@@ -13,9 +13,9 @@ dotenv.config();
 let aiClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI {
   if (!aiClient) {
-    const key = process.env.GOD_API_KEY;
+    const key = process.env.VITE_GEMINI_API_KEY || process.env.GOD_API_KEY;
     if (!key) {
-      throw new Error("GOD_API_KEY environment variable is not defined on the server side.");
+      throw new Error("VITE_GEMINI_API_KEY environment variable is not defined on the server side.");
     }
     aiClient = new GoogleGenAI({
       apiKey: key,
@@ -42,7 +42,7 @@ async function callGeminiWithRetryAndFailover(
   const isImageModel = params.model.indexOf("image") !== -1;
   const modelsToTry = isImageModel 
     ? [params.model] 
-    : [params.model, "gemini-3.1-flash-lite"];
+    : [params.model, "gemini-2.5-flash", "gemini-1.5-flash", "gemini-3.1-flash-lite"];
 
   for (const modelCandidate of modelsToTry) {
     let currentRetries = retries;
@@ -370,7 +370,7 @@ async function startServer() {
   app.post("/api/gemini/answer", async (req, res) => {
     const { prompt, imageBase64, studentContext, language } = req.body;
     try {
-      if (!process.env.GOD_API_KEY) {
+      if (!process.env.VITE_GEMINI_API_KEY && !process.env.GOD_API_KEY) {
         throw new Error("API key is missing.");
       }
       const parts: any[] = [{ text: prompt }];
@@ -431,7 +431,7 @@ async function startServer() {
 
   app.post("/api/gemini/diagram", async (req, res) => {
     try {
-      if (!process.env.GOD_API_KEY) {
+      if (!process.env.VITE_GEMINI_API_KEY && !process.env.GOD_API_KEY) {
         throw new Error("API key is missing.");
       }
       const { prompt } = req.body;
@@ -466,7 +466,7 @@ async function startServer() {
     const { subject, studentContext, language } = req.body;
     const quizLang = language || "English";
     try {
-      if (!process.env.GOD_API_KEY) {
+      if (!process.env.VITE_GEMINI_API_KEY && !process.env.GOD_API_KEY) {
         throw new Error("API key is missing.");
       }
       const classText = studentContext ? `for class/grade ${studentContext.className}` : "";

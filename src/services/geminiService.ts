@@ -5,7 +5,7 @@ import { FALLBACK_QUIZZES, getFallbackAnswer } from "./fallbackData";
 let clientAiInstance: any = null;
 function getClientAiInstance() {
   if (!clientAiInstance) {
-    const apiKey = (import.meta as any).env.GOD_API_KEY || "";
+    const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || (import.meta as any).env.GOD_API_KEY || "";
     if (!apiKey) {
       console.warn("Client Gemini API key missing, will use fallback data.");
     }
@@ -28,13 +28,13 @@ async function callGeminiWithRetryAndFailover(
     contents: any;
     config?: any;
   },
-  retries = 5,
-  delay = 2000
+  retries = 3,
+  delay = 1000
 ): Promise<any> {
   const isImageModel = params.model.indexOf("image") !== -1;
   const modelsToTry = isImageModel 
     ? [params.model] 
-    : [params.model, "gemini-3.1-flash-lite"];
+    : [params.model, "gemini-2.5-flash", "gemini-1.5-flash", "gemini-3.1-flash-lite"];
 
   for (const modelCandidate of modelsToTry) {
     let currentRetries = retries;
