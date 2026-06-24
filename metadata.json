@@ -1,0 +1,11 @@
+{
+  "name": "Remix: StudyBuddy AI",
+  "description": "A modern AI-powered study assistant for students to solve homework, take notes, and plan studies.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
