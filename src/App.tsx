@@ -35,13 +35,13 @@ import {
   Music
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { getStudyAnswer, generateQuiz, generateStudyDiagram } from './services/geminiService';
+import { getStudyAnswer, generateQuiz, generateStudyDiagram, generateFlashcards } from './services/geminiService';
 import { LANGUAGES, translate } from './services/translations';
 import { ProgressChart } from './components/ProgressChart';
 import { StudyTimer } from './components/StudyTimer';
 import { HomeworkSolver } from './components/HomeworkSolver';
 import type { AppLanguage } from './services/translations';
-import type { Note, ScheduleItem, Progress, ChatMessage, Subject, User as UserType, Group, GroupMessage, GroupNote } from './types';
+import type { Note, ScheduleItem, Progress, ChatMessage, Subject, User as UserType, Group, GroupMessage, GroupNote, Flashcard } from './types';
 import { 
   auth, 
   db,
@@ -76,7 +76,10 @@ import {
   subscribeToGroupMessages, 
   sendGroupMessage, 
   subscribeToGroupNotes, 
-  saveGroupNote 
+  saveGroupNote,
+  getFlashcards,
+  saveFlashcard,
+  deleteFlashcard
 } from './services/firebaseDb';
 
 
@@ -450,7 +453,7 @@ const DEFAULT_STREAK_DAYS: StreakDayType[] = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home'); 
-  const [notebookTab, setNotebookTab] = useState<'notes' | 'planner'>('notes');
+  const [notebookTab, setNotebookTab] = useState<'notes' | 'planner' | 'flashcards'>('notes');
   const [waveToast, setWaveToast] = useState<{ name: string; response: string; points: number } | null>(null);
 
   // Retro Audio effects
@@ -536,6 +539,7 @@ export default function App() {
   const [otpSent, setOtpSent] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [leaderboard, setLeaderboard] = useState<{ name: string; points: number; level: number }[]>([]);
   const [buddies, setBuddies] = useState<any[]>([]);
 
@@ -587,10 +591,31 @@ export default function App() {
 
   // Core local states
   const [user, setUser] = useState<UserType | null>(null);
+
+  // Sync registration form states with loaded user profile details
+  useEffect(() => {
+    if (user) {
+      setRegName(user.name || '');
+      setRegSchool(user.school || '');
+      setRegClass(user.className || '6');
+      setRegAvatar(user.avatar || '🐼');
+    }
+  }, [user]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [progress, setProgress] = useState<Progress[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+
+  // Flashcards UI session and generator states
+  const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
+  const [isFlashcardSessionActive, setIsFlashcardSessionActive] = useState(false);
+  const [currentFlashcardIndex, setCurrentFlashcardIndex] = useState(0);
+  const [isFlashcardFlipped, setIsFlashcardFlipped] = useState(false);
+  const [sessionFlashcards, setSessionFlashcards] = useState<Flashcard[]>([]);
+  const [selectedSubjectForFlashcard, setSelectedSubjectForFlashcard] = useState<Subject>('Science');
+  const [selectedNoteIdForFlashcard, setSelectedNoteIdForFlashcard] = useState<string | number | 'none'>('none');
+  const [flashcardCountToGenerate, setFlashcardCountToGenerate] = useState(5);
 
   // Chat & interactive history states
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -633,131 +658,88 @@ export default function App() {
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
-  // Auth Observer
+  // Local Profile Loader
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
-      setFirebaseUser(fUser);
-      if (fUser) {
-        try {
-          const profile = await getUserProfile(fUser.uid);
-          if (profile) {
-            setUser(profile);
-            localStorage.setItem('cached_study_user_' + fUser.uid, JSON.stringify(profile));
-            if (profile.pet) {
-              setPet(profile.pet as any);
-            }
-            setShowProfileSetup(false);
-          } else {
-            // Check if there is a cached version
-            const cached = localStorage.getItem('cached_study_user_' + fUser.uid);
-            if (cached) {
-              try {
-                const parsed = JSON.parse(cached);
-                setUser(parsed);
-                if (parsed.pet) {
-                  setPet(parsed.pet as any);
-                }
-                setShowProfileSetup(false);
-              } catch (e) {
-                setUser(null);
-                setShowProfileSetup(true);
-              }
-            } else {
-              setUser(null);
-              setShowProfileSetup(true);
-            }
-          }
-        } catch (e) {
-          console.error("Error checking profile:", e);
-          // Try to load from cache
-          const cached = localStorage.getItem('cached_study_user_' + fUser.uid);
-          if (cached) {
-            try {
-              const parsed = JSON.parse(cached);
-              setUser(parsed);
-              if (parsed.pet) {
-                setPet(parsed.pet as any);
-              }
-              setShowProfileSetup(false);
-            } catch (err) {
-              const tempUser: UserType = {
-                id: fUser.uid,
-                name: fUser.displayName || fUser.email?.split('@')[0] || "Student",
-                school: "Offline Study",
-                className: "10",
-                points: 100,
-                level: 1,
-                avatar: "🐼",
-                badges: [{ id: Date.now(), badge_name: 'Quick Start', icon: '🚀', date_earned: new Date().toLocaleDateString() }]
-              };
-              setUser(tempUser);
-              setShowProfileSetup(false);
-            }
-          } else {
-            // No cache: set a safe temporary/default profile based on email/uid so the app doesn't crash!
-            const tempUser: UserType = {
-              id: fUser.uid,
-              name: fUser.displayName || fUser.email?.split('@')[0] || "Student",
-              school: "Offline Study",
-              className: "10",
-              points: 100,
-              level: 1,
-              avatar: "🐼",
-              badges: [{ id: Date.now(), badge_name: 'Quick Start', icon: '🚀', date_earned: new Date().toLocaleDateString() }]
-            };
-            setUser(tempUser);
-            setShowProfileSetup(false);
-          }
+    const localProfileStr = localStorage.getItem('studybuddy_local_profile');
+    if (localProfileStr) {
+      try {
+        const parsed = JSON.parse(localProfileStr);
+        setUser(parsed);
+        if (parsed.pet) {
+          setPet(parsed.pet as any);
         }
-      } else {
+      } catch (e) {
         setUser(null);
-        setShowProfileSetup(false);
       }
-      setAuthChecking(false);
-    });
-    return () => unsubscribe();
+    } else {
+      setUser(null);
+    }
+    setAuthChecking(false);
   }, []);
 
   // Sync personal database items from Firestore
   useEffect(() => {
-    if (!firebaseUser || !user) return;
+    if (!user) return;
 
     const syncStudentData = async () => {
       try {
-        const userNotes = await getNotes(firebaseUser.uid);
-        setNotes(userNotes);
+        if (firebaseUser) {
+          const userNotes = await getNotes(firebaseUser.uid);
+          setNotes(userNotes);
 
-        const userSchedule = await getSchedule(firebaseUser.uid);
-        setSchedule(userSchedule);
+          const userSchedule = await getSchedule(firebaseUser.uid);
+          setSchedule(userSchedule);
 
-        const userProgress = await getProgress(firebaseUser.uid);
-        setProgress(userProgress);
+          const userProgress = await getProgress(firebaseUser.uid);
+          setProgress(userProgress);
 
-        const allGroups = await getGroups();
-        setGroups(allGroups);
+          const allGroups = await getGroups();
+          setGroups(allGroups);
 
-        const board = await getLeaderboard();
-        setLeaderboard(board);
+          const board = await getLeaderboard();
+          setLeaderboard(board);
+
+          const userFlashcards = await getFlashcards(firebaseUser.uid);
+          setFlashcards(userFlashcards);
+        } else {
+          // Guest local fallback
+          const localNotes = JSON.parse(localStorage.getItem('studybuddy_guest_notes') || '[]');
+          setNotes(localNotes);
+
+          const localSchedule = JSON.parse(localStorage.getItem('studybuddy_guest_schedule') || '[]');
+          setSchedule(localSchedule);
+
+          const localProgress = JSON.parse(localStorage.getItem('studybuddy_guest_progress') || '[]');
+          setProgress(localProgress);
+
+          const localGroups = JSON.parse(localStorage.getItem('studybuddy_guest_groups') || '[]');
+          setGroups(localGroups);
+
+          const localFlashcards = JSON.parse(localStorage.getItem('studybuddy_guest_flashcards') || '[]');
+          setFlashcards(localFlashcards);
+        }
 
         // Populate peer list dynamically from Firestore
         const peerBuddies: any[] = [];
-        try {
-          const otherUsersSnap = await getDocs(query(collection(db, "users"), limit(10)));
-          otherUsersSnap.forEach((docSnap) => {
-            if (docSnap.id !== firebaseUser.uid) {
-              const data = docSnap.data();
-              peerBuddies.push({
-                id: docSnap.id,
-                name: data.name || "Study Companion",
-                subject: data.className ? `Class ${data.className} student` : "General Study",
-                online: Math.random() > 0.3,
-                avatar: data.avatar || "🦊",
-                waveResponse: `Hey ${user.name}! Let's study and complete our daily challenges together! 🚀`
-              });
-            }
-          });
-        } catch (err) {
-          console.error("Error loading peer presence:", err);
+        if (firebaseUser) {
+          try {
+            const otherUsersSnap = await getDocs(query(collection(db, "users"), limit(10)));
+            otherUsersSnap.forEach((docSnap) => {
+              if (docSnap.id !== firebaseUser.uid) {
+                const data = docSnap.data();
+                peerBuddies.push({
+                  id: docSnap.id,
+                  name: data.name || "Study Companion",
+                  subject: data.className ? `Class ${data.className} student` : "General Study",
+                  online: Math.random() > 0.3,
+                  avatar: data.avatar || "🦊",
+                  waveResponse: `Hey ${user.name}! Let's study and complete our daily challenges together! 🚀`
+                });
+              }
+            });
+          } catch (err) {
+            console.error("Error loading peer presence:", err);
+          }
         }
 
         if (peerBuddies.length === 0) {
@@ -781,27 +763,47 @@ export default function App() {
   useEffect(() => {
     if (!activeGroup) return;
 
-    const unsubMessages = subscribeToGroupMessages(activeGroup.id, (msgs) => {
-      setGroupMessages(prev => ({ ...prev, [activeGroup.id]: msgs }));
-    });
+    // Load group messages from local storage
+    const localMsgs = JSON.parse(localStorage.getItem(`studybuddy_group_messages_${activeGroup.id}`) || '[]');
+    // If it's empty, add some cute mock greetings from our online buddies to make it interactive!
+    if (localMsgs.length === 0) {
+      const defaultGreetings: GroupMessage[] = [
+        {
+          id: 'gmsg_init_1',
+          group_id: activeGroup.id,
+          user_id: 'b1',
+          user_name: 'Alice Sharma',
+          text: `Welcome to ${activeGroup.name}! Let's prepare our notes here! 📚`,
+          created_at: new Date(Date.now() - 3600000).toISOString()
+        },
+        {
+          id: 'gmsg_init_2',
+          group_id: activeGroup.id,
+          user_id: 'b2',
+          user_name: 'Bob Verma',
+          text: `Awesome, I'm ready for the study session! 🚀 Let's ask Gemini AI if we need help.`,
+          created_at: new Date(Date.now() - 1800000).toISOString()
+        }
+      ];
+      localStorage.setItem(`studybuddy_group_messages_${activeGroup.id}`, JSON.stringify(defaultGreetings));
+      setGroupMessages(prev => ({ ...prev, [activeGroup.id]: defaultGreetings }));
+    } else {
+      setGroupMessages(prev => ({ ...prev, [activeGroup.id]: localMsgs }));
+    }
 
-    const unsubNotes = subscribeToGroupNotes(activeGroup.id, (notesList) => {
-      setGroupNotes(prev => ({ ...prev, [activeGroup.id]: notesList }));
-    });
+    // Load group notes from local storage
+    const localNotes = JSON.parse(localStorage.getItem(`studybuddy_group_notes_${activeGroup.id}`) || '[]');
+    setGroupNotes(prev => ({ ...prev, [activeGroup.id]: localNotes }));
 
-    return () => {
-      unsubMessages();
-      unsubNotes();
-    };
   }, [activeGroup]);
 
-  // Update cloud user profile when local state updates
+  // Update local user profile when state updates
   useEffect(() => {
-    if (firebaseUser && user) {
-      saveUserProfile({
+    if (user) {
+      localStorage.setItem('studybuddy_local_profile', JSON.stringify({
         ...user,
         pet: pet as any
-      }).catch(err => console.error("Error autosaving profile details:", err));
+      }));
     }
   }, [user, pet]);
 
@@ -823,34 +825,40 @@ export default function App() {
     }
   };
 
-  const handleRegister = async (e: any) => {
-    e.preventDefault();
+  const handleRegister = (e: any) => {
+    if (e) e.preventDefault();
     if (!regName.trim() || !regSchool.trim() || !regClass.trim()) {
       alert("कृपया अपनी सारी जानकारी भरें!\nPlease fill out all dynamic information fields!");
       return;
     }
-    if (!firebaseUser) return;
-
-    const newUser: UserType = {
-      id: firebaseUser.uid,
-      name: regName.trim(),
-      school: regSchool.trim(),
-      className: regClass,
-      points: 100,
-      level: 1,
-      avatar: regAvatar,
-      badges: [{ id: Date.now(), badge_name: 'Quick Start', icon: '🚀', date_earned: new Date().toLocaleDateString() }]
-    };
 
     try {
       setAuthLoading(true);
-      await saveUserProfile(newUser);
+      const userId = 'student_' + Date.now();
+      const newUser: UserType = {
+        id: userId,
+        name: regName.trim(),
+        school: regSchool.trim(),
+        className: regClass,
+        points: 100,
+        level: 1,
+        avatar: regAvatar,
+        badges: [{ id: Date.now(), badge_name: 'Quick Start', icon: '🚀', date_earned: new Date().toLocaleDateString() }],
+        pet: {
+          name: 'Chimpu 🐼',
+          happiness: 85,
+          fullness: 80,
+          accessory: 'none',
+          petCount: 0
+        }
+      };
+
+      localStorage.setItem('studybuddy_local_profile', JSON.stringify(newUser));
       setUser(newUser);
-      localStorage.setItem('cached_study_user_' + firebaseUser.uid, JSON.stringify(newUser));
       setShowProfileSetup(false);
     } catch (err) {
       console.error("Error saving registered profile:", err);
-      alert("Failed to save profile. Please check connection and try again.");
+      alert("Failed to save profile. Please try again.");
     } finally {
       setAuthLoading(false);
     }
@@ -1196,13 +1204,28 @@ export default function App() {
 
   // Action methods
   const handleAddNote = async () => {
-    if (!newNote.title.trim() || !firebaseUser) return;
+    if (!newNote.title.trim()) return;
     try {
-      const generatedId = await saveNote(firebaseUser.uid, {
-        title: newNote.title,
-        content: newNote.content,
-        subject: newNote.subject
-      });
+      let generatedId: string | number = 'local_' + Date.now();
+      if (firebaseUser) {
+        generatedId = await saveNote(firebaseUser.uid, {
+          title: newNote.title,
+          content: newNote.content,
+          subject: newNote.subject
+        });
+      } else {
+        const localNotes = JSON.parse(localStorage.getItem('studybuddy_guest_notes') || '[]');
+        const newLocalNote = {
+          id: generatedId,
+          title: newNote.title,
+          content: newNote.content,
+          subject: newNote.subject,
+          updated_at: new Date().toISOString()
+        };
+        localNotes.unshift(newLocalNote);
+        localStorage.setItem('studybuddy_guest_notes', JSON.stringify(localNotes));
+      }
+
       const noteItem: Note = { 
         id: generatedId, 
         title: newNote.title, 
@@ -1221,9 +1244,14 @@ export default function App() {
   };
 
   const handleDeleteNote = async (id: string | number) => {
-    if (!firebaseUser) return;
     try {
-      await deleteNote(firebaseUser.uid, id);
+      if (firebaseUser) {
+        await deleteNote(firebaseUser.uid, id);
+      } else {
+        const localNotes = JSON.parse(localStorage.getItem('studybuddy_guest_notes') || '[]');
+        const filtered = localNotes.filter((n: any) => n.id !== id);
+        localStorage.setItem('studybuddy_guest_notes', JSON.stringify(filtered));
+      }
       setNotes(prev => prev.filter(n => n.id !== id));
     } catch (err) {
       console.error("Failed to delete note:", err);
@@ -1231,13 +1259,24 @@ export default function App() {
   };
 
   const handleToggleSchedule = async (item: ScheduleItem) => {
-    if (!firebaseUser) return;
     try {
       const updatedCompleted = !item.completed;
-      await saveScheduleItem(firebaseUser.uid, {
-        id: item.id,
-        completed: updatedCompleted
-      });
+      if (firebaseUser) {
+        await saveScheduleItem(firebaseUser.uid, {
+          id: item.id,
+          completed: updatedCompleted
+        });
+      } else {
+        const localSched = JSON.parse(localStorage.getItem('studybuddy_guest_schedule') || '[]');
+        const updated = localSched.map((s: any) => {
+          if (s.id === item.id) {
+            return { ...s, completed: updatedCompleted };
+          }
+          return s;
+        });
+        localStorage.setItem('studybuddy_guest_schedule', JSON.stringify(updated));
+      }
+
       setSchedule(prev => prev.map(s => {
         if (s.id === item.id) {
           if (updatedCompleted) {
@@ -1254,14 +1293,29 @@ export default function App() {
   };
 
   const handleAddSchedule = async () => {
-    if (!newSchedule.task.trim() || !firebaseUser) return;
+    if (!newSchedule.task.trim()) return;
     try {
-      const generatedId = await saveScheduleItem(firebaseUser.uid, {
-        task: newSchedule.task,
-        time: newSchedule.time || '12:00',
-        day: newSchedule.day,
-        completed: false
-      });
+      let generatedId: string | number = 'local_' + Date.now();
+      if (firebaseUser) {
+        generatedId = await saveScheduleItem(firebaseUser.uid, {
+          task: newSchedule.task,
+          time: newSchedule.time || '12:00',
+          day: newSchedule.day,
+          completed: false
+        });
+      } else {
+        const localSched = JSON.parse(localStorage.getItem('studybuddy_guest_schedule') || '[]');
+        const newLocalSchedItem = {
+          id: generatedId,
+          task: newSchedule.task,
+          time: newSchedule.time || '12:00',
+          day: newSchedule.day,
+          completed: false
+        };
+        localSched.push(newLocalSchedItem);
+        localStorage.setItem('studybuddy_guest_schedule', JSON.stringify(localSched));
+      }
+
       const item: ScheduleItem = { 
         id: generatedId, 
         task: newSchedule.task, 
@@ -1279,9 +1333,14 @@ export default function App() {
   };
 
   const handleDeleteSchedule = async (id: string | number) => {
-    if (!firebaseUser) return;
     try {
-      await deleteScheduleItem(firebaseUser.uid, id);
+      if (firebaseUser) {
+        await deleteScheduleItem(firebaseUser.uid, id);
+      } else {
+        const localSched = JSON.parse(localStorage.getItem('studybuddy_guest_schedule') || '[]');
+        const filtered = localSched.filter((s: any) => s.id !== id);
+        localStorage.setItem('studybuddy_guest_schedule', JSON.stringify(filtered));
+      }
       setSchedule(prev => prev.filter(s => s.id !== id));
     } catch (err) {
       console.error("Failed to delete schedule item:", err);
@@ -1323,7 +1382,7 @@ export default function App() {
       const quizRes: Progress = { id: Date.now(), subject: quizSubject!, score: nextScore, total: quizQuestions.length, date: new Date().toISOString() };
       setProgress(prev => [quizRes, ...prev]);
       
-      // Save quiz results to cloud Firestore
+      // Save quiz results to cloud Firestore or guest localStorage
       if (firebaseUser) {
         try {
           await saveProgressEntry(firebaseUser.uid, {
@@ -1335,6 +1394,10 @@ export default function App() {
         } catch (err) {
           console.error("Failed to save progress entry:", err);
         }
+      } else {
+        const localProgress = JSON.parse(localStorage.getItem('studybuddy_guest_progress') || '[]');
+        localProgress.unshift(quizRes);
+        localStorage.setItem('studybuddy_guest_progress', JSON.stringify(localProgress));
       }
       
       awardPoints(nextScore * 10, 'quiz');
@@ -1346,14 +1409,30 @@ export default function App() {
 
   // Group controls
   const handleCreateGroup = async () => {
-    if (!newGroup.name.trim() || !firebaseUser || !user) return;
+    if (!newGroup.name.trim() || !user) return;
     try {
-      const generatedId = await createGroup(newGroup.name, newGroup.description, firebaseUser.uid, user.name);
+      let generatedId: string | number = 'local_group_' + Date.now();
+      if (firebaseUser) {
+        generatedId = await createGroup(newGroup.name, newGroup.description, firebaseUser.uid, user.name);
+      } else {
+        const localGroups = JSON.parse(localStorage.getItem('studybuddy_guest_groups') || '[]');
+        const newLocalGroup = {
+          id: generatedId,
+          name: newGroup.name,
+          description: newGroup.description,
+          created_by: user.id,
+          created_at: new Date().toISOString(),
+          member_count: 1
+        };
+        localGroups.unshift(newLocalGroup);
+        localStorage.setItem('studybuddy_guest_groups', JSON.stringify(localGroups));
+      }
+
       const grp: Group = { 
         id: generatedId, 
         name: newGroup.name, 
         description: newGroup.description, 
-        created_by: firebaseUser.uid, 
+        created_by: firebaseUser ? firebaseUser.uid : user.id, 
         created_at: new Date().toISOString(), 
         member_count: 1 
       };
@@ -1369,38 +1448,247 @@ export default function App() {
   };
 
   const handleSendGroupMessage = async () => {
-    if (!groupChatInput.trim() || !activeGroup || !firebaseUser || !user) return;
+    if (!groupChatInput.trim() || !activeGroup || !user) return;
     try {
-      await sendGroupMessage(activeGroup.id, firebaseUser.uid, user.name, groupChatInput);
+      const authorId = user.id;
+      const newMsg: GroupMessage = {
+        id: 'gmsg_' + Date.now(),
+        group_id: activeGroup.id,
+        user_id: authorId,
+        user_name: user.name,
+        text: groupChatInput.trim(),
+        created_at: new Date().toISOString()
+      };
+
+      const localMsgs = JSON.parse(localStorage.getItem(`studybuddy_group_messages_${activeGroup.id}`) || '[]');
+      localMsgs.push(newMsg);
+      localStorage.setItem(`studybuddy_group_messages_${activeGroup.id}`, JSON.stringify(localMsgs));
+      setGroupMessages(prev => ({ ...prev, [activeGroup.id]: localMsgs }));
       setGroupChatInput('');
+
+      // Play chime
+      playAudioChime('success');
+
+      // AI or buddy response simulation for extra cute engagement!
+      setTimeout(() => {
+        const responses = [
+          "Wow, that's a great point! 🎯 Let's note it down.",
+          "Perfect! I am studying the same chapter right now.",
+          "Got it! Let's solve a practice quiz on this topic soon. 🏆",
+          "Excellent! Thanks for sharing this tip! ✨"
+        ];
+        const randomBuddy = Math.random() > 0.5 
+          ? { id: 'b1', name: 'Alice Sharma' } 
+          : { id: 'b2', name: 'Bob Verma' };
+        const randomText = responses[Math.floor(Math.random() * responses.length)];
+        
+        const buddyMsg: GroupMessage = {
+          id: 'gmsg_' + Date.now() + '_reply',
+          group_id: activeGroup.id,
+          user_id: randomBuddy.id,
+          user_name: randomBuddy.name,
+          text: randomText,
+          created_at: new Date().toISOString()
+        };
+
+        const currentMsgs = JSON.parse(localStorage.getItem(`studybuddy_group_messages_${activeGroup.id}`) || '[]');
+        currentMsgs.push(buddyMsg);
+        localStorage.setItem(`studybuddy_group_messages_${activeGroup.id}`, JSON.stringify(currentMsgs));
+        setGroupMessages(prev => ({ ...prev, [activeGroup.id]: currentMsgs }));
+        playAudioChime('coin');
+      }, 1500);
+
     } catch (err) {
       console.error("Failed to send group message:", err);
     }
   };
 
   const handleCreateGroupNote = async () => {
-    if (!newGroupNote.title.trim() || !activeGroup || !firebaseUser || !user) return;
+    if (!newGroupNote.title.trim() || !activeGroup || !user) return;
     try {
-      const generatedId = await saveGroupNote(activeGroup.id, {
-        title: newGroupNote.title,
-        content: newGroupNote.content
-      }, firebaseUser.uid, user.name);
+      const authorId = user.id;
       const nNote: GroupNote = { 
-        id: generatedId, 
+        id: 'gnote_' + Date.now(), 
         group_id: activeGroup.id, 
-        title: newGroupNote.title, 
-        content: newGroupNote.content, 
-        updated_by: firebaseUser.uid, 
+        title: newGroupNote.title.trim(), 
+        content: newGroupNote.content.trim(), 
+        updated_by: String(authorId), 
         updated_by_name: user.name, 
         updated_at: new Date().toISOString() 
       };
-      const gid = activeGroup.id;
-      setGroupNotes(prev => ({ ...prev, [gid]: [nNote, ...(prev[gid] || [])] }));
+
+      const localNotes = JSON.parse(localStorage.getItem(`studybuddy_group_notes_${activeGroup.id}`) || '[]');
+      localNotes.unshift(nNote);
+      localStorage.setItem(`studybuddy_group_notes_${activeGroup.id}`, JSON.stringify(localNotes));
+      setGroupNotes(prev => ({ ...prev, [activeGroup.id]: localNotes }));
+
       setIsAddingGroupNote(false);
       setNewGroupNote({ title: '', content: '' });
       awardPoints(10);
+      playAudioChime('success');
     } catch (err) {
       console.error("Failed to create group note:", err);
+    }
+  };
+
+  // ---------------- FLASHCARDS CORE ACTIONS ----------------
+
+  const handleGenerateFlashcards = async () => {
+    setIsGeneratingFlashcards(true);
+    try {
+      let noteTitle: string | undefined = undefined;
+      let noteContent: string | undefined = undefined;
+
+      if (selectedNoteIdForFlashcard !== 'none') {
+        const found = notes.find(n => String(n.id) === String(selectedNoteIdForFlashcard));
+        if (found) {
+          noteTitle = found.title;
+          noteContent = found.content;
+        }
+      }
+
+      const generated = await generateFlashcards(
+        selectedSubjectForFlashcard,
+        noteTitle,
+        noteContent,
+        flashcardCountToGenerate
+      );
+
+      const newCards: Flashcard[] = generated.map((c, i) => ({
+        id: 'fc_' + Date.now() + '_' + i + '_' + Math.random().toString(36).substr(2, 5),
+        front: c.front,
+        back: c.back,
+        subject: selectedSubjectForFlashcard,
+        noteId: selectedNoteIdForFlashcard !== 'none' ? selectedNoteIdForFlashcard : undefined,
+        interval: 1,
+        repetition: 0,
+        easeFactor: 2.5,
+        nextReviewDate: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      }));
+
+      if (firebaseUser) {
+        for (const card of newCards) {
+          const dbId = await saveFlashcard(firebaseUser.uid, card);
+          card.id = dbId;
+        }
+      } else {
+        const local = JSON.parse(localStorage.getItem('studybuddy_guest_flashcards') || '[]');
+        const updated = [...newCards, ...local];
+        localStorage.setItem('studybuddy_guest_flashcards', JSON.stringify(updated));
+      }
+
+      setFlashcards(prev => [...newCards, ...prev]);
+      playAudioChime('success');
+      awardPoints(25, 'note');
+      setSelectedNoteIdForFlashcard('none');
+    } catch (err) {
+      console.error("Failed to generate AI flashcards:", err);
+    } finally {
+      setIsGeneratingFlashcards(false);
+    }
+  };
+
+  const handleDeleteFlashcard = async (id: string | number) => {
+    try {
+      if (firebaseUser) {
+        await deleteFlashcard(firebaseUser.uid, id);
+      } else {
+        const local = JSON.parse(localStorage.getItem('studybuddy_guest_flashcards') || '[]');
+        const filtered = local.filter((c: any) => c.id !== id);
+        localStorage.setItem('studybuddy_guest_flashcards', JSON.stringify(filtered));
+      }
+      setFlashcards(prev => prev.filter(c => c.id !== id));
+      playAudioChime('coin');
+    } catch (err) {
+      console.error("Failed to delete flashcard:", err);
+    }
+  };
+
+  const handleStartStudySession = (reviewOnly = false) => {
+    const now = new Date();
+    const targetCards = reviewOnly 
+      ? flashcards.filter(c => new Date(c.nextReviewDate) <= now)
+      : flashcards;
+
+    if (targetCards.length === 0) return;
+    
+    // Shuffle cards for better active recall
+    const shuffled = [...targetCards].sort(() => Math.random() - 0.5);
+    setSessionFlashcards(shuffled);
+    setCurrentFlashcardIndex(0);
+    setIsFlashcardFlipped(false);
+    setIsFlashcardSessionActive(true);
+    playAudioChime('coin');
+  };
+
+  const handleSpacedRepetitionResponse = async (card: Flashcard, quality: 'again' | 'good' | 'easy') => {
+    let nextRepetition = card.repetition;
+    let nextEaseFactor = card.easeFactor;
+    let nextInterval = card.interval;
+
+    if (quality === 'again') {
+      nextRepetition = 0;
+      nextInterval = 1;
+      nextEaseFactor = Math.max(1.3, card.easeFactor - 0.2);
+    } else if (quality === 'good') {
+      nextRepetition = card.repetition + 1;
+      if (nextRepetition === 1) {
+        nextInterval = 1;
+      } else if (nextRepetition === 2) {
+        nextInterval = 4;
+      } else {
+        nextInterval = Math.round(card.interval * card.easeFactor);
+      }
+    } else if (quality === 'easy') {
+      nextRepetition = card.repetition + 1;
+      if (nextRepetition === 1) {
+        nextInterval = 3;
+      } else if (nextRepetition === 2) {
+        nextInterval = 7;
+      } else {
+        nextInterval = Math.round(card.interval * card.easeFactor * 1.5);
+      }
+      nextEaseFactor = Math.min(3.0, card.easeFactor + 0.15);
+    }
+
+    const nextDate = new Date();
+    nextDate.setDate(nextDate.getDate() + nextInterval);
+    const nextReviewDate = nextDate.toISOString();
+
+    const updatedCard: Flashcard = {
+      ...card,
+      repetition: nextRepetition,
+      easeFactor: nextEaseFactor,
+      interval: nextInterval,
+      nextReviewDate
+    };
+
+    try {
+      if (firebaseUser) {
+        await saveFlashcard(firebaseUser.uid, updatedCard);
+      } else {
+        const local = JSON.parse(localStorage.getItem('studybuddy_guest_flashcards') || '[]');
+        const updated = local.map((c: any) => c.id === card.id ? updatedCard : c);
+        localStorage.setItem('studybuddy_guest_flashcards', JSON.stringify(updated));
+      }
+
+      setFlashcards(prev => prev.map(c => c.id === card.id ? updatedCard : c));
+      awardPoints(5);
+      playAudioChime('success');
+
+      // Proceed to next card or wrap up
+      if (currentFlashcardIndex < sessionFlashcards.length - 1) {
+        setIsFlashcardFlipped(false);
+        setCurrentFlashcardIndex(prev => prev + 1);
+      } else {
+        // Complete session
+        setIsFlashcardSessionActive(false);
+        playAudioChime('levelUp');
+        awardPoints(20, 'quiz');
+      }
+    } catch (err) {
+      console.error("Failed to save flashcard review:", err);
     }
   };
 
@@ -1519,303 +1807,7 @@ export default function App() {
             <p className="text-xs font-bold text-slate-500">Checking authorization...</p>
           </div>
         </div>
-      ) : !firebaseUser ? (
-        <div className="w-full max-w-md h-screen md:h-[90vh] bg-slate-50 md:rounded-3xl shadow-2xl flex flex-col overflow-y-auto p-6 relative z-20 border border-slate-800/10 scrollbar-hide">
-          {/* Floating Settings & Language Control (Onboarding) */}
-          <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsTagMode(!isTagMode)}
-              className={`p-2 rounded-full transition outline-none cursor-pointer ${isTagMode ? 'bg-cyan-950 text-cyan-400' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
-              id="tag_mode_toggle"
-            >
-              <Zap className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const audio = document.getElementById('study-audio') as HTMLAudioElement;
-                if (audio) {
-                  if (audio.paused) {
-                    audio.play();
-                  } else {
-                    audio.pause();
-                  }
-                }
-              }}
-              className={`p-2 rounded-full transition outline-none cursor-pointer ${isTagMode ? 'bg-cyan-950 text-cyan-400' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
-              id="audio_toggle"
-            >
-              <Music className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-              className="p-2 rounded-full hover:bg-slate-100 transition outline-none cursor-pointer text-slate-500 bg-white"
-              id="onboarding_lang_btn"
-            >
-              <MoreVertical className="w-4 h-4" />
-            </button>
-            {showLanguageDropdown && (
-              <div className="absolute left-0 top-9 w-40 bg-white border border-slate-200 rounded-2xl shadow-xl py-1.5 z-50 flex flex-col divide-y divide-slate-100 max-h-56 overflow-y-auto animate-in fade-in slide-in-from-top-2" id="onboarding_lang_dropdown">
-                {LANGUAGES.map((lang) => (
-                  <button
-                    key={lang.code}
-                    type="button"
-                    onClick={() => {
-                      setAppLanguage(lang.code);
-                      localStorage.setItem('studybuddy_appLanguage', lang.code);
-                      setShowLanguageDropdown(false);
-                    }}
-                    className={`w-full px-3 py-2 text-left text-[10px] font-black flex items-center space-x-2 cursor-pointer hover:bg-slate-50 ${
-                      appLanguage === lang.code ? 'text-indigo-600 bg-indigo-50/40 font-black' : 'text-slate-650'
-                    }`}
-                  >
-                    <span>{lang.flag}</span>
-                    <span className="truncate">{lang.label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="my-auto space-y-6 py-4">
-            <div className="text-center space-y-2">
-              <div className="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-violet-600 rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-indigo-200">
-                <BookOpen className="w-9 h-9 text-white animate-pulse" />
-              </div>
-              <h2 className="text-3xl font-black text-slate-900 tracking-tight mt-4 font-display">Ascend Study</h2>
-              <p className="text-[10px] text-indigo-600 font-extrabold tracking-widest uppercase font-mono bg-indigo-50 px-3 py-1 rounded-full inline-block">{translate('onboarding_tagline', appLanguage, 'Your Personal AI Study Companion')}</p>
-            </div>
-
-            {/* Quick Recommended Sign-In Banner */}
-            <div className="bg-gradient-to-br from-indigo-50/80 to-violet-50/80 p-4.5 rounded-3xl border border-indigo-100 shadow-xs space-y-3">
-              <div className="flex items-center space-x-2 justify-center">
-                <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-100/50 px-2.5 py-0.5 rounded-full">Recommended</span>
-              </div>
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black flex items-center justify-center space-x-2 cursor-pointer shadow-md shadow-indigo-100 active:scale-95 transition"
-              >
-                <span>🌐</span>
-                <span>Continue with Google</span>
-              </button>
-              <p className="text-[9px] text-slate-500 font-bold text-center leading-relaxed">
-                Google Login is pre-configured and works immediately!
-              </p>
-            </div>
-
-            <div className="relative flex py-1 items-center">
-              <div className="flex-grow border-t border-slate-200/50"></div>
-              <span className="flex-shrink mx-3 text-slate-400 text-[8px] font-black uppercase tracking-widest">or other methods</span>
-              <div className="flex-grow border-t border-slate-200/50"></div>
-            </div>
-
-            {/* Auth mode selector tabs */}
-            <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-100/85 rounded-2xl border border-slate-200/50">
-              {(['login', 'signup', 'phone', 'guest'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setAuthMode(mode)}
-                  className={`py-2 text-[9px] font-black uppercase rounded-xl transition cursor-pointer ${authMode === mode ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/20' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  {mode === 'login' ? 'Login' : mode === 'signup' ? 'Signup' : mode === 'phone' ? 'Phone' : 'Guest'}
-                </button>
-              ))}
-            </div>
-
-            {/* Authenticating Forms */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-150/60 shadow-sm space-y-4">
-              {authLoading ? (
-                <div className="py-8 text-center space-y-3">
-                  <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto" />
-                  <p className="text-xs font-bold text-slate-500">Processing authenticating request...</p>
-                </div>
-              ) : authMode === 'login' ? (
-                <form onSubmit={handleEmailSignIn} className="space-y-4">
-                  <h3 className="font-bold text-slate-800 text-xs border-b border-slate-100 pb-2.5 flex items-center">
-                    🔒 Email Account Sign In
-                  </h3>
-                  <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/50 p-2.5 rounded-2xl font-semibold flex items-start space-x-1.5 leading-relaxed">
-                    <span>⚠️</span>
-                    <span>Requires <b>Email/Password</b> sign-in enabled in your Firebase console. Use the recommended Google Login for instant access!</span>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Email Address</label>
-                    <input
-                      type="email"
-                      required
-                      value={authEmail}
-                      onChange={(e) => setAuthEmail(e.target.value)}
-                      placeholder="e.g. rohan@gmail.com"
-                      className="w-full p-3 bg-slate-50/50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:border-indigo-500 outline-none transition"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Password</label>
-                    <input
-                      type="password"
-                      required
-                      value={authPassword}
-                      onChange={(e) => setAuthPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full p-3 bg-slate-50/50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:border-indigo-500 outline-none transition"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase shadow-md shadow-indigo-100 transition active:scale-95 cursor-pointer"
-                  >
-                    Login
-                  </button>
-                  <div className="relative flex py-1 items-center">
-                    <div className="flex-grow border-t border-slate-200"></div>
-                    <span className="flex-shrink mx-3 text-slate-400 text-[9px] font-bold uppercase tracking-wider">or</span>
-                    <div className="flex-grow border-t border-slate-200"></div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleGoogleSignIn}
-                    className="w-full py-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-2xl text-xs font-black flex items-center justify-center space-x-2 cursor-pointer active:scale-95 transition"
-                  >
-                    <span>🌐</span>
-                    <span>Sign In with Google</span>
-                  </button>
-                </form>
-              ) : authMode === 'signup' ? (
-                <form onSubmit={handleEmailSignUp} className="space-y-4">
-                  <h3 className="font-bold text-slate-800 text-xs border-b border-slate-100 pb-2.5 flex items-center">
-                    ✨ Create New Email Account
-                  </h3>
-                  <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/50 p-2.5 rounded-2xl font-semibold flex items-start space-x-1.5 leading-relaxed">
-                    <span>⚠️</span>
-                    <span>Requires <b>Email/Password</b> sign-in enabled in your Firebase console. Use the recommended Google Login for instant access!</span>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Email Address</label>
-                    <input
-                      type="email"
-                      required
-                      value={authEmail}
-                      onChange={(e) => setAuthEmail(e.target.value)}
-                      placeholder="e.g. rohan@gmail.com"
-                      className="w-full p-3 bg-slate-50/50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:border-indigo-500 outline-none transition"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Password</label>
-                    <input
-                      type="password"
-                      required
-                      value={authPassword}
-                      onChange={(e) => setAuthPassword(e.target.value)}
-                      placeholder="Min 6 characters"
-                      className="w-full p-3 bg-slate-50/50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:border-indigo-500 outline-none transition"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-2xl text-xs font-black uppercase shadow-md transition active:scale-95 cursor-pointer"
-                  >
-                    Sign Up
-                  </button>
-                  <div className="relative flex py-1 items-center">
-                    <div className="flex-grow border-t border-slate-200"></div>
-                    <span className="flex-shrink mx-3 text-slate-400 text-[9px] font-bold uppercase tracking-wider">or</span>
-                    <div className="flex-grow border-t border-slate-200"></div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleGoogleSignIn}
-                    className="w-full py-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-2xl text-xs font-black flex items-center justify-center space-x-2 cursor-pointer active:scale-95 transition"
-                  >
-                    <span>🌐</span>
-                    <span>Sign Up with Google</span>
-                  </button>
-                </form>
-              ) : authMode === 'phone' ? (
-                <div className="space-y-4">
-                  <h3 className="font-bold text-slate-800 text-xs border-b border-slate-100 pb-2.5 flex items-center">
-                    📱 Phone Number Sign In
-                  </h3>
-                  <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/50 p-2.5 rounded-2xl font-semibold flex items-start space-x-1.5 leading-relaxed">
-                    <span>⚠️</span>
-                    <span>Requires <b>Anonymous</b> authentication enabled in your Firebase console. Use the recommended Google Login for instant access!</span>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Phone Number</label>
-                    <div className="flex space-x-2">
-                      <span className="bg-slate-100 border border-slate-200 px-3 py-3 rounded-2xl text-xs font-semibold text-slate-600 flex items-center">+91</span>
-                      <input
-                        type="tel"
-                        required
-                        value={authPhone}
-                        onChange={(e) => setAuthPhone(e.target.value)}
-                        placeholder="9876543210"
-                        className="flex-1 p-3 bg-slate-50/50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:border-indigo-500 outline-none transition"
-                      />
-                    </div>
-                  </div>
-
-                  {otpSent && (
-                    <form onSubmit={handleVerifyOtp} className="space-y-4 animate-in fade-in duration-300">
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Enter OTP Code</label>
-                        <input
-                          type="text"
-                          required
-                          value={authOtp}
-                          onChange={(e) => setAuthOtp(e.target.value)}
-                          placeholder="e.g. 123456"
-                          className="w-full p-3 bg-slate-50/50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:border-indigo-500 outline-none transition"
-                        />
-                      </div>
-                      <button
-                        type="submit"
-                        className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase transition active:scale-95 cursor-pointer"
-                      >
-                        Verify & Login
-                      </button>
-                    </form>
-                  )}
-
-                  {!otpSent && (
-                    <button
-                      type="button"
-                      onClick={handleSendOtp}
-                      className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase transition active:scale-95 cursor-pointer"
-                    >
-                      Send Verification Code
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4 text-center">
-                  <h3 className="font-bold text-slate-800 text-xs border-b border-slate-100 pb-2.5 text-left">
-                    🐼 Play Instantly as Guest
-                  </h3>
-                  <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/50 p-2.5 rounded-2xl font-semibold flex items-start space-x-1.5 leading-relaxed text-left">
-                    <span>⚠️</span>
-                    <span>Requires <b>Anonymous</b> authentication enabled in your Firebase console. Use the recommended Google Login for instant access!</span>
-                  </div>
-                  <p className="text-xs text-slate-600 text-left leading-relaxed font-semibold">
-                    You can try Ascend Study as a guest student! No signup or password is required. You can customize your avatar and play study games instantly.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleGuestLogin}
-                    className="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md shadow-emerald-100 transition active:scale-95 cursor-pointer mt-2"
-                  >
-                    Play as Guest 🐼
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : showProfileSetup ? (
+      ) : !user ? (
         <div className="w-full max-w-md h-screen md:h-[90vh] bg-slate-50 md:rounded-3xl shadow-2xl flex flex-col overflow-y-auto p-6 relative z-20 border border-slate-800/10 scrollbar-hide">
           {/* Floating Settings & Language Control (Profile Setup) */}
           <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
@@ -1826,14 +1818,6 @@ export default function App() {
               id="tag_mode_toggle_profile"
             >
               <Zap className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => signOut(auth)}
-              className="p-2.5 rounded-2xl hover:bg-slate-100 transition outline-none cursor-pointer text-red-500 bg-white border border-slate-200 text-xs font-black"
-              title="Sign Out"
-            >
-              Sign Out
             </button>
           </div>
 
@@ -2051,17 +2035,11 @@ export default function App() {
                           </span>
                         </div>
                         <button 
-                          onClick={() => {
-                            if (confirm("क्या आप सच में नया छात्र प्रोफाइल सेट करना चाहते हैं?\nDo you really want to set up another student profile?")) {
-                              localStorage.removeItem(KEYS.USER);
-                              setUser(null);
-                              setActiveTab('home');
-                            }
-                          }}
-                          className="text-[9px] text-slate-400 hover:text-red-500 font-extrabold hover:underline select-none transition"
+                          onClick={() => setShowProfileModal(true)}
+                          className="text-[9px] text-slate-400 hover:text-indigo-600 font-extrabold hover:underline select-none transition"
                           id="btn_switch_profile"
                         >
-                          Switch Profile
+                          Switch Profile / Login 🌐
                         </button>
                         {deferredPrompt && (
                           <button
@@ -2969,19 +2947,20 @@ export default function App() {
                 </div>
               )}
 
-              {/* CONSOLIDATED STUDY NOTEBOOK TAB (NOTES & PLANNER TOGETHER IN ITS PLACE) */}
+              {/* CONSOLIDATED STUDY NOTEBOOK TAB (NOTES, PLANNER, AND AI FLASHCARDS TOGETHER) */}
               {activeTab === 'notebook' && (
                 <div className="flex-1 flex flex-col overflow-hidden p-5">
                   <header className="flex justify-between items-center shrink-0 mb-4">
                     <div>
                       <h2 className="text-lg font-bold text-slate-800">Study Notebook</h2>
-                      <p className="text-xs text-slate-400">Class notes & study agenda</p>
+                      <p className="text-xs text-slate-400">Class notes, study agenda, & spaced repetition</p>
                     </div>
-                    {notebookTab === 'notes' ? (
+                    {notebookTab === 'notes' && (
                       <button onClick={() => setIsAddingNote(true)} className="p-2 bg-indigo-600 text-white rounded-full shadow">
                         <Plus className="w-5 h-5" />
                       </button>
-                    ) : (
+                    )}
+                    {notebookTab === 'planner' && (
                       <button onClick={() => setIsAddingSchedule(true)} className="p-2 bg-indigo-600 text-white rounded-full shadow">
                         <Plus className="w-5 h-5" />
                       </button>
@@ -2989,24 +2968,36 @@ export default function App() {
                   </header>
 
                   {/* Sub-tab Switcher Header Controls */}
-                  <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-2xl mb-4 shrink-0">
+                  <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1.5 rounded-2xl mb-4 shrink-0">
                     <button 
-                      onClick={() => setNotebookTab('notes')} 
-                      className={`py-2 text-xs font-bold rounded-xl transition ${notebookTab === 'notes' ? 'bg-white text-indigo-600 shadow' : 'text-slate-500 hover:text-slate-700'}`}
+                      onClick={() => {
+                        setNotebookTab('notes');
+                        setIsFlashcardSessionActive(false);
+                      }} 
+                      className={`py-2 text-[10px] sm:text-xs font-black rounded-xl transition ${notebookTab === 'notes' ? 'bg-white text-indigo-600 shadow' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                       Sticky Notes
                     </button>
                     <button 
-                      onClick={() => setNotebookTab('planner')} 
-                      className={`py-2 text-xs font-bold rounded-xl transition ${notebookTab === 'planner' ? 'bg-white text-indigo-600 shadow' : 'text-slate-500 hover:text-slate-700'}`}
+                      onClick={() => {
+                        setNotebookTab('planner');
+                        setIsFlashcardSessionActive(false);
+                      }} 
+                      className={`py-2 text-[10px] sm:text-xs font-black rounded-xl transition ${notebookTab === 'planner' ? 'bg-white text-indigo-600 shadow' : 'text-slate-500 hover:text-slate-700'}`}
                     >
-                      Dailies & Planner
+                      Dailies
+                    </button>
+                    <button 
+                      onClick={() => setNotebookTab('flashcards')} 
+                      className={`py-2 text-[10px] sm:text-xs font-black rounded-xl transition ${notebookTab === 'flashcards' ? 'bg-white text-indigo-600 shadow' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      AI Flashcards
                     </button>
                   </div>
 
                   {/* Scrollable workspace core */}
                   <div className="flex-1 overflow-y-auto scrollbar-hide pr-1" id="notebook_content">
-                    {notebookTab === 'notes' ? (
+                    {notebookTab === 'notes' && (
                       <div className="space-y-4 pt-1 pb-4">
                         {notes.map((note, idx) => {
                           const palettes = [
@@ -3038,9 +3029,11 @@ export default function App() {
                             </div>
                           );
                         })}
-                        {notes.length === 0 && <p className="text-center text-xs text-slate-400 py-10 italic">Create some study cards!</p>}
+                        {notes.length === 0 && <p className="text-center text-xs text-slate-400 py-10 italic">Create some study notes!</p>}
                       </div>
-                    ) : (
+                    )}
+
+                    {notebookTab === 'planner' && (
                       <div className="space-y-3">
                         {schedule.map(item => (
                           <div key={item.id} className="p-3.5 bg-white rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
@@ -3057,6 +3050,275 @@ export default function App() {
                           </div>
                         ))}
                         {schedule.length === 0 && <p className="text-center text-xs text-slate-400 py-10 italic">Schedule assignments today.</p>}
+                      </div>
+                    )}
+
+                    {notebookTab === 'flashcards' && (
+                      <div>
+                        {isFlashcardSessionActive ? (
+                          /* ACTIVE FLASHCARD STUDY SESSION */
+                          <div className="space-y-4 pt-1 pb-4">
+                            <div className="flex justify-between items-center bg-slate-50 border border-slate-100 p-3 rounded-2xl">
+                              <button 
+                                onClick={() => setIsFlashcardSessionActive(false)} 
+                                className="flex items-center space-x-1.5 text-slate-500 hover:text-slate-800 text-[10px] font-black uppercase tracking-wider"
+                              >
+                                <ArrowLeft className="w-3.5 h-3.5" />
+                                <span>Exit</span>
+                              </button>
+                              <span className="text-[10px] font-black text-indigo-600 uppercase tracking-wider bg-indigo-50 px-2.5 py-1 rounded-xl">
+                                Card {currentFlashcardIndex + 1} of {sessionFlashcards.length}
+                              </span>
+                            </div>
+
+                            {/* Session Progress Bar */}
+                            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                              <div 
+                                className="bg-indigo-600 h-full transition-all duration-300" 
+                                style={{ width: `${Math.round(((currentFlashcardIndex) / sessionFlashcards.length) * 100)}%` }}
+                              ></div>
+                            </div>
+
+                            {/* Flipping Container */}
+                            <div 
+                              onClick={() => setIsFlashcardFlipped(!isFlashcardFlipped)} 
+                              className={`relative w-full h-56 cursor-pointer transition-all duration-500 [transform-style:preserve-3d] ${isFlashcardFlipped ? '[transform:rotateY(180deg)]' : ''} mb-6`}
+                            >
+                              {/* Front Side */}
+                              <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-indigo-50/70 to-indigo-100/60 rounded-3xl border border-indigo-200/50 shadow-md flex flex-col justify-between p-6 [backface-visibility:hidden]">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[9px] uppercase tracking-wider font-black px-2.5 py-1 bg-indigo-200/50 text-indigo-800 rounded-full">
+                                    📌 {sessionFlashcards[currentFlashcardIndex].subject}
+                                  </span>
+                                  <span className="text-[9px] font-mono text-indigo-600 font-bold uppercase tracking-wider">Front Side</span>
+                                </div>
+                                <div className="flex-1 flex items-center justify-center text-center py-2">
+                                  <p className="text-sm font-extrabold text-slate-800 leading-relaxed font-sans px-2">
+                                    {sessionFlashcards[currentFlashcardIndex].front}
+                                  </p>
+                                </div>
+                                <div className="text-center text-[9px] text-indigo-500 font-bold animate-pulse uppercase tracking-wider">
+                                  Tap card to flip & see answer
+                                </div>
+                              </div>
+
+                              {/* Back Side */}
+                              <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-emerald-50/70 to-emerald-100/60 rounded-3xl border border-emerald-200/50 shadow-md flex flex-col justify-between p-6 [backface-visibility:hidden] [transform:rotateY(180deg)]">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[9px] uppercase tracking-wider font-black px-2.5 py-1 bg-emerald-200/50 text-emerald-800 rounded-full">
+                                    📌 {sessionFlashcards[currentFlashcardIndex].subject}
+                                  </span>
+                                  <span className="text-[9px] font-mono text-emerald-600 font-bold uppercase tracking-wider">Back Side</span>
+                                </div>
+                                <div className="flex-1 flex items-center justify-center text-center overflow-y-auto py-2">
+                                  <p className="text-xs font-semibold text-slate-700 leading-relaxed font-sans px-2 whitespace-pre-wrap">
+                                    {sessionFlashcards[currentFlashcardIndex].back}
+                                  </p>
+                                </div>
+                                <div className="text-center text-[9px] text-emerald-600 font-bold uppercase tracking-wider">
+                                  Tap to flip back to front
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Answer Rating Panels */}
+                            {!isFlashcardFlipped ? (
+                              <button 
+                                onClick={() => setIsFlashcardFlipped(true)}
+                                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-2xl text-xs font-black shadow-lg shadow-indigo-150 transition cursor-pointer"
+                              >
+                                Reveal Answer
+                              </button>
+                            ) : (
+                              <div className="space-y-3 pt-1">
+                                <p className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Rate how well you recalled this:</p>
+                                <div className="grid grid-cols-3 gap-2">
+                                  <button 
+                                    onClick={() => handleSpacedRepetitionResponse(sessionFlashcards[currentFlashcardIndex], 'again')}
+                                    className="flex flex-col items-center justify-center p-3 bg-red-50 hover:bg-red-100/80 active:scale-95 border border-red-100 text-red-700 rounded-2xl text-[10px] font-black transition cursor-pointer"
+                                  >
+                                    <span className="text-lg">🔴</span>
+                                    <span className="mt-1 font-extrabold text-[10px]">Again</span>
+                                    <span className="text-[8px] font-medium text-red-500 mt-0.5">Soon</span>
+                                  </button>
+                                  <button 
+                                    onClick={() => handleSpacedRepetitionResponse(sessionFlashcards[currentFlashcardIndex], 'good')}
+                                    className="flex flex-col items-center justify-center p-3 bg-amber-50 hover:bg-amber-100/80 active:scale-95 border border-amber-100 text-amber-700 rounded-2xl text-[10px] font-black transition cursor-pointer"
+                                  >
+                                    <span className="text-lg">🟡</span>
+                                    <span className="mt-1 font-extrabold text-[10px]">Good</span>
+                                    <span className="text-[8px] font-medium text-amber-500 mt-0.5">Spaced Rec</span>
+                                  </button>
+                                  <button 
+                                    onClick={() => handleSpacedRepetitionResponse(sessionFlashcards[currentFlashcardIndex], 'easy')}
+                                    className="flex flex-col items-center justify-center p-3 bg-emerald-50 hover:bg-emerald-100/80 active:scale-95 border border-emerald-100 text-emerald-700 rounded-2xl text-[10px] font-black transition cursor-pointer"
+                                  >
+                                    <span className="text-lg">🟢</span>
+                                    <span className="mt-1 font-extrabold text-[10px]">Easy</span>
+                                    <span className="text-[8px] font-medium text-emerald-500 mt-0.5">Mastered</span>
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          /* MAIN DASHBOARD DECK VIEW */
+                          <div className="space-y-5 pt-1 pb-4">
+                            {/* Statistics Bento row */}
+                            <div className="grid grid-cols-2 gap-3 shrink-0">
+                              <div className="p-4 bg-gradient-to-br from-indigo-50/50 to-indigo-100/30 border border-indigo-100/60 rounded-3xl">
+                                <span className="text-[9px] uppercase font-black text-indigo-500 tracking-wider">Total Cards</span>
+                                <h4 className="text-xl font-black text-slate-800 mt-0.5">{flashcards.length}</h4>
+                              </div>
+                              <div className="p-4 bg-gradient-to-br from-rose-50/50 to-rose-100/30 border border-rose-100/60 rounded-3xl">
+                                <span className="text-[9px] uppercase font-black text-rose-500 tracking-wider">Due For Review</span>
+                                <h4 className="text-xl font-black text-slate-800 mt-0.5">
+                                  {flashcards.filter(c => new Date(c.nextReviewDate) <= new Date()).length}
+                                </h4>
+                              </div>
+                            </div>
+
+                            {/* Study buttons */}
+                            {flashcards.length > 0 && (
+                              <div className="grid grid-cols-1 gap-2 shrink-0">
+                                {flashcards.filter(c => new Date(c.nextReviewDate) <= new Date()).length > 0 && (
+                                  <button 
+                                    onClick={() => handleStartStudySession(true)}
+                                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-2xl text-xs font-black shadow-md shadow-indigo-150 flex items-center justify-center space-x-2 transition cursor-pointer"
+                                  >
+                                    <Sparkles className="w-4 h-4" />
+                                    <span>Review Due Cards ({flashcards.filter(c => new Date(c.nextReviewDate) <= new Date()).length})</span>
+                                  </button>
+                                )}
+                                <button 
+                                  onClick={() => handleStartStudySession(false)}
+                                  className="w-full py-3 bg-slate-800 hover:bg-slate-900 active:scale-95 text-white rounded-2xl text-xs font-black shadow flex items-center justify-center space-x-2 transition cursor-pointer"
+                                >
+                                  <span>Study All Cards ({flashcards.length})</span>
+                                </button>
+                              </div>
+                            )}
+
+                            {/* AI generator block */}
+                            <div className="p-5 bg-gradient-to-r from-slate-50 to-indigo-50/30 border border-slate-150 rounded-3xl shrink-0">
+                              <div className="flex items-center space-x-2 mb-3">
+                                <Sparkles className="w-4 h-4 text-indigo-500" />
+                                <h3 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">AI Flashcard Generator</h3>
+                              </div>
+
+                              <div className="space-y-3">
+                                <div>
+                                  <label className="block text-[8px] uppercase font-black text-slate-400 tracking-wider mb-1">Target Subject</label>
+                                  <select 
+                                    value={selectedSubjectForFlashcard}
+                                    onChange={(e) => setSelectedSubjectForFlashcard(e.target.value as Subject)}
+                                    className="w-full p-2.5 bg-white text-xs font-bold text-slate-700 border border-slate-200/80 rounded-xl outline-none"
+                                  >
+                                    {SUBJECTS.map(subj => (
+                                      <option key={subj} value={subj}>{subj}</option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[8px] uppercase font-black text-slate-400 tracking-wider mb-1">Source Note (Optional)</label>
+                                  <select 
+                                    value={selectedNoteIdForFlashcard}
+                                    onChange={(e) => setSelectedNoteIdForFlashcard(e.target.value)}
+                                    className="w-full p-2.5 bg-white text-xs font-bold text-slate-700 border border-slate-200/80 rounded-xl outline-none"
+                                  >
+                                    <option value="none">✨ General Subject Concepts</option>
+                                    {notes.map(note => (
+                                      <option key={note.id} value={note.id}>📝 {note.title} ({note.subject})</option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[8px] uppercase font-black text-slate-400 tracking-wider mb-1.5">Deck size to generate</label>
+                                  <div className="grid grid-cols-3 gap-1.5">
+                                    {[3, 5, 10].map(size => (
+                                      <button
+                                        key={size}
+                                        type="button"
+                                        onClick={() => setFlashcardCountToGenerate(size)}
+                                        className={`py-1.5 text-xs font-black rounded-xl border transition cursor-pointer ${flashcardCountToGenerate === size ? 'bg-indigo-600 text-white border-indigo-600 shadow' : 'bg-white text-slate-600 border-slate-200/70'}`}
+                                      >
+                                        {size} Cards
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={handleGenerateFlashcards}
+                                  disabled={isGeneratingFlashcards}
+                                  className="w-full py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 active:scale-95 disabled:opacity-50 text-white rounded-2xl text-xs font-black shadow-lg shadow-indigo-100 flex items-center justify-center space-x-2 transition cursor-pointer mt-1"
+                                >
+                                  {isGeneratingFlashcards ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      <span>Gemini creating deck...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Sparkles className="w-4 h-4" />
+                                      <span>Create Flashcards with Gemini</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Deck details / scroll list */}
+                            <div>
+                              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Your Deck ({flashcards.length})</h3>
+                              {flashcards.length === 0 ? (
+                                <div className="p-8 border border-dashed border-slate-200 rounded-3xl text-center">
+                                  <p className="text-xs text-slate-400 italic">No flashcards in your deck yet.</p>
+                                  <p className="text-[10px] text-indigo-500 font-bold mt-1 uppercase tracking-wider">Select a note or subject above to let Gemini build some cards!</p>
+                                </div>
+                              ) : (
+                                <div className="space-y-3 pb-8">
+                                  {flashcards.map(card => {
+                                    const isDue = new Date(card.nextReviewDate) <= new Date();
+                                    return (
+                                      <div key={card.id} className="p-4 bg-white border border-slate-100 rounded-3xl shadow-sm flex flex-col justify-between space-y-3">
+                                        <div className="flex justify-between items-start">
+                                          <span className="text-[9px] uppercase tracking-wider font-black px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-full">
+                                            {card.subject}
+                                          </span>
+                                          <div className="flex items-center space-x-2">
+                                            {isDue ? (
+                                              <span className="text-[9px] uppercase font-black px-2 py-0.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-md">
+                                                🔴 Due
+                                              </span>
+                                            ) : (
+                                              <span className="text-[9px] uppercase font-black px-2 py-0.5 bg-slate-50 text-slate-400 border border-slate-100 rounded-md">
+                                                {Math.max(1, Math.round((new Date(card.nextReviewDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))}d
+                                              </span>
+                                            )}
+                                            <button 
+                                              onClick={() => handleDeleteFlashcard(card.id)}
+                                              className="text-slate-350 hover:text-red-500 p-0.5 cursor-pointer"
+                                            >
+                                              <Trash2 className="w-4 h-4" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <p className="text-xs font-extrabold text-slate-800 leading-normal">{card.front}</p>
+                                          <p className="text-[11px] font-medium text-slate-400 mt-1.5 whitespace-pre-wrap leading-relaxed border-t border-slate-50 pt-2">{card.back}</p>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -3449,6 +3711,156 @@ export default function App() {
                 </div>
 
               </div>
+            </motion.div>
+          )}
+
+          {/* PROFILE & LOGIN MODAL OVERLAY */}
+          {showProfileModal && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end justify-center" 
+              id="profile_login_modal"
+            >
+              <motion.div 
+                initial={{ y: "15%" }} 
+                animate={{ y: 0 }} 
+                exit={{ y: "15%" }} 
+                className="bg-white w-full rounded-t-3xl p-5 space-y-4 shadow-xl border-t border-slate-200 overflow-y-auto max-h-[85vh] scrollbar-hide text-left"
+              >
+                <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                  <div className="flex items-center space-x-2">
+                    <User className="w-4 h-4 text-indigo-600" />
+                    <h3 className="font-bold text-slate-800 text-xs">Account & Profile Settings</h3>
+                  </div>
+                  <button 
+                    onClick={() => setShowProfileModal(false)} 
+                    className="text-slate-400 text-xs font-semibold p-1 bg-slate-100 rounded-full hover:bg-slate-200 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Profile Overview Card */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-150 flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center border border-slate-200 text-2xl shadow-sm">
+                    {user?.avatar || "🐼"}
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-black text-slate-850 text-xs">{user?.name || "Guest Student"}</h4>
+                    <p className="text-[10px] text-slate-500 font-bold">{user?.school || "No School Selected"}</p>
+                    <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md inline-block mt-1">
+                      Class {user?.className || "10"} • {user?.points || 100} XP
+                    </span>
+                  </div>
+                  <span className="text-[8px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full border border-indigo-100">
+                    Offline Saved 💾
+                  </span>
+                </div>
+
+                {/* Edit Profile Form */}
+                <div className="space-y-3 pt-1 border-t border-slate-100 mt-2">
+                  <h4 className="font-extrabold text-slate-700 text-[10px] uppercase tracking-wider">Update Your Profile Details</h4>
+                  
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase">Student Name</label>
+                    <input
+                      type="text"
+                      value={regName}
+                      onChange={(e) => setRegName(e.target.value)}
+                      placeholder="अपना नाम लिखें"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase">School Name</label>
+                    <input
+                      type="text"
+                      value={regSchool}
+                      onChange={(e) => setRegSchool(e.target.value)}
+                      placeholder="Write school name"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase">Student Class</label>
+                    <select
+                      value={regClass}
+                      onChange={(e) => setRegClass(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-100 outline-none"
+                    >
+                      {["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"].map((c) => (
+                        <option key={c} value={c}>{`Class ${c}`}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Avatar Selector */}
+                  <div className="space-y-1.5 pt-1">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase block">Choose Your Avatar</label>
+                    <div className="flex gap-2 justify-start">
+                      {['🐼', '🦁', '🦉', '🦊', '🦄'].map((av) => (
+                        <button
+                          key={av}
+                          type="button"
+                          onClick={() => setRegAvatar(av)}
+                          className={`w-9 h-9 text-lg rounded-xl flex items-center justify-center border transition cursor-pointer ${
+                            regAvatar === av ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-slate-50 border-slate-250'
+                          }`}
+                        >
+                          {av}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    <button
+                      onClick={() => {
+                        if (regName.trim() && regSchool.trim()) {
+                          const updated = {
+                            ...user,
+                            name: regName.trim(),
+                            school: regSchool.trim(),
+                            className: regClass,
+                            avatar: regAvatar
+                          };
+                          setUser(updated as any);
+                          localStorage.setItem('studybuddy_local_profile', JSON.stringify(updated));
+                          setShowProfileModal(false);
+                          alert("Profile updated successfully! 🚀");
+                        } else {
+                          alert("Please fill your Name and School details!");
+                        }
+                      }}
+                      className="py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black transition text-center shadow-md shadow-indigo-100 cursor-pointer"
+                    >
+                      Save Changes 💾
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        if (confirm("Do you really want to reset your local student profile and create a new one?\nYour notes, daily schedule, and other data will remain safe!")) {
+                          localStorage.removeItem('studybuddy_local_profile');
+                          setUser(null);
+                          setRegName('');
+                          setRegSchool('');
+                          setRegClass('6');
+                          setRegAvatar('🐼');
+                          setShowProfileModal(false);
+                          setActiveTab('home');
+                        }
+                      }}
+                      className="py-2.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-150 rounded-xl text-xs font-black transition text-center cursor-pointer"
+                    >
+                      Reset Account 🧹
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>

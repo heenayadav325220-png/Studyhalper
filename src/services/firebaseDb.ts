@@ -14,7 +14,7 @@ import {
   orderBy, 
   limit 
 } from "./firebase";
-import type { User, Note, ScheduleItem, Progress, Group, GroupMessage, GroupNote } from "../types";
+import type { User, Note, ScheduleItem, Progress, Group, GroupMessage, GroupNote, Flashcard } from "../types";
 
 /**
  * Validates connection to Firestore as required by firebase-integration skill.
@@ -296,6 +296,23 @@ export async function isUserInGroup(groupId: string | number, userId: string | n
 }
 
 export function subscribeToGroupMessages(groupId: string | number, callback: (msgs: GroupMessage[]) => void) {
+  if (String(groupId).startsWith("local_")) {
+    const loadLocal = () => {
+      const localMsgs = JSON.parse(localStorage.getItem(`studybuddy_group_messages_${groupId}`) || "[]");
+      callback(localMsgs);
+    };
+    loadLocal();
+    // Watch local storage for messages changes in local mode
+    const handler = (e: StorageEvent) => {
+      if (e.key === `studybuddy_group_messages_${groupId}`) {
+        loadLocal();
+      }
+    };
+    window.addEventListener("storage", handler);
+    return () => {
+      window.removeEventListener("storage", handler);
+    };
+  }
   const colRef = collection(db, "groups", String(groupId), "messages");
   const q = query(colRef, orderBy("created_at", "asc"));
   return onSnapshot(q, (snap) => {
@@ -323,6 +340,23 @@ export async function sendGroupMessage(
   text: string, 
   image?: string | null
 ): Promise<void> {
+  if (String(groupId).startsWith("local_")) {
+    const localMsgs = JSON.parse(localStorage.getItem(`studybuddy_group_messages_${groupId}`) || "[]");
+    const newMsg: GroupMessage = {
+      id: "local_msg_" + Date.now(),
+      group_id: groupId,
+      user_id: String(userId),
+      user_name: userName,
+      text: text,
+      image: image || undefined,
+      created_at: new Date().toISOString()
+    };
+    localMsgs.push(newMsg);
+    localStorage.setItem(`studybuddy_group_messages_${groupId}`, JSON.stringify(localMsgs));
+    // Trigger storage event manually for current tab
+    window.dispatchEvent(new StorageEvent("storage", { key: `studybuddy_group_messages_${groupId}` }));
+    return;
+  }
   const colRef = collection(db, "groups", String(groupId), "messages");
   await addDoc(colRef, {
     user_id: String(userId),
@@ -334,6 +368,22 @@ export async function sendGroupMessage(
 }
 
 export function subscribeToGroupNotes(groupId: string | number, callback: (notes: GroupNote[]) => void) {
+  if (String(groupId).startsWith("local_")) {
+    const loadLocal = () => {
+      const localNotes = JSON.parse(localStorage.getItem(`studybuddy_group_notes_${groupId}`) || "[]");
+      callback(localNotes);
+    };
+    loadLocal();
+    const handler = (e: StorageEvent) => {
+      if (e.key === `studybuddy_group_notes_${groupId}`) {
+        loadLocal();
+      }
+    };
+    window.addEventListener("storage", handler);
+    return () => {
+      window.removeEventListener("storage", handler);
+    };
+  }
   const colRef = collection(db, "groups", String(groupId), "notes");
   const q = query(colRef, orderBy("updated_at", "desc"));
   return onSnapshot(q, (snap) => {
@@ -360,6 +410,30 @@ export async function saveGroupNote(
   userId: string | number, 
   userName: string
 ): Promise<string> {
+  if (String(groupId).startsWith("local_")) {
+    const localNotes = JSON.parse(localStorage.getItem(`studybuddy_group_notes_${groupId}`) || "[]");
+    const payload: GroupNote = {
+      id: note.id ? String(note.id) : "local_gn_" + Date.now(),
+      group_id: groupId,
+      title: note.title || "Untitled Group Note",
+      content: note.content || "",
+      updated_by: String(userId),
+      updated_by_name: userName,
+      updated_at: new Date().toISOString()
+    };
+
+    if (note.id) {
+      const idx = localNotes.findIndex((n: any) => n.id === String(note.id));
+      if (idx !== -1) {
+        localNotes[idx] = payload;
+      }
+    } else {
+      localNotes.unshift(payload);
+    }
+    localStorage.setItem(`studybuddy_group_notes_${groupId}`, JSON.stringify(localNotes));
+    window.dispatchEvent(new StorageEvent("storage", { key: `studybuddy_group_notes_${groupId}` }));
+    return String(payload.id);
+  }
   const colRef = collection(db, "groups", String(groupId), "notes");
   const payload = {
     title: note.title || "Untitled Group Note",
@@ -378,3 +452,65 @@ export async function saveGroupNote(
     return docRef.id;
   }
 }
+
+// ---------------- FLASHCARDS ----------------
+
+export async function getFlashcards(userId: string | number): Promise<Flashcard[]> {
+  try {
+    const colRef = collection(db, "users", String(userId), "flashcards");
+    const snap = await getDocs(colRef);
+    const results: Flashcard[] = [];
+    snap.forEach((docSnap) => {
+      const d = docSnap.data();
+      results.push({
+        id: docSnap.id,
+        front: d.front || "",
+        back: d.back || "",
+        subject: d.subject || "Mathematics",
+        noteId: d.noteId || "",
+        interval: d.interval ?? 1,
+        repetition: d.repetition ?? 0,
+        easeFactor: d.easeFactor ?? 2.5,
+        nextReviewDate: d.nextReviewDate || new Date().toISOString(),
+        created_at: d.created_at || new Date().toISOString()
+      });
+    });
+    return results;
+  } catch (err) {
+    console.error("Error getting flashcards:", err);
+    return [];
+  }
+}
+
+export async function saveFlashcard(
+  userId: string | number, 
+  card: Partial<Flashcard> & { id?: string | number }
+): Promise<string> {
+  const colRef = collection(db, "users", String(userId), "flashcards");
+  const payload = {
+    front: card.front || "",
+    back: card.back || "",
+    subject: card.subject || "Mathematics",
+    noteId: card.noteId || "",
+    interval: card.interval ?? 1,
+    repetition: card.repetition ?? 0,
+    easeFactor: card.easeFactor ?? 2.5,
+    nextReviewDate: card.nextReviewDate || new Date().toISOString(),
+    created_at: card.created_at || new Date().toISOString()
+  };
+
+  if (card.id) {
+    const docRef = doc(db, "users", String(userId), "flashcards", String(card.id));
+    await setDoc(docRef, payload, { merge: true });
+    return String(card.id);
+  } else {
+    const docRef = await addDoc(colRef, payload);
+    return docRef.id;
+  }
+}
+
+export async function deleteFlashcard(userId: string | number, cardId: string | number): Promise<void> {
+  const docRef = doc(db, "users", String(userId), "flashcards", String(cardId));
+  await deleteDoc(docRef);
+}
+

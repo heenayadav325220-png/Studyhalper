@@ -6,6 +6,7 @@ import { Server } from "socket.io";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import { FALLBACK_QUIZZES, getFallbackAnswer } from "./src/services/fallbackData";
+import DatabaseConstructor from "better-sqlite3";
 
 dotenv.config();
 
@@ -14,19 +15,17 @@ const httpServer = createServer(app);
 const io = new Server(httpServer);
 const PORT = 3000;
 
-// Set up database dynamically to prevent native module loading failures on Vercel
+// Set up database
 let db: any;
 if (process.env.VERCEL) {
   console.log("Running on Vercel, bypassing better-sqlite3 and using MockDatabase.");
   db = new MockDatabase();
 } else {
   try {
-    // Use require so better-sqlite3 is loaded at runtime rather than static import time
-    const DatabaseConstructor = require("better-sqlite3");
     db = new DatabaseConstructor("studybuddy.db");
     console.log("Successfully connected to SQLite database (studybuddy.db).");
   } catch (err) {
-    console.warn("better-sqlite3 could not be loaded at module level, falling back to MockDatabase:", err);
+    console.warn("better-sqlite3 could not be loaded, falling back to MockDatabase:", err);
     db = new MockDatabase();
   }
 }
@@ -144,9 +143,10 @@ async function callGeminiWithRetryAndFailover(
   delay = 1000
 ): Promise<any> {
   const isImageModel = params.model.indexOf("image") !== -1;
-  const modelsToTry = isImageModel 
-    ? [params.model] 
-    : [params.model, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash-lite"];
+  const candidates = isImageModel 
+    ? [params.model, "gemini-2.5-flash-image", "gemini-3.1-flash-image"] 
+    : [params.model, "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
+  const modelsToTry = candidates.filter((item, index) => candidates.indexOf(item) === index);
 
   for (const modelCandidate of modelsToTry) {
     let currentRetries = retries;
@@ -198,8 +198,8 @@ const addPoints = (userId: any, points: number) => {
 app.get("/api/gemini/health", async (req, res) => {
   try {
     const ai = getGeminiClient();
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+    const response = await callGeminiWithRetryAndFailover(ai, {
+      model: "gemini-3.5-flash",
       contents: "Test connection: respond with 'OK'",
     });
     if (response && response.text) {
@@ -579,7 +579,7 @@ app.post("/api/gemini/quiz", async (req, res) => {
 
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: instructionText,
       config: {
         responseMimeType: "application/json"
@@ -603,6 +603,75 @@ app.post("/api/gemini/quiz", async (req, res) => {
     const languageKey = (quizLang === "Hindi" ? "Hindi" : "English") as "Hindi" | "English";
     const fallbackSet = FALLBACK_QUIZZES[subject]?.[languageKey] || FALLBACK_QUIZZES[subject]?.["English"] || [];
     res.json(fallbackSet);
+  }
+});
+
+app.post("/api/gemini/flashcard", async (req, res) => {
+  const { subject, noteTitle, noteContent, count = 5 } = req.body;
+  try {
+    const contextText = noteContent 
+      ? `based on this study note titled "${noteTitle || 'Untitled'}" with content: "${noteContent}"`
+      : `for general study of the subject "${subject}"`;
+
+    const instructionText = `You are an expert school tutor. Generate exactly ${count} educational study flashcards ${contextText}.
+Identify key terms, definitions, formulas, or concepts. For each, create a brief, clear, engaging question or term for the "front" and a precise, easy-to-understand answer or explanation for the "back".
+Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`;
+
+    const ai = getGeminiClient();
+    const response = await callGeminiWithRetryAndFailover(ai, {
+      model: "gemini-3.5-flash",
+      contents: instructionText,
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+
+    let flashcardsData = [];
+    try {
+      flashcardsData = JSON.parse(response.text || "[]");
+    } catch (parseErr) {
+      console.error("Flashcards JSON parse error:", parseErr, "Text:", response.text);
+    }
+
+    if (Array.isArray(flashcardsData) && flashcardsData.length > 0) {
+      res.json(flashcardsData);
+    } else {
+      throw new Error("Invalid or empty response format received from upstream API model for flashcards");
+    }
+  } catch (err: any) {
+    console.warn("Gemini flashcard generation error (using fallback):", err.message || err);
+    // Generic high-quality fallbacks
+    const FALLBACK_FLASHCARDS: Record<string, Array<{ front: string; back: string }>> = {
+      "Mathematics": [
+        { front: "What is Pythagoras theorem?", back: "a² + b² = c², where c is the hypotenuse and a, b are the other two sides of a right-angled triangle." },
+        { front: "Formula for area of a circle", back: "Area = πr²" },
+        { front: "What is a prime number?", back: "A number greater than 1 that has only two factors: 1 and itself (e.g. 2, 3, 5, 7)." }
+      ],
+      "Science": [
+        { front: "What is photosynthesis?", back: "The process by which plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar." },
+        { front: "Three states of matter", back: "Solid, Liquid, Gas" },
+        { front: "What is gravity?", back: "The force that pulls objects toward each other, like the earth pulling down on us." }
+      ],
+      "Biology": [
+        { front: "What is the powerhouse of the cell?", back: "Mitochondria - they generate chemical energy for cellular activities." },
+        { front: "Function of red blood cells", back: "To carry oxygen from the lungs to the rest of the body." }
+      ],
+      "Physics": [
+        { front: "Newton's First Law of Motion", back: "An object at rest stays at rest, and an object in motion stays in motion with the same speed and direction unless acted upon by an external force." },
+        { front: "Formula for speed", back: "Speed = Distance / Time" }
+      ],
+      "Chemistry": [
+        { front: "What is the chemical formula for water?", back: "H₂O" },
+        { front: "What is an atom?", back: "The basic unit of a chemical element, consisting of a nucleus of protons and neutrons, with electrons orbiting." }
+      ],
+      "English": [
+        { front: "What is a noun?", back: "A word that represents a person, place, thing, or idea." },
+        { front: "What is a metaphor?", back: "A figure of speech in which a word or phrase is applied to an object or action to which it is not literally applicable, describing it by comparison." }
+      ]
+    };
+    const subjectKey = (subject || "Science") as string;
+    const cards = FALLBACK_FLASHCARDS[subjectKey] || FALLBACK_FLASHCARDS["Science"];
+    res.json(cards);
   }
 });
 
@@ -684,10 +753,10 @@ async function testGeminiOnStartup() {
       console.warn("⚠️  [Startup] No Gemini API key found in server variables (GEMINI_API_KEY / VITE_GEMINI_API_KEY). Fallbacks will be active.");
       return;
     }
-    console.log("🚀 [Startup] Running Gemini API health connection test...");
+    console.log("🚀 [Startup] Running Gemini API health connection test with failover...");
     const ai = getGeminiClient();
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+    const response = await callGeminiWithRetryAndFailover(ai, {
+      model: "gemini-3.5-flash",
       contents: "API connection validation. Return exactly the word 'SUCCESS'.",
     });
     console.log(`✅ [Startup] Gemini API connection test SUCCEEDED: "${response.text?.trim()}"`);

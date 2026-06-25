@@ -59,9 +59,10 @@ async function callClientGeminiWithRetry(
 ): Promise<any> {
   const isImageModel = params.model.indexOf("image") !== -1;
   // Use official stable models for fallbacks
-  const modelsToTry = isImageModel 
-    ? [params.model] 
-    : [params.model, "gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.5-flash-lite"];
+  const candidates = isImageModel 
+    ? [params.model, "gemini-2.5-flash-image", "gemini-3.1-flash-image"] 
+    : [params.model, "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
+  const modelsToTry = candidates.filter((item, index) => candidates.indexOf(item) === index);
 
   for (const modelCandidate of modelsToTry) {
     let currentRetries = retries;
@@ -169,7 +170,7 @@ export async function getStudyAnswer(
       : `${appInfo} ${creatorInfo} You are a helpful study assistant. Explain concepts clearly and provide step-by-step solutions. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. If the user asks for a diagram or visual explanation, describe it clearly or suggest a visual aid. ${langInstruction}`;
 
     const response = await callClientGeminiWithRetry(ai, {
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: { parts },
       config: {
         systemInstruction: systemInstruction,
@@ -285,7 +286,7 @@ export async function generateQuiz(
     const instructionText = `Generate a 5-question multiple choice quiz ${classText} for ${subject} ${langPromptText}. Return only valid JSON in the format: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}]`;
 
     const response = await callClientGeminiWithRetry(ai, {
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: instructionText,
       config: {
         responseMimeType: "application/json",
@@ -308,3 +309,96 @@ export async function generateQuiz(
   const langKey = (language === "Hindi" ? "Hindi" : "English") as "Hindi" | "English";
   return FALLBACK_QUIZZES[subject]?.[langKey] || FALLBACK_QUIZZES[subject]?.["English"] || [];
 }
+
+export async function generateFlashcards(
+  subject: string,
+  noteTitle?: string,
+  noteContent?: string,
+  count: number = 5
+): Promise<Array<{ front: string; back: string }>> {
+  // 1. Try secure backend server route (Primary route)
+  try {
+    const response = await fetch("/api/gemini/flashcard", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ subject, noteTitle, noteContent, count }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (Array.isArray(data) && data.length > 0) {
+        return data;
+      }
+    }
+  } catch (error) {
+    console.warn("Backend Gemini flashcards route unreachable, trying client-side fallback...", error);
+  }
+
+  // 2. Client-side fallback if VITE_GEMINI_API_KEY is available
+  try {
+    const ai = getClientAiInstance();
+    if (ai) {
+      const contextText = noteContent 
+        ? `based on the note titled "${noteTitle || 'Untitled'}" with content: "${noteContent}"`
+        : `for the subject "${subject}"`;
+
+      const instructionText = `Generate exactly ${count} educational study flashcards ${contextText}.
+Identify key terms, definitions, formulas, or concepts. For each, create a brief, clear, engaging question or term for the "front" and a precise, easy-to-understand answer or explanation for the "back".
+Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`;
+
+      const response = await callClientGeminiWithRetry(ai, {
+        model: "gemini-3.5-flash",
+        contents: instructionText,
+        config: {
+          responseMimeType: "application/json",
+        },
+      });
+
+      try {
+        const parsed = JSON.parse(response.text || "[]");
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {
+        console.warn("Client flashcards JSON parsing failed.", e);
+      }
+    }
+  } catch (clientError) {
+    console.warn("Client-side Gemini flashcard generation failed. Using final fallback lists.", clientError);
+  }
+
+  // Final guaranteed fallback
+  const FALLBACK_FLASHCARDS: Record<string, Array<{ front: string; back: string }>> = {
+    "Mathematics": [
+      { front: "What is Pythagoras theorem?", back: "a² + b² = c², where c is the hypotenuse and a, b are the other two sides of a right-angled triangle." },
+      { front: "Formula for area of a circle", back: "Area = πr²" },
+      { front: "What is a prime number?", back: "A number greater than 1 that has only two factors: 1 and itself (e.g. 2, 3, 5, 7)." }
+    ],
+    "Science": [
+      { front: "What is photosynthesis?", back: "The process by which plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar." },
+      { front: "Three states of matter", back: "Solid, Liquid, Gas" },
+      { front: "What is gravity?", back: "The force that pulls objects toward each other, like the earth pulling down on us." }
+    ],
+    "Biology": [
+      { front: "What is the powerhouse of the cell?", back: "Mitochondria - they generate chemical energy for cellular activities." },
+      { front: "Function of red blood cells", back: "To carry oxygen from the lungs to the rest of the body." }
+    ],
+    "Physics": [
+      { front: "Newton's First Law of Motion", back: "An object at rest stays at rest, and an object in motion stays in motion with the same speed and direction unless acted upon by an external force." },
+      { front: "Formula for speed", back: "Speed = Distance / Time" }
+    ],
+    "Chemistry": [
+      { front: "What is the chemical formula for water?", back: "H₂O" },
+      { front: "What is an atom?", back: "The basic unit of a chemical element, consisting of a nucleus of protons and neutrons, with electrons orbiting." }
+    ],
+    "English": [
+      { front: "What is a noun?", back: "A word that represents a person, place, thing, or idea." },
+      { front: "What is a metaphor?", back: "A figure of speech in which a word or phrase is applied to an object or action to which it is not literally applicable, describing it by comparison." }
+    ]
+  };
+
+  return FALLBACK_FLASHCARDS[subject] || FALLBACK_FLASHCARDS["Science"];
+}
+

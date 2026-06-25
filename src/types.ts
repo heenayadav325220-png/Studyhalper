@@ -91,3 +91,18 @@ export interface GroupNote {
   updated_by_name: string;
   updated_at: string;
 }
+
+export interface Flashcard {
+  id: string | number;
+  userId?: string | number;
+  front: string;
+  back: string;
+  subject: Subject;
+  noteId?: string | number;
+  interval: number;
+  repetition: number;
+  easeFactor: number;
+  nextReviewDate: string;
+  created_at: string;
+}
+
