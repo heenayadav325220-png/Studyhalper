@@ -1,13 +1,14 @@
 import { GoogleGenAI } from "@google/genai";
 import { FALLBACK_QUIZZES, getFallbackAnswer } from "./fallbackData";
 
-// Lazy-loaded client-side fallback (specifically for static serverless environments like Vercel)
+// Lazy-loaded client-side fallback
 let clientAiInstance: any = null;
-function getClientAiInstance() {
+function getClientAiInstance(): any {
   if (!clientAiInstance) {
-    const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || (import.meta as any).env.GOD_API_KEY || "";
+    const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || "";
     if (!apiKey) {
-      console.warn("Client Gemini API key missing, will use fallback data.");
+      console.warn("Client VITE_GEMINI_API_KEY is not defined.");
+      return null;
     }
     clientAiInstance = new GoogleGenAI({
       apiKey: apiKey,
@@ -21,7 +22,32 @@ function getClientAiInstance() {
   return clientAiInstance;
 }
 
-async function callGeminiWithRetryAndFailover(
+/**
+ * Handles user-friendly error formatting for Gemini API failures.
+ */
+function handleApiError(error: any): string {
+  const errMsg = error?.message || String(error);
+  const status = error?.status || error?.statusCode || error?.code;
+
+  if (errMsg.includes("API_KEY_INVALID") || errMsg.includes("invalid api key") || status === 400 && errMsg.includes("key")) {
+    return "Invalid API Key: Please verify that your VITE_GEMINI_API_KEY is correct in your settings.";
+  }
+  if (status === 429 || errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("Rate limit")) {
+    return "Rate Limit Exceeded: We are receiving too many requests. Please wait a moment and try again.";
+  }
+  if (status === 503 || errMsg.includes("503") || errMsg.includes("UNAVAILABLE") || errMsg.includes("busy") || errMsg.includes("high demand")) {
+    return "Service Temporarily Unavailable: Google's AI model is currently under high demand. Retrying...";
+  }
+  if (errMsg.includes("timeout") || errMsg.includes("deadline")) {
+    return "Connection Timeout: The request took too long. Please check your internet connection.";
+  }
+  if (errMsg.includes("fetch") || errMsg.includes("NetworkError") || errMsg.includes("Failed to fetch")) {
+    return "Network Error: Could not connect to the API server. Please check your internet connection.";
+  }
+  return `AI Error: ${errMsg}`;
+}
+
+async function callClientGeminiWithRetry(
   ai: any,
   params: {
     model: string;
@@ -32,9 +58,10 @@ async function callGeminiWithRetryAndFailover(
   delay = 1000
 ): Promise<any> {
   const isImageModel = params.model.indexOf("image") !== -1;
+  // Use official stable models for fallbacks
   const modelsToTry = isImageModel 
     ? [params.model] 
-    : [params.model, "gemini-2.5-flash", "gemini-1.5-flash", "gemini-3.1-flash-lite"];
+    : [params.model, "gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.5-flash-lite"];
 
   for (const modelCandidate of modelsToTry) {
     let currentRetries = retries;
@@ -45,27 +72,36 @@ async function callGeminiWithRetryAndFailover(
           ...params,
           model: modelCandidate,
         });
+        if (!result || !result.text && !result.candidates) {
+          throw new Error("Empty response from AI model.");
+        }
         return result;
       } catch (error: any) {
-        const errorMsg = error.message || String(error);
+        const friendlyError = handleApiError(error);
+        console.warn(`[Client Retry] Attempt failed for model ${modelCandidate}. Message: ${friendlyError}`);
+
         const isTransient = error.status === 503 || error.statusCode === 503 || error.code === 503 || 
-                            errorMsg.includes("503") || errorMsg.includes("UNAVAILABLE") || errorMsg.includes("high demand") || errorMsg.includes("temporary");
+                            friendlyError.includes("Temporarily Unavailable") || friendlyError.includes("Connection Timeout");
+        
         if (isTransient && currentRetries > 0) {
-          console.warn(`Gemini client transient error on model ${modelCandidate} (${errorMsg}). Retrying in ${currentDelay}ms... (${currentRetries} retries left)`);
           await new Promise((resolve) => setTimeout(resolve, currentDelay));
           currentRetries--;
           currentDelay *= 2;
         } else {
-          console.warn(`Gemini client call failed for model ${modelCandidate}. Error:`, errorMsg);
-          break;
+          break; // Try next model candidate or throw
         }
       }
     }
   }
-  throw new Error("All candidate Gemini models failed after retries.");
+  throw new Error("All client-side Gemini candidate models failed to generate content.");
 }
 
-export async function getStudyAnswer(prompt: string, imageBase64?: string, studentContext?: { name: string; school: string; className: string }, language: string = "English") {
+export async function getStudyAnswer(
+  prompt: string, 
+  imageBase64?: string, 
+  studentContext?: { name: string; school: string; className: string }, 
+  language: string = "English"
+): Promise<string> {
   // 1. Try secure backend server route (Primary route)
   try {
     const response = await fetch("/api/gemini/answer", {
@@ -78,22 +114,25 @@ export async function getStudyAnswer(prompt: string, imageBase64?: string, stude
 
     if (response.ok) {
       const data = await response.json();
-      return data.text;
+      if (data && data.text) {
+        return data.text;
+      }
+    } else {
+      const errData = await response.json().catch(() => ({}));
+      console.warn("Backend Gemini answer route returned error status:", response.status, errData);
     }
-    console.warn("Backend Gemini answer API failed, executing client-side fallback...");
   } catch (error) {
-    console.warn("Backend Gemini answer API unreachable, executing client-side fallback...", error);
+    console.warn("Backend Gemini answer route unreachable, trying client-side fallback...", error);
   }
 
-  // 2. Client-side fallback
+  // 2. Client-side fallback if VITE_GEMINI_API_KEY is available
   try {
-    const apiKey = (import.meta as any).env.GOD_API_KEY || "";
-    if (!apiKey) {
-      throw new Error("Client Gemini API key missing");
-    }
     const ai = getClientAiInstance();
+    if (!ai) {
+      throw new Error("Client Gemini instance could not be initialized (key missing).");
+    }
+
     const parts: any[] = [{ text: prompt }];
-    
     if (imageBase64) {
       parts.push({
         inlineData: {
@@ -106,8 +145,8 @@ export async function getStudyAnswer(prompt: string, imageBase64?: string, stude
     let langInstruction = `Explain everything in English.`;
     if (language === "Hindi") {
       langInstruction = `You MUST explain entirely in clean, formal Hindi using Devanagari script. All calculations, steps, text, and encouraging words must be in Devangari Hindi.`;
-    } else if (language === "Hinglish") {
-      langInstruction = `You MUST explain concepts in Hinglish (a friendly mix of simple Hindi and English, written in a warm, conversational tone using Latin or Devanagari characters, e.g., 'Hello! Heart humari body ka ek organ hai jo blood pump karta hai. Iske 4 parts hote hai...'). Speak like a helpful study teammate.`;
+    } else if (language === "Hinglish" || language === "Mixed") {
+      langInstruction = `You MUST explain concepts in Hinglish (a friendly mix of simple Hindi and English, written in a warm, conversational tone using Latin characters, e.g., 'Hello! Heart humari body ka ek organ hai jo blood pump karta hai. Iske 4 parts hote hai...'). Speak like a helpful study teammate.`;
     } else if (language === "Marathi") {
       langInstruction = `You MUST explain entirely in clear, friendly Marathi language.`;
     } else if (language === "Tamil") {
@@ -126,8 +165,8 @@ export async function getStudyAnswer(prompt: string, imageBase64?: string, stude
       ? `You are an encouraging, friendly study helper for a child named ${studentContext.name} who studies in ${studentContext.className} at ${studentContext.school}. Explain concepts clearly using step-by-step solutions suitable for class/grade ${studentContext.className}. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. Keep your tone highly personalized, warm, and highly encouraging, referring to their school or name when it fits naturally. ${langInstruction}`
       : `You are a helpful study assistant. Explain concepts clearly and provide step-by-step solutions. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. If the user asks for a diagram or visual explanation, describe it clearly or suggest a visual aid. ${langInstruction}`;
 
-    const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
+    const response = await callClientGeminiWithRetry(ai, {
+      model: "gemini-2.5-flash",
       contents: { parts },
       config: {
         systemInstruction: systemInstruction,
@@ -135,13 +174,13 @@ export async function getStudyAnswer(prompt: string, imageBase64?: string, stude
     });
     
     return response.text;
-  } catch (clientError) {
-    console.warn("Client Gemini answer generation failed. Returning smart fallback answer.", clientError);
+  } catch (clientError: any) {
+    console.warn("Client-side Gemini answer generation failed. Returning smart fallback answer.", clientError?.message || clientError);
     return getFallbackAnswer(prompt, studentContext);
   }
 }
 
-export async function generateStudyDiagram(prompt: string) {
+export async function generateStudyDiagram(prompt: string): Promise<string | null> {
   // 1. Try secure backend server route (Primary route)
   try {
     const response = await fetch("/api/gemini/diagram", {
@@ -156,19 +195,17 @@ export async function generateStudyDiagram(prompt: string) {
       const data = await response.json();
       return data.imageUrl;
     }
-    console.warn("Backend Gemini diagram API failed, executing client-side fallback...");
   } catch (error) {
-    console.warn("Backend Gemini diagram API unreachable, executing client-side fallback...", error);
+    console.warn("Backend Gemini diagram route unreachable, trying client-side fallback...", error);
   }
 
-  // 2. Client-side fallback
+  // 2. Client-side fallback if VITE_GEMINI_API_KEY is available
   try {
-    const apiKey = (import.meta as any).env.GOD_API_KEY || "";
-    if (!apiKey) {
-      throw new Error("Client Gemini API key missing");
-    }
     const ai = getClientAiInstance();
-    const response = await callGeminiWithRetryAndFailover(ai, {
+    if (!ai) {
+      throw new Error("Client Gemini instance could not be initialized for diagram.");
+    }
+    const response = await callClientGeminiWithRetry(ai, {
       model: "gemini-2.5-flash-image",
       contents: [{ text: `Educational diagram or illustration for: ${prompt}. Clear, academic style, labeled if necessary.` }],
       config: {
@@ -191,7 +228,11 @@ export async function generateStudyDiagram(prompt: string) {
   return null;
 }
 
-export async function generateQuiz(subject: string, studentContext?: { name: string; school: string; className: string }, language: string = "English") {
+export async function generateQuiz(
+  subject: string, 
+  studentContext?: { name: string; school: string; className: string }, 
+  language: string = "English"
+): Promise<any[]> {
   // 1. Try secure backend server route (Primary route)
   try {
     const response = await fetch("/api/gemini/quiz", {
@@ -208,23 +249,21 @@ export async function generateQuiz(subject: string, studentContext?: { name: str
         return data;
       }
     }
-    console.warn("Backend Gemini quiz API failed or returned empty, executing client-side fallback...");
   } catch (error) {
-    console.warn("Backend Gemini quiz API unreachable, executing client-side fallback...", error);
+    console.warn("Backend Gemini quiz route unreachable, trying client-side fallback...", error);
   }
 
-  // 2. Client-side fallback
+  // 2. Client-side fallback if VITE_GEMINI_API_KEY is available
   try {
-    const apiKey = (import.meta as any).env.GOD_API_KEY || "";
-    if (!apiKey) {
-      throw new Error("Client Gemini API key missing");
-    }
     const ai = getClientAiInstance();
+    if (!ai) {
+      throw new Error("Client Gemini instance could not be initialized for quiz.");
+    }
     const classText = studentContext ? `for grade/class ${studentContext.className}` : "";
     let langPromptText = `in English`;
     if (language === "Hindi") {
       langPromptText = `entirely in Hindi language (using clear Devanagari script suitable for classroom study). All questions, descriptions, and option texts MUST be in clean Hindi.`;
-    } else if (language === "Hinglish") {
+    } else if (language === "Hinglish" || language === "Mixed") {
       langPromptText = `in Hinglish language (a casual mix of English and Hindi words written using standard English/Latin alphabet, e.g., 'Soil erosion ko prevent karne ka best way kya hai?'). All questions, descriptions, and option texts MUST be in clean Hinglish sentence structures.`;
     } else if (language === "Marathi") {
       langPromptText = `entirely in Marathi language. All questions, descriptions, and option texts MUST be in clean Marathi.`;
@@ -242,23 +281,24 @@ export async function generateQuiz(subject: string, studentContext?: { name: str
 
     const instructionText = `Generate a 5-question multiple choice quiz ${classText} for ${subject} ${langPromptText}. Return only valid JSON in the format: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}]`;
 
-    const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
+    const response = await callClientGeminiWithRetry(ai, {
+      model: "gemini-2.5-flash",
       contents: instructionText,
       config: {
         responseMimeType: "application/json",
       },
     });
+
     try {
       const parsed = JSON.parse(response.text || "[]");
       if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed;
       }
     } catch (e) {
-      console.warn("Client quiz JSON parsing failed, using hardcoded fallback.", e);
+      console.warn("Client quiz JSON parsing failed.", e);
     }
   } catch (clientError) {
-    console.warn("Client Gemini quiz generation failed. Serving high-quality fallback quiz database.", clientError);
+    console.warn("Client-side Gemini quiz generation failed. Serving local fallback quiz database.", clientError);
   }
 
   // Final guaranteed fallback
