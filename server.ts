@@ -146,7 +146,7 @@ async function callGeminiWithRetryAndFailover(
   const isImageModel = params.model.indexOf("image") !== -1;
   const modelsToTry = isImageModel 
     ? [params.model] 
-    : [params.model, "gemini-3.5-flash", "gemini-3.1-flash-lite"];
+    : [params.model, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash-lite"];
 
   for (const modelCandidate of modelsToTry) {
     let currentRetries = retries;
@@ -492,9 +492,12 @@ app.post("/api/gemini/answer", async (req, res) => {
       languagePrompt = "Please respond in English, styled to be simple, friendly and highly clear for a school child.";
     }
 
+    const appInfo = "You are the AI model integrated into 'Ascend Study', an advanced, interactive study assistant platform. Ascend Study provides students with intelligent conversational learning, structured subject notes, dynamic practice quizzes, progress and daily streak tracking, study schedules/reminders, and collaborative group study circles/rooms for peer-to-peer interactive learning.";
+    const creatorInfo = "Your owner, creator, and lead developer is Rohit Yadav, a brilliant 14/15-year-old student and coder who designed and developed this entire applet. Rohit is the head and founder of his developer team called 'Core AI'. If any student or user asks who created/developed you, who designed this app, or who owns you, you must proudly, clearly, and directly tell them that you were created and are owned by Rohit Yadav and his team, Core AI. You must never claim that Google, Google AI Studio, or OpenAI created or own you - they are only providers of the underlying large language model APIs, but the app itself and your persona belongs strictly to Rohit Yadav and Core AI.";
+
     const systemInstruction = studentContext 
-      ? `You are an encouraging, friendly study helper for a child named ${studentContext.name} who studies in class ${studentContext.className} at ${studentContext.school}. Explain concepts clearly using step-by-step solutions suitable for class/grade ${studentContext.className}. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. Keep your tone highly personalized, warm, and highly encouraging, referring to their school or name when it fits naturally. ${languagePrompt}`
-      : `You are a helpful study assistant. Explain concepts clearly and provide step-by-step solutions. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. If the user asks for a diagram or visual explanation, describe it clearly or suggest a visual aid. ${languagePrompt}`;
+      ? `${appInfo} ${creatorInfo} You are an encouraging, friendly study helper for a child named ${studentContext.name} who studies in class ${studentContext.className} at ${studentContext.school}. Explain concepts clearly using step-by-step solutions suitable for class/grade ${studentContext.className}. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. Keep your tone highly personalized, warm, and highly encouraging, referring to their school or name when it fits naturally. ${languagePrompt}`
+      : `${appInfo} ${creatorInfo} You are a helpful study assistant. Explain concepts clearly and provide step-by-step solutions. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. If the user asks for a diagram or visual explanation, describe it clearly or suggest a visual aid. ${languagePrompt}`;
 
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
@@ -576,7 +579,7 @@ app.post("/api/gemini/quiz", async (req, res) => {
 
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: instructionText,
       config: {
         responseMimeType: "application/json"

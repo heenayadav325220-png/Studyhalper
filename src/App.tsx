@@ -2564,13 +2564,64 @@ export default function App() {
                     </div>
                   </section>
 
-                  {/* Developer Credit */}
-                  <div className="text-center py-4 text-slate-500">
-                    <p className="text-[10px] font-medium">Developed by Rohit Yadav</p>
-                    <p className="text-[10px] font-bold text-indigo-500">
-                      <a href="https://www.instagram.com/rohit.Yadav.1.4" target="_blank" rel="noopener noreferrer">@rohit.Yadav.1.4</a>
-                    </p>
-                  </div>
+                  {/* About Ascend Study & Creator (Rohit Yadav & Core AI) Card */}
+                  <section className="bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-950 text-white p-5 rounded-3xl border border-indigo-950/50 shadow-md space-y-4" id="about_app_creator_card">
+                    <div className="flex items-center space-x-2 pb-2.5 border-b border-indigo-900/40">
+                      <span className="text-base select-none">🚀</span>
+                      <div>
+                        <h2 className="text-xs font-black tracking-wider uppercase text-indigo-200 font-sans">
+                          {appLanguage === 'Hindi' ? 'Ascend Study के बारे में' : 'About Ascend Study'}
+                        </h2>
+                        <p className="text-[9px] font-bold text-slate-400">
+                          {appLanguage === 'Hindi' ? 'आधिकारिक निर्माता और प्लेटफॉर्म विवरण' : 'Official Creator & Platform Details'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3.5">
+                      <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
+                        {appLanguage === 'Hindi' 
+                          ? 'Ascend Study एक ऑल-इन-वन शैक्षिक मंच है जिसे इंटरैक्टिव नोट्स, दैनिक अध्ययन कार्यक्रम, अध्ययन प्रगति विश्लेषण, सहयोगी अध्ययन समूहों और एक उन्नत एआई स्टडी बडी के माध्यम से सीखने को बेहतर बनाने के लिए डिज़ाइन किया गया है।'
+                          : 'Ascend Study is an all-in-one educational platform designed to elevate learning through interactive notes, daily study schedules, study progress analytics, collaborative study groups, and an advanced AI Study Buddy.'
+                        }
+                      </p>
+
+                      <div className="bg-indigo-900/30 border border-indigo-500/10 p-3.5 rounded-2xl space-y-2">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center text-xl shadow-xs select-none">
+                            👨‍💻
+                          </div>
+                          <div>
+                            <h3 className="text-xs font-black text-white">Rohit Yadav</h3>
+                            <p className="text-[9px] font-black text-indigo-300 uppercase tracking-widest">
+                              {appLanguage === 'Hindi' ? 'लीड डेवलपर और निर्माता' : 'Lead Developer & Creator'}
+                            </p>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-slate-400 leading-normal font-medium">
+                          {appLanguage === 'Hindi'
+                            ? 'इस अत्याधुनिक शैक्षिक एप्लिकेशन को पूरी तरह से रोहित यादव (एक प्रतिभाशाली 14 वर्षीय छात्र और कोडर) द्वारा उनके संगठन Core AI की टीम के साथ मिलकर डिज़ाइन और विकसित किया गया था।'
+                            : 'This state-of-the-art educational application was designed and engineered entirely by Rohit Yadav, a brilliant 14-year-old student and coder, alongside his team at Core AI.'
+                          }
+                        </p>
+                      </div>
+
+                      <div className="flex justify-between items-center text-[10px] pt-1.5 text-slate-400 font-bold border-t border-indigo-900/30">
+                        <span className="text-[9px] text-indigo-300 tracking-wider font-mono">
+                          {appLanguage === 'Hindi' ? 'Core AI द्वारा निर्मित' : 'Created by Core AI'}
+                        </span>
+                        <a 
+                          href="https://www.instagram.com/rohit.Yadav.1.4" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-xl transition shadow-xs text-[9px] flex items-center space-x-1"
+                        >
+                          <span>📸</span>
+                          <span>@rohit.Yadav.1.4</span>
+                        </a>
+                      </div>
+                    </div>
+                  </section>
 
                   {/* Subject Mastery Performance */}
                   <section className="space-y-3 pb-8">
