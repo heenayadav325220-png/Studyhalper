@@ -1,8 +1,8 @@
 export class MockDatabase {
   private users = [
-    { id: 1, name: "Rohit Yadav", points: 0, level: 1, avatar: null },
+    { id: 1, name: "defualt", points: 0, level: 1, avatar: null },
     { id: 2, name: "Alice Smith", points: 450, level: 5, avatar: null },
-    { id: 3, name: "Bob Johnson", points: 320, level: 3, avatar: null },
+    { id: 3, name: "rendom", points: 320, level: 3, avatar: null },
     { id: 4, name: "Charlie Brown", points: 150, level: 2, avatar: null }
   ];
   private badges: any[] = [];
