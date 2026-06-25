@@ -1,0 +1,147 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores student profile information, points, level, and companion pet state.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique user authentication ID." },
+        "name": { "type": "string", "description": "Name of the student." },
+        "school": { "type": "string", "description": "School of the student." },
+        "className": { "type": "string", "description": "The grade or class level of the student." },
+        "points": { "type": "integer", "description": "Gamification points earned." },
+        "level": { "type": "integer", "description": "Current educational level." },
+        "avatar": { "type": "string", "description": "Elected emoji or icon avatar representing the student." },
+        "badges": { "type": "array", "description": "Array of unlocked achievement badges." },
+        "pet": { "type": "object", "description": "The state of the student's virtual companion pet." }
+      },
+      "required": ["uid", "name", "school", "className"]
+    },
+    "Note": {
+      "title": "Student Note",
+      "description": "A single personal notebook note.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier of the note." },
+        "title": { "type": "string", "description": "Title of the note." },
+        "content": { "type": "string", "description": "Rich text or markdown content of the note." },
+        "subject": { "type": "string", "description": "Academic subject category of the note." },
+        "updated_at": { "type": "string", "format": "date-time", "description": "Last updated timestamp." }
+      },
+      "required": ["id", "title", "subject", "updated_at"]
+    },
+    "ScheduleItem": {
+      "title": "Schedule Planner Item",
+      "description": "An entry in the student's homework planner calendar.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier of the task." },
+        "task": { "type": "string", "description": "Task or homework description." },
+        "time": { "type": "string", "description": "Time scheduled for the task." },
+        "day": { "type": "string", "description": "Day of the week scheduled." },
+        "completed": { "type": "boolean", "description": "Completion flag." }
+      },
+      "required": ["id", "task", "time", "day", "completed"]
+    },
+    "ProgressEntry": {
+      "title": "Quiz Performance Log",
+      "description": "Records student practice quiz results to track progress.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "subject": { "type": "string" },
+        "score": { "type": "integer" },
+        "total": { "type": "integer" },
+        "date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "subject", "score", "total", "date"]
+    },
+    "StudyGroup": {
+      "title": "Study Group",
+      "description": "A collaborative study group created by a student.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "created_by": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "created_by", "created_at"]
+    },
+    "GroupMember": {
+      "title": "Study Group Member",
+      "description": "Details of a user belonging to a study group.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "member"] },
+        "joined_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "role", "joined_at"]
+    },
+    "GroupMessage": {
+      "title": "Study Group Message",
+      "description": "A real-time text message sent inside a study group.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "text": { "type": "string" },
+        "image": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "user_name", "created_at"]
+    },
+    "GroupNote": {
+      "title": "Group Shared Note",
+      "description": "A collaborative group note readable and editable by all group members.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "updated_by": { "type": "string" },
+        "updated_by_name": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "updated_by", "updated_by_name", "updated_at"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Primary user profile document containing student information."
+    },
+    "/users/{userId}/notes/{noteId}": {
+      "schema": "Note",
+      "description": "User's personal study notebooks collection."
+    },
+    "/users/{userId}/schedule/{scheduleId}": {
+      "schema": "ScheduleItem",
+      "description": "Planner calendar schedule list."
+    },
+    "/users/{userId}/progress/{progressId}": {
+      "schema": "ProgressEntry",
+      "description": "Log of practice quiz scores."
+    },
+    "/groups/{groupId}": {
+      "schema": "StudyGroup",
+      "description": "Interactive, multi-user cooperative groups."
+    },
+    "/groups/{groupId}/members/{memberId}": {
+      "schema": "GroupMember",
+      "description": "A student who is joined in the group."
+    },
+    "/groups/{groupId}/messages/{messageId}": {
+      "schema": "GroupMessage",
+      "description": "A secure real-time message stream for the group."
+    },
+    "/groups/{groupId}/notes/{noteId}": {
+      "schema": "GroupNote",
+      "description": "Shared notebook for brainstorming and task distribution inside study groups."
+    }
+  }
+}

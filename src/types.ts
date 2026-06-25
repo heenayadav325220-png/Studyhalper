@@ -1,7 +1,7 @@
 export type Subject = 'Mathematics' | 'Science' | 'Biology' | 'Physics' | 'Chemistry' | 'English';
 
 export interface User {
-  id: number;
+  id: string | number;
   name: string;
   school: string;
   className: string;
@@ -11,10 +11,17 @@ export interface User {
   badges: Badge[];
   weeklyGoal?: number;
   completedThisWeek?: number;
+  pet?: {
+    name: string;
+    happiness: number;
+    fullness: number;
+    accessory: string;
+    petCount: number;
+  };
 }
 
 export interface Badge {
-  id: number;
+  id: string | number;
   badge_name: string;
   icon: string;
   date_earned: string;
@@ -27,7 +34,7 @@ export interface LeaderboardEntry {
 }
 
 export interface Note {
-  id: number;
+  id: string | number;
   title: string;
   content: string;
   subject: Subject;
@@ -35,7 +42,7 @@ export interface Note {
 }
 
 export interface ScheduleItem {
-  id: number;
+  id: string | number;
   task: string;
   time: string;
   day: string;
@@ -43,7 +50,7 @@ export interface ScheduleItem {
 }
 
 export interface Progress {
-  id: number;
+  id: string | number;
   subject: Subject;
   score: number;
   total: number;
@@ -57,18 +64,18 @@ export interface ChatMessage {
 }
 
 export interface Group {
-  id: number;
+  id: string | number;
   name: string;
   description: string;
-  created_by: number;
+  created_by: string | number;
   created_at: string;
   member_count?: number;
 }
 
 export interface GroupMessage {
-  id: number;
-  group_id: number;
-  user_id: number;
+  id: string | number;
+  group_id: string | number;
+  user_id: string | number;
   user_name: string;
   text: string;
   image?: string;
@@ -76,11 +83,11 @@ export interface GroupMessage {
 }
 
 export interface GroupNote {
-  id: number;
-  group_id: number;
+  id: string | number;
+  group_id: string | number;
   title: string;
   content: string;
-  updated_by: number;
+  updated_by: string | number;
   updated_by_name: string;
   updated_at: string;
 }

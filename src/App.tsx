@@ -42,6 +42,43 @@ import { StudyTimer } from './components/StudyTimer';
 import { HomeworkSolver } from './components/HomeworkSolver';
 import type { AppLanguage } from './services/translations';
 import type { Note, ScheduleItem, Progress, ChatMessage, Subject, User as UserType, Group, GroupMessage, GroupNote } from './types';
+import { 
+  auth, 
+  db,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInAnonymously,
+  signOut,
+  onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithPopup,
+  collection,
+  doc,
+  getDocs,
+  query,
+  limit
+} from './services/firebase';
+import { 
+  getUserProfile, 
+  saveUserProfile, 
+  getLeaderboard, 
+  getNotes, 
+  saveNote, 
+  deleteNote, 
+  getSchedule, 
+  saveScheduleItem, 
+  deleteScheduleItem, 
+  getProgress, 
+  saveProgressEntry, 
+  getGroups, 
+  createGroup, 
+  joinGroup, 
+  subscribeToGroupMessages, 
+  sendGroupMessage, 
+  subscribeToGroupNotes, 
+  saveGroupNote 
+} from './services/firebaseDb';
+
 
 const SUBJECTS: Subject[] = ['Mathematics', 'Science', 'Biology', 'Physics', 'Chemistry', 'English'];
 
@@ -488,6 +525,20 @@ export default function App() {
     }
   };
 
+  // Firebase and Authentication States
+  const [firebaseUser, setFirebaseUser] = useState<any>(null);
+  const [authChecking, setAuthChecking] = useState(true);
+  const [authMode, setAuthMode] = useState<'login' | 'signup' | 'phone' | 'guest'>('login');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authPhone, setAuthPhone] = useState('');
+  const [authOtp, setAuthOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [showProfileSetup, setShowProfileSetup] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<{ name: string; points: number; level: number }[]>([]);
+  const [buddies, setBuddies] = useState<any[]>([]);
+
   // Virtual study pet state
   const [pet, setPet] = useState<{
     name: string;
@@ -495,15 +546,12 @@ export default function App() {
     fullness: number;
     accessory: string;
     petCount: number;
-  }>(() => {
-    const stored = localStorage.getItem('studybuddy_pet');
-    return stored ? JSON.parse(stored) : {
-      name: 'Chimpu 🐼',
-      happiness: 85,
-      fullness: 80,
-      accessory: 'none',
-      petCount: 0
-    };
+  }>({
+    name: 'Chimpu 🐼',
+    happiness: 85,
+    fullness: 80,
+    accessory: 'none',
+    petCount: 0
   });
 
   // Daily quests state
@@ -513,39 +561,15 @@ export default function App() {
     textHi: string;
     xp: number;
     completed: boolean;
-  }[]>(() => {
-    const stored = localStorage.getItem('studybuddy_quests');
-    const lastReset = localStorage.getItem('studybuddy_quest_reset');
-    const todayStr = new Date().toDateString();
-    
-    if (stored && lastReset === todayStr) {
-      return JSON.parse(stored);
-    }
-    return [
-      { id: 'ask_ai', text: 'Ask AI Tutor a homework question', textHi: 'एआई टीचर से एक सवाल पूछें 🤖', xp: 15, completed: false },
-      { id: 'quiz_hero', text: 'Earn 3+ score in any Practice Quiz', textHi: 'क्विज़ में 3 या उससे ज़्यादा अंक लाएं 🏆', xp: 25, completed: false },
-      { id: 'pet_care', text: 'Feed or Pet your virtual study companion', textHi: 'अपने स्टडी पार्टनर चिम्पू को खाना खिलाएं या सहलाएं 🎋', xp: 10, completed: false },
-    ];
-  });
+  }[]>([
+    { id: 'ask_ai', text: 'Ask AI Tutor a homework question', textHi: 'एआई टीचर से एक सवाल पूछें 🤖', xp: 15, completed: false },
+    { id: 'quiz_hero', text: 'Earn 3+ score in any Practice Quiz', textHi: 'क्विज़ में 3 या उससे ज़्यादा अंक लाएं 🏆', xp: 25, completed: false },
+    { id: 'pet_care', text: 'Feed or Pet your virtual study companion', textHi: 'अपने स्टडी पार्टनर चिम्पू को खाना खिलाएं या सहलाएं 🎋', xp: 10, completed: false },
+  ]);
 
-  const [streakDays, setStreakDays] = useState<StreakDayType[]>(() => {
-    const stored = localStorage.getItem('studybuddy_streak_days');
-    return stored ? JSON.parse(stored) : DEFAULT_STREAK_DAYS;
-  });
+  const [streakDays, setStreakDays] = useState<StreakDayType[]>(DEFAULT_STREAK_DAYS);
 
-  const [selectedDayId, setSelectedDayId] = useState<number>(() => {
-    const stored = localStorage.getItem('studybuddy_streak_days');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      const firstIncomplete = parsed.find((d: any) => !d.completed);
-      return firstIncomplete ? firstIncomplete.id : 1;
-    }
-    return 1;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('studybuddy_streak_days', JSON.stringify(streakDays));
-  }, [streakDays]);
+  const [selectedDayId, setSelectedDayId] = useState<number>(1);
 
   const [brushColor, setBrushColor] = useState('#1e293b');
   const [showScratchpad, setShowScratchpad] = useState(false);
@@ -562,46 +586,14 @@ export default function App() {
   const [isTagMode, setIsTagMode] = useState(false);
 
   // Core local states
-  const [user, setUser] = useState<UserType | null>(() => {
-    const stored = localStorage.getItem(KEYS.USER);
-    if (!stored) return null;
-    try {
-      const parsed = JSON.parse(stored);
-      if (parsed && parsed.name && parsed.school && parsed.className) {
-        return parsed;
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    localStorage.removeItem(KEYS.USER);
-    return null;
-  });
-  const [notes, setNotes] = useState<Note[]>(() => {
-    const stored = localStorage.getItem(KEYS.NOTES);
-    return stored ? JSON.parse(stored) : DEFAULT_NOTES;
-  });
-  const [schedule, setSchedule] = useState<ScheduleItem[]>(() => {
-    const stored = localStorage.getItem(KEYS.SCHEDULE);
-    return stored ? JSON.parse(stored) : DEFAULT_SCHEDULE;
-  });
-  const [progress, setProgress] = useState<Progress[]>(() => {
-    const stored = localStorage.getItem(KEYS.PROGRESS);
-    return stored ? JSON.parse(stored) : DEFAULT_PROGRESS;
-  });
-  const [groups, setGroups] = useState<Group[]>(() => {
-    const stored = localStorage.getItem(KEYS.GROUPS);
-    return stored ? JSON.parse(stored) : DEFAULT_GROUPS;
-  });
+  const [user, setUser] = useState<UserType | null>(null);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
+  const [progress, setProgress] = useState<Progress[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
 
   // Chat & interactive history states
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
-    const stored = localStorage.getItem(KEYS.CHAT_HISTORY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed.length > 0) return parsed;
-    }
-    return [];
-  });
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [fullScreenMessage, setFullScreenMessage] = useState<ChatMessage | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [chatInput, setChatInput] = useState('');
@@ -614,19 +606,8 @@ export default function App() {
   const [activeGroup, setActiveGroup] = useState<Group | null>(null);
   const [groupTab, setGroupTab] = useState<'chat' | 'notes'>('chat');
   const [groupChatInput, setGroupChatInput] = useState('');
-  const [groupMessages, setGroupMessages] = useState<Record<number, GroupMessage[]>>(() => {
-    const stored = localStorage.getItem(KEYS.GROUP_MESSAGES);
-    return stored ? JSON.parse(stored) : {
-      1: [{ id: 1, group_id: 1, user_id: 2, user_name: 'Alice Johnson', text: 'Hey guys! Anyone ready to review Bio Chapter 5?', created_at: new Date().toISOString() }],
-      2: [{ id: 1, group_id: 2, user_id: 3, user_name: 'Bob Smith', text: 'Integral calculus questions are tricky!', created_at: new Date().toISOString() }]
-    };
-  });
-  const [groupNotes, setGroupNotes] = useState<Record<number, GroupNote[]>>(() => {
-    const stored = localStorage.getItem(KEYS.GROUP_NOTES);
-    return stored ? JSON.parse(stored) : {
-      1: [{ id: 1, group_id: 1, title: 'Mitosis Recap', content: 'Prophase, Metaphase, Anaphase, Telophase. Easy to remember with PMAT!', updated_by: 2, updated_by_name: 'Alice Johnson', updated_at: new Date().toISOString() }]
-    };
-  });
+  const [groupMessages, setGroupMessages] = useState<Record<string | number, GroupMessage[]>>({});
+  const [groupNotes, setGroupNotes] = useState<Record<string | number, GroupNote[]>>({});
 
   // Modal helpers
   const [isAddingNote, setIsAddingNote] = useState(false);
@@ -652,6 +633,122 @@ export default function App() {
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
+  // Auth Observer
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
+      setFirebaseUser(fUser);
+      if (fUser) {
+        try {
+          const profile = await getUserProfile(fUser.uid);
+          if (profile) {
+            setUser(profile);
+            if (profile.pet) {
+              setPet(profile.pet as any);
+            }
+            setShowProfileSetup(false);
+          } else {
+            setUser(null);
+            setShowProfileSetup(true);
+          }
+        } catch (e) {
+          console.error("Error checking profile:", e);
+        }
+      } else {
+        setUser(null);
+        setShowProfileSetup(false);
+      }
+      setAuthChecking(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Sync personal database items from Firestore
+  useEffect(() => {
+    if (!firebaseUser || !user) return;
+
+    const syncStudentData = async () => {
+      try {
+        const userNotes = await getNotes(firebaseUser.uid);
+        setNotes(userNotes);
+
+        const userSchedule = await getSchedule(firebaseUser.uid);
+        setSchedule(userSchedule);
+
+        const userProgress = await getProgress(firebaseUser.uid);
+        setProgress(userProgress);
+
+        const allGroups = await getGroups();
+        setGroups(allGroups);
+
+        const board = await getLeaderboard();
+        setLeaderboard(board);
+
+        // Populate peer list dynamically from Firestore
+        const peerBuddies: any[] = [];
+        try {
+          const otherUsersSnap = await getDocs(query(collection(db, "users"), limit(10)));
+          otherUsersSnap.forEach((docSnap) => {
+            if (docSnap.id !== firebaseUser.uid) {
+              const data = docSnap.data();
+              peerBuddies.push({
+                id: docSnap.id,
+                name: data.name || "Study Companion",
+                subject: data.className ? `Class ${data.className} student` : "General Study",
+                online: Math.random() > 0.3,
+                avatar: data.avatar || "🦊",
+                waveResponse: `Hey ${user.name}! Let's study and complete our daily challenges together! 🚀`
+              });
+            }
+          });
+        } catch (err) {
+          console.error("Error loading peer presence:", err);
+        }
+
+        if (peerBuddies.length === 0) {
+          peerBuddies.push(
+            { id: 'b1', name: 'Alice Sharma', subject: 'Mathematics', online: true, avatar: '🦄', waveResponse: `Hey ${user.name}! Mathematics is fun, let's solve some sums! ✏️` },
+            { id: 'b2', name: 'Bob Verma', subject: 'Science', online: true, avatar: '🦊', waveResponse: `Hey ${user.name}! Ready to review biology chapter 3 today? 🔬` },
+            { id: 'b3', name: 'Sarah Patel', subject: 'English', online: false, avatar: '🦉', waveResponse: `Just read a story book! Catch you later!` }
+          );
+        }
+        setBuddies(peerBuddies);
+
+      } catch (err) {
+        console.error("Error syncing student database:", err);
+      }
+    };
+
+    syncStudentData();
+  }, [firebaseUser, user]);
+
+  // Real-time cooperative study groups sub-listeners
+  useEffect(() => {
+    if (!activeGroup) return;
+
+    const unsubMessages = subscribeToGroupMessages(activeGroup.id, (msgs) => {
+      setGroupMessages(prev => ({ ...prev, [activeGroup.id]: msgs }));
+    });
+
+    const unsubNotes = subscribeToGroupNotes(activeGroup.id, (notesList) => {
+      setGroupNotes(prev => ({ ...prev, [activeGroup.id]: notesList }));
+    });
+
+    return () => {
+      unsubMessages();
+      unsubNotes();
+    };
+  }, [activeGroup]);
+
+  // Update cloud user profile when local state updates
+  useEffect(() => {
+    if (firebaseUser && user) {
+      saveUserProfile({
+        ...user,
+        pet: pet as any
+      }).catch(err => console.error("Error autosaving profile details:", err));
+    }
+  }, [user, pet]);
+
   useEffect(() => {
     const handler = (e: Event) => {
       e.preventDefault();
@@ -670,14 +767,16 @@ export default function App() {
     }
   };
 
-  const handleRegister = (e: any) => {
+  const handleRegister = async (e: any) => {
     e.preventDefault();
     if (!regName.trim() || !regSchool.trim() || !regClass.trim()) {
       alert("कृपया अपनी सारी जानकारी भरें!\nPlease fill out all dynamic information fields!");
       return;
     }
+    if (!firebaseUser) return;
+
     const newUser: UserType = {
-      id: Date.now(),
+      id: firebaseUser.uid,
       name: regName.trim(),
       school: regSchool.trim(),
       className: regClass,
@@ -686,47 +785,19 @@ export default function App() {
       avatar: regAvatar,
       badges: [{ id: Date.now(), badge_name: 'Quick Start', icon: '🚀', date_earned: new Date().toLocaleDateString() }]
     };
-    setUser(newUser);
+
+    try {
+      setAuthLoading(true);
+      await saveUserProfile(newUser);
+      setUser(newUser);
+      setShowProfileSetup(false);
+    } catch (err) {
+      console.error("Error saving registered profile:", err);
+      alert("Failed to save profile. Please check connection and try again.");
+    } finally {
+      setAuthLoading(false);
+    }
   };
-
-  // Persists states in localStorage
-  useEffect(() => { 
-    if (user) {
-      localStorage.setItem(KEYS.USER, JSON.stringify(user)); 
-    } else {
-      localStorage.removeItem(KEYS.USER);
-    }
-  }, [user]);
-  useEffect(() => { localStorage.setItem(KEYS.NOTES, JSON.stringify(notes)); }, [notes]);
-  useEffect(() => { localStorage.setItem(KEYS.SCHEDULE, JSON.stringify(schedule)); }, [schedule]);
-  useEffect(() => { localStorage.setItem(KEYS.PROGRESS, JSON.stringify(progress)); }, [progress]);
-  useEffect(() => { localStorage.setItem(KEYS.GROUPS, JSON.stringify(groups)); }, [groups]);
-  useEffect(() => { localStorage.setItem(KEYS.CHAT_HISTORY, JSON.stringify(chatMessages)); }, [chatMessages]);
-  useEffect(() => { localStorage.setItem(KEYS.GROUP_MESSAGES, JSON.stringify(groupMessages)); }, [groupMessages]);
-  useEffect(() => { localStorage.setItem(KEYS.GROUP_NOTES, JSON.stringify(groupNotes)); }, [groupNotes]);
-  useEffect(() => { localStorage.setItem('studybuddy_appLanguage', appLanguage); }, [appLanguage]);
-
-  // Translate or initialize welcome greeting dynamically when language is changed
-  useEffect(() => {
-    if (chatMessages.length <= 1) {
-      setChatMessages([
-        {
-          role: 'model',
-          text: translate('welcome_ai_chat', appLanguage, "Hello student! 👋 Ask any homework question or ask me to draw a diagram! Let's read together! 🚀")
-        }
-      ]);
-    }
-  }, [appLanguage, user]);
-
-  // Handle companion pet & quest checklist persistence
-  useEffect(() => {
-    localStorage.setItem('studybuddy_pet', JSON.stringify(pet));
-  }, [pet]);
-
-  useEffect(() => {
-    localStorage.setItem('studybuddy_quests', JSON.stringify(quests));
-    localStorage.setItem('studybuddy_quest_reset', new Date().toDateString());
-  }, [quests]);
 
   // Points tracking for chimes
   const prevPointsRef = useRef<number>(user?.points || 0);
@@ -1061,44 +1132,97 @@ export default function App() {
   };
 
   // Action methods
-  const handleAddNote = () => {
-    if (!newNote.title.trim()) return;
-    const noteItem: Note = { id: Date.now(), title: newNote.title, content: newNote.content, subject: newNote.subject, updated_at: new Date().toISOString() };
-    setNotes(prev => [noteItem, ...prev]);
-    setIsAddingNote(false);
-    setNewNote({ title: '', content: '', subject: 'Mathematics' });
-    awardPoints(15, 'note');
-    completeStreakDay(4); // Complete Day 4: study note creation
+  const handleAddNote = async () => {
+    if (!newNote.title.trim() || !firebaseUser) return;
+    try {
+      const generatedId = await saveNote(firebaseUser.uid, {
+        title: newNote.title,
+        content: newNote.content,
+        subject: newNote.subject
+      });
+      const noteItem: Note = { 
+        id: generatedId, 
+        title: newNote.title, 
+        content: newNote.content, 
+        subject: newNote.subject, 
+        updated_at: new Date().toISOString() 
+      };
+      setNotes(prev => [noteItem, ...prev]);
+      setIsAddingNote(false);
+      setNewNote({ title: '', content: '', subject: 'Mathematics' });
+      awardPoints(15, 'note');
+      completeStreakDay(4); // Complete Day 4: study note creation
+    } catch (err) {
+      console.error("Failed to add note:", err);
+    }
   };
 
-  const handleDeleteNote = (id: number) => {
-    setNotes(prev => prev.filter(n => n.id !== id));
+  const handleDeleteNote = async (id: string | number) => {
+    if (!firebaseUser) return;
+    try {
+      await deleteNote(firebaseUser.uid, id);
+      setNotes(prev => prev.filter(n => n.id !== id));
+    } catch (err) {
+      console.error("Failed to delete note:", err);
+    }
   };
 
-  const handleToggleSchedule = (item: ScheduleItem) => {
-    setSchedule(prev => prev.map(s => {
-      if (s.id === item.id) {
-        if (!s.completed) {
-          awardPoints(10);
-          completeStreakDay(5); // Complete Day 5: complete planner task
+  const handleToggleSchedule = async (item: ScheduleItem) => {
+    if (!firebaseUser) return;
+    try {
+      const updatedCompleted = !item.completed;
+      await saveScheduleItem(firebaseUser.uid, {
+        id: item.id,
+        completed: updatedCompleted
+      });
+      setSchedule(prev => prev.map(s => {
+        if (s.id === item.id) {
+          if (updatedCompleted) {
+            awardPoints(10);
+            completeStreakDay(5); // Complete Day 5: complete planner task
+          }
+          return { ...s, completed: updatedCompleted };
         }
-        return { ...s, completed: !s.completed };
-      }
-      return s;
-    }));
+        return s;
+      }));
+    } catch (err) {
+      console.error("Failed to toggle schedule item completed:", err);
+    }
   };
 
-  const handleAddSchedule = () => {
-    if (!newSchedule.task.trim()) return;
-    const item: ScheduleItem = { id: Date.now(), task: newSchedule.task, time: newSchedule.time || '12:00', day: newSchedule.day, completed: false };
-    setSchedule(prev => [...prev, item]);
-    setIsAddingSchedule(false);
-    setNewSchedule({ task: '', time: '', day: 'Monday' });
-    awardPoints(5);
+  const handleAddSchedule = async () => {
+    if (!newSchedule.task.trim() || !firebaseUser) return;
+    try {
+      const generatedId = await saveScheduleItem(firebaseUser.uid, {
+        task: newSchedule.task,
+        time: newSchedule.time || '12:00',
+        day: newSchedule.day,
+        completed: false
+      });
+      const item: ScheduleItem = { 
+        id: generatedId, 
+        task: newSchedule.task, 
+        time: newSchedule.time || '12:00', 
+        day: newSchedule.day, 
+        completed: false 
+      };
+      setSchedule(prev => [...prev, item]);
+      setIsAddingSchedule(false);
+      setNewSchedule({ task: '', time: '', day: 'Monday' });
+      awardPoints(5);
+    } catch (err) {
+      console.error("Failed to add schedule item:", err);
+    }
   };
 
-  const handleDeleteSchedule = (id: number) => {
-    setSchedule(prev => prev.filter(s => s.id !== id));
+  const handleDeleteSchedule = async (id: string | number) => {
+    if (!firebaseUser) return;
+    try {
+      await deleteScheduleItem(firebaseUser.uid, id);
+      setSchedule(prev => prev.filter(s => s.id !== id));
+    } catch (err) {
+      console.error("Failed to delete schedule item:", err);
+    }
   };
 
   // Quiz launcher
@@ -1122,7 +1246,7 @@ export default function App() {
     }
   };
 
-  const handleQuizAnswer = (selectedIdx: number) => {
+  const handleQuizAnswer = async (selectedIdx: number) => {
     const isCorrect = selectedIdx === quizQuestions[currentQuizIndex].answer;
     const gain = isCorrect ? 1 : 0;
     const nextScore = quizScore + gain;
@@ -1135,6 +1259,21 @@ export default function App() {
       setQuizFinished(true);
       const quizRes: Progress = { id: Date.now(), subject: quizSubject!, score: nextScore, total: quizQuestions.length, date: new Date().toISOString() };
       setProgress(prev => [quizRes, ...prev]);
+      
+      // Save quiz results to cloud Firestore
+      if (firebaseUser) {
+        try {
+          await saveProgressEntry(firebaseUser.uid, {
+            subject: quizSubject!,
+            score: nextScore,
+            total: quizQuestions.length,
+            date: new Date().toISOString()
+          });
+        } catch (err) {
+          console.error("Failed to save progress entry:", err);
+        }
+      }
+      
       awardPoints(nextScore * 10, 'quiz');
       if (nextScore >= 3) {
         completeQuest('quiz_hero');
@@ -1143,47 +1282,159 @@ export default function App() {
   };
 
   // Group controls
-  const handleCreateGroup = () => {
-    if (!newGroup.name.trim()) return;
-    const grp: Group = { id: Date.now(), name: newGroup.name, description: newGroup.description, created_by: user.id, created_at: new Date().toISOString(), member_count: 1 };
-    setGroups(prev => [grp, ...prev]);
-    setGroupMessages(prev => ({ ...prev, [grp.id]: [] }));
-    setGroupNotes(prev => ({ ...prev, [grp.id]: [] }));
-    setIsAddingGroup(false);
-    setNewGroup({ name: '', description: '' });
-    awardPoints(10);
-  };
-
-  const handleSendGroupMessage = () => {
-    if (!groupChatInput.trim() || !activeGroup) return;
-    const msg: GroupMessage = { id: Date.now(), group_id: activeGroup.id, user_id: user.id, user_name: user.name, text: groupChatInput, created_at: new Date().toISOString() };
-    const gid = activeGroup.id;
-    setGroupMessages(prev => ({ ...prev, [gid]: [...(prev[gid] || []), msg] }));
-    setGroupChatInput('');
-
-    // Peer message triggers auto response
-    setTimeout(() => {
-      const replies = ["Fabulous study tip! Let's conquer this calculation.", "Totally agree with those points!", "Oh perfect, adding that to my review list."];
-      const botResponse: GroupMessage = {
-        id: Date.now() + 1,
-        group_id: gid,
-        user_id: 101, // Alice
-        user_name: 'Alice Johnson',
-        text: replies[Math.floor(Math.random() * replies.length)],
-        created_at: new Date().toISOString()
+  const handleCreateGroup = async () => {
+    if (!newGroup.name.trim() || !firebaseUser || !user) return;
+    try {
+      const generatedId = await createGroup(newGroup.name, newGroup.description, firebaseUser.uid, user.name);
+      const grp: Group = { 
+        id: generatedId, 
+        name: newGroup.name, 
+        description: newGroup.description, 
+        created_by: firebaseUser.uid, 
+        created_at: new Date().toISOString(), 
+        member_count: 1 
       };
-      setGroupMessages(prev => ({ ...prev, [gid]: [...(prev[gid] || []), botResponse] }));
-    }, 1200);
+      setGroups(prev => [grp, ...prev]);
+      setGroupMessages(prev => ({ ...prev, [grp.id]: [] }));
+      setGroupNotes(prev => ({ ...prev, [grp.id]: [] }));
+      setIsAddingGroup(false);
+      setNewGroup({ name: '', description: '' });
+      awardPoints(10);
+    } catch (err) {
+      console.error("Failed to create study group:", err);
+    }
   };
 
-  const handleCreateGroupNote = () => {
-    if (!newGroupNote.title.trim() || !activeGroup) return;
-    const nNote: GroupNote = { id: Date.now(), group_id: activeGroup.id, title: newGroupNote.title, content: newGroupNote.content, updated_by: user.id, updated_by_name: user.name, updated_at: new Date().toISOString() };
-    const gid = activeGroup.id;
-    setGroupNotes(prev => ({ ...prev, [gid]: [nNote, ...(prev[gid] || [])] }));
-    setIsAddingGroupNote(false);
-    setNewGroupNote({ title: '', content: '' });
-    awardPoints(10);
+  const handleSendGroupMessage = async () => {
+    if (!groupChatInput.trim() || !activeGroup || !firebaseUser || !user) return;
+    try {
+      await sendGroupMessage(activeGroup.id, firebaseUser.uid, user.name, groupChatInput);
+      setGroupChatInput('');
+    } catch (err) {
+      console.error("Failed to send group message:", err);
+    }
+  };
+
+  const handleCreateGroupNote = async () => {
+    if (!newGroupNote.title.trim() || !activeGroup || !firebaseUser || !user) return;
+    try {
+      const generatedId = await saveGroupNote(activeGroup.id, {
+        title: newGroupNote.title,
+        content: newGroupNote.content
+      }, firebaseUser.uid, user.name);
+      const nNote: GroupNote = { 
+        id: generatedId, 
+        group_id: activeGroup.id, 
+        title: newGroupNote.title, 
+        content: newGroupNote.content, 
+        updated_by: firebaseUser.uid, 
+        updated_by_name: user.name, 
+        updated_at: new Date().toISOString() 
+      };
+      const gid = activeGroup.id;
+      setGroupNotes(prev => ({ ...prev, [gid]: [nNote, ...(prev[gid] || [])] }));
+      setIsAddingGroupNote(false);
+      setNewGroupNote({ title: '', content: '' });
+      awardPoints(10);
+    } catch (err) {
+      console.error("Failed to create group note:", err);
+    }
+  };
+
+  const handleEmailSignIn = async (e: any) => {
+    e.preventDefault();
+    if (!authEmail || !authPassword) return;
+    try {
+      setAuthLoading(true);
+      await signInWithEmailAndPassword(auth, authEmail, authPassword);
+    } catch (err: any) {
+      console.error(err);
+      if (err?.code === 'auth/operation-not-allowed' || err?.message?.includes('operation-not-allowed')) {
+        alert("This sign-in provider (Email/Password) is not enabled in your Firebase project yet.\n\n👉 Recommended: Use 'Sign In with Google' which is fully pre-configured and works instantly!\n\nAlternatively, you can enable the Email/Password provider in the Firebase Console -> Authentication -> Sign-in method.");
+      } else {
+        alert(err.message || "Failed to sign in. Please check details.");
+      }
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleEmailSignUp = async (e: any) => {
+    e.preventDefault();
+    if (!authEmail || !authPassword) return;
+    try {
+      setAuthLoading(true);
+      await createUserWithEmailAndPassword(auth, authEmail, authPassword);
+    } catch (err: any) {
+      console.error(err);
+      if (err?.code === 'auth/operation-not-allowed' || err?.message?.includes('operation-not-allowed')) {
+        alert("Creating email accounts is not enabled in your Firebase project yet.\n\n👉 Recommended: Use 'Sign In with Google' which is fully pre-configured and works instantly!\n\nAlternatively, you can enable the Email/Password provider in the Firebase Console -> Authentication -> Sign-in method.");
+      } else {
+        alert(err.message || "Failed to register. Please try another email.");
+      }
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setAuthLoading(true);
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Google sign-in cancelled or failed.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSendOtp = () => {
+    if (!authPhone) {
+      alert("Please write your phone number first!");
+      return;
+    }
+    setOtpSent(true);
+    alert("Simulation: OTP Sent to " + authPhone + "! Please enter code 123456 to verify!");
+  };
+
+  const handleVerifyOtp = async (e: any) => {
+    e.preventDefault();
+    if (authOtp !== '123456' && authOtp !== '1234') {
+      alert("Invalid code! Please use code 123456 to verify simulation.");
+      return;
+    }
+    try {
+      setAuthLoading(true);
+      // Log in anonymously to simulate phone auth securely
+      await signInAnonymously(auth);
+    } catch (err: any) {
+      console.error(err);
+      if (err?.code === 'auth/operation-not-allowed' || err?.message?.includes('operation-not-allowed')) {
+        alert("Anonymous / Phone simulation authentication is not enabled in your Firebase project yet.\n\n👉 Recommended: Use 'Sign In with Google' which is fully pre-configured and works instantly!\n\nAlternatively, you can enable the Anonymous provider in your Firebase Console -> Authentication -> Sign-in method.");
+      } else {
+        alert("Failed to verify code.");
+      }
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleGuestLogin = async () => {
+    try {
+      setAuthLoading(true);
+      await signInAnonymously(auth);
+    } catch (err: any) {
+      console.error(err);
+      if (err?.code === 'auth/operation-not-allowed' || err?.message?.includes('operation-not-allowed')) {
+        alert("Guest (Anonymous) login is not enabled in your Firebase project yet.\n\n👉 Recommended: Use 'Sign In with Google' which is fully pre-configured and works instantly!\n\nAlternatively, you can enable the Anonymous provider in your Firebase Console -> Authentication -> Sign-in method.");
+      } else {
+        alert("Guest login failed.");
+      }
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   return (
@@ -1198,9 +1449,15 @@ export default function App() {
       </audio>
 
       {/* Dynamic Student Onboarding Gatekeeper check */}
-      {!user ? (
+      {authChecking ? (
+        <div className="w-full max-w-md h-screen md:h-[90vh] bg-slate-50 md:rounded-3xl shadow-2xl flex flex-col justify-center items-center p-6 relative z-20 border border-slate-800/10">
+          <div className="text-center space-y-4">
+            <Loader2 className="w-10 h-10 text-indigo-600 animate-spin mx-auto" />
+            <p className="text-xs font-bold text-slate-500">Checking authorization...</p>
+          </div>
+        </div>
+      ) : !firebaseUser ? (
         <div className="w-full max-w-md h-screen md:h-[90vh] bg-slate-50 md:rounded-3xl shadow-2xl flex flex-col overflow-y-auto p-6 relative z-20 border border-slate-800/10 scrollbar-hide">
-          
           {/* Floating Settings & Language Control (Onboarding) */}
           <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
             <button
@@ -1258,8 +1515,8 @@ export default function App() {
               </div>
             )}
           </div>
+
           <div className="my-auto space-y-6 py-4">
-            {/* Header/Brand Icon */}
             <div className="text-center space-y-2">
               <div className="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-violet-600 rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-indigo-200">
                 <BookOpen className="w-9 h-9 text-white animate-pulse" />
@@ -1268,21 +1525,264 @@ export default function App() {
               <p className="text-[10px] text-indigo-600 font-extrabold tracking-widest uppercase font-mono bg-indigo-50 px-3 py-1 rounded-full inline-block">{translate('onboarding_tagline', appLanguage, 'Your Personal AI Study Companion')}</p>
             </div>
 
-            {/* Introductory Children Note */}
-            <div className="bg-gradient-to-br from-indigo-50/80 to-purple-50 p-5 rounded-3xl border border-indigo-100/50 shadow-xs space-y-3">
-              <div className="flex items-center space-x-2">
-                <span className="text-xl">🎒</span>
-                <h3 className="font-extrabold text-slate-900 text-sm font-display">{translate('onboarding_welcome_title', appLanguage, 'A Message for Students 🌟')}</h3>
+            {/* Quick Recommended Sign-In Banner */}
+            <div className="bg-gradient-to-br from-indigo-50/80 to-violet-50/80 p-4.5 rounded-3xl border border-indigo-100 shadow-xs space-y-3">
+              <div className="flex items-center space-x-2 justify-center">
+                <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-100/50 px-2.5 py-0.5 rounded-full">Recommended</span>
               </div>
-              <p className="text-xs text-slate-700 leading-relaxed font-semibold">
-                {translate('onboarding_welcome_desc', appLanguage, 'Welcome to Ascend Study! This is your cute AI friend to make your school learning easy and fun. Here you can understand tough subjects in simple words with pictures, and play quiz games live.')}
-              </p>
-              <p className="text-xs text-indigo-700 font-bold leading-relaxed bg-indigo-100/40 p-3 rounded-2xl border border-indigo-200/20">
-                {translate('onboarding_welcome_notice', appLanguage, 'To start, fill in your details below! Let\'s get started! 🚀')}
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black flex items-center justify-center space-x-2 cursor-pointer shadow-md shadow-indigo-100 active:scale-95 transition"
+              >
+                <span>🌐</span>
+                <span>Continue with Google</span>
+              </button>
+              <p className="text-[9px] text-slate-500 font-bold text-center leading-relaxed">
+                Google Login is pre-configured and works immediately!
               </p>
             </div>
 
-            {/* Registration Input Form */}
+            <div className="relative flex py-1 items-center">
+              <div className="flex-grow border-t border-slate-200/50"></div>
+              <span className="flex-shrink mx-3 text-slate-400 text-[8px] font-black uppercase tracking-widest">or other methods</span>
+              <div className="flex-grow border-t border-slate-200/50"></div>
+            </div>
+
+            {/* Auth mode selector tabs */}
+            <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-100/85 rounded-2xl border border-slate-200/50">
+              {(['login', 'signup', 'phone', 'guest'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setAuthMode(mode)}
+                  className={`py-2 text-[9px] font-black uppercase rounded-xl transition cursor-pointer ${authMode === mode ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/20' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  {mode === 'login' ? 'Login' : mode === 'signup' ? 'Signup' : mode === 'phone' ? 'Phone' : 'Guest'}
+                </button>
+              ))}
+            </div>
+
+            {/* Authenticating Forms */}
+            <div className="bg-white p-5 rounded-3xl border border-slate-150/60 shadow-sm space-y-4">
+              {authLoading ? (
+                <div className="py-8 text-center space-y-3">
+                  <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto" />
+                  <p className="text-xs font-bold text-slate-500">Processing authenticating request...</p>
+                </div>
+              ) : authMode === 'login' ? (
+                <form onSubmit={handleEmailSignIn} className="space-y-4">
+                  <h3 className="font-bold text-slate-800 text-xs border-b border-slate-100 pb-2.5 flex items-center">
+                    🔒 Email Account Sign In
+                  </h3>
+                  <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/50 p-2.5 rounded-2xl font-semibold flex items-start space-x-1.5 leading-relaxed">
+                    <span>⚠️</span>
+                    <span>Requires <b>Email/Password</b> sign-in enabled in your Firebase console. Use the recommended Google Login for instant access!</span>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Email Address</label>
+                    <input
+                      type="email"
+                      required
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      placeholder="e.g. rohan@gmail.com"
+                      className="w-full p-3 bg-slate-50/50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:border-indigo-500 outline-none transition"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Password</label>
+                    <input
+                      type="password"
+                      required
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full p-3 bg-slate-50/50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:border-indigo-500 outline-none transition"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase shadow-md shadow-indigo-100 transition active:scale-95 cursor-pointer"
+                  >
+                    Login
+                  </button>
+                  <div className="relative flex py-1 items-center">
+                    <div className="flex-grow border-t border-slate-200"></div>
+                    <span className="flex-shrink mx-3 text-slate-400 text-[9px] font-bold uppercase tracking-wider">or</span>
+                    <div className="flex-grow border-t border-slate-200"></div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignIn}
+                    className="w-full py-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-2xl text-xs font-black flex items-center justify-center space-x-2 cursor-pointer active:scale-95 transition"
+                  >
+                    <span>🌐</span>
+                    <span>Sign In with Google</span>
+                  </button>
+                </form>
+              ) : authMode === 'signup' ? (
+                <form onSubmit={handleEmailSignUp} className="space-y-4">
+                  <h3 className="font-bold text-slate-800 text-xs border-b border-slate-100 pb-2.5 flex items-center">
+                    ✨ Create New Email Account
+                  </h3>
+                  <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/50 p-2.5 rounded-2xl font-semibold flex items-start space-x-1.5 leading-relaxed">
+                    <span>⚠️</span>
+                    <span>Requires <b>Email/Password</b> sign-in enabled in your Firebase console. Use the recommended Google Login for instant access!</span>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Email Address</label>
+                    <input
+                      type="email"
+                      required
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      placeholder="e.g. rohan@gmail.com"
+                      className="w-full p-3 bg-slate-50/50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:border-indigo-500 outline-none transition"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Password</label>
+                    <input
+                      type="password"
+                      required
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      placeholder="Min 6 characters"
+                      className="w-full p-3 bg-slate-50/50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:border-indigo-500 outline-none transition"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-2xl text-xs font-black uppercase shadow-md transition active:scale-95 cursor-pointer"
+                  >
+                    Sign Up
+                  </button>
+                  <div className="relative flex py-1 items-center">
+                    <div className="flex-grow border-t border-slate-200"></div>
+                    <span className="flex-shrink mx-3 text-slate-400 text-[9px] font-bold uppercase tracking-wider">or</span>
+                    <div className="flex-grow border-t border-slate-200"></div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignIn}
+                    className="w-full py-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-2xl text-xs font-black flex items-center justify-center space-x-2 cursor-pointer active:scale-95 transition"
+                  >
+                    <span>🌐</span>
+                    <span>Sign Up with Google</span>
+                  </button>
+                </form>
+              ) : authMode === 'phone' ? (
+                <div className="space-y-4">
+                  <h3 className="font-bold text-slate-800 text-xs border-b border-slate-100 pb-2.5 flex items-center">
+                    📱 Phone Number Sign In
+                  </h3>
+                  <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/50 p-2.5 rounded-2xl font-semibold flex items-start space-x-1.5 leading-relaxed">
+                    <span>⚠️</span>
+                    <span>Requires <b>Anonymous</b> authentication enabled in your Firebase console. Use the recommended Google Login for instant access!</span>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Phone Number</label>
+                    <div className="flex space-x-2">
+                      <span className="bg-slate-100 border border-slate-200 px-3 py-3 rounded-2xl text-xs font-semibold text-slate-600 flex items-center">+91</span>
+                      <input
+                        type="tel"
+                        required
+                        value={authPhone}
+                        onChange={(e) => setAuthPhone(e.target.value)}
+                        placeholder="9876543210"
+                        className="flex-1 p-3 bg-slate-50/50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:border-indigo-500 outline-none transition"
+                      />
+                    </div>
+                  </div>
+
+                  {otpSent && (
+                    <form onSubmit={handleVerifyOtp} className="space-y-4 animate-in fade-in duration-300">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Enter OTP Code</label>
+                        <input
+                          type="text"
+                          required
+                          value={authOtp}
+                          onChange={(e) => setAuthOtp(e.target.value)}
+                          placeholder="e.g. 123456"
+                          className="w-full p-3 bg-slate-50/50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:border-indigo-500 outline-none transition"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase transition active:scale-95 cursor-pointer"
+                      >
+                        Verify & Login
+                      </button>
+                    </form>
+                  )}
+
+                  {!otpSent && (
+                    <button
+                      type="button"
+                      onClick={handleSendOtp}
+                      className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase transition active:scale-95 cursor-pointer"
+                    >
+                      Send Verification Code
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4 text-center">
+                  <h3 className="font-bold text-slate-800 text-xs border-b border-slate-100 pb-2.5 text-left">
+                    🐼 Play Instantly as Guest
+                  </h3>
+                  <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/50 p-2.5 rounded-2xl font-semibold flex items-start space-x-1.5 leading-relaxed text-left">
+                    <span>⚠️</span>
+                    <span>Requires <b>Anonymous</b> authentication enabled in your Firebase console. Use the recommended Google Login for instant access!</span>
+                  </div>
+                  <p className="text-xs text-slate-600 text-left leading-relaxed font-semibold">
+                    You can try Ascend Study as a guest student! No signup or password is required. You can customize your avatar and play study games instantly.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleGuestLogin}
+                    className="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md shadow-emerald-100 transition active:scale-95 cursor-pointer mt-2"
+                  >
+                    Play as Guest 🐼
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : showProfileSetup ? (
+        <div className="w-full max-w-md h-screen md:h-[90vh] bg-slate-50 md:rounded-3xl shadow-2xl flex flex-col overflow-y-auto p-6 relative z-20 border border-slate-800/10 scrollbar-hide">
+          {/* Floating Settings & Language Control (Profile Setup) */}
+          <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsTagMode(!isTagMode)}
+              className={`p-2 rounded-full transition outline-none cursor-pointer ${isTagMode ? 'bg-cyan-950 text-cyan-400' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
+              id="tag_mode_toggle_profile"
+            >
+              <Zap className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => signOut(auth)}
+              className="p-2.5 rounded-2xl hover:bg-slate-100 transition outline-none cursor-pointer text-red-500 bg-white border border-slate-200 text-xs font-black"
+              title="Sign Out"
+            >
+              Sign Out
+            </button>
+          </div>
+
+          <div className="my-auto space-y-6 py-4">
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-violet-600 rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-indigo-200">
+                <GraduationCap className="w-9 h-9 text-white animate-pulse" />
+              </div>
+              <h2 className="text-3xl font-black text-slate-900 tracking-tight mt-4 font-display">Student Profile</h2>
+              <p className="text-[10px] text-indigo-600 font-extrabold tracking-widest uppercase font-mono bg-indigo-50 px-3 py-1 rounded-full inline-block">Create Your Student Identity</p>
+            </div>
+
             <form onSubmit={handleRegister} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
               <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider mb-2 border-b border-slate-100 pb-3 flex items-center font-display">
                 <User className="w-4 h-4 mr-1.5 text-indigo-500" /> {translate('onboarding_details_header', appLanguage, 'Student Details')}
@@ -1367,10 +1867,11 @@ export default function App() {
 
               <button
                 type="submit"
-                className="w-full py-4 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-2xl text-xs font-black tracking-wider uppercase shadow-md shadow-indigo-100 transition active:scale-95 duration-100 mt-2 cursor-pointer font-display"
+                disabled={authLoading}
+                className="w-full py-4 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-2xl text-xs font-black tracking-wider uppercase shadow-md shadow-indigo-100 transition active:scale-95 duration-100 mt-2 cursor-pointer font-display disabled:opacity-50"
                 id="btn_submit_registration"
               >
-                {translate('onboarding_submit_btn', appLanguage, "Let's Study! 🚀")}
+                {authLoading ? 'Saving Profile...' : translate('onboarding_submit_btn', appLanguage, "Let's Study! 🚀")}
               </button>
             </form>
           </div>
