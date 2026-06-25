@@ -642,16 +642,72 @@ export default function App() {
           const profile = await getUserProfile(fUser.uid);
           if (profile) {
             setUser(profile);
+            localStorage.setItem('cached_study_user_' + fUser.uid, JSON.stringify(profile));
             if (profile.pet) {
               setPet(profile.pet as any);
             }
             setShowProfileSetup(false);
           } else {
-            setUser(null);
-            setShowProfileSetup(true);
+            // Check if there is a cached version
+            const cached = localStorage.getItem('cached_study_user_' + fUser.uid);
+            if (cached) {
+              try {
+                const parsed = JSON.parse(cached);
+                setUser(parsed);
+                if (parsed.pet) {
+                  setPet(parsed.pet as any);
+                }
+                setShowProfileSetup(false);
+              } catch (e) {
+                setUser(null);
+                setShowProfileSetup(true);
+              }
+            } else {
+              setUser(null);
+              setShowProfileSetup(true);
+            }
           }
         } catch (e) {
           console.error("Error checking profile:", e);
+          // Try to load from cache
+          const cached = localStorage.getItem('cached_study_user_' + fUser.uid);
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              setUser(parsed);
+              if (parsed.pet) {
+                setPet(parsed.pet as any);
+              }
+              setShowProfileSetup(false);
+            } catch (err) {
+              const tempUser: UserType = {
+                id: fUser.uid,
+                name: fUser.displayName || fUser.email?.split('@')[0] || "Student",
+                school: "Offline Study",
+                className: "10",
+                points: 100,
+                level: 1,
+                avatar: "🐼",
+                badges: [{ id: Date.now(), badge_name: 'Quick Start', icon: '🚀', date_earned: new Date().toLocaleDateString() }]
+              };
+              setUser(tempUser);
+              setShowProfileSetup(false);
+            }
+          } else {
+            // No cache: set a safe temporary/default profile based on email/uid so the app doesn't crash!
+            const tempUser: UserType = {
+              id: fUser.uid,
+              name: fUser.displayName || fUser.email?.split('@')[0] || "Student",
+              school: "Offline Study",
+              className: "10",
+              points: 100,
+              level: 1,
+              avatar: "🐼",
+              badges: [{ id: Date.now(), badge_name: 'Quick Start', icon: '🚀', date_earned: new Date().toLocaleDateString() }]
+            };
+            setUser(tempUser);
+            setShowProfileSetup(false);
+          }
         }
       } else {
         setUser(null);
@@ -790,6 +846,7 @@ export default function App() {
       setAuthLoading(true);
       await saveUserProfile(newUser);
       setUser(newUser);
+      localStorage.setItem('cached_study_user_' + firebaseUser.uid, JSON.stringify(newUser));
       setShowProfileSetup(false);
     } catch (err) {
       console.error("Error saving registered profile:", err);
@@ -906,9 +963,10 @@ export default function App() {
   // Points & Badge System
   const awardPoints = (amount: number, checkBadgeType?: string) => {
     setUser(prev => {
-      const newPoints = prev.points + amount;
+      if (!prev) return null;
+      const newPoints = (prev.points || 0) + amount;
       const newLevel = Math.floor(newPoints / 100) + 1;
-      const updatedBadges = [...prev.badges];
+      const updatedBadges = [...(prev.badges || [])];
 
       if (checkBadgeType === 'quiz' && !updatedBadges.some(b => b.badge_name === 'Quiz Master')) {
         updatedBadges.push({ id: Date.now(), badge_name: 'Quiz Master', icon: '🏆', date_earned: new Date().toLocaleDateString() });
@@ -917,7 +975,12 @@ export default function App() {
         updatedBadges.push({ id: Date.now() + 1, badge_name: 'Note Taker', icon: '📝', date_earned: new Date().toLocaleDateString() });
       }
 
-      return { ...prev, points: newPoints, level: newLevel, badges: updatedBadges };
+      const updatedUser = { ...prev, points: newPoints, level: newLevel, badges: updatedBadges };
+      if (firebaseUser) {
+        localStorage.setItem('cached_study_user_' + firebaseUser.uid, JSON.stringify(updatedUser));
+        saveUserProfile(updatedUser).catch(err => console.error("Failed to update user profile in Firestore:", err));
+      }
+      return updatedUser;
     });
   };
 
@@ -1977,7 +2040,7 @@ export default function App() {
                       <div className="flex flex-col items-center shrink-0 space-y-1.5">
                         <div className="w-13 h-13 bg-gradient-to-tr from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center border-2 border-white shadow-md relative group select-none">
                           {user?.avatar ? (
-                            <span className="text-3xl">{user.avatar}</span>
+                            <span className="text-3xl">{user?.avatar}</span>
                           ) : (
                             <span className="text-xs font-black text-white tracking-wider">
                               {(user?.name || 'ST').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
@@ -2471,11 +2534,11 @@ export default function App() {
                         {translate('badges_title', appLanguage, 'Academic Badges')} 🎖️
                       </h2>
                       <span className="text-[9px] font-mono bg-amber-50 text-amber-700 px-2 py-0.5 rounded-lg font-black uppercase tracking-wider">
-                        {user.badges.length} EARNED
+                        {(user?.badges || []).length} EARNED
                       </span>
                     </div>
                     <div className="grid grid-cols-4 gap-2 pb-0.5">
-                      {user.badges.map((b) => {
+                      {(user?.badges || []).map((b) => {
                         // Dynamic design palette based on badge title
                         let badgeColors = "from-amber-100 via-yellow-50 to-orange-50 text-amber-600 border-amber-200";
                         if (b.badge_name === 'Note Taker') {
@@ -2802,10 +2865,10 @@ export default function App() {
                         {groupTab === 'chat' ? (
                           <div className="space-y-3.5">
                             {(groupMessages[activeGroup.id] || []).map((msg, idx) => (
-                              <div key={idx} className={`flex ${msg.user_id === user.id ? 'justify-end' : 'justify-start'}`}>
+                              <div key={idx} className={`flex ${msg.user_id === user?.id ? 'justify-end' : 'justify-start'}`}>
                                 <div className="max-w-[85%]">
                                   <p className="text-[10px] text-slate-400 font-semibold mb-1 px-1">{msg.user_name}</p>
-                                  <div className={`p-3 rounded-2xl ${msg.user_id === user.id ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white border border-slate-100 text-slate-800 rounded-tl-none shadow-sm'}`}>
+                                  <div className={`p-3 rounded-2xl ${msg.user_id === user?.id ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white border border-slate-100 text-slate-800 rounded-tl-none shadow-sm'}`}>
                                     <p className="text-xs leading-relaxed">{msg.text}</p>
                                   </div>
                                 </div>

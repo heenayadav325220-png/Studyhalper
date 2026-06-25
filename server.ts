@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import { MockDatabase } from "./src/services/mockDb";
 import path from "path";
 import { createServer } from "http";
@@ -17,14 +16,19 @@ const PORT = 3000;
 
 // Set up database dynamically to prevent native module loading failures on Vercel
 let db: any;
-try {
-  // Use require so better-sqlite3 is loaded at runtime rather than static import time
-  const DatabaseConstructor = require("better-sqlite3");
-  db = new DatabaseConstructor("studybuddy.db");
-  console.log("Successfully connected to SQLite database (studybuddy.db).");
-} catch (err) {
-  console.warn("better-sqlite3 could not be loaded at module level, falling back to MockDatabase:", err);
+if (process.env.VERCEL) {
+  console.log("Running on Vercel, bypassing better-sqlite3 and using MockDatabase.");
   db = new MockDatabase();
+} else {
+  try {
+    // Use require so better-sqlite3 is loaded at runtime rather than static import time
+    const DatabaseConstructor = require("better-sqlite3");
+    db = new DatabaseConstructor("studybuddy.db");
+    console.log("Successfully connected to SQLite database (studybuddy.db).");
+  } catch (err) {
+    console.warn("better-sqlite3 could not be loaded at module level, falling back to MockDatabase:", err);
+    db = new MockDatabase();
+  }
 }
 
 // Ensure database tables exist
@@ -142,7 +146,7 @@ async function callGeminiWithRetryAndFailover(
   const isImageModel = params.model.indexOf("image") !== -1;
   const modelsToTry = isImageModel 
     ? [params.model] 
-    : [params.model, "gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.5-flash-lite"];
+    : [params.model, "gemini-3.5-flash", "gemini-3.1-flash-lite"];
 
   for (const modelCandidate of modelsToTry) {
     let currentRetries = retries;
@@ -177,7 +181,8 @@ async function callGeminiWithRetryAndFailover(
   throw new Error("All candidate Gemini models failed after retries.");
 }
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Gamification Helper
 const addPoints = (userId: any, points: number) => {
@@ -493,7 +498,7 @@ app.post("/api/gemini/answer", async (req, res) => {
 
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: { parts },
       config: {
         systemInstruction: systemInstruction,
@@ -571,7 +576,7 @@ app.post("/api/gemini/quiz", async (req, res) => {
 
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: instructionText,
       config: {
         responseMimeType: "application/json"
@@ -652,6 +657,7 @@ io.on("connection", (socket) => {
 // Vite & Static Asset Handling Middleware
 async function initializeViteAndStaticAssets() {
   if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

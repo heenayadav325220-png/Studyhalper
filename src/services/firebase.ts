@@ -13,6 +13,9 @@ import {
 } from "firebase/auth";
 import { 
   getFirestore, 
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   collection, 
   doc, 
   getDoc, 
@@ -44,7 +47,18 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+
+let db: any;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
+  });
+} catch (e) {
+  console.warn("Could not initialize Firestore with persistent local cache, falling back to standard getFirestore:", e);
+  db = getFirestore(app);
+}
 
 export { 
   app, 

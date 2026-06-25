@@ -54,21 +54,25 @@ export async function saveUserProfile(user: User): Promise<void> {
 }
 
 export async function getUserProfile(userId: string | number): Promise<User | null> {
-  const userRef = doc(db, "users", String(userId));
-  const snap = await getDoc(userRef);
-  if (snap.exists()) {
-    const data = snap.data();
-    return {
-      id: userId,
-      name: data.name,
-      school: data.school,
-      className: data.className,
-      points: data.points || 0,
-      level: data.level || 1,
-      avatar: data.avatar || "🐼",
-      badges: data.badges || [],
-      pet: data.pet || undefined
-    };
+  try {
+    const userRef = doc(db, "users", String(userId));
+    const snap = await getDoc(userRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      return {
+        id: userId,
+        name: data.name,
+        school: data.school,
+        className: data.className,
+        points: data.points || 0,
+        level: data.level || 1,
+        avatar: data.avatar || "🐼",
+        badges: data.badges || [],
+        pet: data.pet || undefined
+      };
+    }
+  } catch (err) {
+    console.warn("Offline or failed to fetch user profile from Firestore:", err);
   }
   return null;
 }
