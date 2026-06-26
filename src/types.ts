@@ -47,6 +47,7 @@ export interface ScheduleItem {
   time: string;
   day: string;
   completed: boolean;
+  category?: 'Exam' | 'Homework' | 'Project' | 'Other';
 }
 
 export interface Progress {

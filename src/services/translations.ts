@@ -101,6 +101,17 @@ export const TRANSLATIONS: Record<string, Record<AppLanguage, string>> = {
     French: 'Badges et récompenses académiques',
     German: 'Akademische Auszeichnungen'
   },
+  'leaderboard_title': {
+    English: 'Study Leaderboard',
+    Hindi: 'अध्ययन लीडरबोर्ड',
+    Hinglish: 'Study Leaderboard',
+    Marathi: 'अभ्यास लीडरबोर्ड',
+    Tamil: 'படிப்பு லீடர்போர்டு',
+    Bengali: 'স্টাডি লিডারবোর্ড',
+    Spanish: 'Tabla de clasificación de estudio',
+    French: 'Tableau des leaders',
+    German: 'Studien-Bestenliste'
+  },
   'progress_title': {
     English: 'Learning Progress',
     Hindi: 'सीखने की प्रगति रिपोर्ट',

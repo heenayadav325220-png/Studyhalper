@@ -61,7 +61,7 @@ async function callClientGeminiWithRetry(
   // Use official stable models for fallbacks
   const candidates = isImageModel 
     ? [params.model, "gemini-2.5-flash-image", "gemini-3.1-flash-image"] 
-    : [params.model, "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
+    : [params.model, "gemini-flash-latest", "gemini-3.1-flash-lite", "gemini-3.5-flash"];
   const modelsToTry = candidates.filter((item, index) => candidates.indexOf(item) === index);
 
   for (const modelCandidate of modelsToTry) {
@@ -170,7 +170,7 @@ export async function getStudyAnswer(
       : `${appInfo} ${creatorInfo} You are a helpful study assistant. Explain concepts clearly and provide step-by-step solutions. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. If the user asks for a diagram or visual explanation, describe it clearly or suggest a visual aid. ${langInstruction}`;
 
     const response = await callClientGeminiWithRetry(ai, {
-      model: "gemini-3.5-flash",
+      model: "gemini-flash-latest",
       contents: { parts },
       config: {
         systemInstruction: systemInstruction,
@@ -286,7 +286,7 @@ export async function generateQuiz(
     const instructionText = `Generate a 5-question multiple choice quiz ${classText} for ${subject} ${langPromptText}. Return only valid JSON in the format: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}]`;
 
     const response = await callClientGeminiWithRetry(ai, {
-      model: "gemini-3.5-flash",
+      model: "gemini-flash-latest",
       contents: instructionText,
       config: {
         responseMimeType: "application/json",
@@ -349,7 +349,7 @@ Identify key terms, definitions, formulas, or concepts. For each, create a brief
 Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`;
 
       const response = await callClientGeminiWithRetry(ai, {
-        model: "gemini-3.5-flash",
+        model: "gemini-flash-latest",
         contents: instructionText,
         config: {
           responseMimeType: "application/json",

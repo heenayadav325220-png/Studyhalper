@@ -160,7 +160,8 @@ export async function getSchedule(userId: string | number): Promise<ScheduleItem
         task: d.task || "",
         time: d.time || "",
         day: d.day || "Monday",
-        completed: d.completed || false
+        completed: d.completed || false,
+        category: d.category || "Homework"
       });
     });
     return results;
@@ -176,7 +177,8 @@ export async function saveScheduleItem(userId: string | number, item: Partial<Sc
     task: item.task || "",
     time: item.time || "",
     day: item.day || "Monday",
-    completed: item.completed ?? false
+    completed: item.completed ?? false,
+    category: item.category || "Homework"
   };
 
   if (item.id) {

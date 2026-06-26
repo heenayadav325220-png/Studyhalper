@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.mystudyapp.app',
-  appName: 'My Study App',
+  appId: 'com.ascendstudy.app',
+  appName: 'Ascend Study',
   webDir: 'dist'
 };
 

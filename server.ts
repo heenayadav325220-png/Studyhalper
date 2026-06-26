@@ -145,7 +145,7 @@ async function callGeminiWithRetryAndFailover(
   const isImageModel = params.model.indexOf("image") !== -1;
   const candidates = isImageModel 
     ? [params.model, "gemini-2.5-flash-image", "gemini-3.1-flash-image"] 
-    : [params.model, "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
+    : [params.model, "gemini-flash-latest", "gemini-3.1-flash-lite", "gemini-3.5-flash"];
   const modelsToTry = candidates.filter((item, index) => candidates.indexOf(item) === index);
 
   for (const modelCandidate of modelsToTry) {
@@ -199,7 +199,7 @@ app.get("/api/gemini/health", async (req, res) => {
   try {
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
+      model: "gemini-flash-latest",
       contents: "Test connection: respond with 'OK'",
     });
     if (response && response.text) {
@@ -501,7 +501,7 @@ app.post("/api/gemini/answer", async (req, res) => {
 
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
+      model: "gemini-flash-latest",
       contents: { parts },
       config: {
         systemInstruction: systemInstruction,
@@ -579,7 +579,7 @@ app.post("/api/gemini/quiz", async (req, res) => {
 
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
+      model: "gemini-flash-latest",
       contents: instructionText,
       config: {
         responseMimeType: "application/json"
@@ -619,7 +619,7 @@ Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`;
 
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
+      model: "gemini-flash-latest",
       contents: instructionText,
       config: {
         responseMimeType: "application/json"
@@ -756,7 +756,7 @@ async function testGeminiOnStartup() {
     console.log("🚀 [Startup] Running Gemini API health connection test with failover...");
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
+      model: "gemini-flash-latest",
       contents: "API connection validation. Return exactly the word 'SUCCESS'.",
     });
     console.log(`✅ [Startup] Gemini API connection test SUCCEEDED: "${response.text?.trim()}"`);

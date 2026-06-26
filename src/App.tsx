@@ -17,6 +17,7 @@ import {
   Mic,
   Camera,
   Award,
+  Trophy,
   Star,
   MoreVertical,
   X,
@@ -638,7 +639,8 @@ export default function App() {
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [newNote, setNewNote] = useState({ title: '', content: '', subject: 'Mathematics' as Subject });
   const [isAddingSchedule, setIsAddingSchedule] = useState(false);
-  const [newSchedule, setNewSchedule] = useState({ task: '', time: '', day: 'Monday' });
+  const [newSchedule, setNewSchedule] = useState<{ task: string; time: string; day: string; category: 'Exam' | 'Homework' | 'Project' | 'Other' }>({ task: '', time: '', day: 'Monday', category: 'Homework' });
+  const [badgeToast, setBadgeToast] = useState<{ badge_name: string; icon: string } | null>(null);
   const [isAddingGroup, setIsAddingGroup] = useState(false);
   const [newGroup, setNewGroup] = useState({ name: '', description: '' });
   const [isAddingGroupNote, setIsAddingGroupNote] = useState(false);
@@ -976,11 +978,44 @@ export default function App() {
       const newLevel = Math.floor(newPoints / 100) + 1;
       const updatedBadges = [...(prev.badges || [])];
 
+      let newlyEarnedBadge: any = null;
+
       if (checkBadgeType === 'quiz' && !updatedBadges.some(b => b.badge_name === 'Quiz Master')) {
-        updatedBadges.push({ id: Date.now(), badge_name: 'Quiz Master', icon: '🏆', date_earned: new Date().toLocaleDateString() });
+        newlyEarnedBadge = { id: Date.now(), badge_name: 'Quiz Master', icon: '🏆', date_earned: new Date().toLocaleDateString() };
+        updatedBadges.push(newlyEarnedBadge);
       }
       if (checkBadgeType === 'note' && !updatedBadges.some(b => b.badge_name === 'Note Taker')) {
-        updatedBadges.push({ id: Date.now() + 1, badge_name: 'Note Taker', icon: '📝', date_earned: new Date().toLocaleDateString() });
+        newlyEarnedBadge = { id: Date.now() + 1, badge_name: 'Note Taker', icon: '📝', date_earned: new Date().toLocaleDateString() };
+        updatedBadges.push(newlyEarnedBadge);
+      }
+      if (checkBadgeType === 'math_whiz' && !updatedBadges.some(b => b.badge_name === 'Math Whiz')) {
+        newlyEarnedBadge = { id: Date.now() + 2, badge_name: 'Math Whiz', icon: '📐', date_earned: new Date().toLocaleDateString() };
+        updatedBadges.push(newlyEarnedBadge);
+      }
+      if (checkBadgeType === 'science_master' && !updatedBadges.some(b => b.badge_name === 'Science Master')) {
+        newlyEarnedBadge = { id: Date.now() + 3, badge_name: 'Science Master', icon: '🔬', date_earned: new Date().toLocaleDateString() };
+        updatedBadges.push(newlyEarnedBadge);
+      }
+      if (checkBadgeType === 'study_session' && !updatedBadges.some(b => b.badge_name === 'Study Scholar')) {
+        newlyEarnedBadge = { id: Date.now() + 4, badge_name: 'Study Scholar', icon: '🎓', date_earned: new Date().toLocaleDateString() };
+        updatedBadges.push(newlyEarnedBadge);
+      }
+      if (checkBadgeType === 'topic_master' && !updatedBadges.some(b => b.badge_name === 'Topic Master')) {
+        newlyEarnedBadge = { id: Date.now() + 5, badge_name: 'Topic Master', icon: '⭐', date_earned: new Date().toLocaleDateString() };
+        updatedBadges.push(newlyEarnedBadge);
+      }
+      if (checkBadgeType === 'task_completed' && !updatedBadges.some(b => b.badge_name === 'Task Master')) {
+        newlyEarnedBadge = { id: Date.now() + 6, badge_name: 'Task Master', icon: '✅', date_earned: new Date().toLocaleDateString() };
+        updatedBadges.push(newlyEarnedBadge);
+      }
+
+      if (newlyEarnedBadge) {
+        setTimeout(() => {
+          setBadgeToast({ badge_name: newlyEarnedBadge.badge_name, icon: newlyEarnedBadge.icon });
+          setTimeout(() => {
+            setBadgeToast(null);
+          }, 5000);
+        }, 50);
       }
 
       const updatedUser = { ...prev, points: newPoints, level: newLevel, badges: updatedBadges };
@@ -990,6 +1025,37 @@ export default function App() {
       }
       return updatedUser;
     });
+  };
+
+  // Generate leaderboard displaying real users + fallback friendly classmates for competitive design
+  const getLeaderboardList = () => {
+    const defaultCompetitors = [
+      { name: "Bob Verma 🦊", points: 340, level: 4 },
+      { name: "Alice Sharma 🦄", points: 280, level: 3 },
+      { name: "Sarah Patel 🦉", points: 195, level: 2 },
+      { name: "Rohan Das 🐼", points: 145, level: 2 },
+    ];
+
+    // Combine current user if logged in
+    const activeUserEntry = user ? { name: `${user.name} (You) ⭐️`, points: user.points || 0, level: user.level || 1 } : null;
+
+    let combined = [...leaderboard];
+    if (combined.length === 0) {
+      combined = defaultCompetitors;
+    }
+
+    if (activeUserEntry) {
+      // If user is not already in combined, add them
+      if (!combined.some(c => c.name.includes(user.name))) {
+        combined.push(activeUserEntry);
+      } else {
+        // Update user entry with "(You)" label
+        combined = combined.map(c => c.name === user.name || c.name.includes(user.name) ? activeUserEntry : c);
+      }
+    }
+
+    // Sort descending by points
+    return combined.sort((a, b) => b.points - a.points).slice(0, 5);
   };
 
   // Interactive Buddy Waving System (Bringing People Up)
@@ -1280,7 +1346,7 @@ export default function App() {
       setSchedule(prev => prev.map(s => {
         if (s.id === item.id) {
           if (updatedCompleted) {
-            awardPoints(10);
+            awardPoints(10, 'task_completed');
             completeStreakDay(5); // Complete Day 5: complete planner task
           }
           return { ...s, completed: updatedCompleted };
@@ -1301,7 +1367,8 @@ export default function App() {
           task: newSchedule.task,
           time: newSchedule.time || '12:00',
           day: newSchedule.day,
-          completed: false
+          completed: false,
+          category: newSchedule.category
         });
       } else {
         const localSched = JSON.parse(localStorage.getItem('studybuddy_guest_schedule') || '[]');
@@ -1310,7 +1377,8 @@ export default function App() {
           task: newSchedule.task,
           time: newSchedule.time || '12:00',
           day: newSchedule.day,
-          completed: false
+          completed: false,
+          category: newSchedule.category
         };
         localSched.push(newLocalSchedItem);
         localStorage.setItem('studybuddy_guest_schedule', JSON.stringify(localSched));
@@ -1321,11 +1389,12 @@ export default function App() {
         task: newSchedule.task, 
         time: newSchedule.time || '12:00', 
         day: newSchedule.day, 
-        completed: false 
+        completed: false,
+        category: newSchedule.category
       };
       setSchedule(prev => [...prev, item]);
       setIsAddingSchedule(false);
-      setNewSchedule({ task: '', time: '', day: 'Monday' });
+      setNewSchedule({ task: '', time: '', day: 'Monday', category: 'Homework' });
       awardPoints(5);
     } catch (err) {
       console.error("Failed to add schedule item:", err);
@@ -1403,6 +1472,14 @@ export default function App() {
       awardPoints(nextScore * 10, 'quiz');
       if (nextScore >= 3) {
         completeQuest('quiz_hero');
+        if (quizSubject === 'Mathematics') {
+          awardPoints(0, 'math_whiz');
+        } else if (['Science', 'Physics', 'Biology', 'Chemistry'].includes(quizSubject || '')) {
+          awardPoints(0, 'science_master');
+        }
+      }
+      if (quizQuestions.length > 0 && nextScore === quizQuestions.length) {
+        awardPoints(0, 'topic_master');
       }
     }
   };
@@ -1685,7 +1762,7 @@ export default function App() {
         // Complete session
         setIsFlashcardSessionActive(false);
         playAudioChime('levelUp');
-        awardPoints(20, 'quiz');
+        awardPoints(25, 'study_session');
       }
     } catch (err) {
       console.error("Failed to save flashcard review:", err);
@@ -1981,6 +2058,66 @@ export default function App() {
             )}
           </AnimatePresence>
 
+          {/* Badge Unlocked Notification Toast */}
+          <AnimatePresence>
+            {badgeToast && (
+              <motion.div 
+                initial={{ y: -100, opacity: 0, scale: 0.85 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                exit={{ y: -100, opacity: 0, scale: 0.85 }}
+                transition={{ 
+                  type: "spring", 
+                  stiffness: 140, 
+                  damping: 14, 
+                  mass: 0.8 
+                }}
+                className="absolute top-4 left-4 right-4 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 text-white rounded-3xl p-4 shadow-2xl z-50 flex items-center space-x-4 border border-amber-300 overflow-hidden"
+                id="badge_toast"
+              >
+                {/* Gloss/Shine Sweep Animation */}
+                <motion.div 
+                  initial={{ x: "-100%" }}
+                  animate={{ x: "200%" }}
+                  transition={{ repeat: Infinity, duration: 2.2, ease: "linear", repeatDelay: 1 }}
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12 pointer-events-none"
+                />
+
+                {/* Animated Badge Icon with Bounce/Rotation */}
+                <motion.div 
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: "spring", stiffness: 240, damping: 15, delay: 0.15 }}
+                  className="w-12 h-12 bg-white/25 rounded-full flex items-center justify-center text-3xl shadow-inner shrink-0 relative z-10"
+                >
+                  {badgeToast.icon}
+                </motion.div>
+
+                {/* Sliding/Fading Text Container */}
+                <motion.div 
+                  initial={{ opacity: 0, x: -15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.25, duration: 0.35, ease: "easeOut" }}
+                  className="flex-1 min-w-0 relative z-10"
+                >
+                  <p className="text-[10px] uppercase font-black tracking-widest text-amber-100 animate-pulse">Achievement Unlocked! 🎖️</p>
+                  <p className="text-sm font-black text-white truncate">{badgeToast.badge_name}</p>
+                  <p className="text-xs text-amber-50/95 font-medium">You earned a new academic badge!</p>
+                </motion.div>
+
+                {/* Animated XP Pill */}
+                <motion.div 
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 280, damping: 12, delay: 0.35 }}
+                  className="text-right shrink-0 relative z-10"
+                >
+                  <span className="bg-white text-amber-600 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1">
+                    ✨ +50 XP
+                  </span>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
         {/* Dynamic Nav View Render */}
         <main className="flex-1 w-full overflow-hidden flex flex-col relative" id="main_pane">
@@ -2523,6 +2660,16 @@ export default function App() {
                           badgeColors = "from-pink-100 via-rose-50 to-red-50 text-pink-600 border-pink-200";
                         } else if (b.badge_name === 'Quiz Master') {
                           badgeColors = "from-purple-100 via-indigo-50 to-violet-50 text-purple-600 border-purple-200";
+                        } else if (b.badge_name === 'Math Whiz') {
+                          badgeColors = "from-blue-100 via-cyan-50 to-teal-50 text-blue-600 border-blue-200";
+                        } else if (b.badge_name === 'Science Master') {
+                          badgeColors = "from-emerald-100 via-teal-50 to-green-50 text-emerald-600 border-emerald-200";
+                        } else if (b.badge_name === 'Study Scholar') {
+                          badgeColors = "from-indigo-100 via-sky-50 to-violet-50 text-indigo-600 border-indigo-200";
+                        } else if (b.badge_name === 'Topic Master') {
+                          badgeColors = "from-amber-100 via-yellow-100 to-orange-100 text-amber-700 border-amber-300";
+                        } else if (b.badge_name === 'Task Master') {
+                          badgeColors = "from-teal-100 via-emerald-50 to-green-50 text-teal-600 border-teal-200";
                         }
                         return (
                           <div key={b.id} className="flex flex-col items-center text-center group cursor-pointer">
@@ -2539,6 +2686,53 @@ export default function App() {
                         <span className="text-[10px] font-black leading-none">+ more</span>
                         <span className="text-[7px] font-bold text-slate-400 mt-1 uppercase text-center leading-none">study on</span>
                       </div>
+                    </div>
+                  </section>
+
+                  {/* Leaderboard - Friendly Competition */}
+                  <section className="bg-white p-4.5 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+                    <div className="flex justify-between items-center border-b border-slate-50 pb-2">
+                      <h2 className="text-xs font-extrabold text-slate-800 tracking-tight flex items-center uppercase text-slate-500">
+                        <Trophy className="w-4 h-4 text-amber-500 mr-2 animate-bounce" />
+                        {translate('leaderboard_title', appLanguage, 'Study Leaderboard')} 🏆
+                      </h2>
+                      <span className="text-[9px] font-mono bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg font-black uppercase tracking-wider">
+                        Class Rank #{getLeaderboardList().findIndex(c => c.name.includes('(You)')) + 1 || 5}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {getLeaderboardList().map((player, idx) => {
+                        const isSelf = player.name.includes('(You)');
+                        const rankMedals = ['🥇', '🥈', '🥉'];
+                        return (
+                          <div 
+                            key={idx} 
+                            className={`flex items-center justify-between p-2.5 rounded-2xl border transition-all duration-200 ${
+                              isSelf 
+                                ? 'bg-indigo-50/75 border-indigo-200 shadow-2xs scale-[1.01]' 
+                                : 'bg-slate-50/50 border-slate-100'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <span className="w-6 text-center text-xs font-black text-slate-400">
+                                {idx < 3 ? rankMedals[idx] : `${idx + 1}`}
+                              </span>
+                              <div>
+                                <p className={`text-xs font-black ${isSelf ? 'text-indigo-900' : 'text-slate-800'}`}>
+                                  {player.name}
+                                </p>
+                                <p className="text-[9px] text-slate-400 font-bold uppercase">
+                                  Level {player.level} • Rank Classmate
+                                </p>
+                              </div>
+                            </div>
+                            <span className={`text-[11px] font-mono font-black ${isSelf ? 'text-indigo-600' : 'text-slate-650'}`}>
+                              {player.points} XP
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </section>
 
@@ -3042,7 +3236,19 @@ export default function App() {
                                 {item.completed ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <Circle className="w-5 h-5 text-slate-300" />}
                               </button>
                               <div>
-                                <p className={`text-xs font-bold ${item.completed ? 'line-through text-slate-400' : 'text-slate-800'}`}>{item.task}</p>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className={`text-xs font-bold ${item.completed ? 'line-through text-slate-400' : 'text-slate-800'}`}>{item.task}</p>
+                                  {item.category && (
+                                    <span className={`text-[8px] px-2 py-0.5 rounded-full font-mono font-extrabold uppercase border shadow-2xs shrink-0 select-none ${
+                                      item.category === 'Exam' ? 'bg-rose-50 border-rose-200 text-rose-700' :
+                                      item.category === 'Project' ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                                      item.category === 'Other' ? 'bg-slate-50 border-slate-200 text-slate-700' :
+                                      'bg-indigo-50 border-indigo-200 text-indigo-700'
+                                    }`}>
+                                      {item.category}
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mt-0.5">{item.day} • {item.time}</p>
                               </div>
                             </div>
@@ -3527,6 +3733,15 @@ export default function App() {
                   <input type="time" value={newSchedule.time} onChange={(e) => setNewSchedule({...newSchedule, time: e.target.value})} className="p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none" />
                   <select value={newSchedule.day} onChange={(e) => setNewSchedule({...newSchedule, day: e.target.value})} className="p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none text-slate-700">
                     {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] uppercase font-black text-slate-400 tracking-wider">Category</label>
+                  <select value={newSchedule.category} onChange={(e) => setNewSchedule({...newSchedule, category: e.target.value as any})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none text-slate-700">
+                    <option value="Homework">Homework 📝</option>
+                    <option value="Exam">Exam 🎓</option>
+                    <option value="Project">Project 🧪</option>
+                    <option value="Other">Other 📌</option>
                   </select>
                 </div>
                 <button onClick={handleAddSchedule} className="w-full py-3 bg-indigo-600 text-white rounded-xl text-xs font-bold active:scale-95 transition">Add Session</button>
