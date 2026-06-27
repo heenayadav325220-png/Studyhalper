@@ -1,6 +1,35 @@
 import { GoogleGenAI } from "@google/genai";
 import { FALLBACK_QUIZZES, getFallbackAnswer } from "./fallbackData";
 
+export let isAiQuotaExceeded = false;
+export let lastAiErrorMessage: string | null = null;
+
+export function setAiQuotaExceeded(val: boolean, msg: string | null = null) {
+  isAiQuotaExceeded = val;
+  lastAiErrorMessage = msg;
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("ai-quota-state-changed", { detail: { exceeded: val, message: msg } }));
+  }
+}
+
+// Global fetch interceptor for Gemini API Quota detection
+if (typeof window !== "undefined" && !(window as any).__geminiInterceptorInstalled) {
+  (window as any).__geminiInterceptorInstalled = true;
+  const originalFetch = window.fetch;
+  window.fetch = async function (...args) {
+    const response = await originalFetch.apply(this, args);
+    try {
+      const quotaHeader = response.headers.get("x-gemini-quota-exceeded");
+      if (quotaHeader === "true") {
+        setAiQuotaExceeded(true, "Quota Exceeded on AI Studio / Cloud project.");
+      }
+    } catch (e) {
+      // Ignore header access errors
+    }
+    return response;
+  };
+}
+
 // Lazy-loaded client-side fallback
 let clientAiInstance: any = null;
 function getClientAiInstance(): any {
@@ -33,6 +62,7 @@ function handleApiError(error: any): string {
     return "Invalid API Key: Please verify that your VITE_GEMINI_API_KEY is correct in your settings.";
   }
   if (status === 429 || errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("Rate limit")) {
+    setAiQuotaExceeded(true, "Rate Limit Exceeded on Gemini client API.");
     return "Rate Limit Exceeded: We are receiving too many requests. Please wait a moment and try again.";
   }
   if (status === 503 || errMsg.includes("503") || errMsg.includes("UNAVAILABLE") || errMsg.includes("busy") || errMsg.includes("high demand")) {
@@ -235,7 +265,8 @@ export async function generateStudyDiagram(prompt: string): Promise<string | nul
 export async function generateQuiz(
   subject: string, 
   studentContext?: { name: string; school: string; className: string }, 
-  language: string = "English"
+  language: string = "English",
+  difficulty: string = "Medium"
 ): Promise<any[]> {
   // 1. Try secure backend server route (Primary route)
   try {
@@ -244,7 +275,7 @@ export async function generateQuiz(
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ subject, studentContext, language }),
+      body: JSON.stringify({ subject, studentContext, language, difficulty }),
     });
 
     if (response.ok) {
@@ -283,7 +314,16 @@ export async function generateQuiz(
       langPromptText = `entirely in German language. All questions, descriptions, and option texts MUST be in clean German.`;
     }
 
-    const instructionText = `Generate a 5-question multiple choice quiz ${classText} for ${subject} ${langPromptText}. Return only valid JSON in the format: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}]`;
+    let difficultyInstruct = "";
+    if (difficulty === "Easy") {
+      difficultyInstruct = "The difficulty of the quiz MUST be EASY. Focus on introductory definitions, basic principles, and simple, direct questions. Make option distractors very simple.";
+    } else if (difficulty === "Hard") {
+      difficultyInstruct = "The difficulty of the quiz MUST be HARD or ADVANCED. Focus on complex, multi-step problem solving, critical thinking, advanced theories, and subtle nuances. Use trickier, plausible option distractors.";
+    } else {
+      difficultyInstruct = "The difficulty of the quiz MUST be MEDIUM. Provide a balanced mix of conceptual recall, analytical questions, and practical applications suitable for typical classroom standards.";
+    }
+
+    const instructionText = `Generate a 5-question multiple choice quiz ${classText} for ${subject} ${langPromptText}. ${difficultyInstruct} Return only valid JSON in the format: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}]`;
 
     const response = await callClientGeminiWithRetry(ai, {
       model: "gemini-flash-latest",
@@ -310,13 +350,39 @@ export async function generateQuiz(
   return FALLBACK_QUIZZES[subject]?.[langKey] || FALLBACK_QUIZZES[subject]?.["English"] || [];
 }
 
+// Client-side flashcard cache
+const clientFlashcardsCache = new Map<string, Array<{ front: string; back: string }>>();
+
 export async function generateFlashcards(
   subject: string,
   noteTitle?: string,
   noteContent?: string,
   count: number = 5
 ): Promise<Array<{ front: string; back: string }>> {
-  // 1. Try secure backend server route (Primary route)
+  const cacheKey = `${subject}_${noteTitle || ""}_${noteContent || ""}_${count}`;
+
+  // 1. Try local memory cache
+  if (clientFlashcardsCache.has(cacheKey)) {
+    console.log(`[Cache Hit - Client Memory] Returning flashcards for: ${cacheKey}`);
+    return clientFlashcardsCache.get(cacheKey)!;
+  }
+
+  // 2. Try localStorage cache fallback
+  try {
+    const localCacheStr = localStorage.getItem('studybuddy_flashcard_api_cache');
+    if (localCacheStr) {
+      const cacheMap = JSON.parse(localCacheStr);
+      if (cacheMap[cacheKey] && Array.isArray(cacheMap[cacheKey]) && cacheMap[cacheKey].length > 0) {
+        console.log(`[Cache Hit - Client LocalStorage] Returning flashcards for: ${cacheKey}`);
+        clientFlashcardsCache.set(cacheKey, cacheMap[cacheKey]);
+        return cacheMap[cacheKey];
+      }
+    }
+  } catch (err) {
+    console.warn("Could not read client flashcard localStorage cache", err);
+  }
+
+  // 3. Try secure backend server route (Primary route)
   try {
     const response = await fetch("/api/gemini/flashcard", {
       method: "POST",
@@ -329,6 +395,16 @@ export async function generateFlashcards(
     if (response.ok) {
       const data = await response.json();
       if (Array.isArray(data) && data.length > 0) {
+        // Cache success
+        clientFlashcardsCache.set(cacheKey, data);
+        try {
+          const localCacheStr = localStorage.getItem('studybuddy_flashcard_api_cache') || '{}';
+          const cacheMap = JSON.parse(localCacheStr);
+          cacheMap[cacheKey] = data;
+          localStorage.setItem('studybuddy_flashcard_api_cache', JSON.stringify(cacheMap));
+        } catch (cErr) {
+          console.warn("Failed to store local cache", cErr);
+        }
         return data;
       }
     }
@@ -336,7 +412,7 @@ export async function generateFlashcards(
     console.warn("Backend Gemini flashcards route unreachable, trying client-side fallback...", error);
   }
 
-  // 2. Client-side fallback if VITE_GEMINI_API_KEY is available
+  // 4. Client-side fallback if VITE_GEMINI_API_KEY is available
   try {
     const ai = getClientAiInstance();
     if (ai) {
@@ -344,25 +420,68 @@ export async function generateFlashcards(
         ? `based on the note titled "${noteTitle || 'Untitled'}" with content: "${noteContent}"`
         : `for the subject "${subject}"`;
 
-      const instructionText = `Generate exactly ${count} educational study flashcards ${contextText}.
+      // Batching strategy on client side if count > 5
+      let finalCards: Array<{ front: string; back: string }> = [];
+
+      if (count > 5) {
+        const prompts = [
+          `Generate exactly 5 educational study flashcards ${contextText}. Focus on foundational terms and core definitions. Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`,
+          `Generate exactly ${count - 5} educational study flashcards ${contextText}. Focus on secondary concepts, formulas, and deep-dive details. Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`
+        ];
+
+        const batchPromises = prompts.map(p => 
+          callClientGeminiWithRetry(ai, {
+            model: "gemini-3.5-flash",
+            contents: p,
+            config: { responseMimeType: "application/json" }
+          })
+        );
+
+        const responses = await Promise.all(batchPromises);
+        for (const res of responses) {
+          try {
+            const parsed = JSON.parse(res.text || "[]");
+            if (Array.isArray(parsed)) {
+              finalCards.push(...parsed);
+            }
+          } catch (e) {
+            console.warn("Client batch flashcards JSON parsing failed.", e);
+          }
+        }
+      } else {
+        const instructionText = `Generate exactly ${count} educational study flashcards ${contextText}.
 Identify key terms, definitions, formulas, or concepts. For each, create a brief, clear, engaging question or term for the "front" and a precise, easy-to-understand answer or explanation for the "back".
 Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`;
 
-      const response = await callClientGeminiWithRetry(ai, {
-        model: "gemini-flash-latest",
-        contents: instructionText,
-        config: {
-          responseMimeType: "application/json",
-        },
-      });
+        const response = await callClientGeminiWithRetry(ai, {
+          model: "gemini-3.5-flash",
+          contents: instructionText,
+          config: {
+            responseMimeType: "application/json",
+          },
+        });
 
-      try {
-        const parsed = JSON.parse(response.text || "[]");
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+        try {
+          const parsed = JSON.parse(response.text || "[]");
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            finalCards = parsed;
+          }
+        } catch (e) {
+          console.warn("Client flashcards JSON parsing failed.", e);
         }
-      } catch (e) {
-        console.warn("Client flashcards JSON parsing failed.", e);
+      }
+
+      if (finalCards.length > 0) {
+        clientFlashcardsCache.set(cacheKey, finalCards);
+        try {
+          const localCacheStr = localStorage.getItem('studybuddy_flashcard_api_cache') || '{}';
+          const cacheMap = JSON.parse(localCacheStr);
+          cacheMap[cacheKey] = finalCards;
+          localStorage.setItem('studybuddy_flashcard_api_cache', JSON.stringify(cacheMap));
+        } catch (cErr) {
+          console.warn("Failed to store local cache", cErr);
+        }
+        return finalCards;
       }
     }
   } catch (clientError) {

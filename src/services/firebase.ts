@@ -34,15 +34,7 @@ import {
   writeBatch
 } from "firebase/firestore";
 
-// Public Firebase config credentials from firebase-applet-config.json
-const firebaseConfig = {
-  apiKey: "AIzaSyDabGlcgDJHqvvPGGuecGnogqHztNvS-Kc",
-  authDomain: "planar-surfer-plkqp.firebaseapp.com",
-  projectId: "planar-surfer-plkqp",
-  storageBucket: "planar-surfer-plkqp.firebasestorage.app",
-  messagingSenderId: "45675025134",
-  appId: "1:45675025134:web:56f8bbbc7780f37dff19ff"
-};
+import firebaseConfig from "../../firebase-applet-config.json";
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -54,10 +46,57 @@ try {
     localCache: persistentLocalCache({
       tabManager: persistentMultipleTabManager(),
     }),
-  });
+  }, firebaseConfig.firestoreDatabaseId);
 } catch (e) {
   console.warn("Could not initialize Firestore with persistent local cache, falling back to standard getFirestore:", e);
-  db = getFirestore(app);
+  db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+}
+
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
 }
 
 export { 

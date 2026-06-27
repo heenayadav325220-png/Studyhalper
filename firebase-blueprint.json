@@ -65,9 +65,52 @@
         "name": { "type": "string" },
         "description": { "type": "string" },
         "created_by": { "type": "string" },
-        "created_at": { "type": "string", "format": "date-time" }
+        "created_at": { "type": "string", "format": "date-time" },
+        "subject": { "type": "string", "description": "Subject category of the study group." },
+        "course": { "type": "string", "description": "Specific course or class name." }
       },
       "required": ["id", "name", "created_by", "created_at"]
+    },
+    "GroupQuestion": {
+      "title": "Group Question",
+      "description": "A question posted to the group, which can receive answers/comments.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "asked_by": { "type": "string" },
+        "asked_by_name": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "answers": {
+          "type": "array",
+          "description": "Array of answers posted by other members."
+        }
+      },
+      "required": ["id", "title", "content", "asked_by", "asked_by_name", "created_at"]
+    },
+    "GroupSession": {
+      "title": "Group Study Session",
+      "description": "A scheduled virtual study session with RSVP capabilities.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "topic": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "duration": { "type": "integer" },
+        "meeting_platform": { "type": "string" },
+        "meeting_link": { "type": "string" },
+        "created_by": { "type": "string" },
+        "created_by_name": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "rsvps": {
+          "type": "array",
+          "description": "Attendee status markers."
+        }
+      },
+      "required": ["id", "title", "topic", "date", "time", "duration", "meeting_platform", "created_by", "created_by_name", "created_at"]
     },
     "GroupMember": {
       "title": "Study Group Member",
@@ -142,6 +185,14 @@
     "/groups/{groupId}/notes/{noteId}": {
       "schema": "GroupNote",
       "description": "Shared notebook for brainstorming and task distribution inside study groups."
+    },
+    "/groups/{groupId}/questions/{questionId}": {
+      "schema": "GroupQuestion",
+      "description": "Interactive questions and academic peer help boards within the group."
+    },
+    "/groups/{groupId}/sessions/{sessionId}": {
+      "schema": "GroupSession",
+      "description": "Scheduled virtual live study sessions for group participants."
     }
   }
 }

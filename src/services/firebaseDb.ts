@@ -12,9 +12,11 @@ import {
   query, 
   where, 
   orderBy, 
-  limit 
+  limit,
+  handleFirestoreError,
+  OperationType
 } from "./firebase";
-import type { User, Note, ScheduleItem, Progress, Group, GroupMessage, GroupNote, Flashcard } from "../types";
+import type { User, Note, ScheduleItem, Progress, Group, GroupMessage, GroupNote, Flashcard, GroupQuestion, GroupSession } from "../types";
 
 /**
  * Validates connection to Firestore as required by firebase-integration skill.
@@ -34,25 +36,29 @@ export async function testFirestoreConnection() {
 export async function saveUserProfile(user: User): Promise<void> {
   if (!user.id) return;
   const userRef = doc(db, "users", String(user.id));
-  await setDoc(userRef, {
-    uid: String(user.id),
-    name: user.name,
-    school: user.school,
-    className: user.className,
-    points: user.points,
-    level: user.level,
-    avatar: user.avatar || "🐼",
-    badges: user.badges || [],
-    pet: user.pet || {
-      name: 'Chimpu 🐼',
-      happiness: 85,
-      fullness: 80,
-      accessory: 'none',
-      petCount: 0
-    },
-    quests: (user as any).quests || [],
-    streakDays: (user as any).streakDays || []
-  }, { merge: true });
+  try {
+    await setDoc(userRef, {
+      uid: String(user.id),
+      name: user.name,
+      school: user.school,
+      className: user.className,
+      points: user.points,
+      level: user.level,
+      avatar: user.avatar || "🐼",
+      badges: user.badges || [],
+      pet: user.pet || {
+        name: 'Chimpu 🐼',
+        happiness: 85,
+        fullness: 80,
+        accessory: 'none',
+        petCount: 0
+      },
+      quests: (user as any).quests || [],
+      streakDays: (user as any).streakDays || []
+    }, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `users/${user.id}`);
+  }
 }
 
 export async function getUserProfile(userId: string | number): Promise<User | null> {
@@ -127,27 +133,35 @@ export async function getNotes(userId: string | number): Promise<Note[]> {
 }
 
 export async function saveNote(userId: string | number, note: Partial<Note> & { id?: string | number }): Promise<string> {
-  const colRef = collection(db, "users", String(userId), "notes");
-  const payload = {
-    title: note.title || "Untitled Note",
-    content: note.content || "",
-    subject: note.subject || "Mathematics",
-    updated_at: new Date().toISOString()
-  };
+  try {
+    const colRef = collection(db, "users", String(userId), "notes");
+    const payload = {
+      title: note.title || "Untitled Note",
+      content: note.content || "",
+      subject: note.subject || "Mathematics",
+      updated_at: new Date().toISOString()
+    };
 
-  if (note.id) {
-    const docRef = doc(db, "users", String(userId), "notes", String(note.id));
-    await setDoc(docRef, payload, { merge: true });
-    return String(note.id);
-  } else {
-    const docRef = await addDoc(colRef, payload);
-    return docRef.id;
+    if (note.id) {
+      const docRef = doc(db, "users", String(userId), "notes", String(note.id));
+      await setDoc(docRef, payload, { merge: true });
+      return String(note.id);
+    } else {
+      const docRef = await addDoc(colRef, payload);
+      return docRef.id;
+    }
+  } catch (error) {
+    handleFirestoreError(error, note.id ? OperationType.UPDATE : OperationType.CREATE, `users/${userId}/notes/${note.id || 'new'}`);
   }
 }
 
 export async function deleteNote(userId: string | number, noteId: string | number): Promise<void> {
   const docRef = doc(db, "users", String(userId), "notes", String(noteId));
-  await deleteDoc(docRef);
+  try {
+    await deleteDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `users/${userId}/notes/${noteId}`);
+  }
 }
 
 // ---------------- STUDY SCHEDULE ----------------
@@ -176,22 +190,26 @@ export async function getSchedule(userId: string | number): Promise<ScheduleItem
 }
 
 export async function saveScheduleItem(userId: string | number, item: Partial<ScheduleItem> & { id?: string | number }): Promise<string> {
-  const colRef = collection(db, "users", String(userId), "schedule");
-  const payload = {
-    task: item.task || "",
-    time: item.time || "",
-    day: item.day || "Monday",
-    completed: item.completed ?? false,
-    category: item.category || "Homework"
-  };
+  try {
+    const colRef = collection(db, "users", String(userId), "schedule");
+    const payload = {
+      task: item.task || "",
+      time: item.time || "",
+      day: item.day || "Monday",
+      completed: item.completed ?? false,
+      category: item.category || "Homework"
+    };
 
-  if (item.id) {
-    const docRef = doc(db, "users", String(userId), "schedule", String(item.id));
-    await setDoc(docRef, payload, { merge: true });
-    return String(item.id);
-  } else {
-    const docRef = await addDoc(colRef, payload);
-    return docRef.id;
+    if (item.id) {
+      const docRef = doc(db, "users", String(userId), "schedule", String(item.id));
+      await setDoc(docRef, payload, { merge: true });
+      return String(item.id);
+    } else {
+      const docRef = await addDoc(colRef, payload);
+      return docRef.id;
+    }
+  } catch (error) {
+    handleFirestoreError(error, item.id ? OperationType.UPDATE : OperationType.CREATE, `users/${userId}/schedule/${item.id || 'new'}`);
   }
 }
 
@@ -254,7 +272,9 @@ export async function getGroups(): Promise<Group[]> {
         description: d.description || "",
         created_by: d.created_by || "",
         created_at: d.created_at || new Date().toISOString(),
-        member_count: membersSnap.size
+        member_count: membersSnap.size,
+        subject: d.subject || "General",
+        course: d.course || ""
       });
     }
     return results;
@@ -264,41 +284,316 @@ export async function getGroups(): Promise<Group[]> {
   }
 }
 
-export async function createGroup(name: string, description: string, userId: string | number, userName: string): Promise<string> {
-  const colRef = collection(db, "groups");
-  const docRef = await addDoc(colRef, {
-    name,
-    description,
-    created_by: String(userId),
-    created_at: new Date().toISOString()
-  });
+export async function createGroup(
+  name: string, 
+  description: string, 
+  userId: string | number, 
+  userName: string,
+  subject?: string,
+  course?: string
+): Promise<string> {
+  try {
+    const colRef = collection(db, "groups");
+    const docRef = await addDoc(colRef, {
+      name,
+      description,
+      created_by: String(userId),
+      created_at: new Date().toISOString(),
+      subject: subject || "General",
+      course: course || ""
+    });
 
-  // Add the creator as the admin member in the group
-  const memberRef = doc(db, "groups", docRef.id, "members", String(userId));
-  await setDoc(memberRef, {
-    uid: String(userId),
-    name: userName,
-    role: "admin",
-    joined_at: new Date().toISOString()
-  });
+    // Add the creator as the admin member in the group
+    const memberRef = doc(db, "groups", docRef.id, "members", String(userId));
+    await setDoc(memberRef, {
+      uid: String(userId),
+      name: userName,
+      role: "admin",
+      joined_at: new Date().toISOString()
+    });
 
-  return docRef.id;
+    return docRef.id;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, `groups`);
+  }
 }
 
 export async function joinGroup(groupId: string | number, userId: string | number, userName: string): Promise<void> {
-  const memberRef = doc(db, "groups", String(groupId), "members", String(userId));
-  await setDoc(memberRef, {
-    uid: String(userId),
-    name: userName,
-    role: "member",
-    joined_at: new Date().toISOString()
-  });
+  try {
+    const memberRef = doc(db, "groups", String(groupId), "members", String(userId));
+    await setDoc(memberRef, {
+      uid: String(userId),
+      name: userName,
+      role: "member",
+      joined_at: new Date().toISOString()
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `groups/${groupId}/members/${userId}`);
+  }
 }
 
 export async function isUserInGroup(groupId: string | number, userId: string | number): Promise<boolean> {
   const memberRef = doc(db, "groups", String(groupId), "members", String(userId));
   const snap = await getDoc(memberRef);
   return snap.exists();
+}
+
+// ---------------- GROUP QUESTIONS ----------------
+
+export function subscribeToGroupQuestions(groupId: string | number, callback: (questions: GroupQuestion[]) => void) {
+  if (String(groupId).startsWith("local_")) {
+    const fetchLocal = () => {
+      const localQ = JSON.parse(localStorage.getItem(`studybuddy_group_questions_${groupId}`) || "[]");
+      callback(localQ);
+    };
+    fetchLocal();
+    const storageHandler = (e: StorageEvent) => {
+      if (e.key === `studybuddy_group_questions_${groupId}`) {
+        fetchLocal();
+      }
+    };
+    window.addEventListener("storage", storageHandler);
+    return () => window.removeEventListener("storage", storageHandler);
+  }
+
+  const colRef = collection(db, "groups", String(groupId), "questions");
+  const q = query(colRef, orderBy("created_at", "desc"));
+  return onSnapshot(q, (snap) => {
+    const results: GroupQuestion[] = [];
+    snap.forEach((docSnap) => {
+      const d = docSnap.data();
+      results.push({
+        id: docSnap.id,
+        group_id: groupId,
+        title: d.title || "",
+        content: d.content || "",
+        asked_by: d.asked_by || "",
+        asked_by_name: d.asked_by_name || "Anonymous",
+        created_at: d.created_at || new Date().toISOString(),
+        answers: d.answers || []
+      });
+    });
+    callback(results);
+  });
+}
+
+export async function saveGroupQuestion(
+  groupId: string | number,
+  question: Partial<GroupQuestion> & { id?: string | number },
+  userId: string | number,
+  userName: string
+): Promise<string> {
+  const payload = {
+    title: question.title || "Untitled Question",
+    content: question.content || "",
+    asked_by: String(userId),
+    asked_by_name: userName,
+    created_at: question.created_at || new Date().toISOString(),
+    answers: question.answers || []
+  };
+
+  if (String(groupId).startsWith("local_")) {
+    const localQ = JSON.parse(localStorage.getItem(`studybuddy_group_questions_${groupId}`) || "[]");
+    const id = question.id ? String(question.id) : "local_q_" + Date.now();
+    const fullPayload: GroupQuestion = {
+      id,
+      group_id: groupId,
+      ...payload
+    };
+
+    if (question.id) {
+      const idx = localQ.findIndex((q: any) => q.id === String(question.id));
+      if (idx !== -1) {
+        localQ[idx] = fullPayload;
+      }
+    } else {
+      localQ.unshift(fullPayload);
+    }
+    localStorage.setItem(`studybuddy_group_questions_${groupId}`, JSON.stringify(localQ));
+    window.dispatchEvent(new StorageEvent("storage", { key: `studybuddy_group_questions_${groupId}` }));
+    return id;
+  }
+
+  if (question.id) {
+    const docRef = doc(db, "groups", String(groupId), "questions", String(question.id));
+    await setDoc(docRef, payload, { merge: true });
+    return String(question.id);
+  } else {
+    const colRef = collection(db, "groups", String(groupId), "questions");
+    const docRef = await addDoc(colRef, payload);
+    return docRef.id;
+  }
+}
+
+export async function answerGroupQuestion(
+  groupId: string | number,
+  questionId: string | number,
+  answerText: string,
+  userId: string | number,
+  userName: string
+): Promise<void> {
+  const newAnswer = {
+    id: "ans_" + Date.now(),
+    user_id: String(userId),
+    user_name: userName,
+    text: answerText,
+    created_at: new Date().toISOString()
+  };
+
+  if (String(groupId).startsWith("local_")) {
+    const localQ = JSON.parse(localStorage.getItem(`studybuddy_group_questions_${groupId}`) || "[]");
+    const idx = localQ.findIndex((q: any) => q.id === String(questionId));
+    if (idx !== -1) {
+      if (!localQ[idx].answers) localQ[idx].answers = [];
+      localQ[idx].answers.push(newAnswer);
+      localStorage.setItem(`studybuddy_group_questions_${groupId}`, JSON.stringify(localQ));
+      window.dispatchEvent(new StorageEvent("storage", { key: `studybuddy_group_questions_${groupId}` }));
+    }
+    return;
+  }
+
+  // Retrieve current doc to append answer
+  const docRef = doc(db, "groups", String(groupId), "questions", String(questionId));
+  const snap = await getDoc(docRef);
+  if (snap.exists()) {
+    const currentAnswers = snap.data().answers || [];
+    currentAnswers.push(newAnswer);
+    await updateDoc(docRef, { answers: currentAnswers });
+  }
+}
+
+// ---------------- GROUP SESSIONS ----------------
+
+export function subscribeToGroupSessions(groupId: string | number, callback: (sessions: GroupSession[]) => void) {
+  if (String(groupId).startsWith("local_")) {
+    const fetchLocal = () => {
+      const localS = JSON.parse(localStorage.getItem(`studybuddy_group_sessions_${groupId}`) || "[]");
+      callback(localS);
+    };
+    fetchLocal();
+    const storageHandler = (e: StorageEvent) => {
+      if (e.key === `studybuddy_group_sessions_${groupId}`) {
+        fetchLocal();
+      }
+    };
+    window.addEventListener("storage", storageHandler);
+    return () => window.removeEventListener("storage", storageHandler);
+  }
+
+  const colRef = collection(db, "groups", String(groupId), "sessions");
+  const q = query(colRef, orderBy("date", "asc"));
+  return onSnapshot(q, (snap) => {
+    const results: GroupSession[] = [];
+    snap.forEach((docSnap) => {
+      const d = docSnap.data();
+      results.push({
+        id: docSnap.id,
+        group_id: groupId,
+        title: d.title || "",
+        topic: d.topic || "",
+        date: d.date || "",
+        time: d.time || "",
+        duration: d.duration || 30,
+        meeting_platform: d.meeting_platform || "Google Meet",
+        meeting_link: d.meeting_link || "",
+        created_by: d.created_by || "",
+        created_by_name: d.created_by_name || "Anonymous",
+        created_at: d.created_at || new Date().toISOString(),
+        rsvps: d.rsvps || []
+      });
+    });
+    callback(results);
+  });
+}
+
+export async function saveGroupSession(
+  groupId: string | number,
+  session: Partial<GroupSession> & { id?: string | number },
+  userId: string | number,
+  userName: string
+): Promise<string> {
+  const payload = {
+    title: session.title || "Virtual Study Room",
+    topic: session.topic || "",
+    date: session.date || new Date().toISOString().split('T')[0],
+    time: session.time || "12:00",
+    duration: Number(session.duration) || 45,
+    meeting_platform: session.meeting_platform || "Google Meet",
+    meeting_link: session.meeting_link || "",
+    created_by: String(userId),
+    created_by_name: userName,
+    created_at: session.created_at || new Date().toISOString(),
+    rsvps: session.rsvps || []
+  };
+
+  if (String(groupId).startsWith("local_")) {
+    const localS = JSON.parse(localStorage.getItem(`studybuddy_group_sessions_${groupId}`) || "[]");
+    const id = session.id ? String(session.id) : "local_s_" + Date.now();
+    const fullPayload: GroupSession = {
+      id,
+      group_id: groupId,
+      ...payload
+    };
+
+    if (session.id) {
+      const idx = localS.findIndex((s: any) => s.id === String(session.id));
+      if (idx !== -1) {
+        localS[idx] = fullPayload;
+      }
+    } else {
+      localS.push(fullPayload);
+    }
+    localStorage.setItem(`studybuddy_group_sessions_${groupId}`, JSON.stringify(localS));
+    window.dispatchEvent(new StorageEvent("storage", { key: `studybuddy_group_sessions_${groupId}` }));
+    return id;
+  }
+
+  if (session.id) {
+    const docRef = doc(db, "groups", String(groupId), "sessions", String(session.id));
+    await setDoc(docRef, payload, { merge: true });
+    return String(session.id);
+  } else {
+    const colRef = collection(db, "groups", String(groupId), "sessions");
+    const docRef = await addDoc(colRef, payload);
+    return docRef.id;
+  }
+}
+
+export async function rsvpGroupSession(
+  groupId: string | number,
+  sessionId: string | number,
+  userId: string | number,
+  userName: string,
+  status: 'yes' | 'no' | 'maybe'
+): Promise<void> {
+  const attendee = {
+    user_id: String(userId),
+    user_name: userName,
+    status
+  };
+
+  if (String(groupId).startsWith("local_")) {
+    const localS = JSON.parse(localStorage.getItem(`studybuddy_group_sessions_${groupId}`) || "[]");
+    const idx = localS.findIndex((s: any) => s.id === String(sessionId));
+    if (idx !== -1) {
+      if (!localS[idx].rsvps) localS[idx].rsvps = [];
+      const currentRsvps = localS[idx].rsvps.filter((r: any) => r.user_id !== String(userId));
+      currentRsvps.push(attendee);
+      localS[idx].rsvps = currentRsvps;
+      localStorage.setItem(`studybuddy_group_sessions_${groupId}`, JSON.stringify(localS));
+      window.dispatchEvent(new StorageEvent("storage", { key: `studybuddy_group_sessions_${groupId}` }));
+    }
+    return;
+  }
+
+  const docRef = doc(db, "groups", String(groupId), "sessions", String(sessionId));
+  const snap = await getDoc(docRef);
+  if (snap.exists()) {
+    const rsvps: any[] = snap.data().rsvps || [];
+    const updatedRsvps = rsvps.filter((r) => r.user_id !== String(userId));
+    updatedRsvps.push(attendee);
+    await updateDoc(docRef, { rsvps: updatedRsvps });
+  }
 }
 
 export function subscribeToGroupMessages(groupId: string | number, callback: (msgs: GroupMessage[]) => void) {

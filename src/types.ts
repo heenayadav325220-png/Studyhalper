@@ -93,6 +93,8 @@ export interface Group {
   created_by: string | number;
   created_at: string;
   member_count?: number;
+  subject?: string;
+  course?: string;
 }
 
 export interface GroupMessage {
@@ -113,6 +115,47 @@ export interface GroupNote {
   updated_by: string | number;
   updated_by_name: string;
   updated_at: string;
+}
+
+export interface GroupQuestionAnswer {
+  id: string | number;
+  user_id: string | number;
+  user_name: string;
+  text: string;
+  created_at: string;
+}
+
+export interface GroupQuestion {
+  id: string | number;
+  group_id: string | number;
+  title: string;
+  content: string;
+  asked_by: string | number;
+  asked_by_name: string;
+  created_at: string;
+  answers?: GroupQuestionAnswer[];
+}
+
+export interface GroupSessionAttendee {
+  user_id: string | number;
+  user_name: string;
+  status: 'yes' | 'no' | 'maybe';
+}
+
+export interface GroupSession {
+  id: string | number;
+  group_id: string | number;
+  title: string;
+  topic: string;
+  date: string;
+  time: string;
+  duration: number; // in minutes
+  meeting_platform: string; // Zoom, Google Meet, Microsoft Teams, Jitsi, etc.
+  meeting_link?: string;
+  created_by: string | number;
+  created_by_name: string;
+  created_at: string;
+  rsvps?: GroupSessionAttendee[];
 }
 
 export interface Flashcard {

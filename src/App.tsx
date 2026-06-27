@@ -33,16 +33,22 @@ import {
   Maximize2,
   Volume2,
   VolumeX,
-  Music
+  Music,
+  Video,
+  Search,
+  HelpCircle,
+  Check,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { getStudyAnswer, generateQuiz, generateStudyDiagram, generateFlashcards } from './services/geminiService';
+import { getStudyAnswer, generateQuiz, generateStudyDiagram, generateFlashcards, isAiQuotaExceeded } from './services/geminiService';
 import { LANGUAGES, translate } from './services/translations';
 import { ProgressChart } from './components/ProgressChart';
 import { StudyTimer } from './components/StudyTimer';
 import { HomeworkSolver } from './components/HomeworkSolver';
+import InteractiveToolkit from './components/InteractiveToolkit';
 import type { AppLanguage } from './services/translations';
-import type { Note, ScheduleItem, Progress, ChatMessage, Subject, User as UserType, Group, GroupMessage, GroupNote, Flashcard } from './types';
+import type { Note, ScheduleItem, Progress, ChatMessage, Subject, User as UserType, Group, GroupMessage, GroupNote, Flashcard, GroupQuestion, GroupSession } from './types';
 import { 
   auth, 
   db,
@@ -74,13 +80,20 @@ import {
   getGroups, 
   createGroup, 
   joinGroup, 
+  isUserInGroup,
   subscribeToGroupMessages, 
   sendGroupMessage, 
   subscribeToGroupNotes, 
   saveGroupNote,
   getFlashcards,
   saveFlashcard,
-  deleteFlashcard
+  deleteFlashcard,
+  subscribeToGroupQuestions,
+  saveGroupQuestion,
+  answerGroupQuestion,
+  subscribeToGroupSessions,
+  saveGroupSession,
+  rsvpGroupSession
 } from './services/firebaseDb';
 
 
@@ -610,6 +623,8 @@ export default function App() {
 
   // Flashcards UI session and generator states
   const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
+  const [flashcardProgressStage, setFlashcardProgressStage] = useState<string>('');
+  const [flashcardProgressPercent, setFlashcardProgressPercent] = useState<number>(0);
   const [isFlashcardSessionActive, setIsFlashcardSessionActive] = useState(false);
   const [currentFlashcardIndex, setCurrentFlashcardIndex] = useState(0);
   const [isFlashcardFlipped, setIsFlashcardFlipped] = useState(false);
@@ -630,21 +645,46 @@ export default function App() {
 
   // Group views helper states
   const [activeGroup, setActiveGroup] = useState<Group | null>(null);
-  const [groupTab, setGroupTab] = useState<'chat' | 'notes'>('chat');
+  const [groupTab, setGroupTab] = useState<'chat' | 'notes' | 'questions' | 'sessions'>('chat');
   const [groupChatInput, setGroupChatInput] = useState('');
   const [groupMessages, setGroupMessages] = useState<Record<string | number, GroupMessage[]>>({});
   const [groupNotes, setGroupNotes] = useState<Record<string | number, GroupNote[]>>({});
+  const [groupQuestions, setGroupQuestions] = useState<Record<string | number, GroupQuestion[]>>({});
+  const [groupSessions, setGroupSessions] = useState<Record<string | number, GroupSession[]>>({});
+  const [joinedGroupIds, setJoinedGroupIds] = useState<(string | number)[]>([]);
+
+  // Filtering states for groups list
+  const [groupFilterSubject, setGroupFilterSubject] = useState<string>('All');
+  const [groupSearchCourse, setGroupSearchCourse] = useState<string>('');
 
   // Modal helpers
   const [isAddingNote, setIsAddingNote] = useState(false);
+  const [isToolkitOpen, setIsToolkitOpen] = useState(false);
   const [newNote, setNewNote] = useState({ title: '', content: '', subject: 'Mathematics' as Subject });
   const [isAddingSchedule, setIsAddingSchedule] = useState(false);
   const [newSchedule, setNewSchedule] = useState<{ task: string; time: string; day: string; category: 'Exam' | 'Homework' | 'Project' | 'Other' }>({ task: '', time: '', day: 'Monday', category: 'Homework' });
   const [badgeToast, setBadgeToast] = useState<{ badge_name: string; icon: string } | null>(null);
+  
   const [isAddingGroup, setIsAddingGroup] = useState(false);
-  const [newGroup, setNewGroup] = useState({ name: '', description: '' });
+  const [newGroup, setNewGroup] = useState({ name: '', description: '', subject: 'Mathematics' as Subject, course: '' });
+  
   const [isAddingGroupNote, setIsAddingGroupNote] = useState(false);
   const [newGroupNote, setNewGroupNote] = useState({ title: '', content: '' });
+
+  const [isAddingGroupQuestion, setIsAddingGroupQuestion] = useState(false);
+  const [newGroupQuestion, setNewGroupQuestion] = useState({ title: '', content: '' });
+
+  const [isAddingGroupSession, setIsAddingGroupSession] = useState(false);
+  const [newGroupSession, setNewGroupSession] = useState({
+    title: '',
+    topic: '',
+    date: '',
+    time: '',
+    duration: 45,
+    meeting_platform: 'Google Meet',
+    meeting_link: ''
+  });
+  const [newAnswerInputs, setNewAnswerInputs] = useState<Record<string, string>>({});
 
   // Quiz helper states
   const [quizSubject, setQuizSubject] = useState<Subject | null>(null);
@@ -654,12 +694,24 @@ export default function App() {
   const [isQuizLoading, setIsQuizLoading] = useState(false);
   const [quizFinished, setQuizFinished] = useState(false);
   const [quizLanguage, setQuizLanguage] = useState<AppLanguage>('English');
+  const [quizDifficulty, setQuizDifficulty] = useState<'Easy' | 'Medium' | 'Hard'>('Medium');
   const [appLanguage, setAppLanguage] = useState<AppLanguage>(() => {
     return (localStorage.getItem('studybuddy_appLanguage') as AppLanguage) || 'English';
   });
+  const [quotaExceeded, setQuotaExceeded] = useState(isAiQuotaExceeded);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [showXpGuide, setShowXpGuide] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleQuotaChange = (e: any) => {
+      setQuotaExceeded(e.detail?.exceeded ?? false);
+    };
+    window.addEventListener('ai-quota-state-changed', handleQuotaChange);
+    return () => {
+      window.removeEventListener('ai-quota-state-changed', handleQuotaChange);
+    };
+  }, []);
 
   // Real Firebase and Authentication state listener
   useEffect(() => {
@@ -768,85 +820,100 @@ export default function App() {
     return () => clearTimeout(timeoutId);
   }, [quests, streakDays, pet, firebaseUser, user?.id]);
 
+  // Reusable function to sync student data from Firestore or LocalStorage
+  const syncStudentData = async () => {
+    if (!user) return;
+    try {
+      if (firebaseUser) {
+        const userNotes = await getNotes(firebaseUser.uid);
+        setNotes(userNotes);
+
+        const userSchedule = await getSchedule(firebaseUser.uid);
+        setSchedule(userSchedule);
+
+        const userProgress = await getProgress(firebaseUser.uid);
+        setProgress(userProgress);
+
+        const allGroups = await getGroups();
+        setGroups(allGroups);
+
+        try {
+          const memberships = await Promise.all(
+            allGroups.map(async (g) => {
+              const isMember = await isUserInGroup(g.id, firebaseUser.uid);
+              return isMember ? g.id : null;
+            })
+          );
+          setJoinedGroupIds(memberships.filter(id => id !== null) as (string | number)[]);
+        } catch (mErr) {
+          console.error("Error verifying group memberships:", mErr);
+        }
+
+        const board = await getLeaderboard();
+        setLeaderboard(board);
+
+        const userFlashcards = await getFlashcards(firebaseUser.uid);
+        setFlashcards(userFlashcards);
+      } else {
+        // Guest local fallback
+        const localNotes = JSON.parse(localStorage.getItem('studybuddy_guest_notes') || '[]');
+        setNotes(localNotes);
+
+        const localSchedule = JSON.parse(localStorage.getItem('studybuddy_guest_schedule') || '[]');
+        setSchedule(localSchedule);
+
+        const localProgress = JSON.parse(localStorage.getItem('studybuddy_guest_progress') || '[]');
+        setProgress(localProgress);
+
+        const localGroups = JSON.parse(localStorage.getItem('studybuddy_guest_groups') || '[]');
+        setGroups(localGroups);
+
+        const localJoined = JSON.parse(localStorage.getItem('studybuddy_guest_joined_groups') || '[]');
+        setJoinedGroupIds(localJoined);
+
+        const localFlashcards = JSON.parse(localStorage.getItem('studybuddy_guest_flashcards') || '[]');
+        setFlashcards(localFlashcards);
+      }
+
+      // Populate peer list dynamically from Firestore
+      const peerBuddies: any[] = [];
+      if (firebaseUser) {
+        try {
+          const otherUsersSnap = await getDocs(query(collection(db, "users"), limit(10)));
+          otherUsersSnap.forEach((docSnap) => {
+            if (docSnap.id !== firebaseUser.uid) {
+              const data = docSnap.data();
+              peerBuddies.push({
+                id: docSnap.id,
+                name: data.name || "Study Companion",
+                subject: data.className ? `Class ${data.className} student` : "General Study",
+                online: Math.random() > 0.3,
+                avatar: data.avatar || "🦊",
+                waveResponse: `Hey ${user.name}! Let's study and complete our daily challenges together! 🚀`
+              });
+            }
+          });
+        } catch (err) {
+          console.error("Error loading peer presence:", err);
+        }
+      }
+
+      if (peerBuddies.length === 0) {
+        peerBuddies.push(
+          { id: 'b1', name: 'Alice Sharma', subject: 'Mathematics', online: true, avatar: '🦄', waveResponse: `Hey ${user.name}! Mathematics is fun, let's solve some sums! ✏️` },
+          { id: 'b2', name: 'Bob Verma', subject: 'Science', online: true, avatar: '🦊', waveResponse: `Hey ${user.name}! Ready to review biology chapter 3 today? 🔬` },
+          { id: 'b3', name: 'Sarah Patel', subject: 'English', online: false, avatar: '🦉', waveResponse: `Just read a story book! Catch you later!` }
+        );
+      }
+      setBuddies(peerBuddies);
+
+    } catch (err) {
+      console.error("Error syncing student database:", err);
+    }
+  };
+
   // Sync personal database items from Firestore
   useEffect(() => {
-    if (!user) return;
-
-    const syncStudentData = async () => {
-      try {
-        if (firebaseUser) {
-          const userNotes = await getNotes(firebaseUser.uid);
-          setNotes(userNotes);
-
-          const userSchedule = await getSchedule(firebaseUser.uid);
-          setSchedule(userSchedule);
-
-          const userProgress = await getProgress(firebaseUser.uid);
-          setProgress(userProgress);
-
-          const allGroups = await getGroups();
-          setGroups(allGroups);
-
-          const board = await getLeaderboard();
-          setLeaderboard(board);
-
-          const userFlashcards = await getFlashcards(firebaseUser.uid);
-          setFlashcards(userFlashcards);
-        } else {
-          // Guest local fallback
-          const localNotes = JSON.parse(localStorage.getItem('studybuddy_guest_notes') || '[]');
-          setNotes(localNotes);
-
-          const localSchedule = JSON.parse(localStorage.getItem('studybuddy_guest_schedule') || '[]');
-          setSchedule(localSchedule);
-
-          const localProgress = JSON.parse(localStorage.getItem('studybuddy_guest_progress') || '[]');
-          setProgress(localProgress);
-
-          const localGroups = JSON.parse(localStorage.getItem('studybuddy_guest_groups') || '[]');
-          setGroups(localGroups);
-
-          const localFlashcards = JSON.parse(localStorage.getItem('studybuddy_guest_flashcards') || '[]');
-          setFlashcards(localFlashcards);
-        }
-
-        // Populate peer list dynamically from Firestore
-        const peerBuddies: any[] = [];
-        if (firebaseUser) {
-          try {
-            const otherUsersSnap = await getDocs(query(collection(db, "users"), limit(10)));
-            otherUsersSnap.forEach((docSnap) => {
-              if (docSnap.id !== firebaseUser.uid) {
-                const data = docSnap.data();
-                peerBuddies.push({
-                  id: docSnap.id,
-                  name: data.name || "Study Companion",
-                  subject: data.className ? `Class ${data.className} student` : "General Study",
-                  online: Math.random() > 0.3,
-                  avatar: data.avatar || "🦊",
-                  waveResponse: `Hey ${user.name}! Let's study and complete our daily challenges together! 🚀`
-                });
-              }
-            });
-          } catch (err) {
-            console.error("Error loading peer presence:", err);
-          }
-        }
-
-        if (peerBuddies.length === 0) {
-          peerBuddies.push(
-            { id: 'b1', name: 'Alice Sharma', subject: 'Mathematics', online: true, avatar: '🦄', waveResponse: `Hey ${user.name}! Mathematics is fun, let's solve some sums! ✏️` },
-            { id: 'b2', name: 'Bob Verma', subject: 'Science', online: true, avatar: '🦊', waveResponse: `Hey ${user.name}! Ready to review biology chapter 3 today? 🔬` },
-            { id: 'b3', name: 'Sarah Patel', subject: 'English', online: false, avatar: '🦉', waveResponse: `Just read a story book! Catch you later!` }
-          );
-        }
-        setBuddies(peerBuddies);
-
-      } catch (err) {
-        console.error("Error syncing student database:", err);
-      }
-    };
-
     syncStudentData();
   }, [firebaseUser, user]);
 
@@ -854,39 +921,78 @@ export default function App() {
   useEffect(() => {
     if (!activeGroup) return;
 
-    // Load group messages from local storage
-    const localMsgs = JSON.parse(localStorage.getItem(`studybuddy_group_messages_${activeGroup.id}`) || '[]');
-    // If it's empty, add some cute mock greetings from our online buddies to make it interactive!
-    if (localMsgs.length === 0) {
-      const defaultGreetings: GroupMessage[] = [
-        {
-          id: 'gmsg_init_1',
-          group_id: activeGroup.id,
-          user_id: 'b1',
-          user_name: 'Alice Sharma',
-          text: `Welcome to ${activeGroup.name}! Let's prepare our notes here! 📚`,
-          created_at: new Date(Date.now() - 3600000).toISOString()
-        },
-        {
-          id: 'gmsg_init_2',
-          group_id: activeGroup.id,
-          user_id: 'b2',
-          user_name: 'Bob Verma',
-          text: `Awesome, I'm ready for the study session! 🚀 Let's ask Gemini AI if we need help.`,
-          created_at: new Date(Date.now() - 1800000).toISOString()
-        }
-      ];
-      localStorage.setItem(`studybuddy_group_messages_${activeGroup.id}`, JSON.stringify(defaultGreetings));
-      setGroupMessages(prev => ({ ...prev, [activeGroup.id]: defaultGreetings }));
+    let unsubMessages = () => {};
+    let unsubNotes = () => {};
+    let unsubQuestions = () => {};
+    let unsubSessions = () => {};
+
+    if (firebaseUser) {
+      // Firebase real-time listeners
+      unsubMessages = subscribeToGroupMessages(activeGroup.id, (msgs) => {
+        setGroupMessages(prev => ({ ...prev, [activeGroup.id]: msgs }));
+      });
+
+      unsubNotes = subscribeToGroupNotes(activeGroup.id, (notes) => {
+        setGroupNotes(prev => ({ ...prev, [activeGroup.id]: notes }));
+      });
+
+      unsubQuestions = subscribeToGroupQuestions(activeGroup.id, (questions) => {
+        setGroupQuestions(prev => ({ ...prev, [activeGroup.id]: questions }));
+      });
+
+      unsubSessions = subscribeToGroupSessions(activeGroup.id, (sessions) => {
+        setGroupSessions(prev => ({ ...prev, [activeGroup.id]: sessions }));
+      });
     } else {
-      setGroupMessages(prev => ({ ...prev, [activeGroup.id]: localMsgs }));
+      // Load group messages from local storage
+      const localMsgs = JSON.parse(localStorage.getItem(`studybuddy_group_messages_${activeGroup.id}`) || '[]');
+      // If it's empty, add some cute mock greetings from our online buddies to make it interactive!
+      if (localMsgs.length === 0) {
+        const defaultGreetings: GroupMessage[] = [
+          {
+            id: 'gmsg_init_1',
+            group_id: activeGroup.id,
+            user_id: 'b1',
+            user_name: 'Alice Sharma',
+            text: `Welcome to ${activeGroup.name}! Let's prepare our notes here! 📚`,
+            created_at: new Date(Date.now() - 3600000).toISOString()
+          },
+          {
+            id: 'gmsg_init_2',
+            group_id: activeGroup.id,
+            user_id: 'b2',
+            user_name: 'Bob Verma',
+            text: `Awesome, I'm ready for the study session! 🚀 Let's ask Gemini AI if we need help.`,
+            created_at: new Date(Date.now() - 1800000).toISOString()
+          }
+        ];
+        localStorage.setItem(`studybuddy_group_messages_${activeGroup.id}`, JSON.stringify(defaultGreetings));
+        setGroupMessages(prev => ({ ...prev, [activeGroup.id]: defaultGreetings }));
+      } else {
+        setGroupMessages(prev => ({ ...prev, [activeGroup.id]: localMsgs }));
+      }
+
+      // Load group notes from local storage
+      const localNotes = JSON.parse(localStorage.getItem(`studybuddy_group_notes_${activeGroup.id}`) || '[]');
+      setGroupNotes(prev => ({ ...prev, [activeGroup.id]: localNotes }));
+
+      // Load group questions & sessions from local storage with real-time reactive event listeners
+      unsubQuestions = subscribeToGroupQuestions(activeGroup.id, (questions) => {
+        setGroupQuestions(prev => ({ ...prev, [activeGroup.id]: questions }));
+      });
+
+      unsubSessions = subscribeToGroupSessions(activeGroup.id, (sessions) => {
+        setGroupSessions(prev => ({ ...prev, [activeGroup.id]: sessions }));
+      });
     }
 
-    // Load group notes from local storage
-    const localNotes = JSON.parse(localStorage.getItem(`studybuddy_group_notes_${activeGroup.id}`) || '[]');
-    setGroupNotes(prev => ({ ...prev, [activeGroup.id]: localNotes }));
-
-  }, [activeGroup]);
+    return () => {
+      unsubMessages();
+      unsubNotes();
+      unsubQuestions();
+      unsubSessions();
+    };
+  }, [activeGroup, firebaseUser]);
 
   // Update local user profile when state updates
   useEffect(() => {
@@ -1401,12 +1507,15 @@ export default function App() {
     try {
       let generatedId: string | number = 'local_' + Date.now();
       if (firebaseUser) {
+        console.log("[SAVE REQUEST] Saving Sticky Note to Firestore...", { userId: firebaseUser.uid, title: newNote.title, subject: newNote.subject });
         generatedId = await saveNote(firebaseUser.uid, {
           title: newNote.title,
           content: newNote.content,
           subject: newNote.subject
         });
+        console.log("[SAVE SUCCESS] Sticky Note saved with ID:", generatedId);
       } else {
+        console.log("[SAVE REQUEST] Saving Sticky Note to LocalStorage (Guest Mode)...", { title: newNote.title });
         const localNotes = JSON.parse(localStorage.getItem('studybuddy_guest_notes') || '[]');
         const newLocalNote = {
           id: generatedId,
@@ -1417,6 +1526,7 @@ export default function App() {
         };
         localNotes.unshift(newLocalNote);
         localStorage.setItem('studybuddy_guest_notes', JSON.stringify(localNotes));
+        console.log("[SAVE SUCCESS] Sticky Note saved to LocalStorage with ID:", generatedId);
       }
 
       const noteItem: Note = { 
@@ -1431,8 +1541,13 @@ export default function App() {
       setNewNote({ title: '', content: '', subject: 'Mathematics' });
       awardPoints(15, 'note');
       completeStreakDay(4); // Complete Day 4: study note creation
+
+      // Reload data after successful save to ensure absolute consistency
+      await syncStudentData();
     } catch (err) {
-      console.error("Failed to add note:", err);
+      console.error("[SAVE ERROR] Failed to add note:", err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      alert(`Error: Failed to save Sticky Note.\nDetails: ${errMsg}`);
     }
   };
 
@@ -1490,6 +1605,7 @@ export default function App() {
     try {
       let generatedId: string | number = 'local_' + Date.now();
       if (firebaseUser) {
+        console.log("[SAVE REQUEST] Saving Daily Planner task to Firestore...", { userId: firebaseUser.uid, task: newSchedule.task, category: newSchedule.category });
         generatedId = await saveScheduleItem(firebaseUser.uid, {
           task: newSchedule.task,
           time: newSchedule.time || '12:00',
@@ -1497,7 +1613,9 @@ export default function App() {
           completed: false,
           category: newSchedule.category
         });
+        console.log("[SAVE SUCCESS] Daily Planner task saved with ID:", generatedId);
       } else {
+        console.log("[SAVE REQUEST] Saving Daily Planner task to LocalStorage (Guest Mode)...", { task: newSchedule.task });
         const localSched = JSON.parse(localStorage.getItem('studybuddy_guest_schedule') || '[]');
         const newLocalSchedItem = {
           id: generatedId,
@@ -1509,6 +1627,7 @@ export default function App() {
         };
         localSched.push(newLocalSchedItem);
         localStorage.setItem('studybuddy_guest_schedule', JSON.stringify(localSched));
+        console.log("[SAVE SUCCESS] Daily Planner task saved to LocalStorage with ID:", generatedId);
       }
 
       const item: ScheduleItem = { 
@@ -1523,8 +1642,13 @@ export default function App() {
       setIsAddingSchedule(false);
       setNewSchedule({ task: '', time: '', day: 'Monday', category: 'Homework' });
       awardPoints(5);
+
+      // Reload data after successful save to ensure absolute consistency
+      await syncStudentData();
     } catch (err) {
-      console.error("Failed to add schedule item:", err);
+      console.error("[SAVE ERROR] Failed to add schedule item:", err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      alert(`Error: Failed to save Daily Planner task.\nDetails: ${errMsg}`);
     }
   };
 
@@ -1544,9 +1668,10 @@ export default function App() {
   };
 
   // Quiz launcher
-  const startQuiz = async (subject: Subject, lang: AppLanguage = appLanguage) => {
+  const startQuiz = async (subject: Subject, lang: AppLanguage = appLanguage, difficulty: 'Easy' | 'Medium' | 'Hard' = quizDifficulty) => {
     setQuizSubject(subject);
     setQuizLanguage(lang);
+    setQuizDifficulty(difficulty);
     setIsQuizLoading(true);
     setQuizQuestions([]);
     setCurrentQuizIndex(0);
@@ -1555,7 +1680,7 @@ export default function App() {
 
     try {
       const studentContext = user ? { name: user.name, school: user.school, className: user.className } : undefined;
-      const res = await generateQuiz(subject, studentContext, lang);
+      const res = await generateQuiz(subject, studentContext, lang, difficulty);
       setQuizQuestions(res || []);
     } catch (err) {
       console.error(err);
@@ -1642,8 +1767,18 @@ export default function App() {
     try {
       let generatedId: string | number = 'local_group_' + Date.now();
       if (firebaseUser) {
-        generatedId = await createGroup(newGroup.name, newGroup.description, firebaseUser.uid, user.name);
+        console.log("[SAVE REQUEST] Creating Study Group in Firestore...", { userId: firebaseUser.uid, name: newGroup.name, subject: newGroup.subject });
+        generatedId = await createGroup(
+          newGroup.name,
+          newGroup.description,
+          firebaseUser.uid,
+          user.name,
+          newGroup.subject,
+          newGroup.course
+        );
+        console.log("[SAVE SUCCESS] Study Group created with ID:", generatedId);
       } else {
+        console.log("[SAVE REQUEST] Creating Study Group in LocalStorage (Guest Mode)...", { name: newGroup.name });
         const localGroups = JSON.parse(localStorage.getItem('studybuddy_guest_groups') || '[]');
         const newLocalGroup = {
           id: generatedId,
@@ -1651,10 +1786,20 @@ export default function App() {
           description: newGroup.description,
           created_by: user.id,
           created_at: new Date().toISOString(),
-          member_count: 1
+          member_count: 1,
+          subject: newGroup.subject || 'Mathematics',
+          course: newGroup.course || ''
         };
         localGroups.unshift(newLocalGroup);
         localStorage.setItem('studybuddy_guest_groups', JSON.stringify(localGroups));
+
+        // Auto join for local storage
+        const localJoined = JSON.parse(localStorage.getItem('studybuddy_guest_joined_groups') || '[]');
+        if (!localJoined.includes(generatedId)) {
+          localJoined.push(generatedId);
+          localStorage.setItem('studybuddy_guest_joined_groups', JSON.stringify(localJoined));
+        }
+        console.log("[SAVE SUCCESS] Study Group created in LocalStorage with ID:", generatedId);
       }
 
       const grp: Group = { 
@@ -1663,16 +1808,140 @@ export default function App() {
         description: newGroup.description, 
         created_by: firebaseUser ? firebaseUser.uid : user.id, 
         created_at: new Date().toISOString(), 
-        member_count: 1 
+        member_count: 1,
+        subject: newGroup.subject || 'Mathematics',
+        course: newGroup.course || ''
       };
       setGroups(prev => [grp, ...prev]);
+      setJoinedGroupIds(prev => [...prev, generatedId]);
       setGroupMessages(prev => ({ ...prev, [grp.id]: [] }));
       setGroupNotes(prev => ({ ...prev, [grp.id]: [] }));
+      setGroupQuestions(prev => ({ ...prev, [grp.id]: [] }));
+      setGroupSessions(prev => ({ ...prev, [grp.id]: [] }));
       setIsAddingGroup(false);
-      setNewGroup({ name: '', description: '' });
-      awardPoints(10);
+      setNewGroup({ name: '', description: '', subject: 'Mathematics' as Subject, course: '' });
+      awardPoints(15); // Added extra points for starting a collaborative learning circle!
+
+      // Reload data after successful save to ensure absolute consistency
+      await syncStudentData();
     } catch (err) {
-      console.error("Failed to create study group:", err);
+      console.error("[SAVE ERROR] Failed to create study group:", err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      alert(`Error: Failed to create Study Group.\nDetails: ${errMsg}`);
+    }
+  };
+
+  const handleJoinGroup = async (groupId: string | number) => {
+    if (!user) return;
+    try {
+      if (firebaseUser) {
+        await joinGroup(groupId, firebaseUser.uid, user.name);
+      } else {
+        const localJoined = JSON.parse(localStorage.getItem('studybuddy_guest_joined_groups') || '[]');
+        if (!localJoined.includes(groupId)) {
+          localJoined.push(groupId);
+          localStorage.setItem('studybuddy_guest_joined_groups', JSON.stringify(localJoined));
+        }
+      }
+      setJoinedGroupIds(prev => [...prev, groupId]);
+      awardPoints(10); // Encouraging peer-to-peer connection!
+      playAudioChime('coin');
+    } catch (err) {
+      console.error("Failed to join study group:", err);
+    }
+  };
+
+  const handleCreateGroupQuestion = async () => {
+    if (!activeGroup || !newGroupQuestion.title.trim() || !user) return;
+    try {
+      await saveGroupQuestion(
+        activeGroup.id,
+        {
+          title: newGroupQuestion.title.trim(),
+          content: newGroupQuestion.content.trim(),
+        },
+        firebaseUser ? firebaseUser.uid : user.id,
+        user.name
+      );
+
+      setIsAddingGroupQuestion(false);
+      setNewGroupQuestion({ title: '', content: '' });
+      awardPoints(10); // Reward active academic questions!
+      playAudioChime('success');
+    } catch (err) {
+      console.error("Failed to create group question:", err);
+    }
+  };
+
+  const handleAnswerQuestion = async (questionId: string | number) => {
+    const text = newAnswerInputs[String(questionId)];
+    if (!text || !text.trim() || !activeGroup || !user) return;
+    try {
+      await answerGroupQuestion(
+        activeGroup.id,
+        questionId,
+        text.trim(),
+        firebaseUser ? firebaseUser.uid : user.id,
+        user.name
+      );
+
+      setNewAnswerInputs(prev => ({ ...prev, [String(questionId)]: '' }));
+      awardPoints(15); // Heavily award academic assistance!
+      playAudioChime('coin');
+    } catch (err) {
+      console.error("Failed to post answer:", err);
+    }
+  };
+
+  const handleCreateGroupSession = async () => {
+    if (!activeGroup || !newGroupSession.title.trim() || !newGroupSession.date || !newGroupSession.time || !user) return;
+    try {
+      await saveGroupSession(
+        activeGroup.id,
+        {
+          title: newGroupSession.title.trim(),
+          topic: newGroupSession.topic.trim(),
+          date: newGroupSession.date,
+          time: newGroupSession.time,
+          duration: Number(newGroupSession.duration),
+          meeting_platform: newGroupSession.meeting_platform,
+          meeting_link: newGroupSession.meeting_link.trim()
+        },
+        firebaseUser ? firebaseUser.uid : user.id,
+        user.name
+      );
+
+      setIsAddingGroupSession(false);
+      setNewGroupSession({
+        title: '',
+        topic: '',
+        date: '',
+        time: '',
+        duration: 45,
+        meeting_platform: 'Google Meet',
+        meeting_link: ''
+      });
+      awardPoints(15); // Reward scheduling collaborative events!
+      playAudioChime('success');
+    } catch (err) {
+      console.error("Failed to schedule group session:", err);
+    }
+  };
+
+  const handleRsvpSession = async (sessionId: string | number, status: 'yes' | 'no' | 'maybe') => {
+    if (!activeGroup || !user) return;
+    try {
+      await rsvpGroupSession(
+        activeGroup.id,
+        sessionId,
+        firebaseUser ? firebaseUser.uid : user.id,
+        user.name,
+        status
+      );
+      awardPoints(5); // Active RSVP points!
+      playAudioChime('success');
+    } catch (err) {
+      console.error("Failed to RSVP to study session:", err);
     }
   };
 
@@ -1764,6 +2033,28 @@ export default function App() {
 
   const handleGenerateFlashcards = async () => {
     setIsGeneratingFlashcards(true);
+    setFlashcardProgressStage('Initializing generator...');
+    setFlashcardProgressPercent(5);
+
+    const progressInterval = setInterval(() => {
+      setFlashcardProgressPercent(prev => {
+        if (prev < 25) {
+          setFlashcardProgressStage('Connecting to Gemini AI...');
+          return prev + 5;
+        } else if (prev < 55) {
+          setFlashcardProgressStage('Analyzing note contents & topics...');
+          return prev + 4;
+        } else if (prev < 80) {
+          setFlashcardProgressStage('Synthesizing question-answer flashcard pairs...');
+          return prev + 3;
+        } else if (prev < 95) {
+          setFlashcardProgressStage('Structuring valid JSON payload...');
+          return prev + 1;
+        }
+        return prev;
+      });
+    }, 250);
+
     try {
       let noteTitle: string | undefined = undefined;
       let noteContent: string | undefined = undefined;
@@ -1782,6 +2073,9 @@ export default function App() {
         noteContent,
         flashcardCountToGenerate
       );
+
+      setFlashcardProgressPercent(90);
+      setFlashcardProgressStage('Saving flashcard deck...');
 
       const newCards: Flashcard[] = generated.map((c, i) => ({
         id: 'fc_' + Date.now() + '_' + i + '_' + Math.random().toString(36).substr(2, 5),
@@ -1808,13 +2102,21 @@ export default function App() {
       }
 
       setFlashcards(prev => [...newCards, ...prev]);
+      setFlashcardProgressPercent(100);
+      setFlashcardProgressStage('Flashcards created!');
       playAudioChime('success');
       awardPoints(25, 'note');
       setSelectedNoteIdForFlashcard('none');
     } catch (err) {
       console.error("Failed to generate AI flashcards:", err);
+      setFlashcardProgressStage('Generation failed');
     } finally {
-      setIsGeneratingFlashcards(false);
+      clearInterval(progressInterval);
+      setTimeout(() => {
+        setIsGeneratingFlashcards(false);
+        setFlashcardProgressPercent(0);
+        setFlashcardProgressStage('');
+      }, 500);
     }
   };
 
@@ -2826,6 +3128,31 @@ export default function App() {
                           <p className="text-[9px] text-purple-50/90 font-bold mt-0.5 leading-none">{translate('planner_desc', appLanguage, 'Class timings & assignments')}</p>
                         </div>
                       </button>
+                      
+                      {/* Advanced AI Study Toolkit Banner */}
+                      <button 
+                        onClick={() => setIsToolkitOpen(true)}
+                        className="col-span-2 p-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl text-left shadow-lg border border-indigo-500/20 hover:shadow-indigo-500/10 hover:-translate-y-0.5 transition-all active:scale-95 flex items-center justify-between overflow-hidden relative group cursor-pointer"
+                        id="btn_advanced_toolkit"
+                      >
+                        <div className="absolute top-0 right-0 bg-indigo-600 text-[8px] font-black uppercase text-white px-3 py-1 rounded-bl-2xl tracking-wider">
+                          19+ Advanced Tools
+                        </div>
+                        <div className="flex items-center gap-3.5 z-10">
+                          <div className="p-3 bg-indigo-600/30 rounded-2xl border border-indigo-400/20 group-hover:scale-110 transition-transform">
+                            <Sparkles className="w-6 h-6 stroke-[2.5] text-indigo-300" />
+                          </div>
+                          <div>
+                            <h3 className="font-extrabold text-xs flex items-center gap-1.5 text-indigo-100">
+                              Advanced Study Toolkit ⚡
+                            </h3>
+                            <p className="text-[9px] text-slate-300 font-bold mt-1 max-w-md leading-normal">
+                              Open Scientific Calculator, AI Mind Maps, Mock Tests, Ambient Sounds, OCR homework helper, document readers & file backups.
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-indigo-300 shrink-0 group-hover:translate-x-1 transition-transform" />
+                      </button>
 
                     </div>
                   </section>
@@ -3037,9 +3364,15 @@ export default function App() {
                       <BrainCircuit className="w-5 h-5 text-indigo-600" />
                       <div>
                         <h2 className="font-bold text-slate-800 text-sm">AI Study Helper</h2>
-                        <span className="text-[10px] text-emerald-500 font-semibold animate-pulse flex items-center">
-                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1" /> Gemini 3.5 Flash Connected
-                        </span>
+                        {quotaExceeded ? (
+                          <span className="text-[10px] text-amber-500 font-semibold flex items-center">
+                            <span className="w-1.5 h-1.5 bg-amber-500 rounded-full mr-1 animate-ping" /> Offline Fallback Active (Quota Exceeded)
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-emerald-500 font-semibold animate-pulse flex items-center">
+                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1" /> Gemini 3.5 Flash Connected
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center space-x-1.5">
@@ -3111,6 +3444,15 @@ export default function App() {
 
                   {/* Chat messages queue */}
                   <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-50" id="chat_scroll">
+                    {quotaExceeded && (
+                      <div className="p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/85 rounded-2xl flex items-start gap-2.5 shadow-2xs select-none">
+                        <span className="text-base shrink-0">⚠️</span>
+                        <div className="text-[10px] text-amber-950 leading-normal">
+                          <p className="font-extrabold uppercase tracking-widest text-amber-800">Free Daily AI Quota Exceeded</p>
+                          <p className="mt-0.5 text-slate-600 font-medium">This Cloud environment has reached its free limit of 20 live AI calls for today. Ascend Study has automatically switched to our high-quality **Offline Fallback System** so you can continue learning seamlessly! To enable live, unlimited AI responses, upgrade your billing plan or configure a custom Gemini API Key in the Settings {"->"} Secrets menu.</p>
+                        </div>
+                      </div>
+                    )}
                     {chatMessages.length === 0 && (
                       <div className="text-center py-10 max-w-[240px] mx-auto">
                         <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -3235,86 +3577,382 @@ export default function App() {
                       <header className="flex justify-between items-center shrink-0 mb-4">
                         <div>
                           <h2 className="text-lg font-bold text-slate-800">Study Groups</h2>
-                          <p className="text-xs text-slate-400">Classrooms & team shared chats</p>
+                          <p className="text-xs text-slate-400">Join classmates & study courses together</p>
                         </div>
-                        <button onClick={() => setIsAddingGroup(true)} className="p-2 bg-indigo-600 text-white rounded-full shadow-md">
+                        <button onClick={() => setIsAddingGroup(true)} className="p-2 bg-indigo-600 text-white rounded-full shadow-md active:scale-95 transition">
                           <Plus className="w-5 h-5" />
                         </button>
                       </header>
 
+                      {/* Filter Controls */}
+                      <div className="bg-white p-3.5 rounded-3xl border border-slate-100 shadow-xs mb-4 space-y-3 shrink-0">
+                        {/* Course search */}
+                        <div className="relative">
+                          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                          <input 
+                            type="text" 
+                            placeholder="Search by specific course (e.g., AP Chemistry, Math)..." 
+                            value={groupSearchCourse}
+                            onChange={(e) => setGroupSearchCourse(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-150 rounded-2xl text-xs outline-none focus:border-indigo-400 font-semibold"
+                          />
+                        </div>
+
+                        {/* Subject Filter Chips */}
+                        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-hide">
+                          {['All', 'Mathematics', 'Science', 'History', 'Literature', 'Computer Science', 'Languages'].map((sub) => (
+                            <button
+                              key={sub}
+                              onClick={() => setGroupFilterSubject(sub)}
+                              className={`px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap border cursor-pointer transition ${
+                                groupFilterSubject === sub 
+                                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' 
+                                  : 'bg-slate-50 text-slate-600 border-slate-150 hover:bg-slate-100'
+                              }`}
+                            >
+                              {sub}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
                       {/* Scrollable list of cooperative study groups */}
                       <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 scrollbar-hide">
-                        {groups.map(group => (
-                          <div key={group.id} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex items-stretch justify-between">
-                            <div className="flex-1 flex flex-col justify-between">
-                              <div>
-                                <h3 className="font-bold text-slate-800 text-sm leading-tight">{group.name}</h3>
-                                <p className="text-xs text-slate-400 mt-1 line-clamp-2 pr-4">{group.description}</p>
+                        {groups.filter(g => {
+                          const matchesSubject = !groupFilterSubject || groupFilterSubject === 'All' || g.subject === groupFilterSubject;
+                          const matchesCourse = !groupSearchCourse || 
+                            (g.course || '').toLowerCase().includes(groupSearchCourse.toLowerCase()) || 
+                            g.name.toLowerCase().includes(groupSearchCourse.toLowerCase());
+                          return matchesSubject && matchesCourse;
+                        }).map(group => {
+                          const isJoined = joinedGroupIds.includes(group.id);
+                          return (
+                            <div key={group.id} className="bg-white p-4.5 rounded-3xl border border-slate-150 shadow-sm flex items-stretch justify-between hover:shadow-md transition duration-200">
+                              <div className="flex-1 flex flex-col justify-between min-w-0 pr-3">
+                                <div>
+                                  <div className="flex items-center space-x-2 flex-wrap mb-1.5">
+                                    <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-600 border border-indigo-100">
+                                      {group.subject}
+                                    </span>
+                                    {group.course && (
+                                      <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+                                        {group.course}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <h3 className="font-bold text-slate-800 text-sm leading-tight truncate">{group.name}</h3>
+                                  <p className="text-xs text-slate-400 mt-1 line-clamp-2">{group.description}</p>
+                                </div>
+                                <div className="flex items-center space-x-1 mt-4">
+                                  <Users className="w-3.5 h-3.5 text-slate-400" />
+                                  <span className="text-[10px] text-slate-500 font-bold">
+                                    {group.member_count || 1} study mates
+                                  </span>
+                                </div>
                               </div>
-                              <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 self-start px-2 py-0.5 rounded-lg mt-3">
-                                {group.member_count || 1} members active
-                              </span>
+                              <div className="flex flex-col justify-end">
+                                {isJoined ? (
+                                  <button 
+                                    onClick={() => setActiveGroup(group)}
+                                    className="px-4.5 py-2 bg-indigo-600 text-white rounded-2xl text-xs font-black hover:bg-indigo-700 transition active:scale-95 shadow-xs"
+                                  >
+                                    Enter
+                                  </button>
+                                ) : (
+                                  <button 
+                                    onClick={() => handleJoinGroup(group.id)}
+                                    className="px-4.5 py-2 border border-indigo-600 text-indigo-600 rounded-2xl text-xs font-black hover:bg-indigo-50 transition active:scale-95"
+                                  >
+                                    Join Group
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                            <button 
-                              onClick={() => setActiveGroup(group)}
-                              className="px-4 bg-indigo-600 text-white rounded-2xl text-xs font-bold hover:bg-indigo-700 transition active:scale-95 self-end py-2"
-                            >
-                              Enter
+                          );
+                        })}
+
+                        {groups.filter(g => {
+                          const matchesSubject = !groupFilterSubject || groupFilterSubject === 'All' || g.subject === groupFilterSubject;
+                          const matchesCourse = !groupSearchCourse || 
+                            (g.course || '').toLowerCase().includes(groupSearchCourse.toLowerCase()) || 
+                            g.name.toLowerCase().includes(groupSearchCourse.toLowerCase());
+                          return matchesSubject && matchesCourse;
+                        }).length === 0 && (
+                          <div className="text-center py-12 bg-white rounded-3xl border border-slate-100 p-6">
+                            <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                            <h4 className="font-bold text-slate-700 text-xs">No matching groups yet</h4>
+                            <p className="text-slate-400 text-[11px] mt-1 mb-4">Be the visionary student to create the first group for this course!</p>
+                            <button onClick={() => setIsAddingGroup(true)} className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-2xl shadow-sm active:scale-95 transition">
+                              Create Group
                             </button>
                           </div>
-                        ))}
+                        )}
                       </div>
                     </div>
                   ) : (
                     <div className="flex-1 flex flex-col overflow-hidden h-full">
                       
                       {/* Active group inside header */}
-                      <header className="p-4 border-b border-slate-100 flex items-center bg-white space-x-3 shrink-0">
-                        <button onClick={() => setActiveGroup(null)} className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-600">
-                          <ArrowLeft className="w-4 h-4" />
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-slate-800 text-sm leading-none truncate">{activeGroup.name}</h3>
-                          <div className="flex space-x-4 mt-2">
-                            <button onClick={() => setGroupTab('chat')} className={`text-xs font-bold leading-none pb-1 ${groupTab === 'chat' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400'}`}>Chat</button>
-                            <button onClick={() => setGroupTab('notes')} className={`text-xs font-bold leading-none pb-1 ${groupTab === 'notes' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400'}`}>Shared Notes</button>
+                      <header className="p-4 border-b border-slate-100 flex flex-col bg-white shrink-0">
+                        <div className="flex items-center space-x-3 mb-3">
+                          <button onClick={() => setActiveGroup(null)} className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-600 cursor-pointer">
+                            <ArrowLeft className="w-4 h-4" />
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-bold text-slate-800 text-sm leading-none truncate">{activeGroup.name}</h3>
+                            <div className="flex items-center space-x-2 mt-1.5">
+                              <span className="text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-600 border border-indigo-100">
+                                {activeGroup.subject}
+                              </span>
+                              {activeGroup.course && (
+                                <span className="text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200">
+                                  {activeGroup.course}
+                                </span>
+                              )}
+                            </div>
                           </div>
+                        </div>
+
+                        {/* Sub-tab Selectors */}
+                        <div className="flex space-x-5 border-t border-slate-50 pt-2 pb-0">
+                          <button onClick={() => setGroupTab('chat')} className={`text-[11px] font-extrabold pb-2 transition border-b-2 leading-none cursor-pointer ${groupTab === 'chat' ? 'text-indigo-600 border-indigo-600 font-black' : 'text-slate-400 border-transparent hover:text-slate-600'}`}>Chat</button>
+                          <button onClick={() => setGroupTab('notes')} className={`text-[11px] font-extrabold pb-2 transition border-b-2 leading-none cursor-pointer ${groupTab === 'notes' ? 'text-indigo-600 border-indigo-600 font-black' : 'text-slate-400 border-transparent hover:text-slate-600'}`}>Notes</button>
+                          <button onClick={() => setGroupTab('questions')} className={`text-[11px] font-extrabold pb-2 transition border-b-2 leading-none cursor-pointer ${groupTab === 'questions' ? 'text-indigo-600 border-indigo-600 font-black' : 'text-slate-400 border-transparent hover:text-slate-600'}`}>Q&A Board</button>
+                          <button onClick={() => setGroupTab('sessions')} className={`text-[11px] font-extrabold pb-2 transition border-b-2 leading-none cursor-pointer ${groupTab === 'sessions' ? 'text-indigo-600 border-indigo-600 font-black' : 'text-slate-400 border-transparent hover:text-slate-600'}`}>Sessions</button>
                         </div>
                       </header>
 
                       {/* Inner Group View Tabs */}
                       <div className="flex-1 overflow-y-auto p-4 bg-slate-50" id="group_tab_pane">
-                        {groupTab === 'chat' ? (
+                        {groupTab === 'chat' && (
                           <div className="space-y-3.5">
-                            {(groupMessages[activeGroup.id] || []).map((msg, idx) => (
-                              <div key={idx} className={`flex ${msg.user_id === user?.id ? 'justify-end' : 'justify-start'}`}>
-                                <div className="max-w-[85%]">
-                                  <p className="text-[10px] text-slate-400 font-semibold mb-1 px-1">{msg.user_name}</p>
-                                  <div className={`p-3 rounded-2xl ${msg.user_id === user?.id ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white border border-slate-100 text-slate-800 rounded-tl-none shadow-sm'}`}>
-                                    <p className="text-xs leading-relaxed">{msg.text}</p>
+                            {(groupMessages[activeGroup.id] || []).length === 0 ? (
+                              <div className="text-center py-12">
+                                <MessageSquare className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                                <h4 className="text-xs font-bold text-slate-700">Class chat is quiet</h4>
+                                <p className="text-[10px] text-slate-400 mt-1">Start the conversation by typing a greeting!</p>
+                              </div>
+                            ) : (
+                              (groupMessages[activeGroup.id] || []).map((msg, idx) => (
+                                <div key={idx} className={`flex ${msg.user_id === user?.id ? 'justify-end' : 'justify-start'}`}>
+                                  <div className="max-w-[85%]">
+                                    <p className="text-[9px] text-slate-400 font-bold mb-1 px-1">{msg.user_name}</p>
+                                    <div className={`p-3 rounded-2xl ${msg.user_id === user?.id ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white border border-slate-100 text-slate-800 rounded-tl-none shadow-xs'}`}>
+                                      <p className="text-xs leading-relaxed">{msg.text}</p>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            ))}
+                              ))
+                            )}
                           </div>
-                        ) : (
+                        )}
+
+                        {groupTab === 'notes' && (
                           <div className="space-y-3">
-                            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Class Lecture Library</h4>
-                              <button onClick={() => setIsAddingGroupNote(true)} className="px-2.5 py-1 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl text-[10px] font-bold flex items-center">
+                            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                              <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Class Lecture Library</h4>
+                              <button onClick={() => setIsAddingGroupNote(true)} className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] font-bold flex items-center transition cursor-pointer">
                                 <Plus className="w-3 h-3 mr-1" /> New Note
                               </button>
                             </div>
                             {(groupNotes[activeGroup.id] || []).map(note => (
-                              <div key={note.id} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm relative">
+                              <div key={note.id} className="bg-white p-4 rounded-3xl border border-slate-150 shadow-xs relative">
                                 <h4 className="font-bold text-slate-800 text-xs mb-1">{note.title}</h4>
-                                <p className="text-xs text-slate-500 whitespace-pre-wrap">{note.content}</p>
-                                <div className="flex justify-between items-center border-t border-slate-50 pt-2.5 mt-3 text-[9px] text-slate-400">
-                                  <span>Contributor: {note.updated_by_name}</span>
+                                <p className="text-xs text-slate-550 whitespace-pre-wrap">{note.content}</p>
+                                <div className="flex justify-between items-center border-t border-slate-100 pt-2.5 mt-3.5 text-[9px] text-slate-400">
+                                  <span>Contributor: <strong className="text-slate-600">{note.updated_by_name}</strong></span>
                                   <span>{new Date(note.updated_at).toLocaleDateString()}</span>
                                 </div>
                               </div>
                             ))}
+                            {(groupNotes[activeGroup.id] || []).length === 0 && (
+                              <div className="text-center py-12">
+                                <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                                <h4 className="text-xs font-bold text-slate-700">No shared notes yet</h4>
+                                <p className="text-[10px] text-slate-400 mt-1 mb-3">Share your study notes or summaries with your team.</p>
+                                <button onClick={() => setIsAddingGroupNote(true)} className="px-3.5 py-1.5 bg-indigo-600 text-white rounded-xl text-[10px] font-bold active:scale-95 transition">
+                                  Add First Note
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {groupTab === 'questions' && (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                              <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Academic Q&A Board</h4>
+                              <button onClick={() => setIsAddingGroupQuestion(true)} className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] font-bold flex items-center transition cursor-pointer">
+                                <HelpCircle className="w-3 h-3 mr-1" /> Ask Question
+                              </button>
+                            </div>
+
+                            {/* List Questions */}
+                            {((groupQuestions[activeGroup.id]) || []).map(q => (
+                              <div key={q.id} className="bg-white p-4 rounded-3xl border border-slate-150 shadow-xs space-y-3">
+                                <div>
+                                  <h4 className="font-bold text-slate-850 text-xs">{q.title}</h4>
+                                  {q.content && <p className="text-xs text-slate-500 mt-1 whitespace-pre-wrap">{q.content}</p>}
+                                  <div className="flex justify-between items-center text-[9px] text-slate-400 mt-2 pb-2.5 border-b border-slate-50">
+                                    <span>Asked by <strong className="text-indigo-600">{q.asked_by_name}</strong></span>
+                                    <span>{new Date(q.created_at).toLocaleDateString()}</span>
+                                  </div>
+                                </div>
+
+                                {/* Answers Section */}
+                                <div className="space-y-2">
+                                  <h5 className="text-[9px] font-bold uppercase tracking-wider text-slate-400 px-1">Answers ({q.answers?.length || 0})</h5>
+                                  {(q.answers || []).map((ans, aIdx) => (
+                                    <div key={aIdx} className="bg-slate-50/80 p-2.5 rounded-2xl border border-slate-100 text-xs">
+                                      <div className="flex justify-between text-[9px] font-bold text-indigo-650 mb-0.5">
+                                        <span>{ans.user_name}</span>
+                                        <span className="text-slate-400 font-normal">{new Date(ans.created_at).toLocaleDateString()}</span>
+                                      </div>
+                                      <p className="text-slate-700 font-medium">{ans.text}</p>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Answer input field */}
+                                <div className="pt-1.5 flex items-center space-x-2">
+                                  <input 
+                                    type="text"
+                                    placeholder="Know the answer? Share it..."
+                                    value={newAnswerInputs[String(q.id)] || ''}
+                                    onChange={(e) => {
+                                      const text = e.target.value;
+                                      setNewAnswerInputs(prev => ({ ...prev, [String(q.id)]: text }));
+                                    }}
+                                    onKeyPress={(e) => e.key === 'Enter' && handleAnswerQuestion(q.id)}
+                                    className="flex-1 p-2 bg-slate-50 border border-slate-150 rounded-xl text-xs outline-none focus:border-indigo-350"
+                                  />
+                                  <button 
+                                    onClick={() => handleAnswerQuestion(q.id)}
+                                    className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black cursor-pointer transition active:scale-95"
+                                  >
+                                    Answer
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+
+                            {((groupQuestions[activeGroup.id]) || []).length === 0 && (
+                              <div className="text-center py-12">
+                                <HelpCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                                <h4 className="text-xs font-bold text-slate-700">No questions posted yet</h4>
+                                <p className="text-[10px] text-slate-400 mt-1 mb-3">Stuck on a formula or problem? Ask your peers for help.</p>
+                                <button onClick={() => setIsAddingGroupQuestion(true)} className="px-3.5 py-1.5 bg-indigo-600 text-white rounded-xl text-[10px] font-bold active:scale-95 transition">
+                                  Ask a Question
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {groupTab === 'sessions' && (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                              <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Virtual Classrooms & Schedules</h4>
+                              <button onClick={() => setIsAddingGroupSession(true)} className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] font-bold flex items-center transition cursor-pointer">
+                                <Calendar className="w-3.5 h-3.5 mr-1" /> Schedule Session
+                              </button>
+                            </div>
+
+                            {/* List Scheduled Sessions */}
+                            {((groupSessions[activeGroup.id]) || []).map(session => (
+                              <div key={session.id} className="bg-white p-4 rounded-3xl border border-slate-150 shadow-xs space-y-3 hover:border-indigo-100 transition duration-150">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded bg-rose-50 text-rose-600 border border-rose-100">
+                                      {session.meeting_platform}
+                                    </span>
+                                    <h4 className="font-bold text-slate-850 text-xs mt-1.5">{session.title}</h4>
+                                    {session.topic && <p className="text-[11px] text-slate-500 mt-0.5 font-medium">Topic: {session.topic}</p>}
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-[10px] font-bold text-slate-700">{new Date(session.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+                                    <p className="text-[10px] font-extrabold text-indigo-600">{session.time}</p>
+                                    <p className="text-[8px] font-bold text-slate-400">{session.duration} mins</p>
+                                  </div>
+                                </div>
+
+                                {/* Attendee RSVP Renders */}
+                                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 space-y-2.5">
+                                  <div className="flex justify-between items-center text-[9px] uppercase font-black tracking-widest text-slate-400">
+                                    <span>Attendees RSVP ({session.attendees?.filter(a => a.status === 'yes').length || 0})</span>
+                                    <span className="text-indigo-600 lowercase font-extrabold">scheduled by {session.created_by_name}</span>
+                                  </div>
+
+                                  {/* List RSVP names */}
+                                  <div className="flex flex-wrap gap-1">
+                                    {(session.attendees || []).map((att, aIdx) => (
+                                      <span key={aIdx} className={`text-[8px] font-black px-1.5 py-0.5 rounded-md flex items-center space-x-0.5 ${
+                                        att.status === 'yes' ? 'bg-green-100 text-green-700 border border-green-200' :
+                                        att.status === 'maybe' ? 'bg-amber-100 text-amber-700 border border-amber-200' :
+                                        'bg-slate-200 text-slate-600'
+                                      }`}>
+                                        <span>👤 {att.user_name}</span>
+                                        <span>({att.status})</span>
+                                      </span>
+                                    ))}
+                                    {(session.attendees || []).length === 0 && (
+                                      <p className="text-[9px] text-slate-400 italic">No RSVPs yet. Secure your spot!</p>
+                                    )}
+                                  </div>
+
+                                  {/* User RSVP Choices */}
+                                  <div className="flex items-center justify-between border-t border-slate-100 pt-2 mt-1">
+                                    <span className="text-[9px] text-slate-500 font-extrabold uppercase">Update Your RSVP:</span>
+                                    <div className="flex items-center space-x-1.5">
+                                      <button 
+                                        onClick={() => handleRsvpSession(session.id, 'yes')}
+                                        className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white text-[9px] font-bold rounded-lg cursor-pointer transition active:scale-90"
+                                      >
+                                        Going
+                                      </button>
+                                      <button 
+                                        onClick={() => handleRsvpSession(session.id, 'maybe')}
+                                        className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-bold rounded-lg cursor-pointer transition active:scale-90"
+                                      >
+                                        Maybe
+                                      </button>
+                                      <button 
+                                        onClick={() => handleRsvpSession(session.id, 'no')}
+                                        className="px-2.5 py-1 bg-slate-400 hover:bg-slate-500 text-white text-[9px] font-bold rounded-lg cursor-pointer transition active:scale-90"
+                                      >
+                                        Declined
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Join Meeting platform button */}
+                                {session.meeting_link && (
+                                  <a 
+                                    href={session.meeting_link} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    referrerPolicy="no-referrer"
+                                    className="w-full inline-flex items-center justify-center space-x-1.5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black rounded-2xl shadow-xs transition active:scale-95"
+                                  >
+                                    <Video className="w-3.5 h-3.5" />
+                                    <span>Join Session / Meet Room</span>
+                                    <ExternalLink className="w-3 h-3 ml-0.5" />
+                                  </a>
+                                )}
+                              </div>
+                            ))}
+
+                            {((groupSessions[activeGroup.id]) || []).length === 0 && (
+                              <div className="text-center py-12">
+                                <Calendar className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                                <h4 className="text-xs font-bold text-slate-700">No sessions scheduled</h4>
+                                <p className="text-[10px] text-slate-400 mt-1 mb-3">Schedule a group virtual meeting or a group study challenge!</p>
+                                <button onClick={() => setIsAddingGroupSession(true)} className="px-3.5 py-1.5 bg-indigo-600 text-white rounded-xl text-[10px] font-bold active:scale-95 transition">
+                                  Schedule Session
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -3328,7 +3966,7 @@ export default function App() {
                             onChange={(e) => setGroupChatInput(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && handleSendGroupMessage()}
                             placeholder="Message study mates..."
-                            className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-800 outline-none"
+                            className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-850 outline-none"
                           />
                           <button onClick={handleSendGroupMessage} className="p-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl shadow active:scale-95">
                             <Send className="w-4 h-4" />
@@ -3673,6 +4311,25 @@ export default function App() {
                                     </>
                                   )}
                                 </button>
+
+                                {isGeneratingFlashcards && (
+                                  <div className="mt-3 p-3 bg-slate-50 border border-slate-200/50 rounded-2xl space-y-2">
+                                    <div className="flex justify-between items-center text-[9px] font-black tracking-wide text-slate-500">
+                                      <span className="truncate max-w-[80%] text-slate-600">
+                                        {flashcardProgressStage || 'Generating cards...'}
+                                      </span>
+                                      <span className="text-indigo-600 shrink-0 font-black">
+                                        {flashcardProgressPercent}%
+                                      </span>
+                                    </div>
+                                    <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                      <div 
+                                        className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-300"
+                                        style={{ width: `${flashcardProgressPercent}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
 
@@ -3745,57 +4402,102 @@ export default function App() {
 
                   <div className="flex-1 overflow-y-auto scrollbar-hide" id="quiz_feed">
                     {!quizSubject ? (
-                      <div className="grid grid-cols-2 gap-3.5 pb-2">
-                        {SUBJECTS.map(sub => {
-                          const details = SUBJECT_DETAILS[sub];
-                          const IconComponent = details.icon;
-                          return (
-                            <div
-                              key={sub}
-                              className="bg-white p-4 rounded-3xl border border-slate-100 shadow-xs flex flex-col justify-between h-52 hover:shadow-md transition-all duration-250 hover:border-slate-200"
-                            >
-                              <div className="flex items-start justify-between">
-                                <div className={`p-2 rounded-2xl bg-gradient-to-tr ${details.color} text-white shadow-xs`}>
-                                  <IconComponent className="w-5 h-5 stroke-[2.5]" />
-                                </div>
-                                <span className="text-[9px] font-black tracking-wider uppercase px-2 py-0.5 bg-slate-50 text-slate-400 rounded-md border border-slate-100">
-                                  {sub}
-                                </span>
-                              </div>
-                              <div className="mt-2">
-                                <h3 className="font-extrabold text-slate-900 text-xs tracking-tight leading-tight">{details.text}</h3>
-                                <p className="text-[10px] font-bold text-slate-400 mt-0.5 leading-none">{details.textHi}</p>
-                              </div>
-                              <div className="space-y-1 mt-1.5 pt-2 border-t border-slate-50">
+                      <>
+                        {/* Difficulty Selector */}
+                        <div className="mb-4 bg-white/70 backdrop-blur-xs p-3.5 rounded-3xl border border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+                          <div className="text-center sm:text-left">
+                            <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight flex items-center justify-center sm:justify-start gap-1">
+                              <span>🎯</span>
+                              <span>Select Quiz Difficulty</span>
+                            </p>
+                            <p className="text-[9px] text-slate-400 font-bold leading-normal mt-0.5">Gemini will adjust question depth and distractors dynamically</p>
+                          </div>
+                          <div className="flex gap-1.5 w-full sm:w-auto">
+                            {(['Easy', 'Medium', 'Hard'] as const).map((level) => {
+                              const active = quizDifficulty === level;
+                              const colors = {
+                                Easy: active 
+                                  ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-200 border-emerald-600' 
+                                  : 'hover:bg-emerald-50 text-emerald-700 border-emerald-100 bg-emerald-50/20',
+                                Medium: active 
+                                  ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-200 border-indigo-600' 
+                                  : 'hover:bg-indigo-50 text-indigo-700 border-indigo-100 bg-indigo-50/20',
+                                Hard: active 
+                                  ? 'bg-rose-600 text-white shadow-xs shadow-rose-200 border-rose-600' 
+                                  : 'hover:bg-rose-50 text-rose-700 border-rose-100 bg-rose-50/20',
+                              };
+                              return (
                                 <button
-                                  onClick={() => startQuiz(sub, appLanguage)}
-                                  className="w-full py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 active:scale-95 transition rounded-xl text-[9px] font-black text-white flex items-center justify-center space-x-1 shadow-sm cursor-pointer"
-                                  id={`quiz_selected_${sub.toLowerCase()}`}
+                                  key={level}
+                                  type="button"
+                                  onClick={() => setQuizDifficulty(level)}
+                                  className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border cursor-pointer transition duration-150 active:scale-95 flex items-center justify-center gap-1 ${colors[level]}`}
+                                  id={`diff_selector_${level.toLowerCase()}`}
                                 >
-                                  <span>{LANGUAGES.find(l => l.code === appLanguage)?.flag || '✨'}</span>
-                                  <span>{translate('start_quiz', appLanguage, 'Start quiz')} ({LANGUAGES.find(l => l.code === appLanguage)?.label.split(' ')[0]})</span>
+                                  <span>
+                                    {level === 'Easy' && '🌱'}
+                                    {level === 'Medium' && '📚'}
+                                    {level === 'Hard' && '🔥'}
+                                  </span>
+                                  <span>{level}</span>
                                 </button>
-                                {appLanguage !== 'English' && (
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3.5 pb-2">
+                          {SUBJECTS.map(sub => {
+                            const details = SUBJECT_DETAILS[sub];
+                            const IconComponent = details.icon;
+                            return (
+                              <div
+                                key={sub}
+                                className="bg-white p-4 rounded-3xl border border-slate-100 shadow-xs flex flex-col justify-between h-52 hover:shadow-md transition-all duration-250 hover:border-slate-200"
+                              >
+                                <div className="flex items-start justify-between">
+                                  <div className={`p-2 rounded-2xl bg-gradient-to-tr ${details.color} text-white shadow-xs`}>
+                                    <IconComponent className="w-5 h-5 stroke-[2.5]" />
+                                  </div>
+                                  <span className="text-[9px] font-black tracking-wider uppercase px-2 py-0.5 bg-slate-50 text-slate-400 rounded-md border border-slate-100">
+                                    {sub}
+                                  </span>
+                                </div>
+                                <div className="mt-2">
+                                  <h3 className="font-extrabold text-slate-900 text-xs tracking-tight leading-tight">{details.text}</h3>
+                                  <p className="text-[10px] font-bold text-slate-400 mt-0.5 leading-none">{details.textHi}</p>
+                                </div>
+                                <div className="space-y-1 mt-1.5 pt-2 border-t border-slate-50">
                                   <button
-                                    onClick={() => startQuiz(sub, 'English')}
-                                    className="w-full py-1 bg-slate-50 hover:bg-slate-100 active:scale-95 transition rounded-xl text-[9px] font-bold text-slate-650 flex items-center justify-center space-x-1 border border-slate-200/50 cursor-pointer"
-                                    id={`quiz_en_alt_${sub.toLowerCase()}`}
+                                    onClick={() => startQuiz(sub, appLanguage)}
+                                    className="w-full py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 active:scale-95 transition rounded-xl text-[9px] font-black text-white flex items-center justify-center space-x-1 shadow-sm cursor-pointer"
+                                    id={`quiz_selected_${sub.toLowerCase()}`}
                                   >
-                                    <span>🇬🇧</span>
-                                    <span>English Practice</span>
+                                    <span>{LANGUAGES.find(l => l.code === appLanguage)?.flag || '✨'}</span>
+                                    <span>{translate('start_quiz', appLanguage, 'Start quiz')} ({LANGUAGES.find(l => l.code === appLanguage)?.label.split(' ')[0]})</span>
                                   </button>
-                                )}
+                                  {appLanguage !== 'English' && (
+                                    <button
+                                      onClick={() => startQuiz(sub, 'English')}
+                                      className="w-full py-1 bg-slate-50 hover:bg-slate-100 active:scale-95 transition rounded-xl text-[9px] font-bold text-slate-650 flex items-center justify-center space-x-1 border border-slate-200/50 cursor-pointer"
+                                      id={`quiz_en_alt_${sub.toLowerCase()}`}
+                                    >
+                                      <span>🇬🇧</span>
+                                      <span>English Practice</span>
+                                    </button>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                            );
+                          })}
+                        </div>
+                      </>
                     ) : (
                       <div className="bg-white p-5 rounded-3xl border border-slate-150/80 shadow-md space-y-4">
                         {isQuizLoading ? (
                           <div className="py-12 text-center space-y-3">
                             <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" />
-                            <p className="text-xs text-slate-700 font-extrabold">Formulating your {quizSubject} {quizLanguage === 'Hindi' ? 'हिंदी' : 'English'} challenge...</p>
+                            <p className="text-xs text-slate-700 font-extrabold">Formulating your {quizSubject} ({quizDifficulty}) {quizLanguage === 'Hindi' ? 'हिंदी' : 'English'} challenge...</p>
                             <p className="text-[10px] text-slate-400 font-semibold uppercase animate-pulse">Wait a moment while Gemini writes questions</p>
                           </div>
                         ) : quizFinished ? (
@@ -3803,7 +4505,7 @@ export default function App() {
                             <span className="text-4xl">🎓</span>
                             <div>
                               <h3 className="text-base font-black text-slate-900">{translate('quiz_completed_title', appLanguage, 'Quiz Completed!')}</h3>
-                              <p className="text-xs text-slate-600 font-bold mt-1">{translate('quiz_completed_score', appLanguage, 'Excellent Effort! You scored')} {quizScore} / {quizQuestions.length}</p>
+                              <p className="text-xs text-slate-600 font-bold mt-1">Excellent Effort on {quizDifficulty}! You scored {quizScore} / {quizQuestions.length}</p>
                               <p className="text-indigo-600 font-black text-xs mt-2.5 flex items-center justify-center space-x-1">
                                 <Sparkles className="w-4 h-4 text-amber-500 fill-amber-400" />
                                 <span>+{quizScore * 10} XP Reward Added to Profile!</span>
@@ -3816,7 +4518,7 @@ export default function App() {
                             <div className="flex justify-between items-center text-[9px] uppercase font-bold text-slate-400">
                               <span className="inline-flex items-center space-x-1.5">
                                 <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                                <span>{quizSubject} ({quizLanguage}) Practice</span>
+                                <span>{quizSubject} ({quizLanguage}) Practice • <span className="text-indigo-600 font-extrabold">{quizDifficulty}</span></span>
                               </span>
                               <span>{currentQuizIndex + 1} / {quizQuestions.length}</span>
                             </div>
@@ -3903,6 +4605,72 @@ export default function App() {
 
         {/* MODAL SYSTEM (LIGHTWEIGHT CONTEXT DIALOG BACKDROPS) */}
         <AnimatePresence>
+          {isToolkitOpen && (
+            <InteractiveToolkit 
+              onClose={() => setIsToolkitOpen(false)}
+              appLanguage={appLanguage}
+              firebaseUser={firebaseUser}
+              user={user}
+              notes={notes}
+              onAddNote={async (noteData) => {
+                try {
+                  let generatedId: string | number = 'local_' + Date.now();
+                  if (firebaseUser) {
+                    generatedId = await saveNote(firebaseUser.uid, {
+                      title: noteData.title,
+                      content: noteData.content,
+                      subject: noteData.subject
+                    });
+                  } else {
+                    const localNotes = JSON.parse(localStorage.getItem('studybuddy_guest_notes') || '[]');
+                    const newLocalNote = {
+                      id: generatedId,
+                      title: noteData.title,
+                      content: noteData.content,
+                      subject: noteData.subject,
+                      updated_at: new Date().toISOString()
+                    };
+                    localNotes.unshift(newLocalNote);
+                    localStorage.setItem('studybuddy_guest_notes', JSON.stringify(localNotes));
+                  }
+                  const noteItem: Note = { 
+                    id: generatedId, 
+                    title: noteData.title, 
+                    content: noteData.content, 
+                    subject: noteData.subject, 
+                    updated_at: new Date().toISOString() 
+                  };
+                  setNotes(prev => [noteItem, ...prev]);
+                  awardPoints(15, 'note');
+                } catch (err) {
+                  console.error("Failed to add AI note:", err);
+                }
+              }}
+              onAddProgress={async (score, total, subject) => {
+                const entry = {
+                  subject,
+                  score,
+                  total,
+                  date: new Date().toISOString()
+                };
+                try {
+                  if (firebaseUser) {
+                    const id = await saveProgressEntry(firebaseUser.uid, entry);
+                    setProgress(prev => [{ id, ...entry }, ...prev]);
+                  } else {
+                    const localProgress = JSON.parse(localStorage.getItem('studybuddy_guest_progress') || '[]');
+                    const newLocal = [{ id: 'guest_' + Date.now(), ...entry }, ...localProgress];
+                    localStorage.setItem('studybuddy_guest_progress', JSON.stringify(newLocal));
+                    setProgress(newLocal);
+                  }
+                  awardPoints(score * 30, 'quiz');
+                } catch (err) {
+                  console.error("Failed to save mock test progress:", err);
+                }
+              }}
+            />
+          )}
+
           {isAddingNote && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end justify-center" id="new_note_modal">
               <motion.div initial={{ y: "15%" }} animate={{ y: 0 }} exit={{ y: "15%" }} className="bg-white w-full rounded-t-3xl p-5 space-y-4 shadow-xl border-t border-slate-200">
@@ -3950,14 +4718,47 @@ export default function App() {
 
           {isAddingGroup && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end justify-center" id="new_group_modal">
-              <motion.div initial={{ y: "15%" }} animate={{ y: 0 }} exit={{ y: "15%" }} className="bg-white w-full rounded-t-3xl p-5 space-y-4 shadow-xl border-t border-slate-200">
+              <motion.div initial={{ y: "15%" }} animate={{ y: 0 }} exit={{ y: "15%" }} className="bg-white w-full rounded-t-3xl p-5 space-y-4 shadow-xl border-t border-slate-200 max-h-[85vh] overflow-y-auto">
                 <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-                  <h3 className="font-bold text-slate-800 text-sm">Create New Classroom</h3>
+                  <h3 className="font-bold text-slate-800 text-sm">Create New Study Group</h3>
                   <button onClick={() => setIsAddingGroup(false)} className="text-slate-400 text-xs font-semibold">Cancel</button>
                 </div>
-                <input type="text" placeholder="Classroom Title" value={newGroup.name} onChange={(e) => setNewGroup({...newGroup, name: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none" />
-                <textarea placeholder="Classroom description..." value={newGroup.description} onChange={(e) => setNewGroup({...newGroup, description: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs h-20 resize-none outline-none text-slate-700" />
-                <button onClick={handleCreateGroup} className="w-full py-3 bg-indigo-600 text-white rounded-xl text-xs font-bold active:scale-95 transition">Create Team</button>
+                
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Group Name</label>
+                  <input type="text" placeholder="e.g. Calculus BC Study Circle" value={newGroup.name} onChange={(e) => setNewGroup({...newGroup, name: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Subject Focus</label>
+                    <select 
+                      value={newGroup.subject} 
+                      onChange={(e) => setNewGroup({...newGroup, subject: e.target.value as Subject})} 
+                      className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-bold outline-none text-slate-700"
+                    >
+                      <option value="Mathematics">Mathematics 📐</option>
+                      <option value="Science">Science 🧪</option>
+                      <option value="Literature">Literature 📖</option>
+                      <option value="History">History ⏳</option>
+                      <option value="Computer Science">Computer Science 💻</option>
+                      <option value="Languages">Languages 🗣️</option>
+                      <option value="Art">Art 🎨</option>
+                      <option value="Geography">Geography 🗺️</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Specific Course / Class</label>
+                    <input type="text" placeholder="e.g. AP Math Section B" value={newGroup.course} onChange={(e) => setNewGroup({...newGroup, course: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none text-slate-700" />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Description</label>
+                  <textarea placeholder="Tell peers what you are studying together..." value={newGroup.description} onChange={(e) => setNewGroup({...newGroup, description: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs h-20 resize-none outline-none text-slate-700" />
+                </div>
+
+                <button onClick={handleCreateGroup} className="w-full py-3 bg-indigo-600 text-white rounded-xl text-xs font-bold active:scale-95 transition shadow-md">Create Group</button>
               </motion.div>
             </motion.div>
           )}
@@ -3972,6 +4773,74 @@ export default function App() {
                 <input type="text" placeholder="Topic Title" value={newGroupNote.title} onChange={(e) => setNewGroupNote({...newGroupNote, title: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none" />
                 <textarea placeholder="Write note content..." value={newGroupNote.content} onChange={(e) => setNewGroupNote({...newGroupNote, content: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs h-24 resize-none outline-none text-slate-700" />
                 <button onClick={handleCreateGroupNote} className="w-full py-3 bg-indigo-600 text-white rounded-xl text-xs font-bold active:scale-95 transition">Share with Team</button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {isAddingGroupQuestion && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end justify-center" id="new_group_question_modal">
+              <motion.div initial={{ y: "15%" }} animate={{ y: 0 }} exit={{ y: "15%" }} className="bg-white w-full rounded-t-3xl p-5 space-y-4 shadow-xl border-t border-slate-200">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                  <h3 className="font-bold text-slate-800 text-sm">Ask Group a Question</h3>
+                  <button onClick={() => setIsAddingGroupQuestion(false)} className="text-slate-400 text-xs font-semibold">Cancel</button>
+                </div>
+                <input type="text" placeholder="What is your question about?" value={newGroupQuestion.title} onChange={(e) => setNewGroupQuestion({...newGroupQuestion, title: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none" />
+                <textarea placeholder="Provide more details or copy-paste a problem..." value={newGroupQuestion.content} onChange={(e) => setNewGroupQuestion({...newGroupQuestion, content: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs h-24 resize-none outline-none text-slate-700" />
+                <button onClick={handleCreateGroupQuestion} className="w-full py-3 bg-indigo-600 text-white rounded-xl text-xs font-bold active:scale-95 transition">Ask Peers</button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {isAddingGroupSession && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end justify-center" id="new_group_session_modal">
+              <motion.div initial={{ y: "15%" }} animate={{ y: 0 }} exit={{ y: "15%" }} className="bg-white w-full rounded-t-3xl p-5 space-y-4 shadow-xl border-t border-slate-200 max-h-[85vh] overflow-y-auto">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                  <h3 className="font-bold text-slate-800 text-sm">Schedule Live Study Session</h3>
+                  <button onClick={() => setIsAddingGroupSession(false)} className="text-slate-400 text-xs font-semibold">Cancel</button>
+                </div>
+                <input type="text" placeholder="Session Title (e.g., Physics Prep)" value={newGroupSession.title} onChange={(e) => setNewGroupSession({...newGroupSession, title: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none text-slate-700" />
+                <input type="text" placeholder="Topic of discussion" value={newGroupSession.topic} onChange={(e) => setNewGroupSession({...newGroupSession, topic: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none text-slate-700" />
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Date</label>
+                    <input type="date" value={newGroupSession.date} onChange={(e) => setNewGroupSession({...newGroupSession, date: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none text-slate-750" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Time</label>
+                    <input type="time" value={newGroupSession.time} onChange={(e) => setNewGroupSession({...newGroupSession, time: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none text-slate-755" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Duration (mins)</label>
+                    <select value={newGroupSession.duration} onChange={(e) => setNewGroupSession({...newGroupSession, duration: Number(e.target.value)})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none text-slate-700">
+                      <option value="30">30 Mins</option>
+                      <option value="45">45 Mins</option>
+                      <option value="60">1 Hour</option>
+                      <option value="90">1.5 Hours</option>
+                      <option value="120">2 Hours</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Meeting Platform</label>
+                    <select value={newGroupSession.meeting_platform} onChange={(e) => setNewGroupSession({...newGroupSession, meeting_platform: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none text-slate-700">
+                      <option value="Google Meet">Google Meet 📹</option>
+                      <option value="Zoom">Zoom 🎥</option>
+                      <option value="Microsoft Teams">MS Teams 👔</option>
+                      <option value="Jitsi Meet">Jitsi Meet 🌐</option>
+                      <option value="Discord">Discord 🎮</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Meeting Link (Optional)</label>
+                  <input type="url" placeholder="https://meet.google.com/..." value={newGroupSession.meeting_link} onChange={(e) => setNewGroupSession({...newGroupSession, meeting_link: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs outline-none text-slate-700" />
+                </div>
+
+                <button onClick={handleCreateGroupSession} className="w-full py-3 bg-indigo-600 text-white rounded-xl text-xs font-bold active:scale-95 transition shadow-md">Schedule Session</button>
               </motion.div>
             </motion.div>
           )}

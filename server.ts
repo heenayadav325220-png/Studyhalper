@@ -181,6 +181,19 @@ async function callGeminiWithRetryAndFailover(
   throw new Error("All candidate Gemini models failed after retries.");
 }
 
+function handleRouteError(res: any, err: any) {
+  res.setHeader("x-gemini-fallback", "true");
+  const errMsg = err?.message || String(err);
+  if (
+    errMsg.includes("quota") || 
+    errMsg.includes("429") || 
+    errMsg.includes("RESOURCE_EXHAUSTED") ||
+    errMsg.includes("limit")
+  ) {
+    res.setHeader("x-gemini-quota-exceeded", "true");
+  }
+}
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -511,6 +524,7 @@ app.post("/api/gemini/answer", async (req, res) => {
     res.json({ text: response.text });
   } catch (err: any) {
     console.warn("Gemini answer error (using offline fallback):", err.message || err);
+    handleRouteError(res, err);
     const fallbackText = getFallbackAnswer(prompt, studentContext);
     res.json({ text: fallbackText });
   }
@@ -542,13 +556,204 @@ app.post("/api/gemini/diagram", async (req, res) => {
     res.json({ imageUrl });
   } catch (err: any) {
     console.warn("Gemini diagram error (returning null gracefully):", err.message || err);
+    handleRouteError(res, err);
     res.json({ imageUrl: null });
   }
 });
 
+app.post("/api/gemini/notes-generator", async (req, res) => {
+  const { topic, subject, grade = "10" } = req.body;
+  try {
+    const prompt = `Generate comprehensive, highly educational, structured study notes on the topic: "${topic}" for Subject: "${subject}" at a Grade ${grade} level. 
+    Format with clean Markdown, clear headings, bullet points, key definitions, and examples.
+    Return ONLY valid JSON in the format: {"title": "...", "content": "..."}`;
+    
+    const ai = getGeminiClient();
+    const response = await callGeminiWithRetryAndFailover(ai, {
+      model: "gemini-flash-latest",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+    const parsed = JSON.parse(response.text || "{}");
+    res.json(parsed);
+  } catch (err: any) {
+    console.warn("Notes generator error:", err);
+    handleRouteError(res, err);
+    res.json({ 
+      title: `${topic} Notes`, 
+      content: `### ${topic}\n\nNotes could not be generated dynamically due to a network error. Here is a brief outline of ${topic} for ${subject}.\n\n- Key Concept 1: Definition and details\n- Key Concept 2: Mathematical or practical applications\n- Important Formula/Fact: Standard references.` 
+    });
+  }
+});
+
+app.post("/api/gemini/notes-summarizer", async (req, res) => {
+  const { content } = req.body;
+  try {
+    const prompt = `Create a concise, high-impact summary of the following study notes. Highlight key terms, major formulas, and critical takeaways using bullet points. Keep it clear and easy for a student to review quickly.\n\nNotes Content:\n${content}`;
+    
+    const ai = getGeminiClient();
+    const response = await callGeminiWithRetryAndFailover(ai, {
+      model: "gemini-flash-latest",
+      contents: prompt,
+    });
+    res.json({ summary: response.text });
+  } catch (err: any) {
+    console.warn("Notes summarizer error:", err);
+    handleRouteError(res, err);
+    res.json({ summary: "Failed to summarize notes dynamically due to a service error. Please try again." });
+  }
+});
+
+app.post("/api/gemini/explain-topic", async (req, res) => {
+  const { topic, subject, grade = "10", style = "Simple" } = req.body;
+  try {
+    let styleInstruction = "Explain in extremely simple, friendly language suitable for a child.";
+    if (style === "Analogies") {
+      styleInstruction = "Explain using vivid, funny everyday analogies and metaphors that makes it impossible to forget.";
+    } else if (style === "5-year-old") {
+      styleInstruction = "Explain like I am 5 years old (ELI5). Use very basic words and a fun, story-like approach.";
+    } else if (style === "Step-by-step") {
+      styleInstruction = "Provide a meticulous, clear step-by-step breakdown from first principles.";
+    }
+    
+    const prompt = `${styleInstruction} Topic: "${topic}" (Subject: ${subject}) for Grade ${grade}. Make it engaging and encouraging!`;
+    const ai = getGeminiClient();
+    const response = await callGeminiWithRetryAndFailover(ai, {
+      model: "gemini-flash-latest",
+      contents: prompt,
+    });
+    res.json({ explanation: response.text });
+  } catch (err: any) {
+    console.warn("Explain topic error:", err);
+    handleRouteError(res, err);
+    res.json({ explanation: "Could not fetch a simplified explanation at this moment. Please check your internet connection and try again." });
+  }
+});
+
+app.post("/api/gemini/mindmap", async (req, res) => {
+  const { topic } = req.body;
+  try {
+    const prompt = `Generate a hierarchical mind map structure for the topic: "${topic}".
+    Provide a deeply nested JSON representation where each node has a "name" and an optional list of "children" (which is an array of other nodes). Limit hierarchy depth to 3 levels.
+    Format your response ONLY as valid JSON in this exact structure:
+    {"name": "${topic}", "children": [{"name": "Subtopic A", "children": [{"name": "Detail 1"}]}, {"name": "Subtopic B", "children": []}]}`;
+    
+    const ai = getGeminiClient();
+    const response = await callGeminiWithRetryAndFailover(ai, {
+      model: "gemini-flash-latest",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+    const parsed = JSON.parse(response.text || "{}");
+    res.json(parsed);
+  } catch (err: any) {
+    console.warn("Mindmap error:", err);
+    handleRouteError(res, err);
+    res.json({
+      name: topic,
+      children: [
+        { name: "Overview & Definitions", children: [{ name: "Core terms" }, { name: "Basic ideas" }] },
+        { name: "Key Formulas & Rules", children: [{ name: "Standard applications" }] },
+        { name: "Examples", children: [] }
+      ]
+    });
+  }
+});
+
+app.post("/api/gemini/question-paper", async (req, res) => {
+  const { topic, subject, grade = "10" } = req.body;
+  try {
+    const prompt = `Create a complete, formal, school-grade question paper for the topic: "${topic}" in Subject: "${subject}" for Grade ${grade} students.
+    Divide the paper into:
+    - Section A: 5 Multiple Choice Questions (with correct options indicated at the very bottom in an answer key)
+    - Section B: 3 Short Answer Questions (each with marks allotted, e.g., [3 Marks])
+    - Section C: 2 Long Answer/Analytical Questions (each with marks allotted, e.g., [5 Marks])
+    Format beautifully with clean Markdown headings and lines.`;
+    
+    const ai = getGeminiClient();
+    const response = await callGeminiWithRetryAndFailover(ai, {
+      model: "gemini-flash-latest",
+      contents: prompt,
+    });
+    res.json({ paperText: response.text });
+  } catch (err: any) {
+    console.warn("Question paper error:", err);
+    handleRouteError(res, err);
+    res.json({ paperText: "Failed to generate question paper dynamically. Please try again." });
+  }
+});
+
+app.post("/api/gemini/ocr", async (req, res) => {
+  const { imageBase64 } = req.body;
+  try {
+    if (!imageBase64) {
+      return res.status(400).json({ error: "Missing imageBase64 data" });
+    }
+    const cleanBase64 = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
+    
+    const ai = getGeminiClient();
+    const response = await callGeminiWithRetryAndFailover(ai, {
+      model: "gemini-flash-latest",
+      contents: [
+        { text: "Extract all study-related text, math equations, formulas, and written contents from this image. Return clean text formatted properly. If there are math equations, format them nicely." },
+        {
+          inlineData: {
+            mimeType: "image/png",
+            data: cleanBase64
+          }
+        }
+      ],
+    });
+    res.json({ text: response.text });
+  } catch (err: any) {
+    console.warn("OCR error:", err);
+    handleRouteError(res, err);
+    res.status(500).json({ error: "Failed to extract text from image." });
+  }
+});
+
+app.post("/api/gemini/pdf-summary", async (req, res) => {
+  const { textContent } = req.body;
+  try {
+    const prompt = `Analyze the following document text and produce a structured analysis.
+    Return a JSON object containing:
+    1. "summary": A concise overview of the document (Markdown-enabled string).
+    2. "keyTerms": An array of objects: [{"term": "...", "definition": "..."}].
+    3. "questions": An array of mock test questions: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}].
+    Limit key terms to 5 and questions to 5.
+    
+    Document text:
+    ${textContent.substring(0, 8000)}`;
+    
+    const ai = getGeminiClient();
+    const response = await callGeminiWithRetryAndFailover(ai, {
+      model: "gemini-flash-latest",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+    const parsed = JSON.parse(response.text || "{}");
+    res.json(parsed);
+  } catch (err: any) {
+    console.warn("PDF Summary error:", err);
+    handleRouteError(res, err);
+    res.json({
+      summary: "Could not summarize document dynamically. Pasted content is too long or server is busy.",
+      keyTerms: [],
+      questions: []
+    });
+  }
+});
+
 app.post("/api/gemini/quiz", async (req, res) => {
-  const { subject, studentContext, language } = req.body;
+  const { subject, studentContext, language, difficulty } = req.body;
   const quizLang = language || "English";
+  const quizDiff = difficulty || "Medium";
   try {
     const classText = studentContext ? `for class/grade ${studentContext.className}` : "";
     
@@ -575,7 +780,16 @@ app.post("/api/gemini/quiz", async (req, res) => {
       languageInstruct = "entirely in simple, school-grade English.";
     }
 
-    const instructionText = `Generate a 5-question multiple choice quiz ${classText} for ${subject} ${languageInstruct} Return only valid JSON in the format: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}]`;
+    let difficultyInstruct = "";
+    if (quizDiff === "Easy") {
+      difficultyInstruct = "The difficulty of the quiz MUST be EASY. Focus on introductory definitions, basic concepts, and direct, straightforward questions. Keep option choices distinct and simple.";
+    } else if (quizDiff === "Hard") {
+      difficultyInstruct = "The difficulty of the quiz MUST be HARD or ADVANCED. Focus on complex, multi-step problem solving, critical thinking, advanced theories, and subtle nuances. Use trickier, highly plausible options/distractors to challenge the student.";
+    } else {
+      difficultyInstruct = "The difficulty of the quiz MUST be MEDIUM. Provide a balanced mix of conceptual recall, analytical questions, and practical applications suitable for typical classroom standards.";
+    }
+
+    const instructionText = `Generate a 5-question multiple choice quiz ${classText} for ${subject} ${languageInstruct} ${difficultyInstruct} Return only valid JSON in the format: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}]`;
 
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
@@ -600,46 +814,97 @@ app.post("/api/gemini/quiz", async (req, res) => {
     }
   } catch (err: any) {
     console.warn("Gemini quiz error (using high-quality localized fallback database):", err.message || err);
+    handleRouteError(res, err);
     const languageKey = (quizLang === "Hindi" ? "Hindi" : "English") as "Hindi" | "English";
     const fallbackSet = FALLBACK_QUIZZES[subject]?.[languageKey] || FALLBACK_QUIZZES[subject]?.["English"] || [];
     res.json(fallbackSet);
   }
 });
 
+const flashcardsMemoryCache = new Map<string, any>();
+
 app.post("/api/gemini/flashcard", async (req, res) => {
   const { subject, noteTitle, noteContent, count = 5 } = req.body;
+  
+  // 1. Check Server Memory Cache
+  const cacheKey = `${subject}_${noteTitle || ""}_${noteContent || ""}_${count}`;
+  if (flashcardsMemoryCache.has(cacheKey)) {
+    console.log(`[Cache Hit - Server] Returning flashcards for: ${cacheKey}`);
+    return res.json(flashcardsMemoryCache.get(cacheKey));
+  }
+
   try {
     const contextText = noteContent 
       ? `based on this study note titled "${noteTitle || 'Untitled'}" with content: "${noteContent}"`
       : `for general study of the subject "${subject}"`;
 
-    const instructionText = `You are an expert school tutor. Generate exactly ${count} educational study flashcards ${contextText}.
+    const ai = getGeminiClient();
+    let finalCards: Array<{ front: string; back: string }> = [];
+
+    // 2. Batching / Optimization Strategy
+    // For larger counts (e.g., 10), we split into 2 parallel batches of 5 to optimize generation speed
+    // and provide richer variety without upstream timeouts.
+    if (count > 5) {
+      console.log(`[Batching] Generating ${count} flashcards in parallel batches of 5...`);
+      const prompts = [
+        `You are an expert school tutor. Generate exactly 5 educational study flashcards ${contextText}.
+Focus on fundamental terms, core definitions, and primary concepts.
+Create a brief, clear, engaging question or term for the "front" and a precise, easy-to-understand answer or explanation for the "back".
+Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`,
+        `You are an expert school tutor. Generate exactly ${count - 5} educational study flashcards ${contextText}.
+Focus on secondary topics, advanced applications, formulas, or deep-dive details (ensuring no duplication with introductory definitions).
+Create a brief, clear, engaging question or term for the "front" and a precise, easy-to-understand answer or explanation for the "back".
+Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`
+      ];
+
+      const batchPromises = prompts.map(promptText => 
+        callGeminiWithRetryAndFailover(ai, {
+          model: "gemini-3.5-flash",
+          contents: promptText,
+          config: { responseMimeType: "application/json" }
+        })
+      );
+
+      const responses = await Promise.all(batchPromises);
+      for (const response of responses) {
+        try {
+          const parsed = JSON.parse(response.text || "[]");
+          if (Array.isArray(parsed)) {
+            finalCards.push(...parsed);
+          }
+        } catch (parseErr) {
+          console.error("Batch parse error:", parseErr, "Text:", response.text);
+        }
+      }
+    } else {
+      // Single fast batch for standard sizes (3 or 5)
+      const instructionText = `You are an expert school tutor. Generate exactly ${count} educational study flashcards ${contextText}.
 Identify key terms, definitions, formulas, or concepts. For each, create a brief, clear, engaging question or term for the "front" and a precise, easy-to-understand answer or explanation for the "back".
 Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`;
 
-    const ai = getGeminiClient();
-    const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-flash-latest",
-      contents: instructionText,
-      config: {
-        responseMimeType: "application/json"
-      }
-    });
+      const response = await callGeminiWithRetryAndFailover(ai, {
+        model: "gemini-3.5-flash",
+        contents: instructionText,
+        config: { responseMimeType: "application/json" }
+      });
 
-    let flashcardsData = [];
-    try {
-      flashcardsData = JSON.parse(response.text || "[]");
-    } catch (parseErr) {
-      console.error("Flashcards JSON parse error:", parseErr, "Text:", response.text);
+      try {
+        finalCards = JSON.parse(response.text || "[]");
+      } catch (parseErr) {
+        console.error("Flashcards JSON parse error:", parseErr, "Text:", response.text);
+      }
     }
 
-    if (Array.isArray(flashcardsData) && flashcardsData.length > 0) {
-      res.json(flashcardsData);
+    if (Array.isArray(finalCards) && finalCards.length > 0) {
+      // Save to cache
+      flashcardsMemoryCache.set(cacheKey, finalCards);
+      res.json(finalCards);
     } else {
       throw new Error("Invalid or empty response format received from upstream API model for flashcards");
     }
   } catch (err: any) {
     console.warn("Gemini flashcard generation error (using fallback):", err.message || err);
+    handleRouteError(res, err);
     // Generic high-quality fallbacks
     const FALLBACK_FLASHCARDS: Record<string, Array<{ front: string; back: string }>> = {
       "Mathematics": [
