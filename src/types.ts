@@ -1,5 +1,25 @@
 export type Subject = 'Mathematics' | 'Science' | 'Biology' | 'Physics' | 'Chemistry' | 'English';
 
+export interface Quest {
+  id: string;
+  text: string;
+  textHi: string;
+  xp: number;
+  completed: boolean;
+}
+
+export interface StreakDay {
+  id: number;
+  name: string;
+  nameHi: string;
+  label: string;
+  labelHi: string;
+  goal: string;
+  goalHi: string;
+  completed: boolean;
+  xpAwarded: number;
+}
+
 export interface User {
   id: string | number;
   name: string;
@@ -18,6 +38,8 @@ export interface User {
     accessory: string;
     petCount: number;
   };
+  quests?: Quest[];
+  streakDays?: StreakDay[];
 }
 
 export interface Badge {

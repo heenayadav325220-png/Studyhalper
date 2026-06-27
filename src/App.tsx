@@ -658,26 +658,115 @@ export default function App() {
     return (localStorage.getItem('studybuddy_appLanguage') as AppLanguage) || 'English';
   });
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [showXpGuide, setShowXpGuide] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
-  // Local Profile Loader
+  // Real Firebase and Authentication state listener
   useEffect(() => {
-    const localProfileStr = localStorage.getItem('studybuddy_local_profile');
-    if (localProfileStr) {
-      try {
-        const parsed = JSON.parse(localProfileStr);
-        setUser(parsed);
-        if (parsed.pet) {
-          setPet(parsed.pet as any);
+    const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
+      setAuthChecking(true);
+      if (fUser) {
+        setFirebaseUser(fUser);
+        try {
+          const dbProfile = await getUserProfile(fUser.uid);
+          if (dbProfile) {
+            const loadedUser: UserType = {
+              id: fUser.uid,
+              name: dbProfile.name,
+              school: dbProfile.school,
+              className: dbProfile.className,
+              points: dbProfile.points || 100,
+              level: dbProfile.level || 1,
+              avatar: dbProfile.avatar || '🐼',
+              badges: dbProfile.badges || [],
+              pet: (dbProfile.pet as any) || {
+                name: 'Chimpu 🐼',
+                happiness: 85,
+                fullness: 80,
+                accessory: 'none',
+                petCount: 0
+              }
+            };
+            setUser(loadedUser);
+            if (dbProfile.pet) {
+              setPet(dbProfile.pet as any);
+            }
+            if ((dbProfile as any).quests && (dbProfile as any).quests.length > 0) {
+              setQuests((dbProfile as any).quests);
+            }
+            if ((dbProfile as any).streakDays && (dbProfile as any).streakDays.length > 0) {
+              setStreakDays((dbProfile as any).streakDays);
+            }
+            localStorage.setItem('studybuddy_local_profile', JSON.stringify(loadedUser));
+          } else {
+            // New user signed in (e.g. Google Sign-In) but doesn't have a profile yet in Firestore
+            const localProfileStr = localStorage.getItem('studybuddy_local_profile');
+            if (localProfileStr) {
+              try {
+                const parsed = JSON.parse(localProfileStr);
+                const uploadedUser: UserType = {
+                  ...parsed,
+                  id: fUser.uid
+                };
+                await saveUserProfile(uploadedUser);
+                setUser(uploadedUser);
+                localStorage.setItem('studybuddy_local_profile', JSON.stringify(uploadedUser));
+              } catch (e) {
+                setUser(null);
+              }
+            } else {
+              setUser(null);
+            }
+          }
+        } catch (err) {
+          console.error("Error reading student profile on auth change:", err);
+          setUser(null);
         }
-      } catch (e) {
-        setUser(null);
+      } else {
+        setFirebaseUser(null);
+        const localProfileStr = localStorage.getItem('studybuddy_local_profile');
+        if (localProfileStr) {
+          try {
+            const parsed = JSON.parse(localProfileStr);
+            setUser(parsed);
+            if (parsed.pet) {
+              setPet(parsed.pet as any);
+            }
+            if (parsed.quests) {
+              setQuests(parsed.quests);
+            }
+            if (parsed.streakDays) {
+              setStreakDays(parsed.streakDays);
+            }
+          } catch (e) {
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
       }
-    } else {
-      setUser(null);
-    }
-    setAuthChecking(false);
+      setAuthChecking(false);
+    });
+
+    return () => unsubscribe();
   }, []);
+
+  // Synchronize quests, streakDays, and pet to Firestore on state change
+  useEffect(() => {
+    if (!firebaseUser || !user) return;
+    
+    const timeoutId = setTimeout(() => {
+      const updatedUser = {
+        ...user,
+        quests,
+        streakDays,
+        pet
+      };
+      saveUserProfile(updatedUser as any).catch(err => console.error("Error autosaving quests/streak/pet:", err));
+    }, 1000); // Debounce to prevent rapid writes
+
+    return () => clearTimeout(timeoutId);
+  }, [quests, streakDays, pet, firebaseUser, user?.id]);
 
   // Sync personal database items from Firestore
   useEffect(() => {
@@ -827,7 +916,7 @@ export default function App() {
     }
   };
 
-  const handleRegister = (e: any) => {
+  const handleRegister = async (e: any) => {
     if (e) e.preventDefault();
     if (!regName.trim() || !regSchool.trim() || !regClass.trim()) {
       alert("कृपया अपनी सारी जानकारी भरें!\nPlease fill out all dynamic information fields!");
@@ -836,7 +925,7 @@ export default function App() {
 
     try {
       setAuthLoading(true);
-      const userId = 'student_' + Date.now();
+      const userId = firebaseUser ? firebaseUser.uid : 'student_' + Date.now();
       const newUser: UserType = {
         id: userId,
         name: regName.trim(),
@@ -852,11 +941,18 @@ export default function App() {
           fullness: 80,
           accessory: 'none',
           petCount: 0
-        }
+        },
+        quests: quests,
+        streakDays: streakDays
       };
 
       localStorage.setItem('studybuddy_local_profile', JSON.stringify(newUser));
       setUser(newUser);
+      
+      if (firebaseUser) {
+        await saveUserProfile(newUser);
+      }
+      
       setShowProfileSetup(false);
     } catch (err) {
       console.error("Error saving registered profile:", err);
@@ -869,6 +965,21 @@ export default function App() {
   // Points tracking for chimes
   const prevPointsRef = useRef<number>(user?.points || 0);
   const prevLevelRef = useRef<number>(user?.level || 1);
+  const questsRef = useRef(quests);
+  const streakDaysRef = useRef(streakDays);
+  const petRef = useRef(pet);
+
+  useEffect(() => {
+    questsRef.current = quests;
+  }, [quests]);
+
+  useEffect(() => {
+    streakDaysRef.current = streakDays;
+  }, [streakDays]);
+
+  useEffect(() => {
+    petRef.current = pet;
+  }, [pet]);
   useEffect(() => {
     if (!user) return;
     const prevPoints = prevPointsRef.current;
@@ -988,12 +1099,12 @@ export default function App() {
         newlyEarnedBadge = { id: Date.now() + 1, badge_name: 'Note Taker', icon: '📝', date_earned: new Date().toLocaleDateString() };
         updatedBadges.push(newlyEarnedBadge);
       }
-      if (checkBadgeType === 'math_whiz' && !updatedBadges.some(b => b.badge_name === 'Math Whiz')) {
-        newlyEarnedBadge = { id: Date.now() + 2, badge_name: 'Math Whiz', icon: '📐', date_earned: new Date().toLocaleDateString() };
+      if ((checkBadgeType === 'math_whiz' || checkBadgeType === 'master_mathematician') && !updatedBadges.some(b => b.badge_name === 'Master Mathematician')) {
+        newlyEarnedBadge = { id: Date.now() + 2, badge_name: 'Master Mathematician', icon: '📐', date_earned: new Date().toLocaleDateString() };
         updatedBadges.push(newlyEarnedBadge);
       }
-      if (checkBadgeType === 'science_master' && !updatedBadges.some(b => b.badge_name === 'Science Master')) {
-        newlyEarnedBadge = { id: Date.now() + 3, badge_name: 'Science Master', icon: '🔬', date_earned: new Date().toLocaleDateString() };
+      if ((checkBadgeType === 'science_master' || checkBadgeType === 'science_whiz') && !updatedBadges.some(b => b.badge_name === 'Science Whiz')) {
+        newlyEarnedBadge = { id: Date.now() + 3, badge_name: 'Science Whiz', icon: '🔬', date_earned: new Date().toLocaleDateString() };
         updatedBadges.push(newlyEarnedBadge);
       }
       if (checkBadgeType === 'study_session' && !updatedBadges.some(b => b.badge_name === 'Study Scholar')) {
@@ -1018,16 +1129,24 @@ export default function App() {
         }, 50);
       }
 
-      const updatedUser = { ...prev, points: newPoints, level: newLevel, badges: updatedBadges };
+      const updatedUser = { 
+        ...prev, 
+        points: newPoints, 
+        level: newLevel, 
+        badges: updatedBadges,
+        quests: questsRef.current,
+        streakDays: streakDaysRef.current,
+        pet: petRef.current
+      };
       if (firebaseUser) {
         localStorage.setItem('cached_study_user_' + firebaseUser.uid, JSON.stringify(updatedUser));
-        saveUserProfile(updatedUser).catch(err => console.error("Failed to update user profile in Firestore:", err));
+        saveUserProfile(updatedUser as any).catch(err => console.error("Failed to update user profile in Firestore:", err));
       }
       return updatedUser;
     });
   };
 
-  // Generate leaderboard displaying real users + fallback friendly classmates for competitive design
+  // Generate leaderboard displaying real users from Firestore
   const getLeaderboardList = () => {
     const defaultCompetitors = [
       { name: "Bob Verma 🦊", points: 340, level: 4 },
@@ -1040,22 +1159,30 @@ export default function App() {
     const activeUserEntry = user ? { name: `${user.name} (You) ⭐️`, points: user.points || 0, level: user.level || 1 } : null;
 
     let combined = [...leaderboard];
-    if (combined.length === 0) {
-      combined = defaultCompetitors;
+    if (combined.length <= 1) {
+      // Use fallback if there's no other users in db yet
+      combined = [...combined, ...defaultCompetitors];
     }
 
     if (activeUserEntry) {
-      // If user is not already in combined, add them
-      if (!combined.some(c => c.name.includes(user.name))) {
-        combined.push(activeUserEntry);
-      } else {
-        // Update user entry with "(You)" label
-        combined = combined.map(c => c.name === user.name || c.name.includes(user.name) ? activeUserEntry : c);
+      // Filter out any duplicate of the current user's name without the (You) suffix
+      combined = combined.filter(c => c.name !== user.name && !c.name.includes('(You)'));
+      combined.push(activeUserEntry);
+    }
+
+    // Filter duplicates by clean name
+    const seen = new Set<string>();
+    const unique: typeof combined = [];
+    for (const item of combined) {
+      const cleanName = item.name.replace(' (You) ⭐️', '').trim();
+      if (!seen.has(cleanName)) {
+        seen.add(cleanName);
+        unique.push(item);
       }
     }
 
     // Sort descending by points
-    return combined.sort((a, b) => b.points - a.points).slice(0, 5);
+    return unique.sort((a, b) => b.points - a.points).slice(0, 5);
   };
 
   // Interactive Buddy Waving System (Bringing People Up)
@@ -1481,6 +1608,31 @@ export default function App() {
       if (quizQuestions.length > 0 && nextScore === quizQuestions.length) {
         awardPoints(0, 'topic_master');
       }
+    }
+  };
+
+  const handleStudySessionComplete = async (subject: Subject, durationMinutes: number) => {
+    const entry = {
+      subject,
+      score: durationMinutes,
+      total: durationMinutes,
+      date: new Date().toISOString()
+    };
+
+    try {
+      if (firebaseUser) {
+        const id = await saveProgressEntry(firebaseUser.uid, entry);
+        setProgress(prev => [{ id, ...entry }, ...prev]);
+      } else {
+        const localProgress = JSON.parse(localStorage.getItem('studybuddy_guest_progress') || '[]');
+        const newLocal = [{ id: 'guest_' + Date.now(), ...entry }, ...localProgress];
+        localStorage.setItem('studybuddy_guest_progress', JSON.stringify(newLocal));
+        setProgress(newLocal);
+      }
+
+      awardPoints(durationMinutes * 2, 'study_session');
+    } catch (err) {
+      console.error("Error saving completed study session:", err);
     }
   };
 
@@ -2195,7 +2347,16 @@ export default function App() {
                           <Sparkles className="w-3 h-3 text-amber-500 fill-amber-400 animate-spin" />
                           <span>LEVEL {user?.level || 1}</span>
                         </span>
-                        <span className="text-slate-500 font-black">{(user?.points || 0) % 100}/100 XP</span>
+                        <div className="flex items-center space-x-1">
+                          <span className="text-slate-500 font-black">{(user?.points || 0) % 100}/100 XP</span>
+                          <button
+                            onClick={() => setShowXpGuide(!showXpGuide)}
+                            className="text-[9px] text-indigo-500 hover:text-indigo-700 font-extrabold flex items-center space-x-0.5 select-none transition border border-indigo-100 px-1 rounded hover:bg-indigo-50"
+                          >
+                            <span>ℹ️</span>
+                            <span>{showXpGuide ? 'Hide Guide' : 'Earn XP'}</span>
+                          </button>
+                        </div>
                       </div>
                       <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/50 p-0.5">
                         <div 
@@ -2203,6 +2364,36 @@ export default function App() {
                           style={{ width: `${(user?.points || 0) % 100}%` }} 
                         />
                       </div>
+
+                      {/* XP Guide Panel */}
+                      {showXpGuide && (
+                        <div className="bg-slate-50/70 border border-slate-100 p-2.5 rounded-2xl space-y-1.5 text-[9px] text-slate-600 animate-fadeIn mt-1">
+                          <p className="font-extrabold text-indigo-900 uppercase tracking-wide border-b border-slate-100 pb-1">📚 Point System & XP Breakdown</p>
+                          <div className="grid grid-cols-2 gap-1.5 font-bold">
+                            <div className="flex items-center space-x-1">
+                              <span>📝</span>
+                              <span>Create Notes: <strong className="text-emerald-600">+15 XP</strong></span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <span>✅</span>
+                              <span>Complete Tasks: <strong className="text-emerald-600">+10 XP</strong></span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <span>🎓</span>
+                              <span>Study Timer: <strong className="text-emerald-600">+2 XP / min</strong></span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <span>🏆</span>
+                              <span>Quizzes: <strong className="text-emerald-600">+10 XP / correct</strong></span>
+                            </div>
+                            <div className="flex items-center space-x-1 col-span-2 border-t border-dashed border-slate-200/60 pt-1">
+                              <span>👋</span>
+                              <span>Interact & Wave to Peers: <strong className="text-indigo-600">+5 XP</strong></span>
+                            </div>
+                          </div>
+                          <p className="text-[8px] text-slate-400 italic">Level up every 100 XP to feed and unlock accessories for your pet Panda! 🐼</p>
+                        </div>
+                      )}
                     </div>
                   </header>
 
@@ -2399,7 +2590,7 @@ export default function App() {
                     </div>
                   </section>
 
-                  <ProgressChart isTagMode={isTagMode} />
+                  <ProgressChart progress={progress} isTagMode={isTagMode} />
 
                   <HomeworkSolver user={user} language={appLanguage} isTagMode={isTagMode} />
 
@@ -2639,7 +2830,7 @@ export default function App() {
                     </div>
                   </section>
                   
-                  <StudyTimer isTagMode={isTagMode} />
+                  <StudyTimer isTagMode={isTagMode} onSessionComplete={handleStudySessionComplete} />
 
                   {/* Badges and Progress Statistics from Profile */}
                   <section className="bg-white p-4.5 rounded-3xl border border-slate-100 shadow-xs space-y-4">
@@ -2660,9 +2851,9 @@ export default function App() {
                           badgeColors = "from-pink-100 via-rose-50 to-red-50 text-pink-600 border-pink-200";
                         } else if (b.badge_name === 'Quiz Master') {
                           badgeColors = "from-purple-100 via-indigo-50 to-violet-50 text-purple-600 border-purple-200";
-                        } else if (b.badge_name === 'Math Whiz') {
+                        } else if (b.badge_name === 'Math Whiz' || b.badge_name === 'Master Mathematician') {
                           badgeColors = "from-blue-100 via-cyan-50 to-teal-50 text-blue-600 border-blue-200";
-                        } else if (b.badge_name === 'Science Master') {
+                        } else if (b.badge_name === 'Science Master' || b.badge_name === 'Science Whiz') {
                           badgeColors = "from-emerald-100 via-teal-50 to-green-50 text-emerald-600 border-emerald-200";
                         } else if (b.badge_name === 'Study Scholar') {
                           badgeColors = "from-indigo-100 via-sky-50 to-violet-50 text-indigo-600 border-indigo-200";
@@ -2697,42 +2888,50 @@ export default function App() {
                         {translate('leaderboard_title', appLanguage, 'Study Leaderboard')} 🏆
                       </h2>
                       <span className="text-[9px] font-mono bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg font-black uppercase tracking-wider">
-                        Class Rank #{getLeaderboardList().findIndex(c => c.name.includes('(You)')) + 1 || 5}
+                        Class Rank #{getLeaderboardList().findIndex(c => c.name.includes('(You)')) !== -1 ? getLeaderboardList().findIndex(c => c.name.includes('(You)')) + 1 : '-'}
                       </span>
                     </div>
 
                     <div className="space-y-2">
-                      {getLeaderboardList().map((player, idx) => {
-                        const isSelf = player.name.includes('(You)');
-                        const rankMedals = ['🥇', '🥈', '🥉'];
-                        return (
-                          <div 
-                            key={idx} 
-                            className={`flex items-center justify-between p-2.5 rounded-2xl border transition-all duration-200 ${
-                              isSelf 
-                                ? 'bg-indigo-50/75 border-indigo-200 shadow-2xs scale-[1.01]' 
-                                : 'bg-slate-50/50 border-slate-100'
-                            }`}
-                          >
-                            <div className="flex items-center space-x-3">
-                              <span className="w-6 text-center text-xs font-black text-slate-400">
-                                {idx < 3 ? rankMedals[idx] : `${idx + 1}`}
-                              </span>
-                              <div>
-                                <p className={`text-xs font-black ${isSelf ? 'text-indigo-900' : 'text-slate-800'}`}>
-                                  {player.name}
-                                </p>
-                                <p className="text-[9px] text-slate-400 font-bold uppercase">
-                                  Level {player.level} • Rank Classmate
-                                </p>
+                      {getLeaderboardList().length === 0 ? (
+                        <div className="text-center py-6 space-y-2">
+                          <span className="text-2xl">🏆</span>
+                          <p className="text-xs font-bold text-slate-500">No students on the leaderboard yet</p>
+                          <p className="text-[10px] text-slate-400 max-w-[240px] mx-auto">Complete subject quizzes and practice sessions to earn XP and claim the #1 spot!</p>
+                        </div>
+                      ) : (
+                        getLeaderboardList().map((player, idx) => {
+                          const isSelf = player.name.includes('(You)');
+                          const rankMedals = ['🥇', '🥈', '🥉'];
+                          return (
+                            <div 
+                              key={idx} 
+                              className={`flex items-center justify-between p-2.5 rounded-2xl border transition-all duration-200 ${
+                                isSelf 
+                                  ? 'bg-indigo-50/75 border-indigo-200 shadow-2xs scale-[1.01]' 
+                                  : 'bg-slate-50/50 border-slate-100'
+                              }`}
+                            >
+                              <div className="flex items-center space-x-3">
+                                <span className="w-6 text-center text-xs font-black text-slate-400">
+                                  {idx < 3 ? rankMedals[idx] : `${idx + 1}`}
+                                </span>
+                                <div>
+                                  <p className={`text-xs font-black ${isSelf ? 'text-indigo-900' : 'text-slate-800'}`}>
+                                    {player.name}
+                                  </p>
+                                  <p className="text-[9px] text-slate-400 font-bold uppercase">
+                                    Level {player.level} • Rank Classmate
+                                  </p>
+                                </div>
                               </div>
+                              <span className={`text-[11px] font-mono font-black ${isSelf ? 'text-indigo-600' : 'text-slate-650'}`}>
+                                {player.points} XP
+                              </span>
                             </div>
-                            <span className={`text-[11px] font-mono font-black ${isSelf ? 'text-indigo-600' : 'text-slate-650'}`}>
-                              {player.points} XP
-                            </span>
-                          </div>
-                        );
-                      })}
+                          );
+                        })
+                      )}
                     </div>
                   </section>
 

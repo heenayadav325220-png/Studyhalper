@@ -49,7 +49,9 @@ export async function saveUserProfile(user: User): Promise<void> {
       fullness: 80,
       accessory: 'none',
       petCount: 0
-    }
+    },
+    quests: (user as any).quests || [],
+    streakDays: (user as any).streakDays || []
   }, { merge: true });
 }
 
@@ -68,8 +70,10 @@ export async function getUserProfile(userId: string | number): Promise<User | nu
         level: data.level || 1,
         avatar: data.avatar || "🐼",
         badges: data.badges || [],
-        pet: data.pet || undefined
-      };
+        pet: data.pet || undefined,
+        quests: data.quests || [],
+        streakDays: data.streakDays || []
+      } as any;
     }
   } catch (err) {
     console.warn("Offline or failed to fetch user profile from Firestore:", err);
