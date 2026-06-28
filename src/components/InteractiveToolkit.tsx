@@ -40,6 +40,8 @@ export default function InteractiveToolkit({
   const [aiGrade, setAiGrade] = useState('10');
   const [aiStyle, setAiStyle] = useState('Simple');
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiThrottled, setAiThrottled] = useState(false);
+  const [testThrottled, setTestThrottled] = useState(false);
   const [aiResult, setAiResult] = useState<any>(null);
   const [pastedContent, setPastedContent] = useState('');
   const [ocrImage, setOcrImage] = useState<string | null>(null);
@@ -307,6 +309,10 @@ export default function InteractiveToolkit({
 
   // AI execution triggers
   const handleAiToolExecute = async (overridePrompt?: string) => {
+    if (aiThrottled || aiLoading) {
+      alert("Please wait 3 seconds between requests to protect the server!");
+      return;
+    }
     const query = overridePrompt || aiTopic;
     if (!query && aiTool !== 'pdf' && aiTool !== 'ocr') {
       alert("Please specify a topic or text first!");
@@ -319,6 +325,11 @@ export default function InteractiveToolkit({
         : "⚠️ Your daily Advanced Toolkit limit of 50 messages has been reached. Please try again tomorrow or enjoy our other unlimited app features!");
       return;
     }
+
+    setAiThrottled(true);
+    setTimeout(() => {
+      setAiThrottled(false);
+    }, 3000);
 
     setAiLoading(true);
     setAiResult(null);
@@ -356,6 +367,10 @@ export default function InteractiveToolkit({
         const data = await response.json();
         setAiResult(data);
         incrementToolkitUsage();
+        // Trigger Interstitial Ad
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('studybuddy-trigger-ad'));
+        }, 1500);
       } else {
         alert("Failed to reach Gemini API model. Running internal offline generator.");
         // fallback
@@ -374,12 +389,21 @@ export default function InteractiveToolkit({
 
   // Execute Mock Test Generation
   const handleGenerateMockTest = async () => {
+    if (testThrottled || testLoading) {
+      alert("Please wait 3 seconds between requests to protect the server!");
+      return;
+    }
     if (toolkitUsage.count >= toolkitUsage.limit) {
       alert(appLanguage === 'Hindi' 
         ? "⚠️ आपके एडवांस्ड टूलकिट की दैनिक सीमा (50 मैसेजेस) समाप्त हो गई है। कृपया कल पुनः प्रयास करें या अन्य सामान्य असीमित (unlimited) सुविधाओं का उपयोग करें।" 
         : "⚠️ Your daily Advanced Toolkit limit of 50 messages has been reached. Please try again tomorrow or enjoy our other unlimited app features!");
       return;
     }
+
+    setTestThrottled(true);
+    setTimeout(() => {
+      setTestThrottled(false);
+    }, 3000);
 
     setTestLoading(true);
     setTestActive(false);
@@ -392,6 +416,10 @@ export default function InteractiveToolkit({
         setTestTimer(testDuration);
         setTestActive(true);
         incrementToolkitUsage();
+        // Trigger Interstitial Ad
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('studybuddy-trigger-ad'));
+        }, 1500);
       } else {
         alert("Could not generate mock questions. Using fallback exam database.");
       }

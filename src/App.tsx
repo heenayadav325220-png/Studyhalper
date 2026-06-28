@@ -42,7 +42,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getStudyAnswer, generateQuiz, generateStudyDiagram, generateFlashcards, isAiQuotaExceeded, getDailyAiUsage } from './services/geminiService';
-import { LANGUAGES, translate } from './services/translations';
+import { LANGUAGES, COUNTRIES, translate } from './services/translations';
 import { ProgressChart } from './components/ProgressChart';
 import { StudyTimer } from './components/StudyTimer';
 import { HomeworkSolver } from './components/HomeworkSolver';
@@ -292,7 +292,9 @@ const getChatPlaceholder = (lang: AppLanguage) => {
     Bengali: 'প্রশ্ন জিজ্ঞাসা করো বা ছবি আঁকতে বলো...',
     Spanish: 'Haz una pregunta o pide un diagrama...',
     French: 'Posez une question ou demandez un schéma...',
-    German: 'Stelle eine Frage oder bitte um ein Diagramm...'
+    German: 'Stelle eine Frage oder bitte um ein Diagramm...',
+    Russian: 'Задайте вопрос по домашнему заданию или попросите схему...',
+    Chinese: '提问家庭作业或请求图表解释...'
   };
   return placeholders[lang] || 'Ask a homework question...';
 };
@@ -307,7 +309,9 @@ const getSolvingText = (lang: AppLanguage) => {
     Bengali: 'জেমিনি সমাধান করছে...',
     Spanish: 'Gemini está respondiendo...',
     French: 'Gemini est en train de résoudre...',
-    German: 'Gemini löst...'
+    German: 'Gemini löst...',
+    Russian: 'Gemini решает...',
+    Chinese: 'Gemini 正在解答...'
   };
   return txt[lang] || 'Gemini is solving...';
 };
@@ -322,7 +326,9 @@ const getFullscreenLabel = (lang: AppLanguage) => {
     Bengali: 'ফুল স্ক্রিন 📺',
     Spanish: 'Pantalla completa 📺',
     French: 'Plein écran 📺',
-    German: 'Vollbild 📺'
+    German: 'Vollbild 📺',
+    Russian: 'На весь экран 📺',
+    Chinese: '全屏 📺'
   };
   return lbls[lang] || 'Fullscreen';
 };
@@ -337,7 +343,9 @@ const getListeningLabel = (lang: AppLanguage) => {
     Bengali: 'শুনছি...',
     Spanish: 'Escuchando...',
     French: 'Écoute...',
-    German: 'Zuhören...'
+    German: 'Zuhören...',
+    Russian: 'Слушаю...',
+    Chinese: '正在聆听...'
   };
   return labels[lang] || 'Listening...';
 };
@@ -352,7 +360,9 @@ const getClearChatsLabel = (lang: AppLanguage) => {
     Bengali: 'মুছে ফেলো 🧹',
     Spanish: 'Limpiar chats 🧹',
     French: 'Effacer chats 🧹',
-    German: 'Chats leeren 🧹'
+    German: 'Chats leeren 🧹',
+    Russian: 'Очистить чаты 🧹',
+    Chinese: '清除聊天 🧹'
   };
   return translations[lang] || 'Clear Chats';
 };
@@ -367,7 +377,9 @@ const getChatIntroDesc = (lang: AppLanguage) => {
     Bengali: 'হোমওয়ার্ক সমাধান ও ছবি এঁকে সাহায্য করে!',
     Spanish: 'Resuelve tareas y genera diagramas educativos!',
     French: 'Résout vos exercices et crée des illustrations !',
-    German: 'Löst Aufgaben und erstellt Zeichnungen !'
+    German: 'Löst Aufgaben und erstellt Zeichnungen !',
+    Russian: 'Решайте домашние задания, объясняйте науку и создавайте схемы прямо в чате!',
+    Chinese: '在聊天中解答家庭作业、解释科学原理并绘制图表！'
   };
   return intro[lang] || 'Solve Homework...';
 };
@@ -619,6 +631,7 @@ export default function App() {
   const [regSchool, setRegSchool] = useState('');
   const [regClass, setRegClass] = useState('6');
   const [regAvatar, setRegAvatar] = useState('🐼');
+  const [regCountry, setRegCountry] = useState('Global');
   const [isTagMode, setIsTagMode] = useState(false);
 
   // Core local states
@@ -631,6 +644,7 @@ export default function App() {
       setRegSchool(user.school || '');
       setRegClass(user.className || '6');
       setRegAvatar(user.avatar || '🐼');
+      setRegCountry(user.country || 'Global');
     }
   }, [user]);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -719,8 +733,98 @@ export default function App() {
   });
   const [quotaExceeded, setQuotaExceeded] = useState(isAiQuotaExceeded);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [flashcardThrottled, setFlashcardThrottled] = useState(false);
+  const [quizThrottled, setQuizThrottled] = useState(false);
+
+  // Monetization and Premium states
+  const [isPremium, setIsPremium] = useState<boolean>(() => {
+    return localStorage.getItem('studybuddy_is_premium') === 'true';
+  });
+  const [adCount, setAdCount] = useState<number>(() => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const stored = localStorage.getItem("studybuddy_daily_ad_data");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.date === todayStr) {
+          return parsed.count || 0;
+        }
+      } catch (e) {}
+    }
+    return 0;
+  });
+  const [adsExhaustedForToday, setAdsExhaustedForToday] = useState<boolean>(() => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const stored = localStorage.getItem("studybuddy_daily_ad_data");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.date === todayStr) {
+          return (parsed.count || 0) >= 4;
+        }
+      } catch (e) {}
+    }
+    return false;
+  });
+  const [showInterstitialAd, setShowInterstitialAd] = useState<boolean>(false);
+  const [adCountdown, setAdCountdown] = useState<number>(0);
+
   const [showXpGuide, setShowXpGuide] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleAdTrigger = () => {
+      if (localStorage.getItem('studybuddy_is_premium') === 'true') {
+        console.log("[AdMob Interstitial] Bypassing ad since user isPremium: true");
+        return;
+      }
+      
+      const todayStr = new Date().toISOString().split("T")[0];
+      const storedAdData = localStorage.getItem("studybuddy_daily_ad_data");
+      let count = 0;
+      if (storedAdData) {
+        try {
+          const parsed = JSON.parse(storedAdData);
+          if (parsed && parsed.date === todayStr) {
+            count = parsed.count || 0;
+          }
+        } catch (e) {}
+      }
+      
+      if (count >= 4) {
+        console.log("[AdMob Interstitial] Daily limit of 4 ads reached. adsExhaustedForToday = true");
+        setAdsExhaustedForToday(true);
+        return;
+      }
+      
+      setAdCountdown(5);
+      setShowInterstitialAd(true);
+      
+      const nextCount = count + 1;
+      localStorage.setItem("studybuddy_daily_ad_data", JSON.stringify({ date: todayStr, count: nextCount }));
+      setAdCount(nextCount);
+      if (nextCount >= 4) {
+        setAdsExhaustedForToday(true);
+      }
+    };
+    
+    window.addEventListener('studybuddy-trigger-ad', handleAdTrigger);
+    return () => {
+      window.removeEventListener('studybuddy-trigger-ad', handleAdTrigger);
+    };
+  }, []);
+
+  useEffect(() => {
+    let timer: any;
+    if (showInterstitialAd && adCountdown > 0) {
+      timer = setInterval(() => {
+        setAdCountdown(prev => prev - 1);
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [showInterstitialAd, adCountdown]);
 
   useEffect(() => {
     const handleQuotaChange = (e: any) => {
@@ -1101,6 +1205,7 @@ export default function App() {
         name: regName.trim(),
         school: regSchool.trim(),
         className: regClass,
+        country: regCountry,
         points: 100,
         level: 1,
         avatar: regAvatar,
@@ -1379,7 +1484,7 @@ export default function App() {
     setIsChatLoading(true);
 
     try {
-      const studentContext = user ? { name: user.name, school: user.school, className: user.className } : undefined;
+      const studentContext = user ? { name: user.name, school: user.school, className: user.className, country: user.country || 'Global' } : undefined;
       const answer = await getStudyAnswer(inputCopy || "Discuss this homework task", imageCopy || undefined, studentContext, appLanguage);
       let aiImage: string | undefined = undefined;
 
@@ -1810,6 +1915,15 @@ export default function App() {
 
   // Quiz launcher
   const startQuiz = async (subject: Subject, lang: AppLanguage = appLanguage, difficulty: 'Easy' | 'Medium' | 'Hard' = quizDifficulty) => {
+    if (quizThrottled || isQuizLoading) {
+      alert("Please wait 3 seconds between requests to protect the server!");
+      return;
+    }
+    setQuizThrottled(true);
+    setTimeout(() => {
+      setQuizThrottled(false);
+    }, 3000);
+
     setQuizSubject(subject);
     setQuizLanguage(lang);
     setQuizDifficulty(difficulty);
@@ -1820,7 +1934,7 @@ export default function App() {
     setQuizFinished(false);
 
     try {
-      const studentContext = user ? { name: user.name, school: user.school, className: user.className } : undefined;
+      const studentContext = user ? { name: user.name, school: user.school, className: user.className, country: user.country || 'Global' } : undefined;
       const res = await generateQuiz(subject, studentContext, lang, difficulty);
       setQuizQuestions(res || []);
     } catch (err) {
@@ -1874,6 +1988,10 @@ export default function App() {
       if (quizQuestions.length > 0 && nextScore === quizQuestions.length) {
         awardPoints(0, 'topic_master');
       }
+      // Trigger AdMob Interstitial Ad!
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('studybuddy-trigger-ad'));
+      }, 800);
     }
   };
 
@@ -2173,6 +2291,15 @@ export default function App() {
   // ---------------- FLASHCARDS CORE ACTIONS ----------------
 
   const handleGenerateFlashcards = async () => {
+    if (flashcardThrottled || isGeneratingFlashcards) {
+      alert("Please wait 3 seconds between requests to protect the server!");
+      return;
+    }
+    setFlashcardThrottled(true);
+    setTimeout(() => {
+      setFlashcardThrottled(false);
+    }, 3000);
+
     setIsGeneratingFlashcards(true);
     setFlashcardProgressStage('Initializing generator...');
     setFlashcardProgressPercent(5);
@@ -2248,6 +2375,11 @@ export default function App() {
       playAudioChime('success');
       awardPoints(25, 'note');
       setSelectedNoteIdForFlashcard('none');
+
+      // Trigger AdMob Interstitial Ad!
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('studybuddy-trigger-ad'));
+      }, 1200);
     } catch (err) {
       console.error("Failed to generate AI flashcards:", err);
       setFlashcardProgressStage('Generation failed');
@@ -2554,6 +2686,33 @@ export default function App() {
                 </select>
               </div>
 
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  {appLanguage === 'Russian' ? 'Страна (Syllabus Country) *' : appLanguage === 'Chinese' ? '国家 (Syllabus Country) *' : 'Syllabus Country / Region *'}
+                </label>
+                <select
+                  required
+                  value={regCountry}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setRegCountry(val);
+                    const matched = COUNTRIES.find(c => c.name === val);
+                    if (matched) {
+                      setAppLanguage(matched.defaultLanguage);
+                      localStorage.setItem('studybuddy_appLanguage', matched.defaultLanguage);
+                    }
+                  }}
+                  className="w-full p-3 bg-slate-50/50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-800 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+                  id="reg_country_select"
+                >
+                  {COUNTRIES.map((ct) => (
+                    <option key={ct.name} value={ct.name}>
+                      {ct.flag} {ct.name} ({ct.syllabus})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Study Avatar Selector Option */}
               <div className="space-y-2 pt-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block text-center">
@@ -2598,39 +2757,6 @@ export default function App() {
       ) : (
         /* Main App Container (Absolutely locked viewport) */
         <div className="w-full max-w-md h-screen md:h-[90vh] bg-slate-50 md:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative z-10 border border-slate-800/25">
-          
-          {/* Floating Settings & Language Control (Main App) */}
-          <div className="absolute top-4 left-4 z-50">
-            <button
-              type="button"
-              onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-              className="p-1 rounded-full hover:bg-slate-100 transition outline-none cursor-pointer text-slate-500"
-              id="main_lang_btn"
-            >
-              <MoreVertical className="w-4 h-4" />
-            </button>
-            {showLanguageDropdown && (
-              <div className="absolute left-0 top-9 w-40 bg-white border border-slate-200 rounded-2xl shadow-xl py-1.5 z-50 flex flex-col divide-y divide-slate-100 max-h-56 overflow-y-auto animate-in fade-in slide-in-from-top-2" id="main_lang_dropdown">
-                {LANGUAGES.map((lang) => (
-                  <button
-                    key={lang.code}
-                    type="button"
-                    onClick={() => {
-                      setAppLanguage(lang.code);
-                      localStorage.setItem('studybuddy_appLanguage', lang.code);
-                      setShowLanguageDropdown(false);
-                    }}
-                    className={`w-full px-3 py-2 text-left text-[10px] font-black flex items-center space-x-2 cursor-pointer hover:bg-slate-50 ${
-                      appLanguage === lang.code ? 'text-indigo-600 bg-indigo-50/40 font-black' : 'text-slate-650'
-                    }`}
-                  >
-                    <span>{lang.flag}</span>
-                    <span className="truncate">{lang.label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
           
           {/* Wave Animation Interactive Toast Message */}
           <AnimatePresence>
@@ -5001,33 +5127,15 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Date</label>
-                    <input type="date" value={newGroupSession.date} onChange={(e) => setNewGroupSession({...newGroupSession, date: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none text-slate-750" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Time</label>
-                    <input type="time" value={newGroupSession.time} onChange={(e) => setNewGroupSession({...newGroupSession, time: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none text-slate-755" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Duration (mins)</label>
-                    <select value={newGroupSession.duration} onChange={(e) => setNewGroupSession({...newGroupSession, duration: Number(e.target.value)})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none text-slate-700">
-                      <option value="30">30 Mins</option>
-                      <option value="45">45 Mins</option>
-                      <option value="60">1 Hour</option>
-                      <option value="90">1.5 Hours</option>
-                      <option value="120">2 Hours</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Meeting Platform</label>
-                    <select value={newGroupSession.meeting_platform} onChange={(e) => setNewGroupSession({...newGroupSession, meeting_platform: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none text-slate-700">
-                      <option value="Google Meet">Google Meet 📹</option>
-                      <option value="Zoom">Zoom 🎥</option>
-                      <option value="Microsoft Teams">MS Teams 👔</option>
-                      <option value="Jitsi Meet">Jitsi Meet 🌐</option>
-                      <option value="Discord">Discord 🎮</option>
+                    <input type="date" value={newGroupSession.date} onChange={(e) => setNewGroupSession({...newGroupSession, date: e.target.value                   <div className="relative flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFullScreenMessage(null)}
+                      className="p-1 rounded-full hover:bg-slate-700 transition outline-none cursor-pointer text-slate-300"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>                      <option value="Discord">Discord 🎮</option>
                     </select>
                   </div>
                 </div>
@@ -5379,6 +5487,29 @@ export default function App() {
                     </select>
                   </div>
 
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase">Syllabus Country / Region</label>
+                    <select
+                      value={regCountry}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setRegCountry(val);
+                        const matched = COUNTRIES.find(c => c.name === val);
+                        if (matched) {
+                          setAppLanguage(matched.defaultLanguage);
+                          localStorage.setItem('studybuddy_appLanguage', matched.defaultLanguage);
+                        }
+                      }}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-100 outline-none"
+                    >
+                      {COUNTRIES.map((ct) => (
+                        <option key={ct.name} value={ct.name}>
+                          {ct.flag} {ct.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* Avatar Selector */}
                   <div className="space-y-1.5 pt-1">
                     <label className="text-[9px] font-bold text-slate-400 uppercase block">Choose Your Avatar</label>
@@ -5407,6 +5538,7 @@ export default function App() {
                             name: regName.trim(),
                             school: regSchool.trim(),
                             className: regClass,
+                            country: regCountry,
                             avatar: regAvatar
                           };
                           setUser(updated as any);

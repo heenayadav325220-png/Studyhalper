@@ -501,15 +501,38 @@ app.post("/api/gemini/answer", async (req, res) => {
       languagePrompt = "Please respond entirely in German language, customized to be clear and encouraging for a school child.";
     } else if (language === "Japanese") {
       languagePrompt = "Please respond entirely in Japanese language, customized to be clear and encouraging for a school child.";
+    } else if (language === "Russian") {
+      languagePrompt = "Please respond entirely in Russian language, customized to be clear and encouraging for a Russian school child.";
+    } else if (language === "Chinese") {
+      languagePrompt = "Please respond entirely in Chinese (Simplified) language, customized to be clear and encouraging for a Chinese school child.";
     } else {
       languagePrompt = "Please respond in English, styled to be simple, friendly and highly clear for a school child.";
+    }
+
+    let syllabusPrompt = "";
+    if (studentContext) {
+      const country = studentContext.country || "Global";
+      const className = studentContext.className || "10";
+      if (country === "Russia") {
+        syllabusPrompt = `You must strictly follow the Russian National Educational Syllabus (Государственная программа / ФГОС) for grade/class ${className}. All academic standards, terminology, reference formulas, and pedagogy must be tailored to the Russian standard curriculum. Speak in Russian.`;
+      } else if (country === "China") {
+        syllabusPrompt = `You must strictly follow the Chinese National Curriculum Standard (国家课程标准) / Gaokao-aligned pathway for grade/class ${className}. All academic standards, terminology, reference formulas, and pedagogy must match the Chinese educational system. Speak in Chinese.`;
+      } else if (country === "United States") {
+        syllabusPrompt = `You must strictly follow the US Common Core / Next Generation Science Standards (NGSS) or AP/honors standards for grade/class ${className}. Tailor academic terminology and curriculum standards to the United States educational system.`;
+      } else if (country === "India") {
+        syllabusPrompt = `You must strictly follow the Indian CBSE (NCERT) / ICSE / State Board curriculum for grade/class ${className}. Tailor explanations, topics, and terms to the Indian schooling system.`;
+      } else if (country === "United Kingdom") {
+        syllabusPrompt = `You must strictly follow the National Curriculum of England / GCSE / Key Stage curriculum for grade/class ${className}. Tailor spelling, terms (like Key Stages) and curriculum standards to the UK school system.`;
+      } else {
+        syllabusPrompt = `You must follow an internationally recognized global curriculum standard such as the International Baccalaureate (IB) or Cambridge Assessment International Education (CIE) suitable for grade/class ${className}.`;
+      }
     }
 
     const appInfo = "You are the AI model integrated into 'Ascend Study', an advanced, interactive study assistant platform. Ascend Study provides students with intelligent conversational learning, structured subject notes, dynamic practice quizzes, progress and daily streak tracking, study schedules/reminders, and collaborative group study circles/rooms for peer-to-peer interactive learning.";
     const creatorInfo = "Your owner, creator, and lead developer is Rohit Yadav, a brilliant 14/15-year-old student and coder who designed and developed this entire applet. Rohit is the head and founder of his developer team called 'Core AI'. If any student or user asks who created/developed you, who designed this app, or who owns you, you must proudly, clearly, and directly tell them that you were created and are owned by Rohit Yadav and his team, Core AI. You must never claim that Google, Google AI Studio, or OpenAI created or own you - they are only providers of the underlying large language model APIs, but the app itself and your persona belongs strictly to Rohit Yadav and Core AI.";
 
     const systemInstruction = studentContext 
-      ? `${appInfo} ${creatorInfo} You are an encouraging, friendly study helper for a child named ${studentContext.name} who studies in class ${studentContext.className} at ${studentContext.school}. Explain concepts clearly using step-by-step solutions suitable for class/grade ${studentContext.className}. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. Keep your tone highly personalized, warm, and highly encouraging, referring to their school or name when it fits naturally. ${languagePrompt}`
+      ? `${appInfo} ${creatorInfo} You are an encouraging, friendly study helper/coach for a child named ${studentContext.name} who studies in class ${studentContext.className} at ${studentContext.school}. ${syllabusPrompt} Keep your tone highly personalized, warm, and highly encouraging, referring to their school or name when it fits naturally. ${languagePrompt}`
       : `${appInfo} ${creatorInfo} You are a helpful study assistant. Explain concepts clearly and provide step-by-step solutions. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. If the user asks for a diagram or visual explanation, describe it clearly or suggest a visual aid. ${languagePrompt}`;
 
     const ai = getGeminiClient();
@@ -776,8 +799,28 @@ app.post("/api/gemini/quiz", async (req, res) => {
       languageInstruct = "entirely in clean, simple German language suitable for school students.";
     } else if (quizLang === "Japanese") {
       languageInstruct = "entirely in clean, simple Japanese language suitable for school students.";
+    } else if (quizLang === "Russian") {
+      languageInstruct = "entirely in clean, simple Russian language suitable for school students.";
+    } else if (quizLang === "Chinese") {
+      languageInstruct = "entirely in clean, simple Chinese (Simplified) language suitable for school students.";
     } else {
       languageInstruct = "entirely in simple, school-grade English.";
+    }
+
+    let syllabusInstruct = "";
+    if (studentContext) {
+      const country = studentContext.country || "Global";
+      if (country === "Russia") {
+        syllabusInstruct = "strictly following the Russian National Educational Syllabus (Государственная программа / ФГОС) standard,";
+      } else if (country === "China") {
+        syllabusInstruct = "strictly matching the Chinese National Curriculum Standard (国家课程标准) standard,";
+      } else if (country === "United States") {
+        syllabusInstruct = "aligned with US Common Core / NGSS standards,";
+      } else if (country === "India") {
+        syllabusInstruct = "aligned with Indian CBSE (NCERT) syllabus guidelines,";
+      } else if (country === "United Kingdom") {
+        syllabusInstruct = "aligned with GCSE / National Curriculum of England standards,";
+      }
     }
 
     let difficultyInstruct = "";
@@ -789,7 +832,7 @@ app.post("/api/gemini/quiz", async (req, res) => {
       difficultyInstruct = "The difficulty of the quiz MUST be MEDIUM. Provide a balanced mix of conceptual recall, analytical questions, and practical applications suitable for typical classroom standards.";
     }
 
-    const instructionText = `Generate a 5-question multiple choice quiz ${classText} for ${subject} ${languageInstruct} ${difficultyInstruct} Return only valid JSON in the format: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}]`;
+    const instructionText = `Generate a 5-question multiple choice quiz ${classText} ${syllabusInstruct} for ${subject} ${languageInstruct} ${difficultyInstruct} Return only valid JSON in the format: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}]`;
 
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {

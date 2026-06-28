@@ -96,11 +96,83 @@ export function setAiQuotaExceeded(val: boolean, msg: string | null = null) {
   }
 }
 
-// Safe custom fetch wrapper instead of intercepting read-only window.fetch
-export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const response = await fetch(input, init);
+// Local Cache System for high durability
+export function getLocalCache(category: string, country: string, topic: string, additionalKey?: string): any | null {
   try {
-    const url = typeof input === "string" ? input : (input as any).url || "";
+    const key = `sb_durability_cache_${category}_${country}_${topic}_${additionalKey || ''}`;
+    const cached = localStorage.getItem(key);
+    if (cached) {
+      console.log(`[Durability Cache Hit] Instantly loaded ${category} for ${country}/${topic} from cache.`);
+      return JSON.parse(cached);
+    }
+  } catch (e) {
+    console.warn("Failed to read from local cache", e);
+  }
+  return null;
+}
+
+export function setLocalCache(category: string, country: string, topic: string, additionalKey: string, data: any) {
+  try {
+    const key = `sb_durability_cache_${category}_${country}_${topic}_${additionalKey || ''}`;
+    localStorage.setItem(key, JSON.stringify(data));
+    console.log(`[Durability Cache Store] Saved ${category} for ${country}/${topic} into cache.`);
+  } catch (e) {
+    console.warn("Failed to write to local cache", e);
+  }
+}
+
+// Safe custom fetch wrapper with built-in localized caching for notes & AI tools
+export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const url = typeof input === "string" ? input : (input as any).url || "";
+  const isPost = init?.method === "POST";
+  
+  // Identify if this is a cacheable educational study notes/tools endpoint
+  const cacheableEndpoints = [
+    "/api/gemini/notes-generator",
+    "/api/gemini/notes-summarizer",
+    "/api/gemini/explain-topic",
+    "/api/gemini/mindmap",
+    "/api/gemini/question-paper",
+    "/api/gemini/pdf-summary"
+  ];
+  
+  const isCacheable = cacheableEndpoints.some(ep => url.includes(ep));
+  
+  let country = "Global";
+  try {
+    const profileStr = localStorage.getItem('studybuddy_local_profile');
+    if (profileStr) {
+      const parsed = JSON.parse(profileStr);
+      if (parsed && parsed.country) country = parsed.country;
+    }
+  } catch (e) {}
+
+  let bodyObj: any = null;
+  let cacheKey = "";
+  if (isPost && isCacheable && init?.body) {
+    try {
+      bodyObj = JSON.parse(init.body as string);
+      // Construct a unique cache key based on country, endpoint and body params
+      const endpointName = url.split("/").pop() || "tool";
+      const bodyStr = JSON.stringify(bodyObj);
+      cacheKey = `sb_notes_cache_${country}_${endpointName}_${bodyStr}`;
+      
+      const cachedResponseText = localStorage.getItem(cacheKey);
+      if (cachedResponseText) {
+        console.log(`[Cache Hit - safeFetch] Returning cached study notes instantly for ${cacheKey}`);
+        return new Response(cachedResponseText, {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    } catch (err) {
+      console.warn("Failed to check safeFetch cache", err);
+    }
+  }
+
+  const response = await fetch(input, init);
+
+  try {
     if ((url.includes("/api/gemini/") || url.includes("generativelanguage.googleapis.com")) && response.ok) {
       incrementDailyAiUsage();
     }
@@ -108,8 +180,16 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
     if (quotaHeader === "true") {
       setAiQuotaExceeded(true, "Quota Exceeded on AI Studio / Cloud project.");
     }
+
+    // Save to cache if successful
+    if (response.ok && isPost && isCacheable && cacheKey) {
+      const clone = response.clone();
+      const text = await clone.text();
+      localStorage.setItem(cacheKey, text);
+      console.log(`[Cache Store - safeFetch] Saved study notes result to ${cacheKey}`);
+    }
   } catch (e) {
-    // Ignore header access errors
+    // Ignore caching and header errors
   }
   return response;
 }
@@ -214,7 +294,7 @@ async function callClientGeminiWithRetry(
 export async function getStudyAnswer(
   prompt: string, 
   imageBase64?: string, 
-  studentContext?: { name: string; school: string; className: string }, 
+  studentContext?: { name: string; school: string; className: string; country?: string }, 
   language: string = "English"
 ): Promise<string> {
   // 1. Try secure backend server route (Primary route)
@@ -274,13 +354,36 @@ export async function getStudyAnswer(
       langInstruction = `You MUST explain entirely in clear, friendly French language.`;
     } else if (language === "German") {
       langInstruction = `You MUST explain entirely in clear, friendly German language.`;
+    } else if (language === "Russian") {
+      langInstruction = `You MUST explain entirely in clear, friendly Russian language.`;
+    } else if (language === "Chinese") {
+      langInstruction = `You MUST explain entirely in clear, friendly Chinese (Simplified) language.`;
+    }
+
+    let syllabusPrompt = "";
+    if (studentContext) {
+      const country = studentContext.country || "Global";
+      const className = studentContext.className || "10";
+      if (country === "Russia") {
+        syllabusPrompt = `You must strictly follow the Russian National Educational Syllabus (Государственная программа / ФГОС) for grade/class ${className}. All academic standards, terminology, reference formulas, and pedagogy must be tailored to the Russian standard curriculum. Speak in Russian.`;
+      } else if (country === "China") {
+        syllabusPrompt = `You must strictly follow the Chinese National Curriculum Standard (国家课程标准) / Gaokao-aligned pathway for grade/class ${className}. All academic standards, terminology, reference formulas, and pedagogy must match the Chinese educational system. Speak in Chinese.`;
+      } else if (country === "United States") {
+        syllabusPrompt = `You must strictly follow the US Common Core / Next Generation Science Standards (NGSS) or AP/honors standards for grade/class ${className}. Tailor academic terminology and curriculum standards to the United States educational system.`;
+      } else if (country === "India") {
+        syllabusPrompt = `You must strictly follow the Indian CBSE (NCERT) / ICSE / State Board curriculum for grade/class ${className}. Tailor explanations, topics, and terms to the Indian schooling system.`;
+      } else if (country === "United Kingdom") {
+        syllabusPrompt = `You must strictly follow the National Curriculum of England / GCSE / Key Stage curriculum for grade/class ${className}. Tailor spelling, terms (like Key Stages) and curriculum standards to the UK school system.`;
+      } else {
+        syllabusPrompt = `You must follow an internationally recognized global curriculum standard such as the International Baccalaureate (IB) or Cambridge Assessment International Education (CIE) suitable for grade/class ${className}.`;
+      }
     }
 
     const appInfo = "You are the AI model integrated into 'Ascend Study', an advanced, interactive study assistant platform. Ascend Study provides students with intelligent conversational learning, structured subject notes, dynamic practice quizzes, progress and daily streak tracking, study schedules/reminders, and collaborative group study circles/rooms for peer-to-peer interactive learning.";
     const creatorInfo = "Your owner, creator, and lead developer is Rohit Yadav, a brilliant 14/15-year-old student and coder who designed and developed this entire applet. Rohit is the head and founder of his developer team called 'Core AI'. If any student or user asks who created/developed you, who designed this app, or who owns you, you must proudly, clearly, and directly tell them that you were created and are owned by Rohit Yadav and his team, Core AI. You must never claim that Google, Google AI Studio, or OpenAI created or own you - they are only providers of the underlying large language model APIs, but the app itself and your persona belongs strictly to Rohit Yadav and Core AI.";
 
     const systemInstruction = studentContext 
-      ? `${appInfo} ${creatorInfo} You are an encouraging, friendly study helper for a child named ${studentContext.name} who studies in ${studentContext.className} at ${studentContext.school}. Explain concepts clearly using step-by-step solutions suitable for class/grade ${studentContext.className}. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. Keep your tone highly personalized, warm, and highly encouraging, referring to their school or name when it fits naturally. ${langInstruction}`
+      ? `${appInfo} ${creatorInfo} You are an encouraging, friendly study helper/coach for a child named ${studentContext.name} who studies in ${studentContext.className} at ${studentContext.school}. ${syllabusPrompt} Keep your tone highly personalized, warm, and highly encouraging, referring to their school or name when it fits naturally. ${langInstruction}`
       : `${appInfo} ${creatorInfo} You are a helpful study assistant. Explain concepts clearly and provide step-by-step solutions. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. If the user asks for a diagram or visual explanation, describe it clearly or suggest a visual aid. ${langInstruction}`;
 
     const response = await callClientGeminiWithRetry(ai, {
@@ -348,10 +451,17 @@ export async function generateStudyDiagram(prompt: string): Promise<string | nul
 
 export async function generateQuiz(
   subject: string, 
-  studentContext?: { name: string; school: string; className: string }, 
+  studentContext?: { name: string; school: string; className: string; country?: string }, 
   language: string = "English",
   difficulty: string = "Medium"
 ): Promise<any[]> {
+  const country = studentContext?.country || "Global";
+  const quizCacheKey = `${language}_${difficulty}`;
+  const cachedQuiz = getLocalCache("quiz", country, subject, quizCacheKey);
+  if (cachedQuiz && Array.isArray(cachedQuiz) && cachedQuiz.length > 0) {
+    return cachedQuiz;
+  }
+
   // 1. Try secure backend server route (Primary route)
   try {
     const response = await safeFetch("/api/gemini/quiz", {
@@ -365,6 +475,7 @@ export async function generateQuiz(
     if (response.ok) {
       const data = await response.json();
       if (Array.isArray(data) && data.length > 0) {
+        setLocalCache("quiz", country, subject, quizCacheKey, data);
         return data;
       }
     }
@@ -396,6 +507,26 @@ export async function generateQuiz(
       langPromptText = `entirely in French language. All questions, descriptions, and option texts MUST be in clean French.`;
     } else if (language === "German") {
       langPromptText = `entirely in German language. All questions, descriptions, and option texts MUST be in clean German.`;
+    } else if (language === "Russian") {
+      langPromptText = `entirely in clean, friendly Russian language. All questions, descriptions, and option texts MUST be in clean Russian.`;
+    } else if (language === "Chinese") {
+      langPromptText = `entirely in clean, friendly Chinese (Simplified) language. All questions, descriptions, and option texts MUST be in clean Chinese.`;
+    }
+
+    let syllabusInstruct = "";
+    if (studentContext) {
+      const country = studentContext.country || "Global";
+      if (country === "Russia") {
+        syllabusInstruct = "strictly following the Russian National Educational Syllabus (Государственная программа / ФГОС) standard,";
+      } else if (country === "China") {
+        syllabusInstruct = "strictly matching the Chinese National Curriculum Standard (国家课程标准) standard,";
+      } else if (country === "United States") {
+        syllabusInstruct = "aligned with US Common Core / NGSS standards,";
+      } else if (country === "India") {
+        syllabusInstruct = "aligned with Indian CBSE (NCERT) syllabus guidelines,";
+      } else if (country === "United Kingdom") {
+        syllabusInstruct = "aligned with GCSE / National Curriculum of England standards,";
+      }
     }
 
     let difficultyInstruct = "";
@@ -407,7 +538,7 @@ export async function generateQuiz(
       difficultyInstruct = "The difficulty of the quiz MUST be MEDIUM. Provide a balanced mix of conceptual recall, analytical questions, and practical applications suitable for typical classroom standards.";
     }
 
-    const instructionText = `Generate a 5-question multiple choice quiz ${classText} for ${subject} ${langPromptText}. ${difficultyInstruct} Return only valid JSON in the format: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}]`;
+    const instructionText = `Generate a 5-question multiple choice quiz ${classText} ${syllabusInstruct} for ${subject} ${langPromptText}. ${difficultyInstruct} Return only valid JSON in the format: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}]`;
 
     const response = await callClientGeminiWithRetry(ai, {
       model: "gemini-flash-latest",
@@ -420,6 +551,7 @@ export async function generateQuiz(
     try {
       const parsed = JSON.parse(response.text || "[]");
       if (Array.isArray(parsed) && parsed.length > 0) {
+        setLocalCache("quiz", country, subject, quizCacheKey, parsed);
         return parsed;
       }
     } catch (e) {
@@ -445,13 +577,29 @@ export async function generateFlashcards(
 ): Promise<Array<{ front: string; back: string }>> {
   const cacheKey = `${subject}_${noteTitle || ""}_${noteContent || ""}_${count}`;
 
-  // 1. Try local memory cache
+  // Read active country
+  let country = "Global";
+  try {
+    const profileStr = localStorage.getItem('studybuddy_local_profile');
+    if (profileStr) {
+      const parsed = JSON.parse(profileStr);
+      if (parsed && parsed.country) country = parsed.country;
+    }
+  } catch (e) {}
+
+  // 1. Try country-specific durability cache
+  const cachedFlashcards = getLocalCache("flashcards", country, subject, cacheKey);
+  if (cachedFlashcards && Array.isArray(cachedFlashcards) && cachedFlashcards.length > 0) {
+    return cachedFlashcards;
+  }
+
+  // 2. Try local memory cache
   if (clientFlashcardsCache.has(cacheKey)) {
     console.log(`[Cache Hit - Client Memory] Returning flashcards for: ${cacheKey}`);
     return clientFlashcardsCache.get(cacheKey)!;
   }
 
-  // 2. Try localStorage cache fallback
+  // 3. Try localStorage cache fallback
   try {
     const localCacheStr = localStorage.getItem('studybuddy_flashcard_api_cache');
     if (localCacheStr) {
@@ -459,6 +607,7 @@ export async function generateFlashcards(
       if (cacheMap[cacheKey] && Array.isArray(cacheMap[cacheKey]) && cacheMap[cacheKey].length > 0) {
         console.log(`[Cache Hit - Client LocalStorage] Returning flashcards for: ${cacheKey}`);
         clientFlashcardsCache.set(cacheKey, cacheMap[cacheKey]);
+        setLocalCache("flashcards", country, subject, cacheKey, cacheMap[cacheKey]);
         return cacheMap[cacheKey];
       }
     }
@@ -466,7 +615,7 @@ export async function generateFlashcards(
     console.warn("Could not read client flashcard localStorage cache", err);
   }
 
-  // 3. Try secure backend server route (Primary route)
+  // 4. Try secure backend server route (Primary route)
   try {
     const response = await safeFetch("/api/gemini/flashcard", {
       method: "POST",
@@ -480,6 +629,7 @@ export async function generateFlashcards(
       const data = await response.json();
       if (Array.isArray(data) && data.length > 0) {
         // Cache success
+        setLocalCache("flashcards", country, subject, cacheKey, data);
         clientFlashcardsCache.set(cacheKey, data);
         try {
           const localCacheStr = localStorage.getItem('studybuddy_flashcard_api_cache') || '{}';
@@ -556,6 +706,7 @@ Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`;
       }
 
       if (finalCards.length > 0) {
+        setLocalCache("flashcards", country, subject, cacheKey, finalCards);
         clientFlashcardsCache.set(cacheKey, finalCards);
         try {
           const localCacheStr = localStorage.getItem('studybuddy_flashcard_api_cache') || '{}';
