@@ -7,7 +7,7 @@ import {
   Menu, Settings, ChevronLeft
 } from 'lucide-react';
 import { Subject, Note, Progress } from '../types';
-import { generateQuiz, isAiQuotaExceeded } from '../services/geminiService';
+import { generateQuiz, isAiQuotaExceeded, safeFetch, getToolkitUsage, incrementToolkitUsage, ToolkitUsageData } from '../services/geminiService';
 
 interface InteractiveToolkitProps {
   onClose: () => void;
@@ -44,6 +44,7 @@ export default function InteractiveToolkit({
   const [pastedContent, setPastedContent] = useState('');
   const [ocrImage, setOcrImage] = useState<string | null>(null);
   const [quotaExceeded, setQuotaExceeded] = useState(isAiQuotaExceeded);
+  const [toolkitUsage, setToolkitUsage] = useState<ToolkitUsageData>(() => getToolkitUsage());
 
   useEffect(() => {
     const handleQuotaChange = (e: any) => {
@@ -52,6 +53,18 @@ export default function InteractiveToolkit({
     window.addEventListener('ai-quota-state-changed', handleQuotaChange);
     return () => {
       window.removeEventListener('ai-quota-state-changed', handleQuotaChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleToolkitUsageChange = (e: any) => {
+      if (e.detail) {
+        setToolkitUsage(e.detail);
+      }
+    };
+    window.addEventListener('toolkit-usage-updated', handleToolkitUsageChange);
+    return () => {
+      window.removeEventListener('toolkit-usage-updated', handleToolkitUsageChange);
     };
   }, []);
 
@@ -300,6 +313,13 @@ export default function InteractiveToolkit({
       return;
     }
 
+    if (toolkitUsage.count >= toolkitUsage.limit) {
+      alert(appLanguage === 'Hindi' 
+        ? "⚠️ आपके एडवांस्ड टूलकिट की दैनिक सीमा (50 मैसेजेस) समाप्त हो गई है। कृपया कल पुनः प्रयास करें या अन्य सामान्य असीमित (unlimited) सुविधाओं का उपयोग करें।" 
+        : "⚠️ Your daily Advanced Toolkit limit of 50 messages has been reached. Please try again tomorrow or enjoy our other unlimited app features!");
+      return;
+    }
+
     setAiLoading(true);
     setAiResult(null);
 
@@ -327,7 +347,7 @@ export default function InteractiveToolkit({
     }
 
     try {
-      const response = await fetch(endpoint, {
+      const response = await safeFetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body)
@@ -335,6 +355,7 @@ export default function InteractiveToolkit({
       if (response.ok) {
         const data = await response.json();
         setAiResult(data);
+        incrementToolkitUsage();
       } else {
         alert("Failed to reach Gemini API model. Running internal offline generator.");
         // fallback
@@ -353,6 +374,13 @@ export default function InteractiveToolkit({
 
   // Execute Mock Test Generation
   const handleGenerateMockTest = async () => {
+    if (toolkitUsage.count >= toolkitUsage.limit) {
+      alert(appLanguage === 'Hindi' 
+        ? "⚠️ आपके एडवांस्ड टूलकिट की दैनिक सीमा (50 मैसेजेस) समाप्त हो गई है। कृपया कल पुनः प्रयास करें या अन्य सामान्य असीमित (unlimited) सुविधाओं का उपयोग करें।" 
+        : "⚠️ Your daily Advanced Toolkit limit of 50 messages has been reached. Please try again tomorrow or enjoy our other unlimited app features!");
+      return;
+    }
+
     setTestLoading(true);
     setTestActive(false);
     setTestSubmitted(false);
@@ -363,6 +391,7 @@ export default function InteractiveToolkit({
         setTestAnswers(new Array(questions.length).fill(-1));
         setTestTimer(testDuration);
         setTestActive(true);
+        incrementToolkitUsage();
       } else {
         alert("Could not generate mock questions. Using fallback exam database.");
       }
@@ -397,10 +426,18 @@ export default function InteractiveToolkit({
   // Search vocab
   const handleVocabLookup = async () => {
     if (!vocabWord) return;
+
+    if (toolkitUsage.count >= toolkitUsage.limit) {
+      alert(appLanguage === 'Hindi' 
+        ? "⚠️ आपके एडवांस्ड टूलकिट की दैनिक सीमा (50 मैसेजेस) समाप्त हो गई है। कृपया कल पुनः प्रयास करें या अन्य सामान्य असीमित (unlimited) सुविधाओं का उपयोग करें।" 
+        : "⚠️ Your daily Advanced Toolkit limit of 50 messages has been reached. Please try again tomorrow or enjoy our other unlimited app features!");
+      return;
+    }
+
     setVocabLoading(true);
     try {
       const prompt = `Define the word: "${vocabWord}". Provide: Part of Speech, precise academic definition, 2 synonyms, and 1 example sentence. Format your response ONLY as valid JSON in this structure: {"word": "${vocabWord}", "partOfSpeech": "...", "definition": "...", "synonyms": ["...", "..."], "example": "..."}`;
-      const response = await fetch("/api/gemini/answer", {
+      const response = await safeFetch("/api/gemini/answer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt, language: "English" })
@@ -409,6 +446,7 @@ export default function InteractiveToolkit({
         const d = await response.json();
         const parsed = JSON.parse(d.text);
         setVocabResult(parsed);
+        incrementToolkitUsage();
       }
     } catch (e) {
       console.error(e);
@@ -650,6 +688,20 @@ export default function InteractiveToolkit({
 
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Advanced Toolkit Daily Limit Badge */}
+          <div className={`hidden md:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border select-none text-[10px] font-black uppercase tracking-wider
+            ${focusActive 
+              ? 'bg-cyan-950/40 border-cyan-500/20 text-cyan-400' 
+              : 'bg-amber-50 border-amber-200 text-amber-800'}`}
+          >
+            <BrainCircuit size={12} className={toolkitUsage.count >= toolkitUsage.limit * 0.8 ? "animate-pulse" : ""} />
+            <span>
+              {appLanguage === 'Hindi' 
+                ? `टूलकिट: ${toolkitUsage.count}/${toolkitUsage.limit} प्रयुक्त` 
+                : `Toolkit: ${toolkitUsage.count}/${toolkitUsage.limit} Used`}
+            </span>
+          </div>
+
           {/* Distraction-free Focus button */}
           <button 
             onClick={() => setFocusActive(!focusActive)} 
@@ -834,6 +886,49 @@ export default function InteractiveToolkit({
                 );
               })}
             </div>
+
+            {/* Toolkit Daily Usage Tracker card */}
+            {!isSidebarCollapsed && (
+              <div className="mt-auto p-3 bg-indigo-50/60 border border-indigo-100 rounded-2xl space-y-2 select-none">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1.5">
+                    <BrainCircuit className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+                    <span className="font-extrabold text-[9px] text-slate-750 uppercase tracking-wider">
+                      {appLanguage === 'Hindi' ? 'टूलकिट उपयोग' : 'Toolkit Usage'}
+                    </span>
+                  </div>
+                  <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${
+                    toolkitUsage.count >= toolkitUsage.limit
+                      ? 'bg-rose-100 text-rose-700'
+                      : 'bg-emerald-100 text-emerald-700'
+                  }`}>
+                    {toolkitUsage.count >= toolkitUsage.limit
+                      ? (appLanguage === 'Hindi' ? 'सीमा पूर्ण 🛑' : 'Full 🛑')
+                      : (appLanguage === 'Hindi' ? 'सक्रिय ✅' : 'Active ✅')}
+                  </span>
+                </div>
+                
+                {/* Progress bar */}
+                <div className="space-y-1">
+                  <div className="w-full bg-slate-100 border border-slate-200/40 rounded-full h-1.5 overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-300 ${
+                        toolkitUsage.count >= toolkitUsage.limit 
+                          ? 'bg-rose-500' 
+                          : toolkitUsage.count >= toolkitUsage.limit * 0.8 
+                            ? 'bg-amber-500 animate-pulse' 
+                            : 'bg-indigo-600'
+                      }`}
+                      style={{ width: `${Math.min(100, (toolkitUsage.count / toolkitUsage.limit) * 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[8px] font-extrabold text-slate-500">
+                    <span>{appLanguage === 'Hindi' ? 'दैनिक सीमा (50)' : 'Daily Limit (50)'}</span>
+                    <span>{toolkitUsage.count} / {toolkitUsage.limit}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </aside>
 
           {/* Scrollable Main Workspace */}

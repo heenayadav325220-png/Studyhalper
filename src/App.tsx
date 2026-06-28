@@ -41,7 +41,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { getStudyAnswer, generateQuiz, generateStudyDiagram, generateFlashcards, isAiQuotaExceeded } from './services/geminiService';
+import { getStudyAnswer, generateQuiz, generateStudyDiagram, generateFlashcards, isAiQuotaExceeded, getDailyAiUsage } from './services/geminiService';
 import { LANGUAGES, translate } from './services/translations';
 import { ProgressChart } from './components/ProgressChart';
 import { StudyTimer } from './components/StudyTimer';
@@ -469,6 +469,24 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('home'); 
   const [notebookTab, setNotebookTab] = useState<'notes' | 'planner' | 'flashcards'>('notes');
   const [waveToast, setWaveToast] = useState<{ name: string; response: string; points: number } | null>(null);
+  const [aiUsage, setAiUsage] = useState<any>(() => getDailyAiUsage());
+  const [toolkitUsage, setToolkitUsage] = useState<any>(() => {
+    if (typeof window !== "undefined") {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const stored = localStorage.getItem("studybuddy_toolkit_usage");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.date === todayStr) {
+            return { date: todayStr, count: parsed.count || 0, limit: 50 };
+          }
+        } catch (e) {}
+      }
+      return { date: todayStr, count: 0, limit: 50 };
+    }
+    return { date: "", count: 0, limit: 50 };
+  });
+  const [quotaToast, setQuotaToast] = useState<{ show: boolean; message: string; count: number } | null>(null);
 
   // Retro Audio effects
   const playAudioChime = (type: 'coin' | 'levelUp' | 'success' | 'draw' | 'quest') => {
@@ -659,6 +677,7 @@ export default function App() {
 
   // Modal helpers
   const [isAddingNote, setIsAddingNote] = useState(false);
+  const [selectedReviewNote, setSelectedReviewNote] = useState<Note | null>(null);
   const [isToolkitOpen, setIsToolkitOpen] = useState(false);
   const [newNote, setNewNote] = useState({ title: '', content: '', subject: 'Mathematics' as Subject });
   const [isAddingSchedule, setIsAddingSchedule] = useState(false);
@@ -712,6 +731,51 @@ export default function App() {
       window.removeEventListener('ai-quota-state-changed', handleQuotaChange);
     };
   }, []);
+
+  useEffect(() => {
+    const handleUsageChange = (e: any) => {
+      if (e.detail) {
+        setAiUsage(e.detail);
+      }
+    };
+    window.addEventListener('ai-usage-updated', handleUsageChange);
+    return () => {
+      window.removeEventListener('ai-usage-updated', handleUsageChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleToolkitUsageChange = (e: any) => {
+      if (e.detail) {
+        setToolkitUsage(e.detail);
+      }
+    };
+    window.addEventListener('toolkit-usage-updated', handleToolkitUsageChange);
+    return () => {
+      window.removeEventListener('toolkit-usage-updated', handleToolkitUsageChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (toolkitUsage) {
+      const percentage = (toolkitUsage.count / toolkitUsage.limit) * 100;
+      if (percentage >= 80 && percentage < 100) {
+        setQuotaToast({
+          show: true,
+          message: appLanguage === 'Hindi'
+            ? `⚠️ चेतावनी: आपने अपने दैनिक एडवांस्ड टूलकिट के 50 में से ${toolkitUsage.count} संदेश उपयोग कर लिए हैं (${Math.round(percentage)}%)। आप सीमा के करीब हैं!`
+            : `⚠️ Warning: You have used ${toolkitUsage.count} of your ${toolkitUsage.limit} daily Advanced Toolkit messages (${Math.round(percentage)}%). You are close to your daily restriction limit!`,
+          count: toolkitUsage.count,
+        });
+        
+        // Hide after 6 seconds
+        const timer = setTimeout(() => {
+          setQuotaToast(null);
+        }, 6000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [toolkitUsage, appLanguage]);
 
   // Real Firebase and Authentication state listener
   useEffect(() => {
@@ -1506,12 +1570,20 @@ export default function App() {
     if (!newNote.title.trim()) return;
     try {
       let generatedId: string | number = 'local_' + Date.now();
+      const initialSR = {
+        interval: 1,
+        repetition: 1,
+        easeFactor: 2.5,
+        nextReviewDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      };
+
       if (firebaseUser) {
         console.log("[SAVE REQUEST] Saving Sticky Note to Firestore...", { userId: firebaseUser.uid, title: newNote.title, subject: newNote.subject });
         generatedId = await saveNote(firebaseUser.uid, {
           title: newNote.title,
           content: newNote.content,
-          subject: newNote.subject
+          subject: newNote.subject,
+          ...initialSR
         });
         console.log("[SAVE SUCCESS] Sticky Note saved with ID:", generatedId);
       } else {
@@ -1522,7 +1594,8 @@ export default function App() {
           title: newNote.title,
           content: newNote.content,
           subject: newNote.subject,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          ...initialSR
         };
         localNotes.unshift(newLocalNote);
         localStorage.setItem('studybuddy_guest_notes', JSON.stringify(localNotes));
@@ -1534,7 +1607,8 @@ export default function App() {
         title: newNote.title, 
         content: newNote.content, 
         subject: newNote.subject, 
-        updated_at: new Date().toISOString() 
+        updated_at: new Date().toISOString(),
+        ...initialSR
       };
       setNotes(prev => [noteItem, ...prev]);
       setIsAddingNote(false);
@@ -1563,6 +1637,73 @@ export default function App() {
       setNotes(prev => prev.filter(n => n.id !== id));
     } catch (err) {
       console.error("Failed to delete note:", err);
+    }
+  };
+
+  const handleNoteReviewResponse = async (note: Note, quality: 'easy' | 'good' | 'hard') => {
+    const currentRep = note.repetition ?? 0;
+    const currentInt = note.interval ?? 0;
+    const currentEF = note.easeFactor ?? 2.5;
+
+    let nextRepetition = currentRep;
+    let nextEaseFactor = currentEF;
+    let nextInterval = currentInt;
+
+    if (quality === 'hard') {
+      nextRepetition = 1;
+      nextInterval = 1;
+      nextEaseFactor = Math.max(1.3, currentEF - 0.15);
+    } else if (quality === 'good') {
+      nextRepetition = currentRep + 1;
+      if (nextRepetition === 1) {
+        nextInterval = 1;
+      } else if (nextRepetition === 2) {
+        nextInterval = 3;
+      } else {
+        nextInterval = Math.round(currentInt * currentEF);
+      }
+    } else if (quality === 'easy') {
+      nextRepetition = currentRep + 1;
+      if (nextRepetition === 1) {
+        nextInterval = 3;
+      } else if (nextRepetition === 2) {
+        nextInterval = 6;
+      } else {
+        nextInterval = Math.round(currentInt * currentEF * 1.5);
+      }
+      nextEaseFactor = Math.min(3.0, currentEF + 0.15);
+    }
+
+    const nextDate = new Date();
+    nextDate.setDate(nextDate.getDate() + nextInterval);
+    const nextReviewDate = nextDate.toISOString();
+    const lastReviewedDate = new Date().toISOString();
+
+    const updatedNote: Note = {
+      ...note,
+      repetition: nextRepetition,
+      easeFactor: nextEaseFactor,
+      interval: nextInterval,
+      nextReviewDate,
+      lastReviewedDate,
+      updated_at: new Date().toISOString()
+    };
+
+    try {
+      if (firebaseUser) {
+        await saveNote(firebaseUser.uid, updatedNote);
+      } else {
+        const local = JSON.parse(localStorage.getItem('studybuddy_guest_notes') || '[]');
+        const updated = local.map((n: any) => n.id === note.id ? updatedNote : n);
+        localStorage.setItem('studybuddy_guest_notes', JSON.stringify(updated));
+      }
+
+      setNotes(prev => prev.map(n => n.id === note.id ? updatedNote : n));
+      setSelectedReviewNote(null);
+      awardPoints(10, 'note');
+      playAudioChime('success');
+    } catch (err) {
+      console.error("Failed to save note review:", err);
     }
   };
 
@@ -2573,6 +2714,39 @@ export default function App() {
             )}
           </AnimatePresence>
 
+          {/* Daily AI Quota Warning Toast */}
+          <AnimatePresence>
+            {quotaToast && (
+              <motion.div 
+                initial={{ y: -100, opacity: 0, scale: 0.85 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                exit={{ y: -100, opacity: 0, scale: 0.85 }}
+                transition={{ 
+                  type: "spring", 
+                  stiffness: 140, 
+                  damping: 14, 
+                  mass: 0.8 
+                }}
+                className="absolute top-4 left-4 right-4 bg-gradient-to-r from-amber-600 via-orange-500 to-amber-500 text-white rounded-3xl p-4 shadow-2xl z-50 flex items-center space-x-3 border border-amber-400 overflow-hidden"
+                id="quota_toast"
+              >
+                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-xl shrink-0 relative z-10">
+                  ⚠️
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] uppercase font-black tracking-widest text-amber-100">AI Quota Warning! 🧠</p>
+                  <p className="text-xs font-bold text-white leading-tight">{quotaToast.message}</p>
+                </div>
+                <button 
+                  onClick={() => setQuotaToast(null)} 
+                  className="p-1 bg-white/10 hover:bg-white/20 rounded-full text-white transition cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
         {/* Dynamic Nav View Render */}
         <main className="flex-1 w-full overflow-hidden flex flex-col relative" id="main_pane">
           <AnimatePresence mode="wait">
@@ -3364,15 +3538,15 @@ export default function App() {
                       <BrainCircuit className="w-5 h-5 text-indigo-600" />
                       <div>
                         <h2 className="font-bold text-slate-800 text-sm">AI Study Helper</h2>
-                        {quotaExceeded ? (
-                          <span className="text-[10px] text-amber-500 font-semibold flex items-center">
-                            <span className="w-1.5 h-1.5 bg-amber-500 rounded-full mr-1 animate-ping" /> Offline Fallback Active (Quota Exceeded)
+                        <div className="flex items-center space-x-2 mt-0.5 select-none">
+                          <span className="text-[9px] text-emerald-600 font-extrabold flex items-center">
+                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1 animate-pulse" /> Live AI Connected
                           </span>
-                        ) : (
-                          <span className="text-[10px] text-emerald-500 font-semibold animate-pulse flex items-center">
-                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1" /> Gemini 3.5 Flash Connected
+                          <span className="text-slate-300">•</span>
+                          <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                            {appLanguage === 'Hindi' ? 'मुफ़्त और असीमित एआई ✅' : 'Free & Unlimited AI ✅'}
                           </span>
-                        )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center space-x-1.5">
@@ -4039,17 +4213,23 @@ export default function App() {
                             { bg: 'bg-purple-100/80', border: 'border-purple-200/50', labelBg: 'bg-purple-200/60', text: 'text-purple-900', labelText: 'text-purple-800', shadow: 'shadow-purple-100/40', rotate: '-rotate-1' }
                           ];
                           const design = palettes[idx % palettes.length];
+                          const isDue = !note.nextReviewDate || new Date(note.nextReviewDate) <= new Date();
+
                           return (
                             <div 
                               key={note.id} 
-                              className={`${design.bg} ${design.rotate} p-5 rounded-3xl border ${design.border} ${design.shadow} relative group hover:-translate-y-1 hover:rotate-0 transition-all duration-200 shadow-md`}
+                              onClick={() => setSelectedReviewNote(note)}
+                              className={`${design.bg} ${design.rotate} p-5 rounded-3xl border ${design.border} ${design.shadow} relative group hover:-translate-y-1 hover:rotate-0 transition-all duration-200 shadow-md cursor-pointer hover:shadow-lg`}
                             >
                               <div className="flex justify-between items-start">
                                 <span className={`text-[9px] font-black tracking-wider uppercase px-2.5 py-1 ${design.labelBg} ${design.labelText} rounded-full`}>
                                   📌 {note.subject}
                                 </span>
                                 <button 
-                                  onClick={() => handleDeleteNote(note.id)} 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteNote(note.id);
+                                  }} 
                                   className="text-slate-400 hover:text-red-650 transition-colors p-1 cursor-pointer"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -4057,6 +4237,23 @@ export default function App() {
                               </div>
                               <h3 className={`font-black ${design.text} text-sm mt-3.5 tracking-tight`}>{note.title}</h3>
                               <p className={`text-xs ${design.text} opacity-90 mt-1 line-clamp-4 leading-relaxed whitespace-pre-wrap font-medium`}>{note.content}</p>
+                              
+                              <div className="mt-4 pt-3 border-t border-black/5 flex items-center justify-between flex-wrap gap-1.5 select-none">
+                                {isDue ? (
+                                  <span className="inline-flex items-center text-[8px] font-black uppercase tracking-wider text-rose-850 bg-rose-200/50 px-2 py-0.5 rounded-full animate-pulse">
+                                    🧠 Due for Review
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center text-[8px] font-bold text-slate-500 bg-black/5 px-2 py-0.5 rounded-full">
+                                    📅 Next: {new Date(note.nextReviewDate || '').toLocaleDateString()}
+                                  </span>
+                                )}
+                                {note.interval !== undefined && note.interval > 0 && (
+                                  <span className="text-[8px] font-mono text-black/40 font-bold">
+                                    EF: {note.easeFactor?.toFixed(1)} • Int: {note.interval}d
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
@@ -5040,6 +5237,107 @@ export default function App() {
                   <span className="text-[8px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full border border-indigo-100">
                     Offline Saved 💾
                   </span>
+                </div>
+
+                {/* Daily AI Usage Statistics Section */}
+                <div className="space-y-3">
+                  {/* General App Unlimited Badge */}
+                  <div className="p-4 bg-indigo-50/40 border border-indigo-100 rounded-2xl flex items-center justify-between select-none shadow-2xs">
+                    <div className="flex items-center space-x-1.5">
+                      <BrainCircuit className="w-4 h-4 text-indigo-600 animate-pulse" />
+                      <div>
+                        <h4 className="font-extrabold text-[10px] text-slate-800 uppercase tracking-wider">
+                          {appLanguage === 'Hindi' ? 'सामान्य एआई उपयोग' : 'General AI Usage'}
+                        </h4>
+                        <p className="text-[9px] text-slate-500 font-bold">
+                          {appLanguage === 'Hindi' ? 'मुख्य चैट और अध्ययन' : 'Main Chat & Studies'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full bg-emerald-500 text-white shadow-xs">
+                      {appLanguage === 'Hindi' ? 'असीमित (Free) ✅' : 'Unlimited Free ✅'}
+                    </span>
+                  </div>
+
+                  {/* Advanced Toolkit Quota Card */}
+                  <div className="p-4 bg-amber-50/45 border border-amber-100 rounded-2xl space-y-3 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-1.5">
+                        <Sparkles className="w-4 h-4 text-amber-600 animate-spin" style={{ animationDuration: '6s' }} />
+                        <div>
+                          <h4 className="font-extrabold text-[10px] text-slate-800 uppercase tracking-wider">
+                            {appLanguage === 'Hindi' ? 'एडवांस्ड टूलकिट कोटा' : 'Advanced Toolkit Quota'}
+                          </h4>
+                          <p className="text-[9px] text-slate-500 font-bold">
+                            {appLanguage === 'Hindi' ? 'अभ्यास परीक्षा और टूल्स' : 'Practice Exams & AI Tools'}
+                          </p>
+                        </div>
+                      </div>
+                      <span className={`text-[8px] font-black uppercase px-2.5 py-0.5 rounded-full ${
+                        (toolkitUsage?.count || 0) >= (toolkitUsage?.limit || 50)
+                          ? 'bg-rose-100 text-rose-750 border border-rose-200 animate-pulse'
+                          : (toolkitUsage?.count || 0) >= (toolkitUsage?.limit || 50) * 0.8
+                            ? 'bg-amber-100 text-amber-750 border border-amber-200'
+                            : 'bg-emerald-100 text-emerald-750 border border-emerald-200'
+                      }`}>
+                        {(toolkitUsage?.count || 0) >= (toolkitUsage?.limit || 50)
+                          ? (appLanguage === 'Hindi' ? 'सीमा पूर्ण 🛑' : 'Full 🛑')
+                          : (toolkitUsage?.count || 0) >= (toolkitUsage?.limit || 50) * 0.8
+                            ? (appLanguage === 'Hindi' ? 'सीमा के पास ⚠️' : 'Warning ⚠️')
+                            : (appLanguage === 'Hindi' ? 'सुरक्षित ✅' : 'Safe ✅')}
+                      </span>
+                    </div>
+
+                    {/* Counts Grid */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-white p-2 rounded-xl border border-slate-150 text-center shadow-3xs">
+                        <p className="text-[8px] font-extrabold text-slate-400 uppercase tracking-wider">
+                          {appLanguage === 'Hindi' ? 'कॉल किए गए' : 'Used'}
+                        </p>
+                        <p className="text-xs font-black text-slate-850 mt-0.5">{toolkitUsage?.count || 0}</p>
+                      </div>
+                      <div className="bg-white p-2 rounded-xl border border-slate-150 text-center shadow-3xs">
+                        <p className="text-[8px] font-extrabold text-slate-400 uppercase tracking-wider">
+                          {appLanguage === 'Hindi' ? 'शेष कोटा' : 'Remaining'}
+                        </p>
+                        <p className="text-xs font-black text-amber-600 mt-0.5">
+                          {Math.max(0, (toolkitUsage?.limit || 50) - (toolkitUsage?.count || 0))}
+                        </p>
+                      </div>
+                      <div className="bg-white p-2 rounded-xl border border-slate-150 text-center shadow-3xs">
+                        <p className="text-[8px] font-extrabold text-slate-400 uppercase tracking-wider">
+                          {appLanguage === 'Hindi' ? 'दैनिक सीमा' : 'Daily Limit'}
+                        </p>
+                        <p className="text-xs font-black text-slate-850 mt-0.5">{toolkitUsage?.limit || 50}</p>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[9px] text-slate-500 font-extrabold">
+                        <span>{appLanguage === 'Hindi' ? 'उपयोग स्तर' : 'Usage Level'}</span>
+                        <span>{Math.round(((toolkitUsage?.count || 0) / (toolkitUsage?.limit || 50)) * 100)}%</span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden border border-slate-200/50">
+                        <div 
+                          className={`h-full transition-all duration-300 ${
+                            (toolkitUsage?.count || 0) >= (toolkitUsage?.limit || 50) 
+                              ? 'bg-gradient-to-r from-rose-500 to-red-600' 
+                              : (toolkitUsage?.count || 0) >= (toolkitUsage?.limit || 50) * 0.8 
+                                ? 'bg-gradient-to-r from-amber-500 to-orange-500' 
+                                : 'bg-gradient-to-r from-indigo-500 to-indigo-650'
+                          }`}
+                          style={{ width: `${Math.min(100, ((toolkitUsage?.count || 0) / (toolkitUsage?.limit || 50)) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-[9px] text-slate-500 leading-normal font-medium">
+                      {appLanguage === 'Hindi'
+                        ? '💡 आपका एडवांस्ड टूलकिट दैनिक कोटा रात को रीसेट हो जाता है। सामान्य मुख्य अध्ययन चैट में एआई का उपयोग असीमित और पूरी तरह से मुफ्त है।'
+                        : '💡 Your Advanced Toolkit usage resets at midnight daily. Usage in the main tutor chats is completely free and unlimited.'}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Edit Profile Form */}

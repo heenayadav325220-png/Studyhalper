@@ -4,6 +4,90 @@ import { FALLBACK_QUIZZES, getFallbackAnswer } from "./fallbackData";
 export let isAiQuotaExceeded = false;
 export let lastAiErrorMessage: string | null = null;
 
+export interface AiUsageData {
+  date: string;
+  count: number;
+  limit: number;
+}
+
+export interface ToolkitUsageData {
+  date: string;
+  count: number;
+  limit: number;
+}
+
+export function getDailyAiUsage(): AiUsageData {
+  if (typeof window === "undefined") {
+    return { date: "", count: 0, limit: 999999 };
+  }
+  const todayStr = new Date().toISOString().split("T")[0];
+  const stored = localStorage.getItem("studybuddy_daily_ai_usage");
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (parsed && parsed.date === todayStr) {
+        return { date: todayStr, count: parsed.count || 0, limit: 999999 };
+      }
+    } catch (e) {
+      console.error("Failed to parse daily AI usage", e);
+    }
+  }
+  // Initialize or reset for the new day
+  const initial: AiUsageData = { date: todayStr, count: 0, limit: 999999 };
+  localStorage.setItem("studybuddy_daily_ai_usage", JSON.stringify(initial));
+  return initial;
+}
+
+export function incrementDailyAiUsage(): AiUsageData {
+  if (typeof window === "undefined") {
+    return { date: "", count: 0, limit: 999999 };
+  }
+  const current = getDailyAiUsage();
+  current.count += 1;
+  localStorage.setItem("studybuddy_daily_ai_usage", JSON.stringify(current));
+  
+  // Dispatch custom event so UI components can update React state automatically!
+  window.dispatchEvent(new CustomEvent("ai-usage-updated", { detail: current }));
+  
+  return current;
+}
+
+export function getToolkitUsage(): ToolkitUsageData {
+  if (typeof window === "undefined") {
+    return { date: "", count: 0, limit: 50 };
+  }
+  const todayStr = new Date().toISOString().split("T")[0];
+  const stored = localStorage.getItem("studybuddy_toolkit_usage");
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (parsed && parsed.date === todayStr) {
+        return { date: todayStr, count: parsed.count || 0, limit: 50 };
+      }
+    } catch (e) {
+      console.error("Failed to parse toolkit usage", e);
+    }
+  }
+  // Initialize or reset for the new day
+  const initial: ToolkitUsageData = { date: todayStr, count: 0, limit: 50 };
+  localStorage.setItem("studybuddy_toolkit_usage", JSON.stringify(initial));
+  return initial;
+}
+
+export function incrementToolkitUsage(): ToolkitUsageData {
+  if (typeof window === "undefined") {
+    return { date: "", count: 0, limit: 50 };
+  }
+  const current = getToolkitUsage();
+  current.count += 1;
+  localStorage.setItem("studybuddy_toolkit_usage", JSON.stringify(current));
+  
+  // Dispatch custom event so UI components can update React state automatically!
+  window.dispatchEvent(new CustomEvent("toolkit-usage-updated", { detail: current }));
+  
+  return current;
+}
+
 export function setAiQuotaExceeded(val: boolean, msg: string | null = null) {
   isAiQuotaExceeded = val;
   lastAiErrorMessage = msg;
@@ -12,22 +96,22 @@ export function setAiQuotaExceeded(val: boolean, msg: string | null = null) {
   }
 }
 
-// Global fetch interceptor for Gemini API Quota detection
-if (typeof window !== "undefined" && !(window as any).__geminiInterceptorInstalled) {
-  (window as any).__geminiInterceptorInstalled = true;
-  const originalFetch = window.fetch;
-  window.fetch = async function (...args) {
-    const response = await originalFetch.apply(this, args);
-    try {
-      const quotaHeader = response.headers.get("x-gemini-quota-exceeded");
-      if (quotaHeader === "true") {
-        setAiQuotaExceeded(true, "Quota Exceeded on AI Studio / Cloud project.");
-      }
-    } catch (e) {
-      // Ignore header access errors
+// Safe custom fetch wrapper instead of intercepting read-only window.fetch
+export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const response = await fetch(input, init);
+  try {
+    const url = typeof input === "string" ? input : (input as any).url || "";
+    if ((url.includes("/api/gemini/") || url.includes("generativelanguage.googleapis.com")) && response.ok) {
+      incrementDailyAiUsage();
     }
-    return response;
-  };
+    const quotaHeader = response.headers.get("x-gemini-quota-exceeded");
+    if (quotaHeader === "true") {
+      setAiQuotaExceeded(true, "Quota Exceeded on AI Studio / Cloud project.");
+    }
+  } catch (e) {
+    // Ignore header access errors
+  }
+  return response;
 }
 
 // Lazy-loaded client-side fallback
@@ -135,7 +219,7 @@ export async function getStudyAnswer(
 ): Promise<string> {
   // 1. Try secure backend server route (Primary route)
   try {
-    const response = await fetch("/api/gemini/answer", {
+    const response = await safeFetch("/api/gemini/answer", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -217,7 +301,7 @@ export async function getStudyAnswer(
 export async function generateStudyDiagram(prompt: string): Promise<string | null> {
   // 1. Try secure backend server route (Primary route)
   try {
-    const response = await fetch("/api/gemini/diagram", {
+    const response = await safeFetch("/api/gemini/diagram", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -270,7 +354,7 @@ export async function generateQuiz(
 ): Promise<any[]> {
   // 1. Try secure backend server route (Primary route)
   try {
-    const response = await fetch("/api/gemini/quiz", {
+    const response = await safeFetch("/api/gemini/quiz", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -384,7 +468,7 @@ export async function generateFlashcards(
 
   // 3. Try secure backend server route (Primary route)
   try {
-    const response = await fetch("/api/gemini/flashcard", {
+    const response = await safeFetch("/api/gemini/flashcard", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

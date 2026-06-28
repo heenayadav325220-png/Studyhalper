@@ -26,7 +26,12 @@
         "title": { "type": "string", "description": "Title of the note." },
         "content": { "type": "string", "description": "Rich text or markdown content of the note." },
         "subject": { "type": "string", "description": "Academic subject category of the note." },
-        "updated_at": { "type": "string", "format": "date-time", "description": "Last updated timestamp." }
+        "updated_at": { "type": "string", "format": "date-time", "description": "Last updated timestamp." },
+        "interval": { "type": "integer", "description": "Current spaced repetition review interval in days." },
+        "repetition": { "type": "integer", "description": "Consecutive successful spaced repetition reviews." },
+        "easeFactor": { "type": "number", "description": "Spaced repetition difficulty multiplier factor." },
+        "nextReviewDate": { "type": "string", "format": "date-time", "description": "Scheduled timestamp for the next review." },
+        "lastReviewedDate": { "type": "string", "format": "date-time", "description": "Timestamp when this note was last reviewed." }
       },
       "required": ["id", "title", "subject", "updated_at"]
     },

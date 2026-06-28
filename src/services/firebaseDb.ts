@@ -122,7 +122,12 @@ export async function getNotes(userId: string | number): Promise<Note[]> {
         title: d.title || "",
         content: d.content || "",
         subject: d.subject || "Mathematics",
-        updated_at: d.updated_at || new Date().toISOString()
+        updated_at: d.updated_at || new Date().toISOString(),
+        interval: d.interval !== undefined ? d.interval : undefined,
+        repetition: d.repetition !== undefined ? d.repetition : undefined,
+        easeFactor: d.easeFactor !== undefined ? d.easeFactor : undefined,
+        nextReviewDate: d.nextReviewDate || undefined,
+        lastReviewedDate: d.lastReviewedDate || undefined
       });
     });
     return results;
@@ -135,12 +140,18 @@ export async function getNotes(userId: string | number): Promise<Note[]> {
 export async function saveNote(userId: string | number, note: Partial<Note> & { id?: string | number }): Promise<string> {
   try {
     const colRef = collection(db, "users", String(userId), "notes");
-    const payload = {
+    const payload: any = {
       title: note.title || "Untitled Note",
       content: note.content || "",
       subject: note.subject || "Mathematics",
       updated_at: new Date().toISOString()
     };
+
+    if (note.interval !== undefined) payload.interval = note.interval;
+    if (note.repetition !== undefined) payload.repetition = note.repetition;
+    if (note.easeFactor !== undefined) payload.easeFactor = note.easeFactor;
+    if (note.nextReviewDate !== undefined) payload.nextReviewDate = note.nextReviewDate;
+    if (note.lastReviewedDate !== undefined) payload.lastReviewedDate = note.lastReviewedDate;
 
     if (note.id) {
       const docRef = doc(db, "users", String(userId), "notes", String(note.id));

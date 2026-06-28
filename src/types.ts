@@ -28,6 +28,7 @@ export interface User {
   points: number;
   level: number;
   avatar?: string;
+  country?: string; // e.g. 'United States' | 'Russia' | 'India' | 'China' | 'United Kingdom' | 'Global'
   badges: Badge[];
   weeklyGoal?: number;
   completedThisWeek?: number;
@@ -61,6 +62,11 @@ export interface Note {
   content: string;
   subject: Subject;
   updated_at: string;
+  interval?: number;
+  repetition?: number;
+  easeFactor?: number;
+  nextReviewDate?: string;
+  lastReviewedDate?: string;
 }
 
 export interface ScheduleItem {
