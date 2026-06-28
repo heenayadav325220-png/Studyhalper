@@ -1,6 +1,8 @@
 ASCEND STUDY AI
 
- SHARED IMAGE file_00000000718072088dddd564c56a5e24.png
+![App Logo](file_00000000718072088dddd564c56a5e24.png)
+
+   
 ## Run Locally
 
 **Prerequisites:**  Node.js
