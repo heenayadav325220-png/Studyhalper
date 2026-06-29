@@ -21,6 +21,13 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      # 🛠️ यह ऑफिशियल स्टेप आपके प्रोजेक्ट की खराब जार फ़ाइल को पूरी तरह बाईपास (Bypass) कर देगा
+      # और सही ग्रैडल वर्शन को सीधे क्लाउड पर सेटअप कर देगा।
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper
+
       - name: Install Dependencies
         run: npm install
 
@@ -34,19 +41,13 @@ jobs:
         run: |
           keytool -genkey -v -keystore release.keystore -alias ascend_study -keyalg RSA -keysize 2048 -validity 10000 -storepass "ascendstudy123" -keypass "ascendstudy123" -dname "CN=ascendstudy.com, OU=Ascend Study, O=Ascend, L=Unknown, S=Unknown, C=US"
 
-      # 🛠️ यह नया स्टेप खराब जार फ़ाइल को ठीक करेगा
-      - name: Fix Corrupt Gradle Wrapper
-        run: |
-          cd android/gradle/wrapper
-          rm -f gradle-wrapper.jar
-          curl -LO https://raw.githubusercontent.com/gradle/gradle/v8.2/gradle/wrapper/gradle-wrapper.jar
-
+      # 🛠️ यहाँ हम खराब स्थानीय रैपर (. /gradlew) के बजाय सीधे पर्यावरण के 'gradle' का उपयोग कर रहे हैं
       - name: Build Android App
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
-          ./gradlew assembleRelease
+          gradle assembleDebug
+          gradle assembleRelease
 
       - name: Sign Release APK
         run: |
