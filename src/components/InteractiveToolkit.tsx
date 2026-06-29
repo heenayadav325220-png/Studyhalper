@@ -7,7 +7,22 @@ import {
   Menu, Settings, ChevronLeft
 } from 'lucide-react';
 import { Subject, Note, Progress } from '../types';
-import { generateQuiz, isAiQuotaExceeded, safeFetch, getToolkitUsage, incrementToolkitUsage, ToolkitUsageData } from '../services/geminiService';
+import { 
+  generateQuiz, 
+  isAiQuotaExceeded, 
+  safeFetch, 
+  getToolkitUsage, 
+  incrementToolkitUsage, 
+  ToolkitUsageData,
+  generateNotes,
+  summarizeNotes,
+  explainTopic,
+  generateMindmap,
+  generateQuestionPaper,
+  performOcr,
+  summarizePdf,
+  getStudyAnswer
+} from '../services/geminiService';
 
 interface InteractiveToolkitProps {
   onClose: () => void;
@@ -334,37 +349,25 @@ export default function InteractiveToolkit({
     setAiLoading(true);
     setAiResult(null);
 
-    let endpoint = "/api/gemini/notes-generator";
-    let body: any = { topic: query, subject: aiSubject, grade: aiGrade };
-
-    if (aiTool === 'summarize') {
-      endpoint = "/api/gemini/notes-summarizer";
-      body = { content: query };
-    } else if (aiTool === 'explain') {
-      endpoint = "/api/gemini/explain-topic";
-      body = { topic: query, subject: aiSubject, grade: aiGrade, style: aiStyle };
-    } else if (aiTool === 'mindmap') {
-      endpoint = "/api/gemini/mindmap";
-      body = { topic: query };
-    } else if (aiTool === 'qpaper') {
-      endpoint = "/api/gemini/question-paper";
-      body = { topic: query, subject: aiSubject, grade: aiGrade };
-    } else if (aiTool === 'ocr') {
-      endpoint = "/api/gemini/ocr";
-      body = { imageBase64: ocrImage };
-    } else if (aiTool === 'pdf') {
-      endpoint = "/api/gemini/pdf-summary";
-      body = { textContent: pastedContent };
-    }
-
     try {
-      const response = await safeFetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-      if (response.ok) {
-        const data = await response.json();
+      let data: any = null;
+      if (aiTool === 'notes') {
+        data = await generateNotes(query, aiSubject, aiGrade);
+      } else if (aiTool === 'summarize') {
+        data = await summarizeNotes(query);
+      } else if (aiTool === 'explain') {
+        data = await explainTopic(query, aiSubject, aiGrade, aiStyle);
+      } else if (aiTool === 'mindmap') {
+        data = await generateMindmap(query);
+      } else if (aiTool === 'qpaper') {
+        data = await generateQuestionPaper(query, aiSubject, aiGrade);
+      } else if (aiTool === 'ocr') {
+        data = await performOcr(ocrImage || '');
+      } else if (aiTool === 'pdf') {
+        data = await summarizePdf(pastedContent);
+      }
+
+      if (data) {
         setAiResult(data);
         incrementToolkitUsage();
         // Trigger Interstitial Ad
@@ -465,14 +468,19 @@ export default function InteractiveToolkit({
     setVocabLoading(true);
     try {
       const prompt = `Define the word: "${vocabWord}". Provide: Part of Speech, precise academic definition, 2 synonyms, and 1 example sentence. Format your response ONLY as valid JSON in this structure: {"word": "${vocabWord}", "partOfSpeech": "...", "definition": "...", "synonyms": ["...", "..."], "example": "..."}`;
-      const response = await safeFetch("/api/gemini/answer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, language: "English" })
-      });
-      if (response.ok) {
-        const d = await response.json();
-        const parsed = JSON.parse(d.text);
+      const text = await getStudyAnswer(prompt, undefined, undefined, "English");
+      if (text) {
+        // Clean markdown backticks if any
+        let cleanText = text.trim();
+        if (cleanText.startsWith("```json")) {
+          cleanText = cleanText.substring(7);
+        } else if (cleanText.startsWith("```")) {
+          cleanText = cleanText.substring(3);
+        }
+        if (cleanText.endsWith("```")) {
+          cleanText = cleanText.substring(0, cleanText.length - 3);
+        }
+        const parsed = JSON.parse(cleanText.trim());
         setVocabResult(parsed);
         incrementToolkitUsage();
       }

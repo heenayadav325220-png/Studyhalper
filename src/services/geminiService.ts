@@ -761,3 +761,285 @@ Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`;
   return FALLBACK_FLASHCARDS[subject] || FALLBACK_FLASHCARDS["Science"];
 }
 
+export async function generateNotes(
+  topic: string,
+  subject: string,
+  grade: string = "10"
+): Promise<{ title: string; content: string }> {
+  try {
+    const response = await safeFetch("/api/gemini/notes-generator", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic, subject, grade })
+    });
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (err) {
+    console.warn("Backend notes generator failed, trying client fallback...", err);
+  }
+
+  try {
+    const ai = getClientAiInstance();
+    if (ai) {
+      const prompt = `Generate comprehensive, highly educational, structured study notes on the topic: "${topic}" for Subject: "${subject}" at a Grade ${grade} level. 
+      Format with clean Markdown, clear headings, bullet points, key definitions, and examples.
+      Return ONLY valid JSON in the format: {"title": "...", "content": "..."}`;
+      const response = await callClientGeminiWithRetry(ai, {
+        model: "gemini-3.5-flash",
+        contents: prompt,
+        config: { responseMimeType: "application/json" }
+      });
+      return JSON.parse(response.text || "{}");
+    }
+  } catch (err) {
+    console.error("Client-side notes generator failed:", err);
+  }
+
+  return {
+    title: `${topic} Notes`,
+    content: `### ${topic}\n\nNotes could not be generated dynamically. Here is a brief outline of ${topic} for ${subject} at Grade ${grade} level.\n\n- Key Concept 1: Definition and details\n- Key Concept 2: Mathematical or practical applications\n- Important Formula/Fact: Standard references.`
+  };
+}
+
+export async function summarizeNotes(content: string): Promise<{ summary: string }> {
+  try {
+    const response = await safeFetch("/api/gemini/notes-summarizer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content })
+    });
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (err) {
+    console.warn("Backend notes summarizer failed, trying client fallback...", err);
+  }
+
+  try {
+    const ai = getClientAiInstance();
+    if (ai) {
+      const prompt = `Create a concise, high-impact summary of the following study notes. Highlight key terms, major formulas, and critical takeaways using bullet points. Keep it clear and easy for a student to review quickly.\n\nNotes Content:\n${content}`;
+      const response = await callClientGeminiWithRetry(ai, {
+        model: "gemini-3.5-flash",
+        contents: prompt,
+      });
+      return { summary: response.text || "Failed to generate summary." };
+    }
+  } catch (err) {
+    console.error("Client-side notes summarizer failed:", err);
+  }
+
+  return { summary: "Failed to summarize notes dynamically due to a service error. Please try again." };
+}
+
+export async function explainTopic(
+  topic: string,
+  subject: string,
+  grade: string = "10",
+  style: string = "Simple"
+): Promise<{ explanation: string }> {
+  try {
+    const response = await safeFetch("/api/gemini/explain-topic", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic, subject, grade, style })
+    });
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (err) {
+    console.warn("Backend explain-topic failed, trying client fallback...", err);
+  }
+
+  try {
+    const ai = getClientAiInstance();
+    if (ai) {
+      let styleInstruction = "Explain in extremely simple, friendly language suitable for a child.";
+      if (style === "Analogies") {
+        styleInstruction = "Explain using vivid, funny everyday analogies and metaphors that makes it impossible to forget.";
+      } else if (style === "5-year-old") {
+        styleInstruction = "Explain like I am 5 years old (ELI5). Use very basic words and a fun, story-like approach.";
+      } else if (style === "Step-by-step") {
+        styleInstruction = "Provide a meticulous, clear step-by-step breakdown from first principles.";
+      }
+      const prompt = `${styleInstruction} Topic: "${topic}" (Subject: ${subject}) for Grade ${grade}. Make it engaging and encouraging!`;
+      const response = await callClientGeminiWithRetry(ai, {
+        model: "gemini-3.5-flash",
+        contents: prompt,
+      });
+      return { explanation: response.text || "Failed to generate explanation." };
+    }
+  } catch (err) {
+    console.error("Client-side explain-topic failed:", err);
+  }
+
+  return { explanation: "Could not fetch a simplified explanation at this moment. Please check your internet connection and try again." };
+}
+
+export async function generateMindmap(topic: string): Promise<{ name: string; children: any[] }> {
+  try {
+    const response = await safeFetch("/api/gemini/mindmap", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic })
+    });
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (err) {
+    console.warn("Backend mindmap failed, trying client fallback...", err);
+  }
+
+  try {
+    const ai = getClientAiInstance();
+    if (ai) {
+      const prompt = `Generate a hierarchical mind map structure for the topic: "${topic}".
+      Provide a deeply nested JSON representation where each node has a "name" and an optional list of "children" (which is an array of other nodes). Limit hierarchy depth to 3 levels.
+      Format your response ONLY as valid JSON in this exact structure:
+      {"name": "${topic}", "children": [{"name": "Subtopic A", "children": [{"name": "Detail 1"}]}, {"name": "Subtopic B", "children": []}]}`;
+      const response = await callClientGeminiWithRetry(ai, {
+        model: "gemini-3.5-flash",
+        contents: prompt,
+        config: { responseMimeType: "application/json" }
+      });
+      return JSON.parse(response.text || "{}");
+    }
+  } catch (err) {
+    console.error("Client-side mindmap failed:", err);
+  }
+
+  return {
+    name: topic,
+    children: [
+      { name: "Overview & Definitions", children: [{ name: "Core terms" }, { name: "Basic ideas" }] },
+      { name: "Key Formulas & Rules", children: [{ name: "Standard applications" }] },
+      { name: "Examples", children: [] }
+    ]
+  };
+}
+
+export async function generateQuestionPaper(
+  topic: string,
+  subject: string,
+  grade: string = "10"
+): Promise<{ paperText: string }> {
+  try {
+    const response = await safeFetch("/api/gemini/question-paper", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic, subject, grade })
+    });
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (err) {
+    console.warn("Backend question-paper failed, trying client fallback...", err);
+  }
+
+  try {
+    const ai = getClientAiInstance();
+    if (ai) {
+      const prompt = `Create a complete, formal, school-grade question paper for the topic: "${topic}" in Subject: "${subject}" for Grade ${grade} students.
+      Divide the paper into:
+      - Section A: 5 Multiple Choice Questions (with correct options indicated at the very bottom in an answer key)
+      - Section B: 3 Short Answer Questions (each with marks allotted, e.g., [3 Marks])
+      - Section C: 2 Long Answer/Analytical Questions (each with marks allotted, e.g., [5 Marks])
+      Format beautifully with clean Markdown headings and lines.`;
+      const response = await callClientGeminiWithRetry(ai, {
+        model: "gemini-3.5-flash",
+        contents: prompt,
+      });
+      return { paperText: response.text || "Failed to generate question paper." };
+    }
+  } catch (err) {
+    console.error("Client-side question-paper failed:", err);
+  }
+
+  return { paperText: "Failed to generate question paper dynamically. Please try again." };
+}
+
+export async function performOcr(imageBase64: string): Promise<{ text: string }> {
+  try {
+    const response = await safeFetch("/api/gemini/ocr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageBase64 })
+    });
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (err) {
+    console.warn("Backend OCR failed, trying client fallback...", err);
+  }
+
+  try {
+    const ai = getClientAiInstance();
+    if (ai) {
+      const cleanBase64 = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
+      const response = await callClientGeminiWithRetry(ai, {
+        model: "gemini-3.5-flash",
+        contents: [
+          { text: "Extract all study-related text, math equations, formulas, and written contents from this image. Return clean text formatted properly. If there are math equations, format them nicely." },
+          {
+            inlineData: {
+              mimeType: "image/png",
+              data: cleanBase64
+            }
+          }
+        ],
+      });
+      return { text: response.text || "Failed to extract text." };
+    }
+  } catch (err) {
+    console.error("Client-side OCR failed:", err);
+  }
+
+  return { text: "Failed to extract text from image." };
+}
+
+export async function summarizePdf(textContent: string): Promise<{ summary: string; keyTerms: any[]; questions: any[] }> {
+  try {
+    const response = await safeFetch("/api/gemini/pdf-summary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ textContent })
+    });
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (err) {
+    console.warn("Backend PDF-summary failed, trying client fallback...", err);
+  }
+
+  try {
+    const ai = getClientAiInstance();
+    if (ai) {
+      const prompt = `Analyze the following document text and produce a structured analysis.
+      Return a JSON object containing:
+      1. "summary": A concise overview of the document (Markdown-enabled string).
+      2. "keyTerms": An array of objects: [{"term": "...", "definition": "..."}].
+      3. "questions": An array of mock test questions: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}].
+      Limit key terms to 5 and questions to 5.
+      
+      Document text:
+      ${textContent.substring(0, 8000)}`;
+      const response = await callClientGeminiWithRetry(ai, {
+        model: "gemini-3.5-flash",
+        contents: prompt,
+        config: { responseMimeType: "application/json" }
+      });
+      return JSON.parse(response.text || "{}");
+    }
+  } catch (err) {
+    console.error("Client-side PDF-summary failed:", err);
+  }
+
+  return {
+    summary: "Could not summarize document dynamically.",
+    keyTerms: [],
+    questions: []
+  };
+}
+
+
