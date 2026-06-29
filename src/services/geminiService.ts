@@ -121,6 +121,8 @@ export function setLocalCache(category: string, country: string, topic: string, 
   }
 }
 
+const inFlightRequests = new Map<string, Promise<Response>>();
+
 // Safe custom fetch wrapper with built-in localized caching for notes & AI tools
 export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const url = typeof input === "string" ? input : (input as any).url || "";
@@ -170,32 +172,82 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
     }
   }
 
-  const response = await fetch(input, init);
-
-  try {
-    const isAiEndpoint = url.includes("/api/gemini/") || url.includes("generativelanguage.googleapis.com");
-    if (isAiEndpoint && response.ok) {
-      incrementDailyAiUsage();
-    }
-    const quotaHeader = response.headers.get("x-gemini-quota-exceeded");
-    if (quotaHeader === "true") {
-      setAiQuotaExceeded(true, "Quota Exceeded on AI Studio / Cloud project.");
-    } else if (response.ok && isAiEndpoint) {
-      // Clear quota state upon verified successful live response!
-      setAiQuotaExceeded(false, null);
-    }
-
-    // Save to cache if successful
-    if (response.ok && isPost && isCacheable && cacheKey) {
-      const clone = response.clone();
-      const text = await clone.text();
-      localStorage.setItem(cacheKey, text);
-      console.log(`[Cache Store - safeFetch] Saved study notes result to ${cacheKey}`);
-    }
-  } catch (e) {
-    // Ignore caching and header errors
+  // Deduplicate identical parallel requests (especially post requests with payloads)
+  let dedupeKey = "";
+  if (isPost && init?.body) {
+    try {
+      dedupeKey = `${url}_${init.body as string}`;
+      if (inFlightRequests.has(dedupeKey)) {
+        console.log(`[Deduplication - safeFetch] Joining in-flight request for: ${url}`);
+        const existingPromise = inFlightRequests.get(dedupeKey);
+        if (existingPromise) {
+          const res = await existingPromise;
+          return res.clone();
+        }
+      }
+    } catch (e) {}
   }
-  return response;
+
+  // Define the core fetch promise
+  const executeFetch = async (): Promise<Response> => {
+    // Add Firebase Auth ID token if available
+    let idToken: string | null = null;
+    try {
+      const { auth } = await import("./firebase");
+      if (auth.currentUser) {
+        idToken = await auth.currentUser.getIdToken();
+      }
+    } catch (e) {
+      // Ignore if auth is not loaded or fails
+    }
+
+    const modifiedInit = { ...(init || {}) };
+    if (idToken) {
+      const headers = new Headers(modifiedInit.headers || {});
+      headers.set("Authorization", `Bearer ${idToken}`);
+      modifiedInit.headers = headers;
+    }
+
+    const response = await fetch(input, modifiedInit);
+
+    try {
+      const isAiEndpoint = url.includes("/api/gemini/") || url.includes("generativelanguage.googleapis.com");
+      if (isAiEndpoint && response.ok) {
+        incrementDailyAiUsage();
+      }
+      const quotaHeader = response.headers.get("x-gemini-quota-exceeded");
+      if (quotaHeader === "true") {
+        setAiQuotaExceeded(true, "Quota Exceeded on AI Studio / Cloud project.");
+      } else if (response.ok && isAiEndpoint) {
+        // Clear quota state upon verified successful live response!
+        setAiQuotaExceeded(false, null);
+      }
+
+      // Save to cache if successful
+      if (response.ok && isPost && isCacheable && cacheKey) {
+        const clone = response.clone();
+        const text = await clone.text();
+        localStorage.setItem(cacheKey, text);
+        console.log(`[Cache Store - safeFetch] Saved study notes result to ${cacheKey}`);
+      }
+    } catch (e) {
+      // Ignore caching and header errors
+    }
+    return response;
+  };
+
+  if (dedupeKey) {
+    const promise = executeFetch();
+    inFlightRequests.set(dedupeKey, promise);
+    try {
+      const res = await promise;
+      return res.clone();
+    } finally {
+      inFlightRequests.delete(dedupeKey);
+    }
+  }
+
+  return executeFetch();
 }
 
 // Lazy-loaded client-side fallback

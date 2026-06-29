@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
+import React, { useState, useEffect, useRef, ChangeEvent, lazy, Suspense } from 'react';
 import { 
   Home, 
   MessageSquare, 
@@ -47,7 +47,7 @@ import { LANGUAGES, COUNTRIES, translate } from './services/translations';
 import { ProgressChart } from './components/ProgressChart';
 import { StudyTimer } from './components/StudyTimer';
 import { HomeworkSolver } from './components/HomeworkSolver';
-import InteractiveToolkit from './components/InteractiveToolkit';
+const InteractiveToolkit = lazy(() => import('./components/InteractiveToolkit'));
 import type { AppLanguage } from './services/translations';
 import type { Note, ScheduleItem, Progress, ChatMessage, Subject, User as UserType, Group, GroupMessage, GroupNote, Flashcard, GroupQuestion, GroupSession } from './types';
 import { 
@@ -5103,69 +5103,78 @@ export default function App() {
         {/* MODAL SYSTEM (LIGHTWEIGHT CONTEXT DIALOG BACKDROPS) */}
         <AnimatePresence>
           {isToolkitOpen && (
-            <InteractiveToolkit 
-              onClose={() => setIsToolkitOpen(false)}
-              appLanguage={appLanguage}
-              firebaseUser={firebaseUser}
-              user={user}
-              notes={notes}
-              onAddNote={async (noteData) => {
-                try {
-                  let generatedId: string | number = 'local_' + Date.now();
-                  if (firebaseUser) {
-                    generatedId = await saveNote(firebaseUser.uid, {
-                      title: noteData.title,
-                      content: noteData.content,
-                      subject: noteData.subject
-                    });
-                  } else {
-                    const localNotes = JSON.parse(localStorage.getItem('studybuddy_guest_notes') || '[]');
-                    const newLocalNote = {
-                      id: generatedId,
-                      title: noteData.title,
-                      content: noteData.content,
-                      subject: noteData.subject,
-                      updated_at: new Date().toISOString()
+            <Suspense fallback={
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center">
+                <div className="bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center space-y-4">
+                  <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-xs font-semibold text-slate-600">Loading Study Toolkit...</p>
+                </div>
+              </div>
+            }>
+              <InteractiveToolkit 
+                onClose={() => setIsToolkitOpen(false)}
+                appLanguage={appLanguage}
+                firebaseUser={firebaseUser}
+                user={user}
+                notes={notes}
+                onAddNote={async (noteData) => {
+                  try {
+                    let generatedId: string | number = 'local_' + Date.now();
+                    if (firebaseUser) {
+                      generatedId = await saveNote(firebaseUser.uid, {
+                        title: noteData.title,
+                        content: noteData.content,
+                        subject: noteData.subject
+                      });
+                    } else {
+                      const localNotes = JSON.parse(localStorage.getItem('studybuddy_guest_notes') || '[]');
+                      const newLocalNote = {
+                        id: generatedId,
+                        title: noteData.title,
+                        content: noteData.content,
+                        subject: noteData.subject,
+                        updated_at: new Date().toISOString()
+                      };
+                      localNotes.unshift(newLocalNote);
+                      localStorage.setItem('studybuddy_guest_notes', JSON.stringify(localNotes));
+                    }
+                    const noteItem: Note = { 
+                      id: generatedId, 
+                      title: noteData.title, 
+                      content: noteData.content, 
+                      subject: noteData.subject, 
+                      updated_at: new Date().toISOString() 
                     };
-                    localNotes.unshift(newLocalNote);
-                    localStorage.setItem('studybuddy_guest_notes', JSON.stringify(localNotes));
+                    setNotes(prev => [noteItem, ...prev]);
+                    awardPoints(15, 'note');
+                  } catch (err) {
+                    console.error("Failed to add AI note:", err);
                   }
-                  const noteItem: Note = { 
-                    id: generatedId, 
-                    title: noteData.title, 
-                    content: noteData.content, 
-                    subject: noteData.subject, 
-                    updated_at: new Date().toISOString() 
+                }}
+                onAddProgress={async (score, total, subject) => {
+                  const entry = {
+                    subject,
+                    score,
+                    total,
+                    date: new Date().toISOString()
                   };
-                  setNotes(prev => [noteItem, ...prev]);
-                  awardPoints(15, 'note');
-                } catch (err) {
-                  console.error("Failed to add AI note:", err);
-                }
-              }}
-              onAddProgress={async (score, total, subject) => {
-                const entry = {
-                  subject,
-                  score,
-                  total,
-                  date: new Date().toISOString()
-                };
-                try {
-                  if (firebaseUser) {
-                    const id = await saveProgressEntry(firebaseUser.uid, entry);
-                    setProgress(prev => [{ id, ...entry }, ...prev]);
-                  } else {
-                    const localProgress = JSON.parse(localStorage.getItem('studybuddy_guest_progress') || '[]');
-                    const newLocal = [{ id: 'guest_' + Date.now(), ...entry }, ...localProgress];
-                    localStorage.setItem('studybuddy_guest_progress', JSON.stringify(newLocal));
-                    setProgress(newLocal);
+                  try {
+                    if (firebaseUser) {
+                      const id = await saveProgressEntry(firebaseUser.uid, entry);
+                      setProgress(prev => [{ id, ...entry }, ...prev]);
+                    } else {
+                      const localProgress = JSON.parse(localStorage.getItem('studybuddy_guest_progress') || '[]');
+                      const newLocal = [{ id: 'guest_' + Date.now(), ...entry }, ...localProgress];
+                      localStorage.setItem('studybuddy_guest_progress', JSON.stringify(newLocal));
+                      setProgress(newLocal);
+                    }
+                    awardPoints(score * 30, 'quiz');
+                  } catch (err) {
+                    console.error("Failed to save mock test progress:", err);
                   }
-                  awardPoints(score * 30, 'quiz');
-                } catch (err) {
-                  console.error("Failed to save mock test progress:", err);
-                }
-              }}
-            />
+                }}
+              />
+            </Suspense>
           )}
 
           {isAddingNote && (

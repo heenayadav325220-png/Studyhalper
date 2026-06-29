@@ -7,8 +7,28 @@ import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import { FALLBACK_QUIZZES, getFallbackAnswer } from "./src/services/fallbackData";
 import DatabaseConstructor from "better-sqlite3";
+import { initializeApp as initAdminApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import fs from "fs";
 
 dotenv.config();
+
+// Initialize Firebase Admin SDK
+try {
+  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(configPath)) {
+    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    initAdminApp({
+      projectId: firebaseConfig.projectId
+    });
+    console.log("Successfully initialized Firebase Admin for Project:", firebaseConfig.projectId);
+  } else {
+    initAdminApp();
+    console.log("Initialized Firebase Admin with default configuration.");
+  }
+} catch (err) {
+  console.warn("Firebase Admin SDK could not be initialized. Verify credentials or settings.", err);
+}
 
 const app = express();
 const httpServer = createServer(app);
@@ -205,6 +225,41 @@ function handleRouteError(res: any, err: any) {
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+// Authentication Middleware using Firebase Admin SDK
+async function requireAuth(req: any, res: any, next: any) {
+  // Allow health checks or pre-flight requests to pass without authentication
+  if (req.method === "OPTIONS" || req.path === "/api/gemini/health" || req.path === "/health") {
+    return next();
+  }
+
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    // Graceful fallback for non-production environments to prevent blocking developers
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[Auth Middleware] Missing Authorization header, bypassing in non-production.");
+      return next();
+    }
+    return res.status(401).json({ error: "Unauthorized. Authorization header is missing." });
+  }
+
+  const token = authHeader.split(" ")[1];
+  try {
+    const decodedToken = await getAuth().verifyIdToken(token);
+    req.userId = decodedToken.uid;
+    next();
+  } catch (error: any) {
+    console.error("[Auth Middleware] Firebase ID token verification failed:", error.message || error);
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[Auth Middleware] Token verification failed, bypassing in non-production.");
+      return next();
+    }
+    return res.status(401).json({ error: "Unauthorized. Invalid token.", detail: error.message });
+  }
+}
+
+// Secure all Gemini endpoints with requireAuth middleware
+app.use("/api/gemini", requireAuth);
 
 // Gamification Helper
 const addPoints = (userId: any, points: number) => {

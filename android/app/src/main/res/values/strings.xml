@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Ascend Study</string>
-    <string name="title_activity_main">Ascend Study</string>
+    <string name="app_name">ASCEND STUDY</string>
+    <string name="title_activity_main">ASCEND STUDY</string>
     <string name="package_name">com.ascendstudy.app</string>
     <string name="custom_url_scheme">com.ascendstudy.app</string>
 </resources>

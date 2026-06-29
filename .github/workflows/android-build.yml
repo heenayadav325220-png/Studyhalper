@@ -15,6 +15,12 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
       - name: Install Dependencies
         run: npm install
 
@@ -24,14 +30,37 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Build Android APK
+      - name: Generate Keystore
+        run: |
+          keytool -genkey -v -keystore release.keystore -alias ascend_study -keyalg RSA -keysize 2048 -validity 10000 -storepass "ascendstudy123" -keypass "ascendstudy123" -dname "CN=ascendstudy.com, OU=Ascend Study, O=Ascend, L=Unknown, S=Unknown, C=US"
+
+      - name: Build Android App
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
+          ./gradlew assembleRelease
 
-      - name: Upload APK Artifact
+      - name: Sign Release APK
+        run: |
+          # Locate apksigner in Android SDK build-tools
+          export APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -r | head -n 1)
+          echo "Using apksigner at $APKSIGNER"
+          
+          # Sign the unsigned APK
+          $APKSIGNER sign --ks release.keystore --ks-pass pass:ascendstudy123 --key-pass pass:ascendstudy123 --out android/app/build/outputs/apk/release/ASCEND_STUDY-release-signed.apk android/app/build/outputs/apk/release/app-release-unsigned.apk
+          
+          # Copy debug build for clean naming
+          cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/ASCEND_STUDY-debug.apk
+
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: ASCEND_STUDY-debug-apk
+          path: android/app/build/outputs/apk/debug/ASCEND_STUDY-debug.apk
+
+      - name: Upload Signed Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ASCEND_STUDY-release-apk
+          path: android/app/build/outputs/apk/release/ASCEND_STUDY-release-signed.apk

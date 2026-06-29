@@ -5,6 +5,10 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
+# Keep Capacitor classes safe from stripping/reflection errors
+-keep class com.getcapacitor.** { *; }
+-keep class com.ascendstudy.app.** { *; }
+
 # If your project uses WebView with JS, uncomment the following
 # and specify the fully qualified class name to the JavaScript interface
 # class:

@@ -1,4 +1,4 @@
-package com.mystudyapp.app;
+package com.ascendstudy.app;
 
 import com.getcapacitor.BridgeActivity;
 
