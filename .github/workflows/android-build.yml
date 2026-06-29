@@ -1,4 +1,4 @@
-name: Android Build
+Name: Android Build
 on:
   push:
     branches:
@@ -13,7 +13,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22' # यहाँ वर्शन 20 से बदलकर 22 कर दिया गया है
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
