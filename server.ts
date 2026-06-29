@@ -145,9 +145,10 @@ async function callGeminiWithRetryAndFailover(
   const isImageModel = params.model.indexOf("image") !== -1;
   const candidates = isImageModel 
     ? [params.model, "gemini-2.5-flash-image", "gemini-3.1-flash-image"] 
-    : [params.model, "gemini-flash-latest", "gemini-3.1-flash-lite", "gemini-3.5-flash"];
+    : [params.model, "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
   const modelsToTry = candidates.filter((item, index) => candidates.indexOf(item) === index);
 
+  let lastError: any = null;
   for (const modelCandidate of modelsToTry) {
     let currentRetries = retries;
     let currentDelay = delay;
@@ -162,6 +163,7 @@ async function callGeminiWithRetryAndFailover(
         }
         return result;
       } catch (error: any) {
+        lastError = error;
         const errorMsg = error.message || String(error);
         const isTransient = error.status === 503 || error.statusCode === 503 || error.code === 503 || 
                             errorMsg.includes("503") || errorMsg.includes("UNAVAILABLE") || errorMsg.includes("high demand") || errorMsg.includes("temporary");
@@ -178,13 +180,20 @@ async function callGeminiWithRetryAndFailover(
       }
     }
   }
-  throw new Error("All candidate Gemini models failed after retries.");
+  const finalMessage = lastError ? (lastError.message || String(lastError)) : "All candidate Gemini models failed after retries.";
+  const finalError = new Error(`All candidate Gemini models failed after retries. Detail: ${finalMessage}`);
+  if (lastError) {
+    (finalError as any).status = lastError.status || lastError.statusCode || lastError.code;
+  }
+  throw finalError;
 }
 
 function handleRouteError(res: any, err: any) {
   res.setHeader("x-gemini-fallback", "true");
   const errMsg = err?.message || String(err);
+  const status = err?.status || err?.statusCode || err?.code;
   if (
+    status === 429 ||
     errMsg.includes("quota") || 
     errMsg.includes("429") || 
     errMsg.includes("RESOURCE_EXHAUSTED") ||
@@ -212,7 +221,7 @@ app.get("/api/gemini/health", async (req, res) => {
   try {
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-flash-latest",
+      model: "gemini-3.5-flash",
       contents: "Test connection: respond with 'OK'",
     });
     if (response && response.text) {
@@ -537,7 +546,7 @@ app.post("/api/gemini/answer", async (req, res) => {
 
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-flash-latest",
+      model: "gemini-3.5-flash",
       contents: { parts },
       config: {
         systemInstruction: systemInstruction,
@@ -593,7 +602,7 @@ app.post("/api/gemini/notes-generator", async (req, res) => {
     
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-flash-latest",
+      model: "gemini-3.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json"
@@ -618,7 +627,7 @@ app.post("/api/gemini/notes-summarizer", async (req, res) => {
     
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-flash-latest",
+      model: "gemini-3.5-flash",
       contents: prompt,
     });
     res.json({ summary: response.text });
@@ -644,7 +653,7 @@ app.post("/api/gemini/explain-topic", async (req, res) => {
     const prompt = `${styleInstruction} Topic: "${topic}" (Subject: ${subject}) for Grade ${grade}. Make it engaging and encouraging!`;
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-flash-latest",
+      model: "gemini-3.5-flash",
       contents: prompt,
     });
     res.json({ explanation: response.text });
@@ -665,7 +674,7 @@ app.post("/api/gemini/mindmap", async (req, res) => {
     
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-flash-latest",
+      model: "gemini-3.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json"
@@ -699,7 +708,7 @@ app.post("/api/gemini/question-paper", async (req, res) => {
     
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-flash-latest",
+      model: "gemini-3.5-flash",
       contents: prompt,
     });
     res.json({ paperText: response.text });
@@ -720,7 +729,7 @@ app.post("/api/gemini/ocr", async (req, res) => {
     
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-flash-latest",
+      model: "gemini-3.5-flash",
       contents: [
         { text: "Extract all study-related text, math equations, formulas, and written contents from this image. Return clean text formatted properly. If there are math equations, format them nicely." },
         {
@@ -754,7 +763,7 @@ app.post("/api/gemini/pdf-summary", async (req, res) => {
     
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-flash-latest",
+      model: "gemini-3.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json"
@@ -836,7 +845,7 @@ app.post("/api/gemini/quiz", async (req, res) => {
 
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-flash-latest",
+      model: "gemini-3.5-flash",
       contents: instructionText,
       config: {
         responseMimeType: "application/json"
@@ -1064,7 +1073,7 @@ async function testGeminiOnStartup() {
     console.log("🚀 [Startup] Running Gemini API health connection test with failover...");
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-flash-latest",
+      model: "gemini-3.5-flash",
       contents: "API connection validation. Return exactly the word 'SUCCESS'.",
     });
     console.log(`✅ [Startup] Gemini API connection test SUCCEEDED: "${response.text?.trim()}"`);

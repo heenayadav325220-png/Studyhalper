@@ -173,12 +173,16 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
   const response = await fetch(input, init);
 
   try {
-    if ((url.includes("/api/gemini/") || url.includes("generativelanguage.googleapis.com")) && response.ok) {
+    const isAiEndpoint = url.includes("/api/gemini/") || url.includes("generativelanguage.googleapis.com");
+    if (isAiEndpoint && response.ok) {
       incrementDailyAiUsage();
     }
     const quotaHeader = response.headers.get("x-gemini-quota-exceeded");
     if (quotaHeader === "true") {
       setAiQuotaExceeded(true, "Quota Exceeded on AI Studio / Cloud project.");
+    } else if (response.ok && isAiEndpoint) {
+      // Clear quota state upon verified successful live response!
+      setAiQuotaExceeded(false, null);
     }
 
     // Save to cache if successful
@@ -255,7 +259,7 @@ async function callClientGeminiWithRetry(
   // Use official stable models for fallbacks
   const candidates = isImageModel 
     ? [params.model, "gemini-2.5-flash-image", "gemini-3.1-flash-image"] 
-    : [params.model, "gemini-flash-latest", "gemini-3.1-flash-lite", "gemini-3.5-flash"];
+    : [params.model, "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
   const modelsToTry = candidates.filter((item, index) => candidates.indexOf(item) === index);
 
   for (const modelCandidate of modelsToTry) {
@@ -270,6 +274,7 @@ async function callClientGeminiWithRetry(
         if (!result || !result.text && !result.candidates) {
           throw new Error("Empty response from AI model.");
         }
+        setAiQuotaExceeded(false, null); // Clear quota state on success!
         return result;
       } catch (error: any) {
         const friendlyError = handleApiError(error);
@@ -387,7 +392,7 @@ export async function getStudyAnswer(
       : `${appInfo} ${creatorInfo} You are a helpful study assistant. Explain concepts clearly and provide step-by-step solutions. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. If the user asks for a diagram or visual explanation, describe it clearly or suggest a visual aid. ${langInstruction}`;
 
     const response = await callClientGeminiWithRetry(ai, {
-      model: "gemini-flash-latest",
+      model: "gemini-3.5-flash",
       contents: { parts },
       config: {
         systemInstruction: systemInstruction,
@@ -541,7 +546,7 @@ export async function generateQuiz(
     const instructionText = `Generate a 5-question multiple choice quiz ${classText} ${syllabusInstruct} for ${subject} ${langPromptText}. ${difficultyInstruct} Return only valid JSON in the format: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}]`;
 
     const response = await callClientGeminiWithRetry(ai, {
-      model: "gemini-flash-latest",
+      model: "gemini-3.5-flash",
       contents: instructionText,
       config: {
         responseMimeType: "application/json",

@@ -41,6 +41,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { jsPDF } from 'jspdf';
 import { getStudyAnswer, generateQuiz, generateStudyDiagram, generateFlashcards, isAiQuotaExceeded, getDailyAiUsage } from './services/geminiService';
 import { LANGUAGES, COUNTRIES, translate } from './services/translations';
 import { ProgressChart } from './components/ProgressChart';
@@ -66,6 +67,7 @@ import {
   limit
 } from './services/firebase';
 import { 
+  testFirestoreConnection,
   getUserProfile, 
   saveUserProfile, 
   getLeaderboard, 
@@ -287,14 +289,15 @@ const getChatPlaceholder = (lang: AppLanguage) => {
     English: 'Ask a homework question or request a diagram...',
     Hindi: 'कोई होमवर्क प्रश्न पूछें या चित्र बनाने को कहें...',
     Hinglish: 'Apna homework Sawaal likhein ya diagram mangein...',
-    Marathi: 'गृहपाठाचा प्रश्न विचारा किंवा आकृती मागा...',
+    Marathi: 'गृहपाठाचा प्रश्न विचारा किंवा आकृती माга...',
     Tamil: 'கேள்வி கேட்கவும் அல்லது வரைபடம் கேட்கவும்...',
     Bengali: 'প্রশ্ন জিজ্ঞাসা করো বা ছবি আঁকতে বলো...',
     Spanish: 'Haz una pregunta o pide un diagrama...',
     French: 'Posez une question ou demandez un schéma...',
     German: 'Stelle eine Frage oder bitte um ein Diagramm...',
     Russian: 'Задайте вопрос по домашнему заданию или попросите схему...',
-    Chinese: '提问家庭作业或请求图表解释...'
+    Chinese: '提问家庭作业或请求图表解释...',
+    Japanese: '宿題の質問をするか、図をリクエストしてください...'
   };
   return placeholders[lang] || 'Ask a homework question...';
 };
@@ -311,7 +314,8 @@ const getSolvingText = (lang: AppLanguage) => {
     French: 'Gemini est en train de résoudre...',
     German: 'Gemini löst...',
     Russian: 'Gemini решает...',
-    Chinese: 'Gemini 正在解答...'
+    Chinese: 'Gemini 正在解答...',
+    Japanese: 'Geminiが解決しています...'
   };
   return txt[lang] || 'Gemini is solving...';
 };
@@ -328,7 +332,8 @@ const getFullscreenLabel = (lang: AppLanguage) => {
     French: 'Plein écran 📺',
     German: 'Vollbild 📺',
     Russian: 'На весь экран 📺',
-    Chinese: '全屏 📺'
+    Chinese: '全屏 📺',
+    Japanese: 'フルスクリーン 📺'
   };
   return lbls[lang] || 'Fullscreen';
 };
@@ -345,7 +350,8 @@ const getListeningLabel = (lang: AppLanguage) => {
     French: 'Écoute...',
     German: 'Zuhören...',
     Russian: 'Слушаю...',
-    Chinese: '正在聆听...'
+    Chinese: '正在聆听...',
+    Japanese: '聞いています...'
   };
   return labels[lang] || 'Listening...';
 };
@@ -362,7 +368,8 @@ const getClearChatsLabel = (lang: AppLanguage) => {
     French: 'Effacer chats 🧹',
     German: 'Chats leeren 🧹',
     Russian: 'Очистить чаты 🧹',
-    Chinese: '清除聊天 🧹'
+    Chinese: '清除聊天 🧹',
+    Japanese: 'チャットをクリア 🧹'
   };
   return translations[lang] || 'Clear Chats';
 };
@@ -379,7 +386,8 @@ const getChatIntroDesc = (lang: AppLanguage) => {
     French: 'Résout vos exercices et crée des illustrations !',
     German: 'Löst Aufgaben und erstellt Zeichnungen !',
     Russian: 'Решайте домашние задания, объясняйте науку и создавайте схемы прямо в чате!',
-    Chinese: '在聊天中解答家庭作业、解释科学原理并绘制图表！'
+    Chinese: '在聊天中解答家庭作业、解释科学原理并绘制图表！',
+    Japanese: '宿題を解決し、科学を説明し、ダイレクトスレッド内で図を描きます！'
   };
   return intro[lang] || 'Solve Homework...';
 };
@@ -834,6 +842,12 @@ export default function App() {
     return () => {
       window.removeEventListener('ai-quota-state-changed', handleQuotaChange);
     };
+  }, []);
+
+  useEffect(() => {
+    testFirestoreConnection().catch(err => {
+      console.error("Failed to test Firestore connection on boot:", err);
+    });
   }, []);
 
   useEffect(() => {
@@ -1809,6 +1823,164 @@ export default function App() {
       playAudioChime('success');
     } catch (err) {
       console.error("Failed to save note review:", err);
+    }
+  };
+
+  const handleExportNoteToPdf = (note: Note) => {
+    try {
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const primaryColor = [20, 31, 64];
+      const secondaryColor = [79, 70, 229];
+      const textColor = [51, 65, 85];
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 20;
+      const contentWidth = pageWidth - margin * 2;
+
+      let y = 25;
+
+      doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.rect(0, 0, pageWidth, 4, "F");
+
+      doc.setFont("Helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(156, 163, 175);
+      doc.text("ASCEND STUDY • STUDY NOTEBOOK", pageWidth - margin, 15, { align: "right" });
+
+      doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+      doc.rect(margin, y, 40, 6, "F");
+      
+      doc.setFont("Helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(255, 255, 255);
+      doc.text((note.subject || "GENERAL").toUpperCase(), margin + 2, y + 4.2);
+
+      y += 12;
+
+      doc.setFont("Helvetica", "bold");
+      doc.setFontSize(20);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      
+      const titleLines = doc.splitTextToSize(note.title, contentWidth);
+      titleLines.forEach((line: string) => {
+        if (y > pageHeight - margin) {
+          doc.addPage();
+          y = 25;
+        }
+        doc.text(line, margin, y);
+        y += 9;
+      });
+
+      y += 3;
+
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, pageWidth - margin, y);
+      
+      y += 8;
+
+      doc.setFont("Helvetica", "normal");
+      doc.setFontSize(10.5);
+      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+
+      const contentText = note.content || "";
+      const rawLines = contentText.split("\n");
+      rawLines.forEach((rawLine) => {
+        let textLine = rawLine.trim();
+        if (!textLine) {
+          y += 5;
+          return;
+        }
+
+        let isHeading1 = false;
+        let isHeading2 = false;
+        let isHeading3 = false;
+        let isBullet = false;
+
+        if (textLine.startsWith("# ")) {
+          isHeading1 = true;
+          textLine = textLine.substring(2);
+        } else if (textLine.startsWith("## ")) {
+          isHeading2 = true;
+          textLine = textLine.substring(3);
+        } else if (textLine.startsWith("### ")) {
+          isHeading3 = true;
+          textLine = textLine.substring(4);
+        } else if (textLine.startsWith("- ") || textLine.startsWith("* ")) {
+          isBullet = true;
+          textLine = textLine.substring(2);
+        }
+
+        if (isHeading1) {
+          doc.setFont("Helvetica", "bold");
+          doc.setFontSize(15);
+          doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+          y += 4;
+        } else if (isHeading2) {
+          doc.setFont("Helvetica", "bold");
+          doc.setFontSize(13);
+          doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+          y += 3;
+        } else if (isHeading3) {
+          doc.setFont("Helvetica", "bold");
+          doc.setFontSize(11);
+          doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+          y += 2;
+        } else if (isBullet) {
+          doc.setFont("Helvetica", "normal");
+          doc.setFontSize(10);
+          doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+        } else {
+          doc.setFont("Helvetica", "normal");
+          doc.setFontSize(10);
+          doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+        }
+
+        const linesToDraw = doc.splitTextToSize(isBullet ? `•  ${textLine}` : textLine, isBullet ? contentWidth - 5 : contentWidth);
+        linesToDraw.forEach((line: string) => {
+          if (y > pageHeight - margin - 15) {
+            doc.setFont("Helvetica", "normal");
+            doc.setFontSize(8);
+            doc.setTextColor(148, 163, 184);
+            doc.text(`Page ${doc.getNumberOfPages()}`, pageWidth / 2, pageHeight - 10, { align: "center" });
+
+            doc.addPage();
+            y = 25;
+
+            doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+            doc.rect(0, 0, pageWidth, 4, "F");
+            doc.setFont("Helvetica", "bold");
+            doc.setFontSize(8);
+            doc.setTextColor(156, 163, 175);
+            doc.text("ASCEND STUDY • STUDY NOTEBOOK", pageWidth - margin, 15, { align: "right" });
+          }
+
+          const xPos = isBullet ? margin + 4 : margin;
+          doc.text(line, xPos, y);
+          y += 6;
+        });
+
+        doc.setFont("Helvetica", "normal");
+        doc.setFontSize(10.5);
+        doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+      });
+
+      doc.setFont("Helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text(`Page ${doc.getNumberOfPages()}`, pageWidth / 2, pageHeight - 10, { align: "center" });
+
+      const safeTitle = note.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      doc.save(`ascend-study-${safeTitle}-notes.pdf`);
+    } catch (pdfErr) {
+      console.error("Failed to generate PDF:", pdfErr);
+      alert("Error generating PDF document. Please try again.");
     }
   };
 
@@ -2901,14 +3073,14 @@ export default function App() {
                           <span className="text-sm select-none">{getTimeGreeting(appLanguage).icon}</span>
                         </div>
                         <h1 className="text-xl font-black text-slate-900 tracking-tight mt-1.5 flex items-center leading-tight" id="user_id_display">
-                          Hello, {user?.name}! <span className="text-indigo-500 ml-1">🚀</span>
+                          {appLanguage === 'Hindi' ? `नमस्ते, ${user?.name}!` : appLanguage === 'Hinglish' ? `Hello, ${user?.name}!` : appLanguage === 'Marathi' ? `नमस्कार, ${user?.name}!` : appLanguage === 'Tamil' ? `வணக்கம், ${user?.name}!` : appLanguage === 'Bengali' ? `হ্যালো, ${user?.name}!` : appLanguage === 'Spanish' ? `¡Hola, ${user?.name}!` : appLanguage === 'French' ? `Bonjour, ${user?.name}!` : appLanguage === 'German' ? `Hallo, ${user?.name}!` : appLanguage === 'Russian' ? `Привет, ${user?.name}!` : appLanguage === 'Chinese' ? `你好，${user?.name}！` : appLanguage === 'Japanese' ? `こんにちは、${user?.name}さん！` : `Hello, ${user?.name}!`} <span className="text-indigo-500 ml-1">🚀</span>
                         </h1>
                         <p className="text-xs text-slate-500 font-bold mt-2 flex flex-wrap items-center gap-1.5" id="student_meta_badge">
                           <span className="inline-flex items-center px-2.5 py-1 rounded-xl bg-white border border-slate-100 text-slate-705 shadow-2xs font-mono text-[9px]">
-                            🏫 {user?.school || "School Not Set"}
+                            🏫 {user?.school || translate('school_not_set', appLanguage, 'School Not Set')}
                           </span>
                           <span className="inline-flex items-center px-2.5 py-1 rounded-xl bg-indigo-600 text-white font-mono text-[9px] font-black">
-                            📚 {translate('class_num', appLanguage, 'Class')} {user?.className || "Set class"}
+                            📚 {translate('class_num', appLanguage, 'Class')} {user?.className || translate('set_class', appLanguage, 'Set class')}
                           </span>
                         </p>
                       </div>
@@ -2930,7 +3102,7 @@ export default function App() {
                           className="text-[9px] text-slate-400 hover:text-indigo-600 font-extrabold hover:underline select-none transition"
                           id="btn_switch_profile"
                         >
-                          Switch Profile / Login 🌐
+                          {translate('switch_profile', appLanguage, 'Switch Profile / Login 🌐')}
                         </button>
                         {deferredPrompt && (
                           <button
@@ -2938,7 +3110,7 @@ export default function App() {
                             onClick={handleInstall}
                             className="text-[9px] text-indigo-600 font-extrabold hover:underline select-none transition ml-2"
                           >
-                             Install App
+                             {translate('install_app_header', appLanguage, 'Install App')}
                           </button>
                         )}
                       </div>
@@ -2947,7 +3119,7 @@ export default function App() {
                       <div className="flex justify-between items-center text-[10px]">
                         <span className="font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md flex items-center space-x-1">
                           <Sparkles className="w-3 h-3 text-amber-500 fill-amber-400 animate-spin" />
-                          <span>LEVEL {user?.level || 1}</span>
+                          <span>{translate('level', appLanguage, 'LEVEL')} {user?.level || 1}</span>
                         </span>
                         <div className="flex items-center space-x-1">
                           <span className="text-slate-500 font-black">{(user?.points || 0) % 100}/100 XP</span>
@@ -2956,7 +3128,7 @@ export default function App() {
                             className="text-[9px] text-indigo-500 hover:text-indigo-700 font-extrabold flex items-center space-x-0.5 select-none transition border border-indigo-100 px-1 rounded hover:bg-indigo-50"
                           >
                             <span>ℹ️</span>
-                            <span>{showXpGuide ? 'Hide Guide' : 'Earn XP'}</span>
+                            <span>{showXpGuide ? translate('hide_guide', appLanguage, 'Hide Guide') : translate('earn_xp', appLanguage, 'Earn XP')}</span>
                           </button>
                         </div>
                       </div>
@@ -2970,30 +3142,30 @@ export default function App() {
                       {/* XP Guide Panel */}
                       {showXpGuide && (
                         <div className="bg-slate-50/70 border border-slate-100 p-2.5 rounded-2xl space-y-1.5 text-[9px] text-slate-600 animate-fadeIn mt-1">
-                          <p className="font-extrabold text-indigo-900 uppercase tracking-wide border-b border-slate-100 pb-1">📚 Point System & XP Breakdown</p>
+                          <p className="font-extrabold text-indigo-900 uppercase tracking-wide border-b border-slate-100 pb-1">📚 {translate('xp_guide_title', appLanguage, 'Point System & XP Breakdown')}</p>
                           <div className="grid grid-cols-2 gap-1.5 font-bold">
                             <div className="flex items-center space-x-1">
                               <span>📝</span>
-                              <span>Create Notes: <strong className="text-emerald-600">+15 XP</strong></span>
+                              <span>{translate('create_notes_xp', appLanguage, 'Create Notes')}: <strong className="text-emerald-600">+15 XP</strong></span>
                             </div>
                             <div className="flex items-center space-x-1">
                               <span>✅</span>
-                              <span>Complete Tasks: <strong className="text-emerald-600">+10 XP</strong></span>
+                              <span>{translate('complete_tasks_xp', appLanguage, 'Complete Tasks')}: <strong className="text-emerald-600">+10 XP</strong></span>
                             </div>
                             <div className="flex items-center space-x-1">
                               <span>🎓</span>
-                              <span>Study Timer: <strong className="text-emerald-600">+2 XP / min</strong></span>
+                              <span>{translate('study_timer_xp', appLanguage, 'Study Timer')}: <strong className="text-emerald-600">+2 XP / min</strong></span>
                             </div>
                             <div className="flex items-center space-x-1">
                               <span>🏆</span>
-                              <span>Quizzes: <strong className="text-emerald-600">+10 XP / correct</strong></span>
+                              <span>{translate('quizzes_xp', appLanguage, 'Quizzes')}: <strong className="text-emerald-600">+10 XP / correct</strong></span>
                             </div>
                             <div className="flex items-center space-x-1 col-span-2 border-t border-dashed border-slate-200/60 pt-1">
                               <span>👋</span>
-                              <span>Interact & Wave to Peers: <strong className="text-indigo-600">+5 XP</strong></span>
+                              <span>{translate('interact_wave_xp', appLanguage, 'Interact & Wave to Peers')}: <strong className="text-indigo-600">+5 XP</strong></span>
                             </div>
                           </div>
-                          <p className="text-[8px] text-slate-400 italic">Level up every 100 XP to feed and unlock accessories for your pet Panda! 🐼</p>
+                          <p className="text-[8px] text-slate-400 italic">{translate('pet_unlock_tip', appLanguage, 'Level up every 100 XP to feed and unlock accessories for your pet Panda! 🐼')}</p>
                         </div>
                       )}
                     </div>
@@ -3006,17 +3178,17 @@ export default function App() {
                         <span className="text-base">📅</span>
                         <div>
                           <h2 className="text-xs font-extrabold text-slate-800 tracking-tight flex items-center uppercase font-sans">
-                            {appLanguage === 'Hindi' ? '५-दिवसीय अध्ययन स्ट्रीक' : '5-Day Study Streak'}
+                            {translate('study_streak_title', appLanguage, '5-Day Study Streak')}
                           </h2>
                           <p className="text-[9px] text-slate-400 font-bold leading-none mt-0.5">
-                            {appLanguage === 'Hindi' ? 'दैनिक लक्ष्य पूरा करें और स्ट्रीक बनाए रखें' : 'Complete goals to keep your momentum high'}
+                            {translate('study_streak_desc', appLanguage, 'Complete goals to keep your momentum high')}
                           </p>
                         </div>
                       </div>
                       <span className="bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-xl text-[10px] font-black border border-emerald-100 flex items-center space-x-1 animate-pulse">
                         <span>🔥</span>
                         <span>
-                          {appLanguage === 'Hindi' ? `स्ट्रीक: ${streakDays.filter(d => d.completed).length} दिन` : `Streak: ${streakDays.filter(d => d.completed).length}/5 Days`}
+                          {translate('streak_label', appLanguage, 'Streak')}: {streakDays.filter(d => d.completed).length}/5 {appLanguage === 'Hindi' ? 'दिन' : appLanguage === 'Russian' ? 'дней' : appLanguage === 'Chinese' ? '天' : appLanguage === 'Japanese' ? '日' : 'Days'}
                         </span>
                       </span>
                     </div>
@@ -3040,12 +3212,12 @@ export default function App() {
                           >
                             {/* Day Title */}
                             <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400">
-                              {appLanguage === 'Hindi' ? day.nameHi : day.name}
+                              {translate('day_' + day.id, appLanguage, day.name)}
                             </span>
                             
                             {/* Weekday Label */}
                             <span className="text-[11px] font-black mt-0.5">
-                              {appLanguage === 'Hindi' ? day.labelHi : day.label}
+                              {day.id === 1 ? translate('mon', appLanguage, 'Mon') : day.id === 2 ? translate('tue', appLanguage, 'Tue') : day.id === 3 ? translate('wed', appLanguage, 'Wed') : day.id === 4 ? translate('thu', appLanguage, 'Thu') : translate('fri', appLanguage, 'Fri')}
                             </span>
 
                             {/* Status Indicator */}
@@ -3084,10 +3256,10 @@ export default function App() {
                             <span className="text-2xl">🏆</span>
                             <div>
                               <h3 className="text-xs font-black text-amber-800">
-                                {appLanguage === 'Hindi' ? 'सभी ५ लक्ष्य पूरे हुए!' : 'All 5 Days Completed!'}
+                                {translate('all_days_completed', appLanguage, 'All 5 Days Completed!')}
                               </h3>
                               <p className="text-[9px] text-slate-500 font-bold">
-                                {appLanguage === 'Hindi' ? 'सुपर स्ट्रीक बोनस का दावा करें' : 'Claim your super streak bonus reward now!'}
+                                {translate('streak_bonus_desc', appLanguage, 'Claim your super streak bonus reward now!')}
                               </p>
                             </div>
                             <button
@@ -3095,7 +3267,7 @@ export default function App() {
                               onClick={claimStreakReward}
                               className="px-4 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-xl text-[10px] font-black shadow-md border border-amber-400 transform active:scale-95 transition cursor-pointer"
                             >
-                              {appLanguage === 'Hindi' ? 'बोनस XP का दावा करें (+50 XP) 🎁' : 'Claim +50 XP Reward 🎁'}
+                              {translate('claim_xp_reward', appLanguage, 'Claim +50 XP Reward 🎁')}
                             </button>
                           </div>
                         );
@@ -3106,10 +3278,10 @@ export default function App() {
                           <div className="flex justify-between items-start">
                             <div>
                               <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
-                                {appLanguage === 'Hindi' ? `${activeDay.nameHi} लक्ष्य` : `${activeDay.name} Goal`}
+                                {translate('day_' + activeDay.id, appLanguage, activeDay.name)} {translate('goal_label', appLanguage, 'Goal')}
                               </span>
                               <h4 className="text-[11px] font-extrabold text-slate-800 mt-1 leading-tight font-sans">
-                                {appLanguage === 'Hindi' ? activeDay.goalHi : activeDay.goal}
+                                {translate('goal_' + activeDay.id, appLanguage, activeDay.goal)}
                               </h4>
                             </div>
                             <span className="text-[9px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-md">
@@ -3120,8 +3292,8 @@ export default function App() {
                           <div className="flex items-center justify-between pt-1 border-t border-slate-100">
                             <span className="text-[9px] text-slate-400 font-semibold">
                               {activeDay.completed 
-                                ? (appLanguage === 'Hindi' ? '✓ लक्ष्य पूरा हो गया है!' : '✓ Goal Completed!')
-                                : (appLanguage === 'Hindi' ? 'लक्ष्य पूरा करके XP जीतें' : 'Do the activity or check in manually')}
+                                ? '✓ ' + translate('goal_completed_manual', appLanguage, 'Goal Completed!')
+                                : translate('manual_check_in', appLanguage, 'Do the activity or check in manually')}
                             </span>
                             
                             {!activeDay.completed ? (
@@ -3130,12 +3302,12 @@ export default function App() {
                                 onClick={() => completeStreakDay(activeDay.id)}
                                 className="px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-black shadow-2xs transform active:scale-95 transition cursor-pointer"
                               >
-                                {appLanguage === 'Hindi' ? 'पूरा हुआ चिह्नित करें ✓' : 'Mark Completed ✓'}
+                                {translate('mark_completed', appLanguage, 'Mark Completed ✓')}
                               </button>
                             ) : (
                               <span className="text-[10px] font-extrabold text-emerald-600 flex items-center space-x-1">
                                 <span>🎉</span>
-                                <span>{appLanguage === 'Hindi' ? 'कमाल कर दिया!' : 'Completed!'}</span>
+                                <span>{translate('completed_cheer', appLanguage, 'Completed!')}</span>
                               </span>
                             )}
                           </div>
@@ -3151,14 +3323,14 @@ export default function App() {
                         <span className="text-base">🔥</span>
                         <div>
                           <h2 className="text-xs font-extrabold text-slate-800 tracking-tight flex items-center uppercase">
-                            {appLanguage === 'Hindi' ? 'दैनिक लक्ष्य' : 'Daily Study Quests'}
+                            {translate('daily_quests_title', appLanguage, 'Daily Study Quests')}
                           </h2>
-                          <p className="text-[9px] text-slate-400 font-bold leading-none mt-0.5">Finish missions, gain bonus XP</p>
+                          <p className="text-[9px] text-slate-400 font-bold leading-none mt-0.5">{translate('daily_quests_desc', appLanguage, 'Finish missions, gain bonus XP')}</p>
                         </div>
                       </div>
                       <span className="bg-amber-50 text-amber-600 px-2.5 py-1 rounded-xl text-[10px] font-black border border-amber-100 flex items-center space-x-1">
                         <span>🔥</span>
-                        <span>Streak: 5 Days</span>
+                        <span>{translate('streak_label', appLanguage, 'Streak')}: 5 {appLanguage === 'Hindi' ? 'दिन' : appLanguage === 'Russian' ? 'дней' : appLanguage === 'Chinese' ? '天' : appLanguage === 'Japanese' ? '日' : 'Days'}</span>
                       </span>
                     </div>
 
@@ -3192,7 +3364,7 @@ export default function App() {
                     </div>
                   </section>
 
-                  <ProgressChart progress={progress} isTagMode={isTagMode} />
+                  <ProgressChart progress={progress} isTagMode={isTagMode} language={appLanguage} />
 
                   <HomeworkSolver user={user} language={appLanguage} isTagMode={isTagMode} />
 
@@ -3200,9 +3372,11 @@ export default function App() {
                   <section className="bg-gradient-to-br from-emerald-500/10 via-emerald-50/5 to-white p-5 rounded-3xl border border-emerald-100/60 shadow-sm space-y-4" id="study_pet_sanctuary">
                     <div className="flex justify-between items-center text-xs">
                       <h2 className="font-extrabold text-slate-800 tracking-tight uppercase flex items-center text-slate-500">
-                        🏝️ {appLanguage === 'Hindi' ? 'पालतू साथी' : "Chimpu's Sanctuary"}
+                        🏝️ {translate('virtual_friend_title', appLanguage, "Chimpu's Sanctuary")}
                       </h2>
-                      <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Virtual Friend</span>
+                      <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        {appLanguage === 'Hindi' ? 'पालतू साथी' : appLanguage === 'Russian' ? 'Виртуальный друг' : appLanguage === 'Chinese' ? '虚拟伙伴' : appLanguage === 'Japanese' ? 'バーチャルフレンド' : 'Virtual Friend'}
+                      </span>
                     </div>
 
                     <div className="bg-gradient-to-br from-teal-400/15 via-emerald-100/30 to-blue-50/40 p-4 rounded-2xl border border-emerald-100/60 shadow-2xs relative overflow-hidden flex flex-col items-center justify-center space-y-3 min-h-36">
@@ -3236,7 +3410,7 @@ export default function App() {
                           🐼
                           
                           {pet.accessory === 'star_sunglasses' && (
-                            <span className="absolute inset-0 top-1 text-2xl flex items-center justify-center leading-none transform translate-y-0.5">🕶️</span>
+                             <span className="absolute inset-0 top-1 text-2xl flex items-center justify-center leading-none transform translate-y-0.5">🕶️</span>
                           )}
                         </motion.div>
                         
@@ -3247,11 +3421,11 @@ export default function App() {
                       {/* Pet State text balloon */}
                       <div className="bg-white px-3.5 py-1.5 rounded-2xl border border-emerald-100 shadow-2xs text-[11px] font-black text-slate-705 max-w-[220px] text-center leading-snug">
                         {pet.fullness < 40 ? (
-                          <span>🎋 {appLanguage === 'Hindi' ? 'मुझे भूख लगी है! कृपया बैम्बू खिलाएं' : "I am starving, feed me tasty Bamboo!"}</span>
+                          <span>🎋 {translate('starving_bamboo', appLanguage, "I am starving, feed me tasty Bamboo!")}</span>
                         ) : pet.happiness < 50 ? (
-                          <span>🥺 {appLanguage === 'Hindi' ? 'मुझे सहलाएं! खेलने का मन है' : "I feel lonely, tap me to play games!"}</span>
+                          <span>🥺 {translate('lonely_tap_play', appLanguage, "I feel lonely, tap me to play games!")}</span>
                         ) : (
-                          <span>🥰 {appLanguage === 'Hindi' ? `चलो मिलकर पढ़ाई करें, ${user?.name}!` : `Let's study together, ${user?.name}!`}</span>
+                          <span>🥰 {translate('study_together_cheer', appLanguage, "Let's study together!")} {user?.name}!</span>
                         )}
                       </div>
 
@@ -3259,7 +3433,7 @@ export default function App() {
                       <div className="w-full grid grid-cols-2 gap-3 pt-1">
                         <div className="space-y-1">
                           <div className="flex justify-between text-[8px] font-bold text-teal-700">
-                            <span>❤️ {appLanguage === 'Hindi' ? 'खुशी' : 'Happiness'}</span>
+                            <span>❤️ {translate('happiness', appLanguage, 'Happiness')}</span>
                             <span>{pet.happiness}%</span>
                           </div>
                           <div className="w-full h-1.5 bg-teal-100/40 rounded-full overflow-hidden p-0.5 border border-teal-200/20">
@@ -3269,7 +3443,7 @@ export default function App() {
 
                         <div className="space-y-1">
                           <div className="flex justify-between text-[8px] font-bold text-amber-700">
-                            <span>🎋 {appLanguage === 'Hindi' ? 'एनर्जी' : 'Energy'}</span>
+                            <span>🎋 {translate('energy', appLanguage, 'Energy')}</span>
                             <span>{pet.fullness}%</span>
                           </div>
                           <div className="w-full h-1.5 bg-amber-150/40 rounded-full overflow-hidden p-0.5 border border-amber-200/20">
@@ -3287,9 +3461,9 @@ export default function App() {
                           className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[10px] font-black rounded-xl border border-emerald-500 shadow-2xs cursor-pointer flex items-center space-x-1.5"
                         >
                           <span>🎋</span>
-                          <span>{appLanguage === 'Hindi' ? 'बैम्बू खिलाएं (-15 XP)' : 'Feed Bamboo (-15 XP)'}</span>
+                          <span>{translate('feed_bamboo_btn', appLanguage, 'Feed Bamboo (-15 XP)')}</span>
                         </button>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{appLanguage === 'Hindi' ? 'ड्रेसिंग रूम' : 'Dressing Area'}</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{translate('dressing_area', appLanguage, 'Dressing Area')}</span>
                       </div>
 
                       <div className="flex justify-between gap-1.5 overflow-x-auto py-1 scrollbar-hide">
@@ -3307,7 +3481,7 @@ export default function App() {
                                 ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-black'
                                 : 'bg-white hover:bg-slate-100 border-slate-100 hover:border-slate-200 text-slate-800'
                             }`}
-                            title={`Buy ${item.label} for ${item.cost} XP`}
+                            title={appLanguage === 'Hindi' ? `खरीदें ${item.char} (${item.cost} XP)` : `Buy ${item.char} for ${item.cost} XP`}
                           >
                             <span className="text-lg">{item.char}</span>
                             <span className="text-[8px] font-black mt-0.5">{item.cost} XP</span>
@@ -3457,7 +3631,7 @@ export default function App() {
                     </div>
                   </section>
                   
-                  <StudyTimer isTagMode={isTagMode} onSessionComplete={handleStudySessionComplete} />
+                  <StudyTimer isTagMode={isTagMode} language={appLanguage} onSessionComplete={handleStudySessionComplete} />
 
                   {/* Badges and Progress Statistics from Profile */}
                   <section className="bg-white p-4.5 rounded-3xl border border-slate-100 shadow-xs space-y-4">
@@ -5127,15 +5301,33 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Date</label>
-                    <input type="date" value={newGroupSession.date} onChange={(e) => setNewGroupSession({...newGroupSession, date: e.target.value                   <div className="relative flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setFullScreenMessage(null)}
-                      className="p-1 rounded-full hover:bg-slate-700 transition outline-none cursor-pointer text-slate-300"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>                      <option value="Discord">Discord 🎮</option>
+                    <input type="date" value={newGroupSession.date} onChange={(e) => setNewGroupSession({...newGroupSession, date: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none text-slate-750" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Time</label>
+                    <input type="time" value={newGroupSession.time} onChange={(e) => setNewGroupSession({...newGroupSession, time: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none text-slate-755" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Duration (mins)</label>
+                    <select value={newGroupSession.duration} onChange={(e) => setNewGroupSession({...newGroupSession, duration: Number(e.target.value)})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none text-slate-700">
+                      <option value="30">30 Mins</option>
+                      <option value="45">45 Mins</option>
+                      <option value="60">1 Hour</option>
+                      <option value="90">1.5 Hours</option>
+                      <option value="120">2 Hours</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Meeting Platform</label>
+                    <select value={newGroupSession.meeting_platform} onChange={(e) => setNewGroupSession({...newGroupSession, meeting_platform: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-semibold outline-none text-slate-700">
+                      <option value="Google Meet">Google Meet 📹</option>
+                      <option value="Zoom">Zoom 🎥</option>
+                      <option value="Microsoft Teams">MS Teams 👔</option>
+                      <option value="Jitsi Meet">Jitsi Meet 🌐</option>
+                      <option value="Discord">Discord 🎮</option>
                     </select>
                   </div>
                 </div>
@@ -5146,6 +5338,86 @@ export default function App() {
                 </div>
 
                 <button onClick={handleCreateGroupSession} className="w-full py-3 bg-indigo-600 text-white rounded-xl text-xs font-bold active:scale-95 transition shadow-md">Schedule Session</button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {selectedReviewNote && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end justify-center" 
+              id="view_study_note_modal"
+            >
+              <motion.div 
+                initial={{ y: "15%" }} 
+                animate={{ y: 0 }} 
+                exit={{ y: "15%" }} 
+                className="bg-white w-full rounded-t-3xl p-5 space-y-4 shadow-xl border-t border-slate-200 max-h-[85vh] flex flex-col"
+              >
+                {/* Header */}
+                <div className="flex justify-between items-center border-b border-slate-100 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-black tracking-wider uppercase px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-full">
+                      📌 {selectedReviewNote.subject}
+                    </span>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedReviewNote(null)} 
+                    className="text-slate-400 hover:text-slate-600 text-xs font-black uppercase tracking-wider cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                {/* Title */}
+                <h3 className="font-extrabold text-slate-800 text-base leading-snug">{selectedReviewNote.title}</h3>
+
+                {/* Scrollable Content */}
+                <div className="flex-1 overflow-y-auto bg-slate-50 border border-slate-100 p-4 rounded-2xl text-xs text-slate-700 leading-relaxed font-medium whitespace-pre-wrap max-h-[40vh] scrollbar-hide">
+                  {selectedReviewNote.content}
+                </div>
+
+                {/* PDF Export Section */}
+                <div className="bg-indigo-50/50 border border-indigo-100/50 p-3.5 rounded-2xl flex items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] font-extrabold text-slate-800">Need an offline copy?</p>
+                    <p className="text-[9px] text-slate-500 font-medium">Export this note as a beautifully formatted PDF document.</p>
+                  </div>
+                  <button 
+                    onClick={() => handleExportNoteToPdf(selectedReviewNote)}
+                    className="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-wider px-3.5 py-2.5 rounded-xl transition active:scale-95 shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    📄 Export to PDF
+                  </button>
+                </div>
+
+                {/* Spaced Repetition Buttons */}
+                <div className="space-y-2 pt-1 border-t border-slate-100">
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Spaced Repetition Review (SM-2)</p>
+                  <p className="text-[9px] text-slate-500 font-semibold">How well do you remember this topic? Rating updates your daily study schedule.</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button 
+                      onClick={() => handleNoteReviewResponse(selectedReviewNote, 'hard')}
+                      className="py-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 rounded-xl text-[10px] font-extrabold transition active:scale-95 cursor-pointer"
+                    >
+                      🔴 Hard (1d)
+                    </button>
+                    <button 
+                      onClick={() => handleNoteReviewResponse(selectedReviewNote, 'good')}
+                      className="py-2.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl text-[10px] font-extrabold transition active:scale-95 cursor-pointer"
+                    >
+                      🔵 Good (4d)
+                    </button>
+                    <button 
+                      onClick={() => handleNoteReviewResponse(selectedReviewNote, 'easy')}
+                      className="py-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-xl text-[10px] font-extrabold transition active:scale-95 cursor-pointer"
+                    >
+                      🟢 Easy (7d)
+                    </button>
+                  </div>
+                </div>
               </motion.div>
             </motion.div>
           )}
