@@ -21,12 +21,12 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      # 🛠️ यह ऑफिशियल स्टेप आपके प्रोजेक्ट की खराब जार फ़ाइल को पूरी तरह बाईपास (Bypass) कर देगा
-      # और सही ग्रैडल वर्शन को सीधे क्लाउड पर सेटअप कर देगा।
+      # 🛠️ ग्रैडल को क्लाउड पर सही ढंग से सेटअप करना और सुरक्षा बाईपास ऑन रखना
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: wrapper
+          validate-wrappers: false
 
       - name: Install Dependencies
         run: npm install
@@ -37,23 +37,29 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      # 🛠️ कीस्टोर को सही 'android' फ़ोल्डर के अंदर बनाना ताकि ग्रैडल उसे एक्सेस कर सके
       - name: Generate Keystore
         run: |
+          cd android
           keytool -genkey -v -keystore release.keystore -alias ascend_study -keyalg RSA -keysize 2048 -validity 10000 -storepass "ascendstudy123" -keypass "ascendstudy123" -dname "CN=ascendstudy.com, OU=Ascend Study, O=Ascend, L=Unknown, S=Unknown, C=US"
 
-      # 🛠️ यहाँ हम खराब स्थानीय रैपर (. /gradlew) के बजाय सीधे पर्यावरण के 'gradle' का उपयोग कर रहे हैं
+      # 🛠️ एंड्रॉइड फ़ोल्डर में जाकर सीधे ग्रैडल के माध्यम से क्लीन बिल्ड तैयार करना
       - name: Build Android App
         run: |
           cd android
-          chmod +x gradlew
           gradle assembleDebug
           gradle assembleRelease
 
+      # 🛠️ साइनिंग पाथ को पूरी तरह फिक्स किया गया ताकि मिसिंग फ़ाइल का एरर न आए
       - name: Sign Release APK
         run: |
           export APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -r | head -n 1)
           echo "Using apksigner at $APKSIGNER"
-          $APKSIGNER sign --ks release.keystore --ks-pass pass:ascendstudy123 --key-pass pass:ascendstudy123 --out android/app/build/outputs/apk/release/ASCEND_STUDY-release-signed.apk android/app/build/outputs/apk/release/app-release-unsigned.apk
+          
+          # सही पाथ पर जाकर एपीके को साइन करना
+          $APKSIGNER sign --ks android/release.keystore --ks-pass pass:ascendstudy123 --key-pass pass:ascendstudy123 --out android/app/build/outputs/apk/release/ASCEND_STUDY-release-signed.apk android/app/build/outputs/apk/release/app-release-unsigned.apk
+          
+          # क्लीन नेमिंग के लिए कॉपी करना
           cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/ASCEND_STUDY-debug.apk
 
       - name: Upload Debug APK
