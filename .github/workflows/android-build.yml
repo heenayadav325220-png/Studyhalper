@@ -21,17 +21,8 @@ jobs:
           distribution: 'zulu'
           java-version: '21'
 
-      # 🛠️ फिक्स 33: गिटहब के कंप्यूटर पर Android 16 (SDK 36) के टूल्स को ज़बरदस्ती इंस्टॉल करना
-      - name: Setup Android SDK Tools
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'platforms;android-36 build-tools;36.0.0-rc1' # या जो भी लेटेस्ट RC टूल है, यह उसे खुद खींच लेगा
-
-      # 🛠️ ग्रैडल wrapper से सीधे 8.14.3 उठाएगा
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: wrapper
 
       - name: Install Dependencies
         run: npm install
@@ -44,21 +35,25 @@ jobs:
 
       - name: Generate Keystore
         run: |
-          cd android/app
-          keytool -genkey -v -keystore release.keystore -alias ascend_study -keyalg RSA -keysize 2048 -validity 10000 -storepass "ascendstudy123" -keypass "ascendstudy123" -dname "CN=ascendstudy.com, OU=Ascend Study, O=Ascend, L=Unknown, S=Unknown, C=US"
+          keytool -genkey -v -keystore android/app/release.keystore -alias ascend_study -keyalg RSA -keysize 2048 -validity 10000 -storepass "ascendstudy123" -keypass "ascendstudy123" -dname "CN=ascendstudy.com, OU=Ascend Study, O=Ascend, L=Unknown, S=Unknown, C=US"
 
       - name: Build Android App
         run: |
           cd android
-          ./gradlew clean assembleDebug assembleRelease --no-daemon
+          chmod +x gradlew
+          ./gradlew assembleDebug
+          ./gradlew assembleRelease
 
       - name: Sign Release APK
         run: |
+          # Locate apksigner in Android SDK build-tools
           export APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -r | head -n 1)
           echo "Using apksigner at $APKSIGNER"
           
+          # Sign the unsigned APK using the keystore generated inside android/app/
           $APKSIGNER sign --ks android/app/release.keystore --ks-pass pass:ascendstudy123 --key-pass pass:ascendstudy123 --out android/app/build/outputs/apk/release/ASCEND_STUDY-release-signed.apk android/app/build/outputs/apk/release/app-release-unsigned.apk
           
+          # Copy debug build for clean naming
           cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/ASCEND_STUDY-debug.apk
 
       - name: Upload Debug APK
