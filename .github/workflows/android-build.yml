@@ -15,17 +15,18 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Set up JDK 17
+      # 🛠️ फिक्स 1: कैपेसिटर 8.x और लेटेस्ट एंड्रॉइड प्लगइन के लिए JDK 21 अनिवार्य है
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
 
-      # 🛠️ यहाँ ग्रैडल वर्शन को '8.2' पर लॉक कर दिया है ताकि वर्शन 9.6 वाला एरर कभी न आए
+      # 🛠️ फिक्स 2: आपके प्लगइन को सपोर्ट करने के लिए ग्रैडल को '8.7' पर लॉक किया है
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.2'
+          gradle-version: '8.7'
           validate-wrappers: false
 
       - name: Install Dependencies
@@ -37,23 +38,25 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      # 🛠️ फिक्स 3: कीस्टोर का सही पाथ ऐप फ़ोल्डर के अंदर सेट किया
       - name: Generate Keystore
         run: |
-          cd android
+          cd android/app
           keytool -genkey -v -keystore release.keystore -alias ascend_study -keyalg RSA -keysize 2048 -validity 10000 -storepass "ascendstudy123" -keypass "ascendstudy123" -dname "CN=ascendstudy.com, OU=Ascend Study, O=Ascend, L=Unknown, S=Unknown, C=US"
 
+      # 🛠️ फिक्स 4: बिना किसी कैश एरर के सही एंड्रॉइड फ़ोल्डर में जाकर फ्रेश बिल्ड बनाना
       - name: Build Android App
         run: |
           cd android
-          gradle assembleDebug
-          gradle assembleRelease
+          gradle clean assembleDebug assembleRelease --no-daemon
 
+      # 🛠️ फिक्स 5: एपीके साइनिंग और अलाइनमेंट पाथ को पूरी तरह फिक्स किया
       - name: Sign Release APK
         run: |
           export APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -r | head -n 1)
           echo "Using apksigner at $APKSIGNER"
           
-          $APKSIGNER sign --ks android/release.keystore --ks-pass pass:ascendstudy123 --key-pass pass:ascendstudy123 --out android/app/build/outputs/apk/release/ASCEND_STUDY-release-signed.apk android/app/build/outputs/apk/release/app-release-unsigned.apk
+          $APKSIGNER sign --ks android/app/release.keystore --ks-pass pass:ascendstudy123 --key-pass pass:ascendstudy123 --out android/app/build/outputs/apk/release/ASCEND_STUDY-release-signed.apk android/app/build/outputs/apk/release/app-release-unsigned.apk
           
           cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/ASCEND_STUDY-debug.apk
 
