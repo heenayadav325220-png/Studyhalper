@@ -7,6 +7,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # 🛠️ पीली वार्निंग पूरी तरह खत्म (Node 24 कम्पेटिबल)
       - name: Checkout Source
         uses: actions/checkout@v4
 
@@ -15,19 +16,18 @@ jobs:
         with:
           node-version: '22'
 
-      # 🛠️ फिक्स 1: कैपेसिटर 8.x और लेटेस्ट एंड्रॉइड प्लगइन के लिए JDK 21 अनिवार्य है
+      # 🛠️ जावा फिक्स: कैपेसिटर 8 और ग्रैडल 8.14 के लिए JDK 21
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '21'
 
-      # 🛠️ फिक्स 2: आपके प्लगइन को सपोर्ट करने के लिए ग्रैडल को '8.7' पर लॉक किया है
+      # 🛠️ ग्रैडल फिक्स: यह सीधे तुम्हारी 'gradle-wrapper.properties' फ़ाइल से 8.14.3 वर्शन उठाएगा
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.7'
-          validate-wrappers: false
+          gradle-version: wrapper
 
       - name: Install Dependencies
         run: npm install
@@ -38,19 +38,19 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      # 🛠️ फिक्स 3: कीस्टोर का सही पाथ ऐप फ़ोल्डर के अंदर सेट किया
+      # 🛠️ पाथ फिक्स: कीस्टोर सीधे 'android/app' फोल्डर के अंदर
       - name: Generate Keystore
         run: |
           cd android/app
           keytool -genkey -v -keystore release.keystore -alias ascend_study -keyalg RSA -keysize 2048 -validity 10000 -storepass "ascendstudy123" -keypass "ascendstudy123" -dname "CN=ascendstudy.com, OU=Ascend Study, O=Ascend, L=Unknown, S=Unknown, C=US"
 
-      # 🛠️ फिक्स 4: बिना किसी कैश एरर के सही एंड्रॉइड फ़ोल्डर में जाकर फ्रेश बिल्ड बनाना
+      # 🛠️ क्लीन बिल्ड: तुम्हारे असली ग्रैडल इंजन के साथ फ्रेश कंपाइलेशन
       - name: Build Android App
         run: |
           cd android
-          gradle clean assembleDebug assembleRelease --no-daemon
+          ./gradlew clean assembleDebug assembleRelease --no-daemon
 
-      # 🛠️ फिक्स 5: एपीके साइनिंग और अलाइनमेंट पाथ को पूरी तरह फिक्स किया
+      # 🛠️ एपीके साइनिंग: बिना किसी पाथ एरर के सीधे अलाइन करना
       - name: Sign Release APK
         run: |
           export APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -r | head -n 1)
