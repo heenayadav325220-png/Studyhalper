@@ -528,7 +528,7 @@ export default function App() {
     }
     return { date: "", count: 0, limit: 50 };
   });
-  const [quotaToast, setQuotaToast] = useState<{ show: boolean; message: string; count: number } | null>(null);
+  const [quotaToast, setQuotaToast] = useState<{ show?: boolean; message: string; count?: number; type?: 'warning' | 'success' | 'error'; title?: string } | null>(null);
 
   // Retro Audio effects
   const playAudioChime = (type: 'coin' | 'levelUp' | 'success' | 'draw' | 'quest') => {
@@ -804,7 +804,10 @@ export default function App() {
 
       // Show toast alert
       setQuotaToast({
+        show: true,
         message: `Diagram "${titleVal || "Untitled"}" compiled successfully and saved to your Vault! 🎨`,
+        type: 'success',
+        title: 'SUCCESS! ✨',
       });
 
     } catch (err: any) {
@@ -816,7 +819,10 @@ export default function App() {
         error: err.message || "Generation failed",
       }));
       setQuotaToast({
+        show: true,
         message: `Diagram generation failed: ${err.message || "Unknown error"}`,
+        type: 'error',
+        title: 'ERROR! ❌',
       });
     }
   };
@@ -3172,37 +3178,60 @@ export default function App() {
             )}
           </AnimatePresence>
 
-          {/* Daily AI Quota Warning Toast */}
+          {/* Dynamic Status / Quota Notification Toast */}
           <AnimatePresence>
-            {quotaToast && (
-              <motion.div 
-                initial={{ y: -100, opacity: 0, scale: 0.85 }}
-                animate={{ y: 0, opacity: 1, scale: 1 }}
-                exit={{ y: -100, opacity: 0, scale: 0.85 }}
-                transition={{ 
-                  type: "spring", 
-                  stiffness: 140, 
-                  damping: 14, 
-                  mass: 0.8 
-                }}
-                className="absolute top-4 left-4 right-4 bg-gradient-to-r from-amber-600 via-orange-500 to-amber-500 text-white rounded-3xl p-4 shadow-2xl z-50 flex items-center space-x-3 border border-amber-400 overflow-hidden"
-                id="quota_toast"
-              >
-                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-xl shrink-0 relative z-10">
-                  ⚠️
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] uppercase font-black tracking-widest text-amber-100">AI Quota Warning! 🧠</p>
-                  <p className="text-xs font-bold text-white leading-tight">{quotaToast.message}</p>
-                </div>
-                <button 
-                  onClick={() => setQuotaToast(null)} 
-                  className="p-1 bg-white/10 hover:bg-white/20 rounded-full text-white transition cursor-pointer"
+            {quotaToast && (() => {
+              const type = quotaToast.type || 'warning';
+              let bgClass = "bg-gradient-to-r from-amber-600 via-orange-500 to-amber-500";
+              let borderClass = "border-amber-400";
+              let icon = "⚠️";
+              let titleText = quotaToast.title || "AI Quota Warning! 🧠";
+              let titleColorClass = "text-amber-100";
+
+              if (type === 'success') {
+                bgClass = "bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-500";
+                borderClass = "border-emerald-400";
+                icon = "✨";
+                titleColorClass = "text-emerald-100";
+                titleText = quotaToast.title || "SUCCESS! ✨";
+              } else if (type === 'error') {
+                bgClass = "bg-gradient-to-r from-rose-600 via-red-500 to-rose-500";
+                borderClass = "border-rose-400";
+                icon = "❌";
+                titleColorClass = "text-rose-100";
+                titleText = quotaToast.title || "ERROR! ❌";
+              }
+
+              return (
+                <motion.div 
+                  initial={{ y: -100, opacity: 0, scale: 0.85 }}
+                  animate={{ y: 0, opacity: 1, scale: 1 }}
+                  exit={{ y: -100, opacity: 0, scale: 0.85 }}
+                  transition={{ 
+                    type: "spring", 
+                    stiffness: 140, 
+                    damping: 14, 
+                    mass: 0.8 
+                  }}
+                  className={`absolute top-4 left-4 right-4 ${bgClass} text-white rounded-3xl p-4 shadow-2xl z-50 flex items-center space-x-3 border ${borderClass} overflow-hidden`}
+                  id="quota_toast"
                 >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </motion.div>
-            )}
+                  <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-xl shrink-0 relative z-10">
+                    {icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-[10px] uppercase font-black tracking-widest ${titleColorClass}`}>{titleText}</p>
+                    <p className="text-xs font-bold text-white leading-tight">{quotaToast.message}</p>
+                  </div>
+                  <button 
+                    onClick={() => setQuotaToast(null)} 
+                    className="p-1 bg-white/10 hover:bg-white/20 rounded-full text-white transition cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </motion.div>
+              );
+            })()}
           </AnimatePresence>
 
         {/* Dynamic Nav View Render */}

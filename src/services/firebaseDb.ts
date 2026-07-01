@@ -1,5 +1,6 @@
 import { 
   db, 
+  auth,
   collection, 
   doc, 
   getDoc, 
@@ -828,6 +829,24 @@ export async function deleteFlashcard(userId: string | number, cardId: string | 
 
 // ---------------- STUDY DIAGRAMS ----------------
 
+// Local storage helpers for diagrams in guest/offline mode
+function getLocalDiagrams(): any[] {
+  try {
+    const val = localStorage.getItem("studybuddy_local_diagrams");
+    return val ? JSON.parse(val) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveLocalDiagrams(diagrams: any[]): void {
+  try {
+    localStorage.setItem("studybuddy_local_diagrams", JSON.stringify(diagrams));
+  } catch (e) {
+    console.error("Failed to save local diagrams to localStorage:", e);
+  }
+}
+
 export async function saveUserDiagram(
   userId: string | number,
   diagram: {
@@ -840,7 +859,6 @@ export async function saveUserDiagram(
     created_at?: string;
   }
 ): Promise<string> {
-  const colRef = collection(db, "users", String(userId), "diagrams");
   const payload = {
     title: diagram.title || "",
     prompt: diagram.prompt || "",
@@ -850,6 +868,25 @@ export async function saveUserDiagram(
     created_at: diagram.created_at || new Date().toISOString()
   };
 
+  // Safe check if the user is signed in to Firebase Auth
+  if (!auth.currentUser) {
+    const localDiagrams = getLocalDiagrams();
+    if (diagram.id) {
+      const idx = localDiagrams.findIndex(d => d.id === diagram.id);
+      if (idx > -1) {
+        localDiagrams[idx] = { ...localDiagrams[idx], ...payload };
+      }
+      saveLocalDiagrams(localDiagrams);
+      return String(diagram.id);
+    } else {
+      const generatedId = "local_diag_" + Math.random().toString(36).substring(2, 11);
+      localDiagrams.unshift({ id: generatedId, ...payload });
+      saveLocalDiagrams(localDiagrams);
+      return generatedId;
+    }
+  }
+
+  const colRef = collection(db, "users", String(userId), "diagrams");
   try {
     if (diagram.id) {
       const docRef = doc(db, "users", String(userId), "diagrams", String(diagram.id));
@@ -861,10 +898,20 @@ export async function saveUserDiagram(
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `users/${userId}/diagrams/${diagram.id || "new"}`);
+    // Fallback to local storage if Firestore write fails due to lack of permissions or network error
+    const localDiagrams = getLocalDiagrams();
+    const generatedId = "local_diag_" + Math.random().toString(36).substring(2, 11);
+    localDiagrams.unshift({ id: generatedId, ...payload });
+    saveLocalDiagrams(localDiagrams);
+    return generatedId;
   }
 }
 
 export async function getUserDiagrams(userId: string | number): Promise<any[]> {
+  if (!auth.currentUser) {
+    return getLocalDiagrams();
+  }
+
   try {
     const q = query(collection(db, "users", String(userId), "diagrams"), orderBy("created_at", "desc"));
     const snap = await getDocs(q);
@@ -877,17 +924,28 @@ export async function getUserDiagrams(userId: string | number): Promise<any[]> {
     });
     return results;
   } catch (error) {
-    console.warn("Offline or failed to fetch user diagrams:", error);
-    return [];
+    console.warn("Offline or failed to fetch user diagrams from Firestore, falling back to local storage:", error);
+    return getLocalDiagrams();
   }
 }
 
 export async function deleteUserDiagram(userId: string | number, diagramId: string): Promise<void> {
+  if (!auth.currentUser || String(diagramId).startsWith("local_diag_")) {
+    const localDiagrams = getLocalDiagrams();
+    const filtered = localDiagrams.filter(d => d.id !== diagramId);
+    saveLocalDiagrams(filtered);
+    return;
+  }
+
   try {
     const docRef = doc(db, "users", String(userId), "diagrams", String(diagramId));
     await deleteDoc(docRef);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `users/${userId}/diagrams/${diagramId}`);
+    // If Firestore delete fails, also remove from local storage just in case
+    const localDiagrams = getLocalDiagrams();
+    const filtered = localDiagrams.filter(d => d.id !== diagramId);
+    saveLocalDiagrams(filtered);
   }
 }
 
