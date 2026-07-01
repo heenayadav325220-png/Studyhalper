@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+import java.util.Properties
+
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.ascendstudy.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,6 +24,16 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile file(keystoreProperties['storeFile'] ?: 'android/app/release.keystore')
+                storePassword keystoreProperties['storePassword'] ?: ''
+                keyAlias keystoreProperties['keyAlias'] ?: ''
+                keyPassword keystoreProperties['keyPassword'] ?: ''
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled true
@@ -23,6 +41,11 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+}
+
+// If keystore properties were provided, wire signingConfig to release build
+if (keystorePropertiesFile.exists()) {
+    android.buildTypes.release.signingConfig android.signingConfigs.release
 }
 
 repositories {
