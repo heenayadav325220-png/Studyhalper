@@ -38,7 +38,9 @@ import {
   Search,
   HelpCircle,
   Check,
-  ExternalLink
+  ExternalLink,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
@@ -486,6 +488,23 @@ const DEFAULT_STREAK_DAYS: StreakDayType[] = [
 ];
 
 export default function App() {
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem('studybuddy_darkMode') === 'true';
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('studybuddy_darkMode', 'true');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('studybuddy_darkMode', 'false');
+    }
+  }, [darkMode]);
+
   const [activeTab, setActiveTab] = useState('home'); 
   const [notebookTab, setNotebookTab] = useState<'notes' | 'planner' | 'flashcards'>('notes');
   const [waveToast, setWaveToast] = useState<{ name: string; response: string; points: number } | null>(null);
@@ -5808,6 +5827,25 @@ export default function App() {
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Dark Mode Theme Toggle */}
+                  <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase block">App Theme</label>
+                    <button
+                      type="button"
+                      onClick={() => setDarkMode(!darkMode)}
+                      className="w-full flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-xl transition hover:bg-slate-100 cursor-pointer"
+                      id="dark_mode_toggle_profile"
+                    >
+                      <div className="flex items-center space-x-2 text-xs font-semibold text-slate-700">
+                        {darkMode ? <Moon className="w-4 h-4 text-indigo-500 animate-pulse" /> : <Sun className="w-4 h-4 text-amber-500" />}
+                        <span>{darkMode ? "Dark Mode Enabled" : "Light Mode Enabled"}</span>
+                      </div>
+                      <div className={`w-8 h-4 rounded-full p-0.5 transition-colors duration-200 ${darkMode ? 'bg-indigo-600' : 'bg-slate-300'}`}>
+                        <div className={`w-3 h-3 bg-white rounded-full shadow-md transform transition-transform duration-200 ${darkMode ? 'translate-x-4' : 'translate-x-0'}`} />
+                      </div>
+                    </button>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 pt-2">

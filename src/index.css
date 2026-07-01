@@ -7,6 +7,8 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
+@variant dark (&:where(.dark, .dark *));
+
 /* Custom Scrollbar and layout tweaks */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
@@ -15,3 +17,114 @@
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }
+
+/* Comprehensive Dark Mode Theme Overrides */
+.dark {
+  /* Override Tailwind's theme variables for slate/zinc shades */
+  --color-slate-50: #030712;   /* Deep slate background */
+  --color-slate-100: #0b0f19;  /* Secondary panel background */
+  --color-slate-150: #1e293b;  /* Borders and dividers */
+  --color-slate-200: #1e293b;
+  --color-slate-250: #334155;
+  --color-slate-300: #475569;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #cbd5e1;
+  --color-slate-700: #f1f5f9;  /* Light slate for text */
+  --color-slate-750: #f8fafc;
+  --color-slate-800: #f1f5f9;
+  --color-slate-850: #f8fafc;
+  --color-slate-900: #ffffff;  /* Heading and bold text */
+}
+
+/* Override background colors of panels and cards */
+.dark .bg-white {
+  background-color: #0b0f19 !important;
+}
+
+.dark .bg-slate-50 {
+  background-color: #030712 !important;
+}
+
+/* Ensure text is clearly visible and has excellent contrast in dark mode */
+.dark .text-slate-800 {
+  color: #f1f5f9 !important;
+}
+
+.dark .text-slate-900 {
+  color: #ffffff !important;
+}
+
+.dark .text-slate-700 {
+  color: #e2e8f0 !important;
+}
+
+.dark .text-slate-650 {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+/* Support borders in dark mode */
+.dark .border-slate-100 {
+  border-color: #1e293b !important;
+}
+
+.dark .border-slate-150 {
+  border-color: #1e293b !important;
+}
+
+.dark .border-slate-200 {
+  border-color: #1e293b !important;
+}
+
+.dark .border-slate-250 {
+  border-color: #334155 !important;
+}
+
+/* Modals and Overlays */
+.dark .bg-white.w-full.rounded-t-3xl {
+  background-color: #070a13 !important;
+  border-top-color: #1e293b !important;
+}
+
+/* Input Fields and Select Dropdowns */
+.dark input[type="text"],
+.dark input[type="password"],
+.dark input[type="email"],
+.dark input[type="tel"],
+.dark select,
+.dark textarea {
+  background-color: #0b0f19 !important;
+  color: #ffffff !important;
+  border-color: #1e293b !important;
+}
+
+/* Custom chalk messages rendering in dark mode */
+.dark .bg-slate-900\/5 {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* Tabs and navigation bar overrides */
+.dark .bg-white\/90 {
+  background-color: rgba(11, 15, 25, 0.9) !important;
+}
+
+.dark .border-slate-200\/80 {
+  border-color: rgba(30, 41, 59, 0.8) !important;
+}
+
+/* Focus and hover enhancements */
+.dark .hover\:bg-slate-100:hover {
+  background-color: #1e293b !important;
+}
+
+.dark .hover\:bg-slate-50:hover {
+  background-color: #0b0f19 !important;
+}
+
