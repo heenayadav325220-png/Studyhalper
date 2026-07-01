@@ -99,7 +99,8 @@ import {
   answerGroupQuestion,
   subscribeToGroupSessions,
   saveGroupSession,
-  rsvpGroupSession
+  rsvpGroupSession,
+  saveUserDiagram
 } from './services/firebaseDb';
 
 
@@ -681,6 +682,144 @@ export default function App() {
   const [progress, setProgress] = useState<Progress[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+
+  // Global background diagram generator state
+  const [backgroundDiagram, setBackgroundDiagram] = useState<{
+    status: 'idle' | 'generating' | 'success' | 'error';
+    prompt: string;
+    title: string;
+    subject: string;
+    style: string;
+    practiceMode: boolean;
+    imageUrl: string | null;
+    explanation: string;
+    step: string;
+    error: string | null;
+  }>({
+    status: 'idle',
+    prompt: '',
+    title: '',
+    subject: 'Science',
+    style: 'textbook',
+    practiceMode: false,
+    imageUrl: null,
+    explanation: '',
+    step: '',
+    error: null,
+  });
+
+  const generateDiagramInBackground = async (
+    promptVal: string,
+    titleVal: string,
+    subjectVal: string,
+    styleVal: string,
+    practiceVal: boolean
+  ) => {
+    setBackgroundDiagram({
+      status: 'generating',
+      prompt: promptVal,
+      title: titleVal,
+      subject: subjectVal,
+      style: styleVal,
+      practiceMode: practiceVal,
+      imageUrl: null,
+      explanation: '',
+      step: 'Drafting scientific illustration geometry...',
+      error: null,
+    });
+
+    try {
+      const styles = [
+        { id: "textbook", name: "Textbook Illustration", promptSuffix: "Clear, colored, clean textbook illustration style with professional academic labels." },
+        { id: "blueprint", name: "Modern Blueprint", promptSuffix: "Clean white lines and blue grid blueprint schematic style, neat architectural labels." },
+        { id: "chalkboard", name: "Chalkboard Sketch", promptSuffix: "Hand-drawn chalk sketch style on a dusty green classroom blackboard background." },
+        { id: "pencil", name: "Pencil Drawing", promptSuffix: "Detailed black and white graphite pencil sketch drawing style, neat hand-written annotations." },
+        { id: "infographic", name: "Colorful Infographic", promptSuffix: "Minimalist, high-contrast, modern colorful infographic vectors with bold typography pointers." }
+      ];
+      const styleObj = styles.find(s => s.id === styleVal);
+      const stylePrompt = styleObj ? styleObj.promptSuffix : '';
+      
+      const modePrompt = practiceVal 
+        ? "Create a BLANK self-test practice version of this diagram. Use numbered blank circles (e.g., ①, ②, ③) pointing to the parts instead of actual labels, so students can practice labeling them."
+        : "Include clear, readable labels pointing to all major parts.";
+
+      const finalImagePrompt = `${promptVal}. Style: ${stylePrompt}. Mode: ${modePrompt} Clear educational context, academic style, centered diagram on solid, clean high-contrast neutral background.`;
+
+      // Step 1: Generate diagram image
+      const diagramImg = await generateStudyDiagram(finalImagePrompt);
+      if (!diagramImg) {
+        throw new Error("Unable to render diagram.");
+      }
+
+      // Update intermediate progress
+      setBackgroundDiagram(prev => ({
+        ...prev,
+        imageUrl: diagramImg,
+        step: 'Assembling textbook labeling pointers and study guide...'
+      }));
+
+      // Step 2: Generate educational explanation
+      const explanationPrompt = `
+        Provide a textbook-level educational breakdown of the following study diagram topic: "${titleVal || promptVal}" (Subject: ${subjectVal}).
+        
+        Format your response beautifully using structured sections:
+        
+        ### 📌 Key Labeled Parts
+        (Create a detailed, bulleted list explaining what each major component is and its specific biological, physical, or geographical function)
+        
+        ### ✏️ Step-by-Step Drawing Guide (For Exams)
+        (Give 4-5 practical, easy-to-follow steps on how a student can draw this diagram on paper during a timed school exam to score full marks)
+        
+        ### ❓ Core Exam Questions
+        (Provide 2 mock exam questions related to this diagram - one short 2-mark question and one comprehensive 5-mark question, along with brief high-scoring answers)
+        
+        Make sure the language is encouraging and highly educational! Suitable for grade levels.
+      `;
+      const resultText = await getStudyAnswer(explanationPrompt, undefined, undefined, appLanguage);
+
+      // Save it automatically to the database if user is logged in
+      if (user?.id) {
+        const diagramData = {
+          title: titleVal || promptVal.substring(0, 30) + " Diagram",
+          prompt: promptVal,
+          imageUrl: diagramImg,
+          explanation: resultText,
+          subject: subjectVal,
+        };
+        await saveUserDiagram(user.id, diagramData);
+      }
+
+      setBackgroundDiagram({
+        status: 'success',
+        prompt: promptVal,
+        title: titleVal,
+        subject: subjectVal,
+        style: styleVal,
+        practiceMode: practiceVal,
+        imageUrl: diagramImg,
+        explanation: resultText,
+        step: '',
+        error: null,
+      });
+
+      // Show toast alert
+      setQuotaToast({
+        message: `Diagram "${titleVal || "Untitled"}" compiled successfully and saved to your Vault! 🎨`,
+      });
+
+    } catch (err: any) {
+      console.error("Background diagram generation failed:", err);
+      setBackgroundDiagram(prev => ({
+        ...prev,
+        status: 'error',
+        step: '',
+        error: err.message || "Generation failed",
+      }));
+      setQuotaToast({
+        message: `Diagram generation failed: ${err.message || "Unknown error"}`,
+      });
+    }
+  };
 
   // Flashcards UI session and generator states
   const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
@@ -3081,10 +3220,10 @@ export default function App() {
               
               {/* HOME SCREEN */}
               {activeTab === 'home' && (
-                <div className="flex-1 overflow-y-auto p-5 space-y-6 scrollbar-hide">
+                <div className="flex-1 overflow-y-auto p-4 space-y-4.5 scrollbar-hide">
                   
                   {/* Dashboard Welcome Header */}
-                  <header className="flex flex-col space-y-3.5 bg-gradient-to-br from-indigo-50/70 via-purple-50/50 to-slate-50/10 p-5 rounded-3xl border border-indigo-100/45 shadow-sm" id="welcome_header">
+                  <header className="flex flex-col space-y-2.5 bg-gradient-to-br from-indigo-50/70 via-purple-50/50 to-slate-50/10 p-4 rounded-2xl border border-indigo-100/45 shadow-sm" id="welcome_header">
                     <div className="flex justify-between items-start gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-1.5">
@@ -3193,7 +3332,7 @@ export default function App() {
                   </header>
 
                   {/* 5-DAY STUDY STREAK CALENDAR CARD */}
-                  <section className="bg-white p-5 rounded-3xl border border-slate-150/70 shadow-xs space-y-4" id="study_streak_calendar_card">
+                  <section className="bg-white p-4 rounded-2xl border border-slate-150/70 shadow-xs space-y-3" id="study_streak_calendar_card">
                     <div className="flex items-center justify-between border-b border-slate-50 pb-2.5">
                       <div className="flex items-center space-x-1.5">
                         <span className="text-base">📅</span>
@@ -3338,7 +3477,7 @@ export default function App() {
                   </section>
 
                   {/* DAILY CHALLENGES & STREAK CARD */}
-                  <section className="bg-white p-5 rounded-3xl border border-slate-150/70 shadow-xs space-y-4" id="daily_quests_card">
+                  <section className="bg-white p-4 rounded-2xl border border-slate-150/70 shadow-xs space-y-3" id="daily_quests_card">
                     <div className="flex items-center justify-between border-b border-slate-50 pb-2.5">
                       <div className="flex items-center space-x-1.5">
                         <span className="text-base">🔥</span>
@@ -3390,7 +3529,7 @@ export default function App() {
                   <HomeworkSolver user={user} language={appLanguage} isTagMode={isTagMode} />
 
                   {/* VIRTUAL STUDY COMPANION - CHIMPU'S ISLAND */}
-                  <section className="bg-gradient-to-br from-emerald-500/10 via-emerald-50/5 to-white p-5 rounded-3xl border border-emerald-100/60 shadow-sm space-y-4" id="study_pet_sanctuary">
+                  <section className="bg-gradient-to-br from-emerald-500/10 via-emerald-50/5 to-white p-4 rounded-2xl border border-emerald-100/60 shadow-sm space-y-3" id="study_pet_sanctuary">
                     <div className="flex justify-between items-center text-xs">
                       <h2 className="font-extrabold text-slate-800 tracking-tight uppercase flex items-center text-slate-500">
                         🏝️ {translate('virtual_friend_title', appLanguage, "Chimpu's Sanctuary")}
@@ -5065,11 +5204,40 @@ export default function App() {
               )}
 
               {activeTab === 'diagram' && (
-                <DiagramMaker user={user} language={appLanguage} isTagMode={isTagMode} />
+                <DiagramMaker 
+                  user={user} 
+                  language={appLanguage} 
+                  isTagMode={isTagMode} 
+                  backgroundDiagram={backgroundDiagram}
+                  setBackgroundDiagram={setBackgroundDiagram}
+                  onGenerateDiagram={generateDiagramInBackground}
+                />
               )}
 
             </motion.div>
           </AnimatePresence>
+
+          {/* Background Diagram Generation Status Indicator */}
+          {backgroundDiagram.status === 'generating' && activeTab !== 'diagram' && (
+            <div 
+              className="absolute bottom-16 left-4 right-4 bg-slate-900/95 backdrop-blur-md border border-slate-800 text-white rounded-2xl p-3 shadow-lg z-50 flex items-center justify-between animate-bounce"
+              style={{ animationDuration: '3s' }}
+            >
+              <div className="flex items-center space-x-3 min-w-0">
+                <Loader2 className="w-4 h-4 text-indigo-450 animate-spin shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 leading-none">Background Generating...</p>
+                  <p className="text-[11px] font-extrabold truncate mt-1 text-white">{backgroundDiagram.title || "Study Diagram"}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setActiveTab('diagram')}
+                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[9px] font-black uppercase rounded-lg shadow transition shrink-0 cursor-pointer"
+              >
+                View Lab
+              </button>
+            </div>
+          )}
         </main>
 
         {/* Dynamic Mobile Standard App Bottom Tab Bar (ALIGNED PINNED NO CLIP) */}

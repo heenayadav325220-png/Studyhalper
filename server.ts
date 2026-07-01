@@ -170,9 +170,26 @@ async function callGeminiWithRetryAndFailover(
   delay = 1000
 ): Promise<any> {
   const isImageModel = params.model.indexOf("image") !== -1;
-  const candidates = isImageModel 
+  const hasModelsPrefix = params.model.startsWith("models/");
+  const baseCandidates = isImageModel 
     ? [params.model, "gemini-3.1-flash-lite-image", "gemini-3.1-flash-image"] 
-    : [params.model, "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
+    : [
+        params.model,
+        "gemini-3.5-flash",
+        "gemini-2.5-flash",
+        "gemini-1.5-flash",
+        "gemini-2.0-flash",
+        "gemini-2.5-pro",
+        "gemini-1.5-pro",
+        "gemini-3.1-flash-lite",
+        "gemini-flash-latest"
+      ];
+  const candidates = baseCandidates.map(m => {
+    if (hasModelsPrefix && !m.startsWith("models/")) {
+      return `models/${m}`;
+    }
+    return m;
+  });
   const modelsToTry = candidates.filter((item, index) => candidates.indexOf(item) === index);
 
   let lastError: any = null;
@@ -195,7 +212,37 @@ async function callGeminiWithRetryAndFailover(
         const isTransient = error.status === 503 || error.statusCode === 503 || error.code === 503 || 
                             errorMsg.includes("503") || errorMsg.includes("UNAVAILABLE") || errorMsg.includes("high demand") || errorMsg.includes("temporary");
         
-        if (isTransient && currentRetries > 0) {
+        const isQuota = error.status === 429 || error.statusCode === 429 || error.code === 429 ||
+                        errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED") ||
+                        errorMsg.includes("quota") || errorMsg.includes("limit");
+
+        const currentModelIndex = modelsToTry.indexOf(modelCandidate);
+        const hasNextCandidate = currentModelIndex < modelsToTry.length - 1;
+
+        if (isQuota && hasNextCandidate) {
+          console.warn(`[Server Gemini Quota Failover] Model ${modelCandidate} hit rate limit / quota (${errorMsg}). Falling back to next candidate model immediately...`);
+          break; // Break the while retry loop to let the outer loop try the next candidate model immediately!
+        } else if (isQuota && currentRetries > 0) {
+          let waitTimeMs = 5000; // default wait for quota
+          const match = errorMsg.match(/Please retry in ([\d\.]+)s/i);
+          if (match && match[1]) {
+            const seconds = parseFloat(match[1]);
+            if (!isNaN(seconds)) {
+              waitTimeMs = Math.ceil(seconds * 1000) + 1500; // Wait specified time plus 1.5 seconds buffer
+            }
+          } else {
+            waitTimeMs = currentDelay * 3;
+          }
+
+          if (waitTimeMs > 25000) {
+            waitTimeMs = 25000; // Cap at 25 seconds
+          }
+
+          console.warn(`[Server Gemini Quota Wait] Model ${modelCandidate} hit rate limit / quota (${errorMsg}). Waiting ${waitTimeMs}ms before retrying...`);
+          await new Promise((resolve) => setTimeout(resolve, waitTimeMs));
+          currentRetries--;
+          currentDelay *= 2;
+        } else if (isTransient && currentRetries > 0) {
           console.warn(`[Server Gemini Retry] Model ${modelCandidate} failed (${errorMsg}). Retrying in ${currentDelay}ms...`);
           await new Promise((resolve) => setTimeout(resolve, currentDelay));
           currentRetries--;
@@ -624,34 +671,429 @@ app.post("/api/gemini/answer", async (req, res) => {
   }
 });
 
+function generateGuaranteedLocalSvg(prompt: string): string {
+  const normalized = (prompt || "").toLowerCase();
+  
+  if (normalized.includes("water cycle")) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="100%" height="100%">
+      <!-- Background -->
+      <rect width="600" height="400" fill="#f8fafc" rx="16"/>
+      <rect width="600" height="150" y="250" fill="#e0f2fe" rx="0"/>
+      
+      <!-- Ocean -->
+      <path d="M 0 320 Q 150 310 300 320 T 600 320 L 600 400 L 0 400 Z" fill="#0284c7"/>
+      <path d="M 0 340 Q 150 330 300 340 T 600 340 L 600 400 L 0 400 Z" fill="#0369a1"/>
+      
+      <!-- Mountains -->
+      <path d="M 350 320 L 450 180 L 520 260 L 600 150 L 600 320 Z" fill="#64748b"/>
+      <path d="M 430 208 L 450 180 L 470 208 Z" fill="#f1f5f9"/>
+      <path d="M 570 190 L 600 150 L 600 210 Z" fill="#f1f5f9"/>
+
+      <!-- Sun -->
+      <circle cx="80" cy="80" r="30" fill="#eab308" />
+      <line x1="80" y1="35" x2="80" y2="20" stroke="#eab308" stroke-width="4"/>
+      <line x1="80" y1="125" x2="80" y2="140" stroke="#eab308" stroke-width="4"/>
+      <line x1="35" y1="80" x2="20" y2="80" stroke="#eab308" stroke-width="4"/>
+      <line x1="125" y1="80" x2="140" y2="80" stroke="#eab308" stroke-width="4"/>
+      
+      <!-- Clouds -->
+      <path d="M 240 100 a 20 20 0 0 1 30 -10 a 25 25 0 0 1 45 5 a 20 20 0 0 1 15 25 l -90 0 z" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="2"/>
+      <path d="M 440 100 a 20 20 0 0 1 30 -10 a 25 25 0 0 1 45 5 a 20 20 0 0 1 15 25 l -90 0 z" fill="#94a3b8" stroke="#475569" stroke-width="2"/>
+
+      <!-- Rain -->
+      <line x1="460" y1="140" x2="450" y2="160" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 4"/>
+      <line x1="480" y1="140" x2="470" y2="160" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 4"/>
+      <line x1="500" y1="140" x2="490" y2="160" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 4"/>
+      
+      <!-- Arrows (Cycles) -->
+      <!-- Evaporation -->
+      <path d="M 120 290 Q 140 230 180 190" fill="none" stroke="#f97316" stroke-width="3" stroke-dasharray="5 5" marker-end="url(#arrow-orange)"/>
+      <text x="130" y="220" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#ea580c">1. Evaporation</text>
+
+      <!-- Condensation -->
+      <path d="M 280 90 Q 350 80 400 90" fill="none" stroke="#2563eb" stroke-width="3" stroke-dasharray="5 5" marker-end="url(#arrow-blue)"/>
+      <text x="310" y="75" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#1d4ed8">2. Condensation</text>
+
+      <!-- Precipitation -->
+      <path d="M 500 170 Q 520 230 490 280" fill="none" stroke="#0284c7" stroke-width="3" stroke-dasharray="5 5" marker-end="url(#arrow-blue)"/>
+      <text x="515" y="230" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0369a1">3. Precipitation</text>
+
+      <!-- Collection / Runoff -->
+      <path d="M 420 310 Q 260 350 160 340" fill="none" stroke="#0d9488" stroke-width="3" stroke-dasharray="5 5" marker-end="url(#arrow-teal)"/>
+      <text x="260" y="360" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0f766e">4. Surface Runoff</text>
+      
+      <!-- Definitions -->
+      <defs>
+        <marker id="arrow-orange" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#ea580c"/>
+        </marker>
+        <marker id="arrow-blue" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#1d4ed8"/>
+        </marker>
+        <marker id="arrow-teal" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f766e"/>
+        </marker>
+      </defs>
+
+      <!-- Label title -->
+      <rect x="15" y="15" width="220" height="30" fill="white" rx="8" opacity="0.9" stroke="#e2e8f0" stroke-width="1"/>
+      <text x="25" y="35" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#0f172a">THE WATER CYCLE DIAGRAM</text>
+    </svg>`;
+  }
+  
+  if (normalized.includes("heart") || normalized.includes("cardiac")) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
+      <rect width="600" height="450" fill="#fff5f5" rx="16"/>
+      
+      <!-- Heart outline and muscle -->
+      <path d="M 300 130 C 230 60 140 100 140 190 C 140 280 250 350 300 390 C 350 350 460 280 460 190 C 460 100 370 60 300 130 Z" fill="#e11d48" stroke="#be123c" stroke-width="6"/>
+      
+      <!-- Left Ventricle cavity inside -->
+      <path d="M 300 200 C 270 170 200 200 200 250 C 200 300 270 330 300 360 Z" fill="#9f1239" opacity="0.6"/>
+      <!-- Right Ventricle cavity inside -->
+      <path d="M 300 200 C 330 170 400 200 400 250 C 400 300 330 330 300 360 Z" fill="#1e3a8a" opacity="0.6"/>
+
+      <!-- Septum divider line -->
+      <line x1="300" y1="180" x2="300" y2="380" stroke="#be123c" stroke-width="8" stroke-linecap="round"/>
+
+      <!-- Aorta arch (red arch on top) -->
+      <path d="M 280 140 Q 280 60 340 70 Q 380 80 370 140" fill="none" stroke="#e11d48" stroke-width="24" stroke-linecap="round"/>
+      <line x1="320" y1="65" x2="320" y2="40" stroke="#e11d48" stroke-width="12"/>
+      <line x1="350" y1="70" x2="350" y2="45" stroke="#e11d48" stroke-width="12"/>
+
+      <!-- Vena Cava (blue tube on left) -->
+      <rect x="180" y="70" width="20" height="110" rx="6" fill="#2563eb" stroke="#1d4ed8" stroke-width="3"/>
+      
+      <!-- Labels with pointer dots -->
+      <!-- Aorta -->
+      <circle cx="340" cy="70" r="4" fill="#1e293b"/>
+      <line x1="340" y1="70" x2="450" y2="50" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="460" y="54" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0f172a">Aorta (Main Artery)</text>
+
+      <!-- Left Atrium -->
+      <circle cx="360" cy="180" r="4" fill="#1e293b"/>
+      <line x1="360" y1="180" x2="480" y2="160" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="490" y="164" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0f172a">Left Atrium</text>
+
+      <!-- Right Atrium -->
+      <circle cx="230" cy="180" r="4" fill="#1e293b"/>
+      <line x1="230" y1="180" x2="80" y2="160" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="15" y="164" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0f172a">Right Atrium</text>
+
+      <!-- Left Ventricle -->
+      <circle cx="350" cy="280" r="4" fill="#1e293b"/>
+      <line x1="350" y1="280" x2="480" y2="300" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="490" y="304" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0f172a">Left Ventricle</text>
+
+      <!-- Right Ventricle -->
+      <circle cx="250" cy="280" r="4" fill="#1e293b"/>
+      <line x1="250" y1="280" x2="80" y2="300" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="5" y="304" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0f172a">Right Ventricle</text>
+
+      <!-- Title -->
+      <rect x="200" y="15" width="200" height="30" fill="white" rx="8" stroke="#fca5a5" stroke-width="1"/>
+      <text x="300" y="35" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#9f1239" text-anchor="middle">ANATOMY OF THE HEART</text>
+    </svg>`;
+  }
+
+  if (normalized.includes("cell")) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
+      <rect width="600" height="450" fill="#f0fdf4" rx="16"/>
+      
+      <!-- Cell Wall (Outer Hexagon-like path) -->
+      <polygon points="120,80 480,60 520,240 450,380 150,400 80,240" fill="#86efac" stroke="#166534" stroke-width="8" stroke-linejoin="round"/>
+      <!-- Cell Membrane (Inner) -->
+      <polygon points="128,88 472,69 510,238 442,372 156,391 90,238" fill="#bbf7d0" stroke="#15803d" stroke-width="3" stroke-linejoin="round"/>
+      
+      <!-- Cytoplasm filling -->
+      <polygon points="135,95 465,78 500,235 435,365 162,382 98,235" fill="#f0fdf4"/>
+
+      <!-- Large Central Vacuole (blue blob) -->
+      <path d="M 180 180 Q 250 140 350 170 T 400 280 T 250 340 T 150 250 Z" fill="#e0f2fe" stroke="#38bdf8" stroke-width="3"/>
+      <text x="250" y="240" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#0369a1">Central Vacuole</text>
+
+      <!-- Nucleus (Purple circle with nucleolus inside) -->
+      <circle cx="410" cy="140" r="45" fill="#f3e8ff" stroke="#7e22ce" stroke-width="3"/>
+      <circle cx="420" cy="130" r="18" fill="#c084fc" stroke="#6b21a8" stroke-width="2"/>
+      <text x="410" y="175" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#6b21a8" text-anchor="middle">Nucleus</text>
+
+      <!-- Chloroplasts (Green ovals with lines) -->
+      <g transform="translate(140, 110) rotate(15)">
+        <ellipse cx="0" cy="0" rx="22" ry="12" fill="#22c55e" stroke="#14532d" stroke-width="2"/>
+        <line x1="-15" y1="0" x2="15" y2="0" stroke="#14532d" stroke-width="1.5"/>
+      </g>
+      <g transform="translate(160, 340) rotate(-30)">
+        <ellipse cx="0" cy="0" rx="22" ry="12" fill="#22c55e" stroke="#14532d" stroke-width="2"/>
+        <line x1="-15" y1="0" x2="15" y2="0" stroke="#14532d" stroke-width="1.5"/>
+      </g>
+      <g transform="translate(460, 310) rotate(45)">
+        <ellipse cx="0" cy="0" rx="22" ry="12" fill="#22c55e" stroke="#14532d" stroke-width="2"/>
+        <line x1="-15" y1="0" x2="15" y2="0" stroke="#14532d" stroke-width="1.5"/>
+      </g>
+
+      <!-- Mitochondria (Orange ovals with zigzag) -->
+      <g transform="translate(280, 110) rotate(-20)">
+        <ellipse cx="0" cy="0" rx="20" ry="10" fill="#f97316" stroke="#7c2d12" stroke-width="2"/>
+        <path d="M -15 0 Q -10 5 -5 -3 T 5 5 T 15 -2" fill="none" stroke="#7c2d12" stroke-width="1.5"/>
+      </g>
+      <g transform="translate(350, 350) rotate(10)">
+        <ellipse cx="0" cy="0" rx="20" ry="10" fill="#f97316" stroke="#7c2d12" stroke-width="2"/>
+        <path d="M -15 0 Q -10 5 -5 -3 T 5 5 T 15 -2" fill="none" stroke="#7c2d12" stroke-width="1.5"/>
+      </g>
+
+      <!-- Labels with lines -->
+      <!-- Cell Wall -->
+      <circle cx="100" cy="160" r="4" fill="#14532d"/>
+      <line x1="100" y1="160" x2="30" y2="130" stroke="#14532d" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="25" y="115" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#14532d">Cell Wall</text>
+
+      <!-- Chloroplast -->
+      <circle cx="140" cy="110" r="4" fill="#14532d"/>
+      <line x1="140" y1="110" x2="50" y2="70" stroke="#14532d" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="45" y="55" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#14532d">Chloroplast</text>
+
+      <!-- Mitochondrion -->
+      <circle cx="280" cy="110" r="4" fill="#7c2d12"/>
+      <line x1="280" y1="110" x2="280" y2="40" stroke="#7c2d12" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="280" y="30" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#7c2d12" text-anchor="middle">Mitochondrion</text>
+
+      <!-- Title -->
+      <rect x="15" y="15" width="220" height="30" fill="white" rx="8" stroke="#bbf7d0" stroke-width="1"/>
+      <text x="25" y="35" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#166534">PLANT CELL STRUCTURE</text>
+    </svg>`;
+  }
+
+  if (normalized.includes("atom")) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
+      <rect width="600" height="450" fill="#faf5ff" rx="16"/>
+      
+      <!-- Orbital Shell ellipses -->
+      <ellipse cx="300" cy="225" rx="200" ry="80" fill="none" stroke="#a855f7" stroke-width="2" opacity="0.6" transform="rotate(30, 300, 225)"/>
+      <ellipse cx="300" cy="225" rx="200" ry="80" fill="none" stroke="#a855f7" stroke-width="2" opacity="0.6" transform="rotate(-30, 300, 225)"/>
+      <ellipse cx="300" cy="225" rx="200" ry="80" fill="none" stroke="#a855f7" stroke-width="2" opacity="0.6" transform="rotate(90, 300, 225)"/>
+
+      <!-- Electrons (Blue orbiting balls) -->
+      <!-- On Shell 1 (30 deg) -->
+      <circle cx="150" cy="140" r="8" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
+      <circle cx="450" cy="310" r="8" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
+      
+      <!-- On Shell 2 (-30 deg) -->
+      <circle cx="150" cy="310" r="8" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
+      <circle cx="450" cy="140" r="8" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
+
+      <!-- On Shell 3 (90 deg) -->
+      <circle cx="300" cy="45" r="8" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
+      <circle cx="300" cy="405" r="8" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
+
+      <!-- Nucleus Cluster (Protons & Neutrons) -->
+      <g transform="translate(300, 225)">
+        <!-- Neutrons (Gray) -->
+        <circle cx="-10" cy="-10" r="14" fill="#94a3b8" stroke="#475569" stroke-width="1.5"/>
+        <circle cx="12" cy="8" r="14" fill="#94a3b8" stroke="#475569" stroke-width="1.5"/>
+        <circle cx="-12" cy="14" r="14" fill="#94a3b8" stroke="#475569" stroke-width="1.5"/>
+        
+        <!-- Protons (Rose/Red with '+') -->
+        <circle cx="8" cy="-12" r="14" fill="#f43f5e" stroke="#be123c" stroke-width="1.5"/>
+        <text x="8" y="-3" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="white" text-anchor="middle">+</text>
+
+        <circle cx="-5" cy="5" r="14" fill="#f43f5e" stroke="#be123c" stroke-width="1.5"/>
+        <text x="-5" y="14" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="white" text-anchor="middle">+</text>
+
+        <circle cx="14" cy="-3" r="14" fill="#f43f5e" stroke="#be123c" stroke-width="1.5"/>
+        <text x="14" y="6" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="white" text-anchor="middle">+</text>
+      </g>
+
+      <!-- Labels -->
+      <!-- Electron -->
+      <line x1="150" y1="140" x2="80" y2="90" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="75" y="80" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#1d4ed8">Electron (- negative charge)</text>
+
+      <!-- Proton -->
+      <line x1="308" y1="213" x2="480" y2="180" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="490" y="184" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#be123c">Proton (+ positive charge)</text>
+
+      <!-- Neutron -->
+      <line x1="312" y1="233" x2="480" y2="270" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="490" y="274" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#475569">Neutron (Neutral / no charge)</text>
+
+      <!-- Orbital Shell -->
+      <line x1="430" y1="200" x2="480" y2="100" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="490" y="104" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#6b21a8">Electron Orbit / Shell</text>
+
+      <!-- Title -->
+      <rect x="200" y="15" width="200" height="30" fill="white" rx="8" stroke="#d8b4fe" stroke-width="1"/>
+      <text x="300" y="35" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#6b21a8" text-anchor="middle">STRUCTURE OF AN ATOM</text>
+    </svg>`;
+  }
+
+  if (normalized.includes("circuit") || normalized.includes("ohm") || normalized.includes("physics")) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
+      <rect width="600" height="450" fill="#f8fafc" rx="16"/>
+      
+      <!-- Wires / circuit loop outline -->
+      <rect x="150" y="100" width="300" height="250" fill="none" stroke="#334155" stroke-width="4"/>
+
+      <!-- Battery on left wire -->
+      <g transform="translate(150, 225)">
+        <line x1="0" y1="-30" x2="0" y2="30" stroke="#334155" stroke-width="4"/>
+        <line x1="-20" y1="-15" x2="20" y2="-15" stroke="#0f172a" stroke-width="6"/>
+        <line x1="-10" y1="-5" x2="10" y2="-5" stroke="#0f172a" stroke-width="3"/>
+        <line x1="-20" y1="5" x2="20" y2="5" stroke="#0f172a" stroke-width="6"/>
+        <line x1="-10" y1="15" x2="10" y2="15" stroke="#0f172a" stroke-width="3"/>
+        <text x="30" y="-15" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#0f172a">+</text>
+        <text x="30" y="15" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#0f172a">-</text>
+        <text x="-50" y="5" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0284c7">Battery (V)</text>
+      </g>
+
+      <!-- Resistor on top wire (zigzag) -->
+      <g transform="translate(300, 100)">
+        <rect x="-40" y="-15" width="80" height="30" fill="#fed7aa" stroke="#ea580c" stroke-width="3" rx="4"/>
+        <line x1="-40" y1="0" x2="40" y2="0" stroke="#ea580c" stroke-width="2" stroke-dasharray="8 4"/>
+        <text x="0" y="5" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#ea580c" text-anchor="middle">Resistor (R)</text>
+      </g>
+
+      <!-- Switch on bottom wire -->
+      <g transform="translate(300, 350)">
+        <circle cx="-30" cy="0" r="6" fill="#334155"/>
+        <circle cx="30" cy="0" r="6" fill="#334155"/>
+        <line x1="-30" y1="0" x2="20" y2="-20" stroke="#334155" stroke-width="4" stroke-linecap="round"/>
+        <text x="0" y="25" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#334155" text-anchor="middle">Open Switch</text>
+      </g>
+
+      <!-- Ammeter on right wire -->
+      <g transform="translate(450, 225)">
+        <circle cx="0" cy="0" r="22" fill="#e0f2fe" stroke="#0284c7" stroke-width="3"/>
+        <text x="0" y="5" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#0369a1" text-anchor="middle">A</text>
+        <text x="40" y="5" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0369a1">Ammeter</text>
+      </g>
+
+      <!-- Title -->
+      <rect x="15" y="15" width="250" height="30" fill="white" rx="8" stroke="#cbd5e1" stroke-width="1"/>
+      <text x="25" y="35" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#1e293b">SCHEMATIC CIRCUIT DIAGRAM</text>
+    </svg>`;
+  }
+
+  // General concept map/flowchart fallback
+  const cleanPrompt = (prompt || "Core Concept Map").substring(0, 30).replace(/["<>]/g, "");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
+    <rect width="600" height="450" fill="#f8fafc" rx="16"/>
+    
+    <!-- Central Topic box -->
+    <rect x="150" y="180" width="300" height="80" rx="12" fill="#e0e7ff" stroke="#4f46e5" stroke-width="3" />
+    <text x="300" y="220" font-family="system-ui, sans-serif" font-size="14" font-weight="900" fill="#312e81" text-anchor="middle">${cleanPrompt.toUpperCase()}</text>
+    <text x="300" y="240" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#4f46e5" text-anchor="middle">Core Study Topic</text>
+
+    <!-- Node 1 (Top Left) -->
+    <rect x="50" y="50" width="150" height="60" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+    <text x="125" y="85" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#065f46" text-anchor="middle">1. Core Concept</text>
+    <path d="M 125 110 L 220 180" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <!-- Node 2 (Top Right) -->
+    <rect x="400" y="50" width="150" height="60" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+    <text x="475" y="85" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#1e40af" text-anchor="middle">2. Key Structure</text>
+    <path d="M 475 110 L 380 180" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <!-- Node 3 (Bottom Left) -->
+    <rect x="50" y="340" width="150" height="60" rx="10" fill="#fff7ed" stroke="#f97316" stroke-width="2"/>
+    <text x="125" y="375" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#7c2d12" text-anchor="middle">3. Process / Cycle</text>
+    <path d="M 220 260 L 125 340" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <!-- Node 4 (Bottom Right) -->
+    <rect x="400" y="340" width="150" height="60" rx="10" fill="#fdf2f8" stroke="#ec4899" stroke-width="2"/>
+    <text x="475" y="375" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#831843" text-anchor="middle">4. Exam Application</text>
+    <path d="M 380 260 L 475 340" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+      </marker>
+    </defs>
+
+    <!-- Title -->
+    <rect x="15" y="15" width="220" height="30" fill="white" rx="8" stroke="#cbd5e1" stroke-width="1"/>
+    <text x="25" y="35" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#475569">CONCEPT DIAGRAM</text>
+  </svg>`;
+}
+
 app.post("/api/gemini/diagram", async (req, res) => {
   const { prompt } = req.body;
+  
+  // 1. Primary path: Generate a beautiful, high-contrast, scalable vector SVG diagram using gemini-3.5-flash
   try {
     const ai = getGeminiClient();
-    const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.1-flash-lite-image",
-      contents: [{ text: `Educational diagram or illustration for: ${prompt}. Clear, academic style, labeled if necessary.` }],
-      config: {
-        imageConfig: {
-          aspectRatio: "1:1"
-        }
-      }
+    const svgPrompt = `You are an expert educational designer. Create a beautiful, detailed, neat, textbook-grade academic vector SVG diagram/illustration for: "${prompt}".
+    
+    Requirements:
+    1. MUST be a valid, standalone <svg> element with viewBox="0 0 600 450" and width="100%" height="100%".
+    2. Use a modern, ultra-clean design: soft background, precise vector shapes (rects, circles, paths), elegant colors (indigo, slate, sky, emerald), and clear, clean leader lines/arrows pointing to labels.
+    3. Include prominent, highly readable, clear textbook labels for all major parts of the diagram using <text> elements (font-family="system-ui, -apple-system, sans-serif" and proper sizing/contrast).
+    4. Make it highly detailed, professional, and visually appealing.
+    5. Output ONLY the raw SVG code. No markdown formatting (like \`\`\`xml or \`\`\`svg), no leading/trailing commentary, no explanations. It must start with <svg and end with </svg>.`;
+
+    const svgResponse = await callGeminiWithRetryAndFailover(ai, {
+      model: "gemini-3.5-flash", // ensure it uses the working text model
+      contents: svgPrompt,
     });
 
-    let imageUrl = null;
-    if (response.candidates?.[0]?.content?.parts) {
-      for (const part of response.candidates[0].content.parts) {
-        if (part.inlineData) {
-          imageUrl = `data:image/png;base64,${part.inlineData.data}`;
-          break;
+    let svgCode = svgResponse.text || "";
+    // Strip markdown wrapper if present
+    svgCode = svgCode.trim();
+    if (svgCode.startsWith("```")) {
+      svgCode = svgCode.replace(/^```[a-zA-Z]*\n/, "").replace(/\n```$/, "").trim();
+    }
+
+    if (svgCode.includes("<svg")) {
+      // Base64 encode the SVG code for safety in data URLs
+      const base64Svg = Buffer.from(svgCode).toString("base64");
+      const imageUrl = `data:image/svg+xml;base64,${base64Svg}`;
+      return res.json({ imageUrl, isSvg: true });
+    } else {
+      throw new Error("Gemini response did not contain valid SVG code.");
+    }
+  } catch (err: any) {
+    console.warn("Primary Vector SVG generation failed or exceeded quota. Trying image model fallback...", err.message || err);
+    
+    // 2. Secondary fallback: Try generating an image using Gemini's image models
+    try {
+      const ai = getGeminiClient();
+      const response = await callGeminiWithRetryAndFailover(ai, {
+        model: "gemini-3.1-flash-lite-image",
+        contents: [{ text: `Educational diagram or illustration for: ${prompt}. Clear, academic style, labeled if necessary.` }],
+        config: {
+          imageConfig: {
+            aspectRatio: "1:1"
+          }
+        }
+      });
+
+      let imageUrl = null;
+      if (response.candidates?.[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            imageUrl = `data:image/png;base64,${part.inlineData.data}`;
+            break;
+          }
         }
       }
+      
+      if (imageUrl) {
+        return res.json({ imageUrl, isSvg: false });
+      } else {
+        throw new Error("No inline data returned from fallback image model.");
+      }
+    } catch (imgErr: any) {
+      console.warn("Image fallback also failed or exceeded quota:", imgErr.message || imgErr);
     }
-    res.json({ imageUrl });
-  } catch (err: any) {
-    console.warn("Gemini diagram error (returning null gracefully):", err.message || err);
-    handleRouteError(res, err);
-    res.json({ imageUrl: null });
+  }
+
+  // 3. Guaranteed tertiary local fallback: generate local hand-crafted SVG built by code
+  try {
+    const fallbackSvg = generateGuaranteedLocalSvg(prompt);
+    const base64Svg = Buffer.from(fallbackSvg).toString("base64");
+    res.json({ imageUrl: `data:image/svg+xml;base64,${base64Svg}`, isSvg: true });
+  } catch (localErr: any) {
+    console.error("Local fallback SVG conversion failed:", localErr.message || localErr);
+    res.status(500).json({ error: "Failed to generate any diagram." });
   }
 });
 
