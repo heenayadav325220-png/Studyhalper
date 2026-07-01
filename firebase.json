@@ -1,0 +1,12 @@
+{
+  "firestore": [
+    {
+      "database": "(default)",
+      "rules": "firestore.rules"
+    },
+    {
+      "database": "ai-studio-remixstudybuddya-041806f4-3ae7-4c23-ad72-bf4baedde267",
+      "rules": "firestore.rules"
+    }
+  ]
+}
