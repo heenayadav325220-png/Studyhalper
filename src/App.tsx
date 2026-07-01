@@ -40,7 +40,8 @@ import {
   Check,
   ExternalLink,
   Sun,
-  Moon
+  Moon,
+  Palette
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
@@ -49,6 +50,7 @@ import { LANGUAGES, COUNTRIES, translate } from './services/translations';
 import { ProgressChart } from './components/ProgressChart';
 import { StudyTimer } from './components/StudyTimer';
 import { HomeworkSolver } from './components/HomeworkSolver';
+import { DiagramMaker } from './components/DiagramMaker';
 const InteractiveToolkit = lazy(() => import('./components/InteractiveToolkit'));
 import type { AppLanguage } from './services/translations';
 import type { Note, ScheduleItem, Progress, ChatMessage, Subject, User as UserType, Group, GroupMessage, GroupNote, Flashcard, GroupQuestion, GroupSession } from './types';
@@ -5062,6 +5064,10 @@ export default function App() {
                 </div>
               )}
 
+              {activeTab === 'diagram' && (
+                <DiagramMaker user={user} language={appLanguage} isTagMode={isTagMode} />
+              )}
+
             </motion.div>
           </AnimatePresence>
         </main>
@@ -5106,6 +5112,16 @@ export default function App() {
           >
             <BookOpen className="w-5 h-5" />
             <span className="text-[9px] font-extrabold mt-0.5 tracking-tight">{translate('notebook', appLanguage, 'Notebook')}</span>
+          </button>
+
+          <button 
+            onClick={() => { setActiveTab('diagram'); setActiveGroup(null); }}
+            className={`flex flex-col items-center justify-center w-16 py-1 rounded-2xl transition-all duration-200 ${activeTab === 'diagram' ? 'text-indigo-600 bg-indigo-50/70 font-black scale-105' : 'text-slate-400 hover:text-slate-650'}`}
+            title={translate('diagrams', appLanguage, 'Diagram Lab')}
+            id="tab_btn_diagram"
+          >
+            <Palette className="w-5 h-5" />
+            <span className="text-[9px] font-extrabold mt-0.5 tracking-tight">{translate('diagrams', appLanguage, 'Diagrams')}</span>
           </button>
 
           <button 

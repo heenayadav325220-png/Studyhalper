@@ -111,6 +111,20 @@ export const TRANSLATIONS: Record<string, Partial<Record<AppLanguage, string>>> 
     Chinese: '测验',
     Japanese: 'クイズ'
   },
+  'diagrams': {
+    English: 'Diagrams',
+    Hindi: 'चित्र',
+    Hinglish: 'Diagrams',
+    Marathi: 'चित्रे',
+    Tamil: 'வரைபடங்கள்',
+    Bengali: 'চিত্র',
+    Spanish: 'Diagramas',
+    French: 'Diagrammes',
+    German: 'Diagramme',
+    Russian: 'Диаграммы',
+    Chinese: '图表',
+    Japanese: '図表'
+  },
   // Core / Levels / XP / Classes
   'level': {
     English: 'Level',

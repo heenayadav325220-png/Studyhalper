@@ -826,3 +826,68 @@ export async function deleteFlashcard(userId: string | number, cardId: string | 
   await deleteDoc(docRef);
 }
 
+// ---------------- STUDY DIAGRAMS ----------------
+
+export async function saveUserDiagram(
+  userId: string | number,
+  diagram: {
+    id?: string;
+    title: string;
+    prompt: string;
+    imageUrl: string;
+    explanation: string;
+    subject: string;
+    created_at?: string;
+  }
+): Promise<string> {
+  const colRef = collection(db, "users", String(userId), "diagrams");
+  const payload = {
+    title: diagram.title || "",
+    prompt: diagram.prompt || "",
+    imageUrl: diagram.imageUrl || "",
+    explanation: diagram.explanation || "",
+    subject: diagram.subject || "Science",
+    created_at: diagram.created_at || new Date().toISOString()
+  };
+
+  try {
+    if (diagram.id) {
+      const docRef = doc(db, "users", String(userId), "diagrams", String(diagram.id));
+      await setDoc(docRef, payload, { merge: true });
+      return String(diagram.id);
+    } else {
+      const docRef = await addDoc(colRef, payload);
+      return docRef.id;
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `users/${userId}/diagrams/${diagram.id || "new"}`);
+  }
+}
+
+export async function getUserDiagrams(userId: string | number): Promise<any[]> {
+  try {
+    const q = query(collection(db, "users", String(userId), "diagrams"), orderBy("created_at", "desc"));
+    const snap = await getDocs(q);
+    const results: any[] = [];
+    snap.forEach((docSnap) => {
+      results.push({
+        id: docSnap.id,
+        ...docSnap.data()
+      });
+    });
+    return results;
+  } catch (error) {
+    console.warn("Offline or failed to fetch user diagrams:", error);
+    return [];
+  }
+}
+
+export async function deleteUserDiagram(userId: string | number, diagramId: string): Promise<void> {
+  try {
+    const docRef = doc(db, "users", String(userId), "diagrams", String(diagramId));
+    await deleteDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `users/${userId}/diagrams/${diagramId}`);
+  }
+}
+

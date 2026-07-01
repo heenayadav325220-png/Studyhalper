@@ -44,6 +44,13 @@ if (process.env.VERCEL) {
   try {
     db = new DatabaseConstructor("studybuddy.db");
     console.log("Successfully connected to SQLite database (studybuddy.db).");
+    try {
+      db.pragma("journal_mode = WAL");
+      db.pragma("synchronous = NORMAL");
+      console.log("Enabled Write-Ahead Logging (WAL) and synchronous=NORMAL for peak SQLite scalability.");
+    } catch (pe) {
+      console.warn("Could not set database pragmas:", pe);
+    }
   } catch (err) {
     console.warn("better-sqlite3 could not be loaded, falling back to MockDatabase:", err);
     db = new MockDatabase();
@@ -164,7 +171,7 @@ async function callGeminiWithRetryAndFailover(
 ): Promise<any> {
   const isImageModel = params.model.indexOf("image") !== -1;
   const candidates = isImageModel 
-    ? [params.model, "gemini-2.5-flash-image", "gemini-3.1-flash-image"] 
+    ? [params.model, "gemini-3.1-flash-lite-image", "gemini-3.1-flash-image"] 
     : [params.model, "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
   const modelsToTry = candidates.filter((item, index) => candidates.indexOf(item) === index);
 
@@ -622,7 +629,7 @@ app.post("/api/gemini/diagram", async (req, res) => {
   try {
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-2.5-flash-image",
+      model: "gemini-3.1-flash-lite-image",
       contents: [{ text: `Educational diagram or illustration for: ${prompt}. Clear, academic style, labeled if necessary.` }],
       config: {
         imageConfig: {
