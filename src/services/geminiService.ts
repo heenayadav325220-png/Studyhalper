@@ -314,11 +314,6 @@ async function callClientGeminiWithRetry(
     : [
         params.model,
         "gemini-3.5-flash",
-        "gemini-2.5-flash",
-        "gemini-1.5-flash",
-        "gemini-2.0-flash",
-        "gemini-2.5-pro",
-        "gemini-1.5-pro",
         "gemini-3.1-flash-lite",
         "gemini-flash-latest"
       ];
@@ -346,7 +341,7 @@ async function callClientGeminiWithRetry(
         return result;
       } catch (error: any) {
         const friendlyError = handleApiError(error);
-        console.warn(`[Client Retry] Attempt failed for model ${modelCandidate}. Message: ${friendlyError}`);
+        console.warn(`[Gemini Bridge] Transitioning from ${modelCandidate} fallback...`);
 
         const isTransient = error.status === 503 || error.statusCode === 503 || error.code === 503 || 
                             friendlyError.includes("Temporarily Unavailable") || friendlyError.includes("Connection Timeout");

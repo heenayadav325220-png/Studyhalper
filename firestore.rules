@@ -23,26 +23,26 @@ service cloud.firestore {
     // Users collection and sub-collections
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow write: if isOwner(userId);
+      allow write: if isSignedIn() && request.auth.uid == userId;
 
       match /notes/{noteId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
       }
 
       match /schedule/{scheduleId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
       }
 
       match /progress/{progressId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
       }
 
       match /flashcards/{cardId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
       }
 
       match /diagrams/{diagramId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
       }
     }
 

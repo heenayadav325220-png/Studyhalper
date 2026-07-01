@@ -176,11 +176,6 @@ async function callGeminiWithRetryAndFailover(
     : [
         params.model,
         "gemini-3.5-flash",
-        "gemini-2.5-flash",
-        "gemini-1.5-flash",
-        "gemini-2.0-flash",
-        "gemini-2.5-pro",
-        "gemini-1.5-pro",
         "gemini-3.1-flash-lite",
         "gemini-flash-latest"
       ];
@@ -220,7 +215,7 @@ async function callGeminiWithRetryAndFailover(
         const hasNextCandidate = currentModelIndex < modelsToTry.length - 1;
 
         if (isQuota && hasNextCandidate) {
-          console.warn(`[Server Gemini Quota Failover] Model ${modelCandidate} hit rate limit / quota (${errorMsg}). Falling back to next candidate model immediately...`);
+          console.warn(`[Gemini Bridge] Model ${modelCandidate} hit rate limit. Trying fallback candidate model...`);
           break; // Break the while retry loop to let the outer loop try the next candidate model immediately!
         } else if (isQuota && currentRetries > 0) {
           let waitTimeMs = 5000; // default wait for quota
@@ -238,17 +233,17 @@ async function callGeminiWithRetryAndFailover(
             waitTimeMs = 25000; // Cap at 25 seconds
           }
 
-          console.warn(`[Server Gemini Quota Wait] Model ${modelCandidate} hit rate limit / quota (${errorMsg}). Waiting ${waitTimeMs}ms before retrying...`);
+          console.warn(`[Gemini Bridge] Model ${modelCandidate} rate limited. Waiting ${waitTimeMs}ms before retry...`);
           await new Promise((resolve) => setTimeout(resolve, waitTimeMs));
           currentRetries--;
           currentDelay *= 2;
         } else if (isTransient && currentRetries > 0) {
-          console.warn(`[Server Gemini Retry] Model ${modelCandidate} failed (${errorMsg}). Retrying in ${currentDelay}ms...`);
+          console.warn(`[Gemini Bridge] Model ${modelCandidate} temporarily unavailable. Retrying in ${currentDelay}ms...`);
           await new Promise((resolve) => setTimeout(resolve, currentDelay));
           currentRetries--;
           currentDelay *= 2;
         } else {
-          console.warn(`[Server Gemini Fail] Call failed for model ${modelCandidate}:`, errorMsg);
+          console.warn(`[Gemini Bridge] Model ${modelCandidate} skipped. Transitioning to next candidate...`);
           break; // Try next fallback model
         }
       }
@@ -1015,84 +1010,513 @@ function generateGuaranteedLocalSvg(prompt: string): string {
   </svg>`;
 }
 
-app.post("/api/gemini/diagram", async (req, res) => {
-  const { prompt } = req.body;
-  
-  // 1. Primary path: Generate a beautiful, high-contrast, scalable vector SVG diagram using gemini-3.5-flash
-  try {
-    const ai = getGeminiClient();
-    const svgPrompt = `You are an expert educational designer. Create a beautiful, detailed, neat, textbook-grade academic vector SVG diagram/illustration for: "${prompt}".
-    
-    Requirements:
-    1. MUST be a valid, standalone <svg> element with viewBox="0 0 600 450" and width="100%" height="100%".
-    2. Use a modern, ultra-clean design: soft background, precise vector shapes (rects, circles, paths), elegant colors (indigo, slate, sky, emerald), and clear, clean leader lines/arrows pointing to labels.
-    3. Include prominent, highly readable, clear textbook labels for all major parts of the diagram using <text> elements (font-family="system-ui, -apple-system, sans-serif" and proper sizing/contrast).
-    4. Make it highly detailed, professional, and visually appealing.
-    5. Output ONLY the raw SVG code. No markdown formatting (like \`\`\`xml or \`\`\`svg), no leading/trailing commentary, no explanations. It must start with <svg and end with </svg>.`;
+// Helper color function for the dynamic SVG Diagram Generator
+function getNodeColors(colorName: string, theme: string) {
+  const defaultColors = {
+    fill: "#ffffff",
+    stroke: "#94a3b8",
+    title: "#334155",
+    desc: "#64748b"
+  };
 
-    const svgResponse = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash", // ensure it uses the working text model
-      contents: svgPrompt,
-    });
+  const palettes: Record<string, Record<string, { fill: string; stroke: string; title: string; desc: string }>> = {
+    textbook: {
+      indigo: { fill: "#f0f2fe", stroke: "#6366f1", title: "#312e81", desc: "#4338ca" },
+      emerald: { fill: "#ecfdf5", stroke: "#10b981", title: "#064e3b", desc: "#047857" },
+      amber: { fill: "#fffbeb", stroke: "#f59e0b", title: "#78350f", desc: "#b45309" },
+      sky: { fill: "#f0f9ff", stroke: "#0ea5e9", title: "#0c4a6e", desc: "#0369a1" },
+      rose: { fill: "#fff1f2", stroke: "#f43f5e", title: "#4c0519", desc: "#be123c" },
+      violet: { fill: "#faf5ff", stroke: "#a855f7", title: "#3b0764", desc: "#7e22ce" },
+      teal: { fill: "#f0fdfa", stroke: "#14b8a6", title: "#115e59", desc: "#0f766e" },
+    },
+    blueprint: {
+      indigo: { fill: "#0a1d37", stroke: "#4f46e5", title: "#ffffff", desc: "#93c5fd" },
+      emerald: { fill: "#0a261f", stroke: "#10b981", title: "#ffffff", desc: "#86efac" },
+      amber: { fill: "#211a0d", stroke: "#f59e0b", title: "#ffffff", desc: "#fde047" },
+      sky: { fill: "#051f33", stroke: "#0ea5e9", title: "#ffffff", desc: "#7dd3fc" },
+      rose: { fill: "#290c12", stroke: "#f43f5e", title: "#ffffff", desc: "#fda4af" },
+      violet: { fill: "#1a0b2e", stroke: "#a855f7", title: "#ffffff", desc: "#d8b4fe" },
+      teal: { fill: "#05221e", stroke: "#14b8a6", title: "#ffffff", desc: "#99f6e4" },
+    },
+    chalkboard: {
+      indigo: { fill: "rgba(255,255,255,0.05)", stroke: "#a5b4fc", title: "#e0e7ff", desc: "#c7d2fe" },
+      emerald: { fill: "rgba(255,255,255,0.05)", stroke: "#6ee7b7", title: "#ecfdf5", desc: "#a7f3d0" },
+      amber: { fill: "rgba(255,255,255,0.05)", stroke: "#fde047", title: "#fef9c3", desc: "#fef08a" },
+      sky: { fill: "rgba(255,255,255,0.05)", stroke: "#7dd3fc", title: "#e0f2fe", desc: "#bae6fd" },
+      rose: { fill: "rgba(255,255,255,0.05)", stroke: "#fca5a5", title: "#ffe4e6", desc: "#fecdd3" },
+      violet: { fill: "rgba(255,255,255,0.05)", stroke: "#d8b4fe", title: "#faf5ff", desc: "#e9d5ff" },
+      teal: { fill: "rgba(255,255,255,0.05)", stroke: "#99f6e4", title: "#f0fdfa", desc: "#ccfbf1" },
+    },
+    pencil: {
+      indigo: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
+      emerald: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
+      amber: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
+      sky: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
+      rose: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
+      violet: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
+      teal: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
+    },
+    infographic: {
+      indigo: { fill: "#ffffff", stroke: "#6366f1", title: "#312e81", desc: "#4f46e5" },
+      emerald: { fill: "#ffffff", stroke: "#10b981", title: "#064e3b", desc: "#10b981" },
+      amber: { fill: "#ffffff", stroke: "#f59e0b", title: "#78350f", desc: "#d97706" },
+      sky: { fill: "#ffffff", stroke: "#0ea5e9", title: "#0c4a6e", desc: "#0284c7" },
+      rose: { fill: "#ffffff", stroke: "#f43f5e", title: "#4c0519", desc: "#e11d48" },
+      violet: { fill: "#ffffff", stroke: "#a855f7", title: "#3b0764", desc: "#9333ea" },
+      teal: { fill: "#ffffff", stroke: "#14b8a6", title: "#115e59", desc: "#0d9488" },
+    }
+  };
 
-    let svgCode = svgResponse.text || "";
-    // Strip markdown wrapper if present
-    svgCode = svgCode.trim();
-    if (svgCode.startsWith("```")) {
-      svgCode = svgCode.replace(/^```[a-zA-Z]*\n/, "").replace(/\n```$/, "").trim();
+  const themePalette = palettes[theme] || palettes.textbook;
+  return themePalette[colorName] || themePalette.indigo || defaultColors;
+}
+
+// Highly polished responsive vector SVG builder from structured educational JSON
+function buildSvgFromDiagramData(data: any, style: string, isPracticeMode: boolean): string {
+  const title = data.title || "Study Diagram";
+  const subtitle = data.subtitle || "Concept Map";
+  const nodes = data.nodes || [];
+  const connections = data.connections || [];
+  const totalNodes = nodes.length;
+  const layout = data.layout || "central";
+
+  // Position nodes based on selected layout
+  nodes.forEach((node: any, idx: number) => {
+    if (layout === "cycle") {
+      const angle = (idx / totalNodes) * 2 * Math.PI - Math.PI / 2;
+      node.x = 375 + Math.cos(angle) * 220;
+      node.y = 275 + Math.sin(angle) * 125;
+    } else if (layout === "flow") {
+      const colSpacing = 650 / (totalNodes || 1);
+      node.x = 50 + (idx * colSpacing) + (colSpacing / 2);
+      node.y = 275 + (idx % 2 === 0 ? -60 : 60);
+    } else if (layout === "hierarchy") {
+      if (idx === 0) {
+        node.x = 375;
+        node.y = 130;
+      } else {
+        const remainingCount = totalNodes - 1;
+        const colSpacing = 650 / (remainingCount || 1);
+        node.x = 50 + ((idx - 1) * colSpacing) + (colSpacing / 2);
+        node.y = 370;
+      }
+    } else if (layout === "split") {
+      const half = Math.ceil(totalNodes / 2);
+      if (idx < half) {
+        const rowSpacing = 320 / (half || 1);
+        node.x = 180;
+        node.y = 140 + idx * rowSpacing + rowSpacing / 2;
+      } else {
+        const rightIdx = idx - half;
+        const rightCount = totalNodes - half;
+        const rowSpacing = 320 / (rightCount || 1);
+        node.x = 570;
+        node.y = 140 + rightIdx * rowSpacing + rowSpacing / 2;
+      }
+    } else {
+      // Central (Mindmap)
+      if (idx === 0) {
+        node.x = 375;
+        node.y = 275;
+      } else {
+        const remainingCount = totalNodes - 1;
+        const angle = ((idx - 1) / remainingCount) * 2 * Math.PI;
+        node.x = 375 + Math.cos(angle) * 220;
+        node.y = 275 + Math.sin(angle) * 125;
+      }
+    }
+  });
+
+  // Theme styling configurations
+  let bgFill = "#f8fafc";
+  let titleColor = "#0f172a";
+  let subtitleColor = "#475569";
+  let gridLines = "";
+  let lineColor = "#64748b";
+  let lineDash = "";
+  let cardShadow = 'filter="url(#shadow)"';
+  let cardRx = "14";
+  let arrowFill = "#64748b";
+
+  if (style === "blueprint") {
+    bgFill = "#0a132b";
+    titleColor = "#00e5ff";
+    subtitleColor = "#8ecae6";
+    lineColor = "#00b4d8";
+    arrowFill = "#00b4d8";
+    cardShadow = "";
+    cardRx = "4";
+    gridLines = `
+      <defs>
+        <pattern id="blueprint-grid" width="30" height="30" patternUnits="userSpaceOnUse">
+          <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#1c2541" stroke-width="0.5"/>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#blueprint-grid)" rx="16" />
+    `;
+  } else if (style === "chalkboard") {
+    bgFill = "#0f1d13";
+    titleColor = "#fef9c3";
+    subtitleColor = "#cbd5e1";
+    lineColor = "#a7f3d0";
+    arrowFill = "#a7f3d0";
+    cardShadow = "";
+    cardRx = "8";
+    lineDash = 'stroke-dasharray="4 4"';
+    gridLines = `
+      <path d="M 20 40 Q 300 15 700 40" fill="none" stroke="rgba(255,255,255,0.02)" stroke-width="2"/>
+      <path d="M 50 480 Q 400 450 720 470" fill="none" stroke="rgba(255,255,255,0.01)" stroke-width="1.5"/>
+    `;
+  } else if (style === "pencil") {
+    bgFill = "#ffffff";
+    titleColor = "#1e293b";
+    subtitleColor = "#475569";
+    lineColor = "#1e293b";
+    arrowFill = "#1e293b";
+    cardShadow = "";
+    cardRx = "0";
+  } else if (style === "infographic") {
+    bgFill = "url(#info-bg)";
+    titleColor = "#1e1b4b";
+    subtitleColor = "#4338ca";
+    lineColor = "#cbd5e1";
+    arrowFill = "#cbd5e1";
+    gridLines = `
+      <defs>
+        <linearGradient id="info-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#faf5ff"/>
+          <stop offset="100%" stop-color="#eff6ff"/>
+        </linearGradient>
+      </defs>
+    `;
+  }
+
+  let svgHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 520" width="100%" height="100%">
+    <defs>
+      <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+        <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.05" />
+      </filter>
+      <marker id="arrow-marker" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="${arrowFill}"/>
+      </marker>
+    </defs>
+
+    <!-- Canvas Background -->
+    <rect width="100%" height="100%" fill="${bgFill}" rx="16"/>
+    ${gridLines}
+
+    <!-- Connection Lines / Arrows -->
+    <g id="connections">
+  `;
+
+  connections.forEach((conn: any) => {
+    const fromNode = nodes.find((n: any) => String(n.id) === String(conn.from));
+    const toNode = nodes.find((n: any) => String(n.id) === String(conn.to));
+    if (fromNode && toNode) {
+      const dx = toNode.x - fromNode.x;
+      const dy = toNode.y - fromNode.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      
+      const ratioStart = 50 / dist;
+      const ratioEnd = 58 / dist;
+      
+      const startX = fromNode.x + dx * ratioStart;
+      const startY = fromNode.y + dy * ratioStart;
+      const endX = toNode.x - dx * ratioEnd;
+      const endY = toNode.y - dy * ratioEnd;
+
+      svgHtml += `
+        <path d="M ${startX} ${startY} L ${endX} ${endY}" fill="none" stroke="${lineColor}" stroke-width="2" ${lineDash} marker-end="url(#arrow-marker)"/>
+      `;
+
+      if (conn.label) {
+        const midX = (startX + endX) / 2;
+        const midY = (startY + endY) / 2;
+        const pillBg = style === "blueprint" ? "#1c2541" : style === "chalkboard" ? "#1e293b" : "#ffffff";
+        const pillText = style === "blueprint" ? "#8ecae6" : style === "chalkboard" ? "#a7f3d0" : "#475569";
+        const pillBorder = style === "blueprint" ? "#00b4d8" : style === "chalkboard" ? "none" : "#e2e8f0";
+        svgHtml += `
+          <g>
+            <rect x="${midX - 60}" y="${midY - 10}" width="120" height="20" rx="4" fill="${pillBg}" stroke="${pillBorder}" stroke-width="0.5"/>
+            <text x="${midX}" y="${midY + 4}" font-family="system-ui, sans-serif" font-size="9" fill="${pillText}" text-anchor="middle" font-weight="bold">${conn.label}</text>
+          </g>
+        `;
+      }
+    }
+  });
+
+  svgHtml += `</g>\n<g id="nodes">`;
+
+  // Draw Node Cards
+  nodes.forEach((node: any, idx: number) => {
+    const colors = getNodeColors(node.color || "indigo", style);
+    const cardW = 166;
+    const cardH = 76;
+    const rx = node.x - cardW / 2;
+    const ry = node.y - cardH / 2;
+
+    svgHtml += `
+      <!-- Node Card ${node.id} -->
+      <g id="node-${node.id}">
+        <rect x="${rx}" y="${ry}" width="${cardW}" height="${cardH}" rx="${cardRx}" fill="${colors.fill}" stroke="${colors.stroke}" stroke-width="2" ${cardShadow}/>
+    `;
+
+    if (style === "infographic") {
+      svgHtml += `
+        <rect x="${rx}" y="${ry}" width="6" height="${cardH}" rx="3" fill="${colors.stroke}" />
+      `;
     }
 
-    if (svgCode.includes("<svg")) {
-      // Base64 encode the SVG code for safety in data URLs
+    if (isPracticeMode) {
+      const badgeR = 14;
+      const badgeY = ry + 24;
+      svgHtml += `
+        <!-- Self-Test Blank Badge -->
+        <circle cx="${node.x}" cy="${badgeY}" r="${badgeR}" fill="${colors.stroke}" />
+        <text x="${node.x}" y="${badgeY + 4}" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="extrabold" fill="#ffffff" text-anchor="middle">${idx + 1}</text>
+        
+        <!-- Part Description -->
+        <text x="${node.x}" y="${ry + 54}" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="${colors.desc}" text-anchor="middle" font-weight="medium">${node.description || "Identify this component"}</text>
+      `;
+    } else {
+      let displayName = node.name || "Component";
+      if (displayName.length > 22) {
+        displayName = displayName.substring(0, 20) + "...";
+      }
+      
+      let descLine1 = node.description || "";
+      let descLine2 = "";
+      if (descLine1.length > 32) {
+        const words = descLine1.split(" ");
+        let buildLine = "";
+        let breakIndex = 0;
+        for (let i = 0; i < words.length; i++) {
+          if ((buildLine + " " + words[i]).length > 30) {
+            breakIndex = i;
+            break;
+          }
+          buildLine += (i === 0 ? "" : " ") + words[i];
+        }
+        descLine1 = buildLine;
+        descLine2 = words.slice(breakIndex).join(" ");
+        if (descLine2.length > 32) {
+          descLine2 = descLine2.substring(0, 29) + "...";
+        }
+      }
+
+      svgHtml += `
+        <!-- Part Name -->
+        <text x="${node.x}" y="${ry + 26}" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="extrabold" fill="${colors.title}" text-anchor="middle">${displayName}</text>
+        
+        <!-- Part Description Line 1 -->
+        <text x="${node.x}" y="${ry + 44}" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="${colors.desc}" text-anchor="middle">${descLine1}</text>
+      `;
+
+      if (descLine2) {
+        svgHtml += `
+          <!-- Part Description Line 2 -->
+          <text x="${node.x}" y="${ry + 56}" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="${colors.desc}" text-anchor="middle">${descLine2}</text>
+        `;
+      }
+    }
+
+    svgHtml += `</g>`;
+  });
+
+  // Header Title card at the top
+  const titleBg = style === "blueprint" ? "#101b35" : style === "chalkboard" ? "#0f1d13" : "#ffffff";
+  const titleBorder = style === "blueprint" ? "#00b4d8" : style === "chalkboard" ? "#a7f3d0" : "#e2e8f0";
+  const titleBorderW = style === "chalkboard" ? "0" : "1";
+
+  svgHtml += `
+    </g>
+    
+    <!-- Title Card -->
+    <g id="title-card">
+      <rect x="25" y="22" width="700" height="52" fill="${titleBg}" stroke="${titleBorder}" stroke-width="${titleBorderW}" rx="10" ${cardShadow}/>
+      <text x="50" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="900" fill="${titleColor}" letter-spacing="-0.5px">${title.toUpperCase()}</text>
+      <text x="50" y="61" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="bold" fill="${subtitleColor}" opacity="0.85">${subtitle.toUpperCase()}</text>
+  `;
+
+  if (isPracticeMode) {
+    svgHtml += `
+      <rect x="525" y="32" width="175" height="30" rx="6" fill="#e11d48" />
+      <text x="612" y="50" font-family="system-ui, sans-serif" font-size="10" font-weight="extrabold" fill="#ffffff" text-anchor="middle">🧠 SELF-TEST ACTIVE</text>
+    `;
+  } else {
+    const badgeText = `🎨 ${style.toUpperCase()} VIEW`;
+    const badgeFill = style === "blueprint" ? "#003566" : style === "chalkboard" ? "#143a22" : "#f1f5f9";
+    const badgeTextCol = style === "blueprint" ? "#00f5ff" : style === "chalkboard" ? "#a7f3d0" : "#475569";
+    svgHtml += `
+      <rect x="575" y="32" width="125" height="30" rx="6" fill="${badgeFill}" />
+      <text x="637" y="50" font-family="system-ui, sans-serif" font-size="9" font-weight="extrabold" fill="${badgeTextCol}" text-anchor="middle">${badgeText}</text>
+    `;
+  }
+
+  svgHtml += `
+    </g>
+  </svg>`;
+
+  return svgHtml;
+}
+
+app.post("/api/gemini/diagram", async (req, res) => {
+  const { prompt } = req.body;
+  const promptLower = (prompt || "").toLowerCase();
+
+  // Determine design style and practice mode parameters
+  let selectedStyle = "textbook";
+  if (promptLower.includes("blueprint")) {
+    selectedStyle = "blueprint";
+  } else if (promptLower.includes("chalkboard")) {
+    selectedStyle = "chalkboard";
+  } else if (promptLower.includes("pencil")) {
+    selectedStyle = "pencil";
+  } else if (promptLower.includes("infographic")) {
+    selectedStyle = "infographic";
+  }
+
+  const isPracticeMode = promptLower.includes("blank self-test practice") || 
+                         promptLower.includes("①") || 
+                         promptLower.includes("practice mode");
+
+  // 1. Primary path: Generate structured JSON data and render beautifully as high-fidelity SVG (Fast & quota-safe!)
+  try {
+    const ai = getGeminiClient();
+    const jsonPrompt = `You are an expert academic illustrator and curriculum designer.
+    Analyze the following topic and create a comprehensive, clean, structured educational conceptual diagram: "${prompt}".
+    
+    Generate a JSON response that breaks down this diagram into specific nodes (labeled parts) and connections (flows/cycles/relationships) that are highly educational.
+    
+    Return ONLY valid JSON with the following structure:
+    {
+      "title": "Clear, concise academic title of the diagram",
+      "subtitle": "Brief subtitle explaining the visual structure",
+      "layout": "cycle" | "flow" | "central" | "hierarchy" | "split",
+      "nodes": [
+        {
+          "id": "1",
+          "name": "Name of part/step (e.g. Evaporation, Mitochondria, Crust)",
+          "description": "Short, clear 1-sentence educational purpose or definition of this component",
+          "color": "indigo" | "emerald" | "amber" | "sky" | "rose" | "violet" | "teal"
+        }
+      ],
+      "connections": [
+        {
+          "from": "node_id_1",
+          "to": "node_id_2",
+          "label": "Action/flow description (e.g. 'Heated by sun', 'Synthesizes ATP')"
+        }
+      ]
+    }
+    
+    Rules:
+    - Use "cycle" layout for repeating circular processes (e.g. water cycles, life cycles).
+    - Use "flow" layout for sequential step-by-step processes, pathways, or timelines.
+    - Use "central" or "hierarchy" layout for structural components or parts listing.
+    - Keep descriptions clear, concise, and highly informative.`;
+
+    const jsonResponse = await callGeminiWithRetryAndFailover(ai, {
+      model: "gemini-3.5-flash", 
+      contents: jsonPrompt,
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+
+    let rawText = jsonResponse.text || "";
+    // Strip markdown wrapper if present
+    rawText = rawText.trim();
+    if (rawText.startsWith("```")) {
+      rawText = rawText.replace(/^```[a-zA-Z]*\n/, "").replace(/\n```$/, "").trim();
+    }
+
+    const data = JSON.parse(rawText);
+    if (data && data.nodes && data.nodes.length > 0) {
+      const svgCode = buildSvgFromDiagramData(data, selectedStyle, isPracticeMode);
       const base64Svg = Buffer.from(svgCode).toString("base64");
       const imageUrl = `data:image/svg+xml;base64,${base64Svg}`;
       return res.json({ imageUrl, isSvg: true });
     } else {
-      throw new Error("Gemini response did not contain valid SVG code.");
+      throw new Error("Parsed JSON did not contain valid diagram nodes.");
     }
   } catch (err: any) {
-    console.warn("Primary Vector SVG generation failed or exceeded quota. Trying image model fallback...", err.message || err);
+    console.warn("[Gemini Bridge] Primary JSON Diagram path failed or rate-limited. Trying standard text-to-SVG direct fallback...", err.message || err);
     
-    // 2. Secondary fallback: Try generating an image using Gemini's image models
+    // 2. Secondary fallback: Generate standalone raw SVG code using alternative fallback models
     try {
       const ai = getGeminiClient();
-      const response = await callGeminiWithRetryAndFailover(ai, {
-        model: "gemini-3.1-flash-lite-image",
-        contents: [{ text: `Educational diagram or illustration for: ${prompt}. Clear, academic style, labeled if necessary.` }],
-        config: {
-          imageConfig: {
-            aspectRatio: "1:1"
-          }
-        }
+      const svgPrompt = `You are an expert educational designer. Create a beautiful, detailed, neat, textbook-grade academic vector SVG diagram/illustration for: "${prompt}".
+      
+      Requirements:
+      1. MUST be a valid, standalone <svg> element with viewBox="0 0 600 450" and width="100%" height="100%".
+      2. Use a modern, ultra-clean design: soft background, precise vector shapes (rects, circles, paths), elegant colors (indigo, slate, sky, emerald), and clear, clean leader lines/arrows pointing to labels.
+      3. Include prominent, highly readable, clear textbook labels for all major parts of the diagram using <text> elements (font-family="system-ui, -apple-system, sans-serif" and proper sizing/contrast).
+      4. Make it highly detailed, professional, and visually appealing.
+      5. Output ONLY the raw SVG code. No markdown formatting (like \`\`\`xml or \`\`\`svg), no leading/trailing commentary, no explanations. It must start with <svg and end with </svg>.`;
+
+      const svgResponse = await callGeminiWithRetryAndFailover(ai, {
+        model: "gemini-3.1-flash-lite",
+        contents: svgPrompt,
       });
 
-      let imageUrl = null;
-      if (response.candidates?.[0]?.content?.parts) {
-        for (const part of response.candidates[0].content.parts) {
-          if (part.inlineData) {
-            imageUrl = `data:image/png;base64,${part.inlineData.data}`;
-            break;
+      let svgCode = svgResponse.text || "";
+      svgCode = svgCode.trim();
+      if (svgCode.startsWith("```")) {
+        svgCode = svgCode.replace(/^```[a-zA-Z]*\n/, "").replace(/\n```$/, "").trim();
+      }
+
+      if (svgCode.includes("<svg")) {
+        const base64Svg = Buffer.from(svgCode).toString("base64");
+        const imageUrl = `data:image/svg+xml;base64,${base64Svg}`;
+        return res.json({ imageUrl, isSvg: true });
+      } else {
+        throw new Error("Raw SVG fallback did not produce a valid svg tag.");
+      }
+    } catch (svgErr: any) {
+      console.warn("[Gemini Bridge] SVG fallback also failed. Trying standard image model fallback...", svgErr.message || svgErr);
+      
+      // 3. Tertiary fallback: Try generating an image using Gemini's image models
+      try {
+        const ai = getGeminiClient();
+        const response = await callGeminiWithRetryAndFailover(ai, {
+          model: "gemini-3.1-flash-lite-image",
+          contents: [{ text: `Educational diagram or illustration for: ${prompt}. Clear, academic style, labeled if necessary.` }],
+          config: {
+            imageConfig: {
+              aspectRatio: "1:1"
+            }
+          }
+        });
+
+        let imageUrl = null;
+        if (response.candidates?.[0]?.content?.parts) {
+          for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData) {
+              imageUrl = `data:image/png;base64,${part.inlineData.data}`;
+              break;
+            }
           }
         }
+        
+        if (imageUrl) {
+          return res.json({ imageUrl, isSvg: false });
+        } else {
+          throw new Error("No inline data returned from fallback image model.");
+        }
+      } catch (imgErr: any) {
+        console.warn("[Gemini Bridge] Image fallback failed. Generating guaranteed local SVG template...", imgErr.message || imgErr);
       }
-      
-      if (imageUrl) {
-        return res.json({ imageUrl, isSvg: false });
-      } else {
-        throw new Error("No inline data returned from fallback image model.");
-      }
-    } catch (imgErr: any) {
-      console.warn("Image fallback also failed or exceeded quota:", imgErr.message || imgErr);
     }
   }
 
-  // 3. Guaranteed tertiary local fallback: generate local hand-crafted SVG built by code
+  // 4. Guaranteed quaternary local fallback: generate local hand-crafted SVG built by code
   try {
     const fallbackSvg = generateGuaranteedLocalSvg(prompt);
     const base64Svg = Buffer.from(fallbackSvg).toString("base64");
     res.json({ imageUrl: `data:image/svg+xml;base64,${base64Svg}`, isSvg: true });
   } catch (localErr: any) {
-    console.error("Local fallback SVG conversion failed:", localErr.message || localErr);
+    console.error("[Gemini Bridge] Guaranteed local fallback SVG conversion failed:", localErr.message || localErr);
     res.status(500).json({ error: "Failed to generate any diagram." });
   }
 });
