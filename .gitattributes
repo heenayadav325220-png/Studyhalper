@@ -1,0 +1,2 @@
+# Mark all .jar files as binary so Git never modifies their line endings or corrupts them
+*.jar binary
