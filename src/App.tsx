@@ -508,6 +508,30 @@ export default function App() {
     }
   }, [darkMode]);
 
+  const [splashActive, setSplashActive] = useState(true);
+  const [splashProgress, setSplashProgress] = useState(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSplashActive(false);
+    }, 1500);
+
+    const interval = setInterval(() => {
+      setSplashProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          return 100;
+        }
+        return prev + 5;
+      });
+    }, 70);
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, []);
+
   const [activeTab, setActiveTab] = useState('home'); 
   const [notebookTab, setNotebookTab] = useState<'notes' | 'planner' | 'flashcards'>('notes');
   const [waveToast, setWaveToast] = useState<{ name: string; response: string; points: number } | null>(null);
@@ -2969,11 +2993,64 @@ export default function App() {
       </audio>
 
       {/* Dynamic Student Onboarding Gatekeeper check */}
-      {authChecking ? (
-        <div className="w-full max-w-md h-screen md:h-[90vh] bg-slate-50 md:rounded-3xl shadow-2xl flex flex-col justify-center items-center p-6 relative z-20 border border-slate-800/10">
-          <div className="text-center space-y-4">
-            <Loader2 className="w-10 h-10 text-indigo-600 animate-spin mx-auto" />
-            <p className="text-xs font-bold text-slate-500">Checking authorization...</p>
+      {splashActive || authChecking ? (
+        <div className="w-full max-w-md h-screen md:h-[90vh] bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-950 md:rounded-3xl shadow-2xl flex flex-col justify-between items-center p-8 relative z-20 border border-white/5 overflow-hidden">
+          {/* Subtle background animated particle glows */}
+          <div className="absolute top-1/4 left-1/4 w-40 h-40 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none animate-pulse"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-purple-500/10 rounded-full blur-2xl pointer-events-none animate-pulse delay-700"></div>
+          
+          {/* Top spacer or decorative elements */}
+          <div className="flex items-center space-x-1.5 opacity-40 mt-4">
+            <Sparkles className="w-3.5 h-3.5 text-yellow-400 animate-spin" />
+            <span className="text-[9px] font-black tracking-widest uppercase text-indigo-200">AI Study System</span>
+          </div>
+
+          {/* Central Logo and App Name */}
+          <div className="text-center space-y-6 flex flex-col items-center">
+            {/* Logo Wrapper with Double Rings */}
+            <div className="relative">
+              <div className="absolute -inset-1.5 rounded-3xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 opacity-75 blur-md animate-pulse"></div>
+              <div className="relative w-20 h-20 bg-slate-900 border border-white/10 rounded-3xl flex items-center justify-center shadow-2xl">
+                <GraduationCap className="w-11 h-11 text-indigo-400 animate-bounce" />
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border-2 border-slate-900 animate-ping"></div>
+              </div>
+            </div>
+
+            {/* App Branding */}
+            <div className="space-y-2">
+              <h1 className="text-4xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-100 to-indigo-300 font-display">
+                ASCEND STUDY
+              </h1>
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-[10px] text-indigo-400 font-black tracking-widest uppercase bg-indigo-950/85 px-3.5 py-1 rounded-full border border-indigo-900/60 shadow-inner">
+                  {appLanguage === 'Hindi' ? 'आपका एडवांस्ड एआई स्टडी पार्टनर' : 'Your Advanced AI Study Companion'}
+                </span>
+                <span className="text-[9px] font-medium text-slate-400 tracking-wide mt-1">
+                  {appLanguage === 'Hindi' ? 'सुरक्षित फायरबेस व जेमिनी द्वारा संचालित' : 'Secured with Firebase & Gemini AI'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom loading progress section */}
+          <div className="w-full max-w-[280px] space-y-3 mb-6">
+            {/* Progress percentage & status */}
+            <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider text-slate-400 px-1">
+              <span>{authChecking ? (appLanguage === 'Hindi' ? 'सत्यापन हो रहा है...' : 'Authorizing...') : (appLanguage === 'Hindi' ? 'शुरू हो रहा है...' : 'Booting...')}</span>
+              <span className="text-indigo-400 font-mono">{splashProgress}%</span>
+            </div>
+
+            {/* Animated Loading Bar Container */}
+            <div className="w-full h-2 bg-slate-800/80 rounded-full overflow-hidden p-0.5 border border-white/5 shadow-inner">
+              <div 
+                className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full transition-all duration-100 ease-out shadow-[0_0_12px_rgba(99,102,241,0.5)]"
+                style={{ width: `${splashProgress}%` }}
+              ></div>
+            </div>
+
+            <p className="text-[9px] font-bold text-center text-slate-500 tracking-wide">
+              {appLanguage === 'Hindi' ? 'तैयार किया जा रहा है, कृपया प्रतीक्षा करें' : 'Preparing study environment...'}
+            </p>
           </div>
         </div>
       ) : !user ? (

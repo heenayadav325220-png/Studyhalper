@@ -1420,7 +1420,7 @@ function buildSvgFromDiagramData(data: any, style: string, isPracticeMode: boole
 }
 
 app.post("/api/gemini/diagram", async (req, res) => {
-  const { prompt } = req.body;
+  const { prompt, type } = req.body;
   const promptLower = (prompt || "").toLowerCase();
 
   // Determine design style and practice mode parameters
@@ -1438,6 +1438,39 @@ app.post("/api/gemini/diagram", async (req, res) => {
   const isPracticeMode = promptLower.includes("blank self-test practice") || 
                          promptLower.includes("①") || 
                          promptLower.includes("practice mode");
+
+  // If the user requested a full rich image/illustration, try generating a PNG using the image model first
+  if (type === "image") {
+    try {
+      const ai = getGeminiClient();
+      console.log(`[Gemini Bridge] Generating rich educational illustration for: "${prompt}" using image model.`);
+      const response = await callGeminiWithRetryAndFailover(ai, {
+        model: "gemini-3.1-flash-lite-image",
+        contents: [{ text: `A highly detailed, beautiful, textbook-grade full-color graphic educational diagram or illustration showing: ${prompt}. High-contrast academic illustration, clear markings, rich 3D texture, suitable for scientific learning, solid clean neutral background.` }],
+        config: {
+          imageConfig: {
+            aspectRatio: "1:1"
+          }
+        }
+      });
+
+      let imageUrl = null;
+      if (response.candidates?.[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            imageUrl = `data:image/png;base64,${part.inlineData.data}`;
+            break;
+          }
+        }
+      }
+
+      if (imageUrl) {
+        return res.json({ imageUrl, isSvg: false });
+      }
+    } catch (imageErr: any) {
+      console.warn("[Gemini Bridge] Direct image generation failed, falling back to SVG schema path...", imageErr.message || imageErr);
+    }
+  }
 
   // 1. Primary path: Generate structured JSON data and render beautifully as high-fidelity SVG (Fast & quota-safe!)
   try {
