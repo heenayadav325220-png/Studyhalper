@@ -60,6 +60,56 @@ export default function InteractiveToolkit({
   const [aiThrottled, setAiThrottled] = useState(false);
   const [testThrottled, setTestThrottled] = useState(false);
   const [aiResult, setAiResult] = useState<any>(null);
+
+  // Interactive Mindmap States
+  const [mindmapViewMode, setMindmapViewMode] = useState<'visual' | 'tree'>('visual');
+  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
+  const [nodeExplanation, setNodeExplanation] = useState<{ nodeName: string; explanation: string } | null>(null);
+  const [nodeExplanationLoading, setNodeExplanationLoading] = useState(false);
+
+  useEffect(() => {
+    if (aiTool === 'mindmap' && aiResult && aiResult.children) {
+      const initialExpanded: Record<string, boolean> = {};
+      aiResult.children.forEach((child: any, idx: number) => {
+        initialExpanded[`child-${idx}`] = true;
+      });
+      setExpandedNodes(initialExpanded);
+      setNodeExplanation(null);
+    }
+  }, [aiResult, aiTool]);
+
+  const handleExplainNode = async (nodeName: string) => {
+    if (!nodeName) return;
+    setNodeExplanationLoading(true);
+    setNodeExplanation({ nodeName, explanation: '' });
+    try {
+      const prompt = `Explain the concept or subtopic "${nodeName}" in the context of our study topic "${aiTopic}" for class/grade ${aiGrade} level. Give a 2-sentence simple, clear explanation in ${appLanguage}.`;
+      const response = await getStudyAnswer(prompt, undefined, undefined, appLanguage);
+      setNodeExplanation({ nodeName, explanation: response });
+    } catch (err) {
+      console.error(err);
+      setNodeExplanation({ nodeName, explanation: appLanguage === 'Hindi' ? "स्पष्टीकरण लोड करने में असमर्थ। कृपया पुनः प्रयास करें।" : "Unable to load explanation. Please try again." });
+    } finally {
+      setNodeExplanationLoading(false);
+    }
+  };
+
+  const handleAddNodeNote = async (nodeName: string, explanation: string) => {
+    if (!explanation) return;
+    try {
+      await onAddNote({
+        title: nodeName,
+        content: `### ${nodeName}\n\n${explanation}\n\n*Generated from Mindmap of topic: **${aiTopic}**.*`,
+        subject: aiSubject
+      });
+      alert(appLanguage === 'Hindi' 
+        ? `✅ "${nodeName}" को आपके नोटबुक में सफलतापूर्वक जोड़ दिया गया है!` 
+        : `✅ "${nodeName}" has been successfully added to your Notebook!`);
+    } catch (err) {
+      console.error(err);
+      alert(appLanguage === 'Hindi' ? "नोट सहेजने में विफल।" : "Failed to save note.");
+    }
+  };
   const [pastedContent, setPastedContent] = useState('');
   const [ocrImage, setOcrImage] = useState<string | null>(null);
   const [quotaExceeded, setQuotaExceeded] = useState(isAiQuotaExceeded);
@@ -1172,19 +1222,208 @@ export default function InteractiveToolkit({
 
                           <div className="flex-1 overflow-y-auto max-h-[350px] text-xs leading-relaxed text-slate-700 whitespace-pre-line font-medium p-1">
                             {aiTool === 'mindmap' ? (
-                              <div className="space-y-3 font-mono text-[10px] bg-indigo-950 text-indigo-200 p-4 rounded-2xl shadow-inner">
-                                <span className="font-black text-xs text-white">🌳 Mind Map Tree Structure</span>
-                                <div className="space-y-1">
-                                  <strong>{aiResult.name}</strong>
-                                  {aiResult.children?.map((child: any, i: number) => (
-                                    <div key={i} className="pl-4 border-l border-indigo-700/50 mt-1">
-                                      <span>├── {child.name}</span>
-                                      {child.children?.map((gchild: any, j: number) => (
-                                        <div key={j} className="pl-6 text-indigo-400">├── {gchild.name}</div>
+                              <div className="space-y-4 font-sans">
+                                <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+                                  <div className="flex items-center space-x-1.5">
+                                    <span className="text-sm">🌳</span>
+                                    <span className="font-extrabold text-[11px] text-slate-800 uppercase tracking-wider">
+                                      {appLanguage === 'Hindi' ? 'माइंड मैप विज़ुअलाइज़र' : 'Mind Map Visualizer'}
+                                    </span>
+                                  </div>
+                                  <div className="flex bg-slate-100 p-0.5 rounded-xl text-[9px] font-bold">
+                                    <button 
+                                      onClick={() => setMindmapViewMode('visual')}
+                                      className={`px-2.5 py-1 rounded-lg transition-all ${mindmapViewMode === 'visual' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                    >
+                                      🎨 {appLanguage === 'Hindi' ? 'विज़ुअल मैप' : 'Visual Map'}
+                                    </button>
+                                    <button 
+                                      onClick={() => setMindmapViewMode('tree')}
+                                      className={`px-2.5 py-1 rounded-lg transition-all ${mindmapViewMode === 'tree' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                    >
+                                      🌳 {appLanguage === 'Hindi' ? 'ट्री व्यू' : 'Tree View'}
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {mindmapViewMode === 'visual' ? (
+                                  <div className="space-y-4">
+                                    {/* Central Topic badge */}
+                                    <div className="flex justify-center my-2">
+                                      <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-black text-xs px-5 py-3 rounded-2xl shadow-md border-2 border-indigo-200 text-center relative max-w-xs transform hover:scale-105 transition duration-300">
+                                        <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-yellow-400 text-[8px] font-black uppercase text-indigo-950 px-2 py-0.5 rounded-full shadow-sm tracking-wider whitespace-nowrap">
+                                          {appLanguage === 'Hindi' ? 'मुख्य विषय' : 'Main Topic'}
+                                        </div>
+                                        <span className="block mt-0.5 tracking-wide">{aiResult.name}</span>
+                                      </div>
+                                    </div>
+
+                                    {/* Children lists */}
+                                    <div className="space-y-3">
+                                      {aiResult.children?.map((child: any, idx: number) => {
+                                        const isExpanded = !!expandedNodes[`child-${idx}`];
+                                        const hasChildren = child.children && child.children.length > 0;
+                                        
+                                        return (
+                                          <div key={idx} className="bg-white rounded-2xl border border-indigo-50 shadow-xs overflow-hidden transition-all duration-300">
+                                            <div className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-50/20 to-slate-50/35 border-b border-indigo-50/40">
+                                              <div className="flex items-center space-x-2 flex-1 min-w-0 pr-1">
+                                                <span className="flex items-center justify-center w-5 h-5 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-lg shrink-0">
+                                                  {idx + 1}
+                                                </span>
+                                                <span className="font-extrabold text-xs text-slate-800 leading-tight truncate">
+                                                  {child.name}
+                                                </span>
+                                              </div>
+                                              
+                                              <div className="flex items-center space-x-1.5 shrink-0">
+                                                {hasChildren && (
+                                                  <button 
+                                                    onClick={() => setExpandedNodes(prev => ({ ...prev, [`child-${idx}`]: !isExpanded }))}
+                                                    className="p-1 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-55 transition-all text-[9px] font-bold flex items-center gap-0.5"
+                                                    title={isExpanded ? "Collapse" : "Expand"}
+                                                  >
+                                                    <span className="uppercase text-[8px]">
+                                                      {isExpanded 
+                                                        ? (appLanguage === 'Hindi' ? 'छिपाएं' : 'Hide') 
+                                                        : `${appLanguage === 'Hindi' ? 'देखें' : 'Show'} (${child.children.length})`
+                                                      }
+                                                    </span>
+                                                    <ChevronRight size={11} className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                                  </button>
+                                                )}
+
+                                                <button 
+                                                  onClick={() => handleExplainNode(child.name)}
+                                                  className="px-2 py-0.5 text-indigo-600 hover:bg-indigo-50 border border-indigo-100 bg-indigo-50/20 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all"
+                                                >
+                                                  💡 {appLanguage === 'Hindi' ? 'समझें' : 'Explain'}
+                                                </button>
+
+                                                <button 
+                                                  onClick={() => speakText(child.name)}
+                                                  className="p-1 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-50 transition-all"
+                                                  title="Speak text"
+                                                >
+                                                  <Volume2 size={12} />
+                                                </button>
+                                              </div>
+                                            </div>
+
+                                            {isExpanded && hasChildren && (
+                                              <div className="p-2.5 bg-slate-50/40 space-y-2 border-t border-slate-100/40">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                  {child.children.map((gchild: any, gidx: number) => (
+                                                    <div 
+                                                      key={gidx} 
+                                                      className="bg-white border border-slate-150 p-2 rounded-xl shadow-2xs hover:border-indigo-100 transition-all flex items-center justify-between"
+                                                    >
+                                                      <div className="flex items-center space-x-1.5 flex-1 min-w-0 pr-1.5">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0 animate-pulse"></span>
+                                                        <span className="text-[10px] font-bold text-slate-700 truncate leading-tight">
+                                                          {gchild.name}
+                                                        </span>
+                                                      </div>
+
+                                                      <div className="flex items-center space-x-1 shrink-0">
+                                                        <button 
+                                                          onClick={() => handleExplainNode(gchild.name)}
+                                                          className="px-1.5 py-0.5 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 text-slate-500 rounded-lg text-[7px] font-black uppercase transition-all"
+                                                          title="Explain this detail"
+                                                        >
+                                                          AI
+                                                        </button>
+                                                        
+                                                        <button 
+                                                          onClick={() => speakText(gchild.name)}
+                                                          className="p-0.5 text-slate-300 hover:text-indigo-600 transition-all"
+                                                        >
+                                                          <Volume2 size={10} />
+                                                        </button>
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3 font-mono text-[10px] bg-indigo-950 text-indigo-200 p-4 rounded-2xl shadow-inner">
+                                    <span className="font-black text-xs text-white">🌳 Mind Map Tree Structure</span>
+                                    <div className="space-y-1">
+                                      <strong>{aiResult.name}</strong>
+                                      {aiResult.children?.map((child: any, i: number) => (
+                                        <div key={i} className="pl-4 border-l border-indigo-700/50 mt-1">
+                                          <span>├── {child.name}</span>
+                                          {child.children?.map((gchild: any, j: number) => (
+                                            <div key={j} className="pl-6 text-indigo-400">├── {gchild.name}</div>
+                                          ))}
+                                        </div>
                                       ))}
                                     </div>
-                                  ))}
-                                </div>
+                                  </div>
+                                )}
+
+                                {/* Interactive Concept Explanation Card */}
+                                {nodeExplanation && (
+                                  <div className="mt-4 p-4 bg-gradient-to-br from-indigo-950 to-indigo-900 text-white rounded-3xl shadow-xl space-y-3 border border-indigo-800 animate-fadeIn relative overflow-hidden">
+                                    <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-indigo-500/10 rounded-full blur-xl pointer-events-none"></div>
+                                    
+                                    <div className="flex justify-between items-center pb-2 border-b border-indigo-800/60">
+                                      <div className="flex items-center space-x-1.5">
+                                        <Sparkles className="w-4 h-4 text-yellow-300 stroke-[2] animate-bounce" />
+                                        <span className="text-[9px] font-black uppercase tracking-wider text-indigo-300">
+                                          {appLanguage === 'Hindi' ? 'एआई ट्यूटर स्पष्टीकरण' : 'AI Tutor Explanation'}
+                                        </span>
+                                      </div>
+                                      <button 
+                                        onClick={() => setNodeExplanation(null)}
+                                        className="text-indigo-400 hover:text-white p-1 rounded-lg transition-all"
+                                      >
+                                        <X size={14} />
+                                      </button>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                      <h4 className="text-xs font-black text-white flex items-center gap-1.5">
+                                        💡 {nodeExplanation.nodeName}
+                                      </h4>
+                                      
+                                      {nodeExplanationLoading ? (
+                                        <div className="flex items-center space-x-2 py-3 text-indigo-300 text-[11px] font-bold">
+                                          <span className="w-2 h-2 rounded-full bg-yellow-400 animate-ping"></span>
+                                          <span>{appLanguage === 'Hindi' ? 'एआई ट्यूटर विचार कर रहा है...' : 'AI Tutor is thinking...'}</span>
+                                        </div>
+                                      ) : (
+                                        <p className="text-[11px] leading-relaxed text-indigo-100 font-medium">
+                                          {nodeExplanation.explanation}
+                                        </p>
+                                      )}
+                                    </div>
+
+                                    {!nodeExplanationLoading && nodeExplanation.explanation && (
+                                      <div className="flex justify-between items-center pt-2 border-t border-indigo-800/40">
+                                        <button 
+                                          onClick={() => speakText(nodeExplanation.explanation)}
+                                          className="px-3 py-1.5 bg-indigo-800 hover:bg-indigo-700 text-indigo-200 hover:text-white rounded-xl text-[10px] font-extrabold uppercase flex items-center gap-1.5 transition-all"
+                                        >
+                                          <Volume2 size={12} /> {appLanguage === 'Hindi' ? 'सुनें' : 'Listen'}
+                                        </button>
+
+                                        <button 
+                                          onClick={() => handleAddNodeNote(nodeExplanation.nodeName, nodeExplanation.explanation)}
+                                          className="px-4 py-1.5 bg-yellow-400 hover:bg-yellow-300 text-indigo-950 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md shadow-yellow-500/10 active:scale-95"
+                                        >
+                                          <Plus size={12} strokeWidth={2.5} /> {appLanguage === 'Hindi' ? 'नोटबुक' : 'Add to Note'}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               aiResult.content || aiResult.summary || aiResult.explanation || aiResult.paperText || aiResult.text || (aiResult.summary ? "See structured summary cards." : JSON.stringify(aiResult, null, 2))
