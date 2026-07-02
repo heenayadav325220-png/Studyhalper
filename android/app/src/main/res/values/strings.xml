@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ascend Study</string>
+    <string name="title_activity_main">Ascend Study</string>
+    <string name="app_description">A Study Helper Assistant for Students</string>
+</resources>
