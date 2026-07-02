@@ -772,44 +772,103 @@ function generateGuaranteedLocalSvg(prompt: string): string {
   }
 
   // General concept map/flowchart fallback
-  const cleanPrompt = (prompt || "Core Concept Map").substring(0, 30).replace(/["<>]/g, "");
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
-    <rect width="600" height="450" fill="#f8fafc" rx="16"/>
-    
-    <!-- Central Topic box -->
-    <rect x="150" y="180" width="300" height="80" rx="12" fill="#e0e7ff" stroke="#4f46e5" stroke-width="3" />
-    <text x="300" y="220" font-family="system-ui, sans-serif" font-size="14" font-weight="900" fill="#312e81" text-anchor="middle">${cleanPrompt.toUpperCase()}</text>
-    <text x="300" y="240" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#4f46e5" text-anchor="middle">Core Study Topic</text>
+  const cleanTitle = (prompt.replace(/[#*`_-]/g, '').trim().substring(0, 35) || "Custom Concept");
+  const normalizedLower = cleanTitle.toLowerCase();
+  
+  const nodes = [
+    { id: "1", name: "Core Structure", desc: `Basic structural components of ${cleanTitle}` },
+    { id: "2", name: "Primary Function", desc: `The active biological, chemical or physical role` },
+    { id: "3", name: "System Mechanism", desc: `How it interacts with surrounding processes` },
+    { id: "4", name: "Practical Application", desc: `Real-world experiment or standard exam focus` }
+  ];
 
-    <!-- Node 1 (Top Left) -->
-    <rect x="50" y="50" width="150" height="60" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
-    <text x="125" y="85" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#065f46" text-anchor="middle">1. Core Concept</text>
-    <path d="M 125 110 L 220 180" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+  if (normalizedLower.includes("photosynthesis")) {
+    nodes[0] = { id: "1", name: "Light Absorption", desc: "Chlorophyll absorbs red/blue light energy" };
+    nodes[1] = { id: "2", name: "Water Splitting", desc: "Photolysis of H2O releases oxygen gas" };
+    nodes[2] = { id: "3", name: "Carbon Fixation", desc: "CO2 is captured in the Calvin cycle" };
+    nodes[3] = { id: "4", name: "Glucose Synthesis", desc: "High-energy sugars stored as starch" };
+  } else if (normalizedLower.includes("respiration")) {
+    nodes[0] = { id: "1", name: "Glycolysis", desc: "Glucose split into pyruvate in cytosol" };
+    nodes[1] = { id: "2", name: "Krebs Cycle", desc: "Acetyl-CoA oxidized, releasing CO2" };
+    nodes[2] = { id: "3", name: "Electron Transport", desc: "Proton gradient drives ATP synthesis" };
+    nodes[3] = { id: "4", name: "Energy Output", desc: "Cells harvest approx 36 ATP molecules" };
+  } else if (normalizedLower.includes("atom") || normalizedLower.includes("element") || normalizedLower.includes("structure")) {
+    nodes[0] = { id: "1", name: "Protons & Neutrons", desc: "Heavy subatomic particles inside nucleus" };
+    nodes[1] = { id: "2", name: "Electron Orbitals", desc: "Negative charge clouds orbiting shell" };
+    nodes[2] = { id: "3", name: "Valence Shell", desc: "Outer electrons determining bonding" };
+    nodes[3] = { id: "4", name: "Atomic Mass", desc: "Sum of protons/neutrons in nucleus" };
+  } else if (normalizedLower.includes("brain") || normalizedLower.includes("nervous")) {
+    nodes[0] = { id: "1", name: "Cerebrum", desc: "Handles conscious thought and memory" };
+    nodes[1] = { id: "2", name: "Cerebellum", desc: "Coordinates balance and posture" };
+    nodes[2] = { id: "3", name: "Brain Stem", desc: "Controls autonomic heart rate & breath" };
+    nodes[3] = { id: "4", name: "Neural Pathways", desc: "Transmits impulses via spinal cord" };
+  } else if (normalizedLower.includes("volcano") || normalizedLower.includes("earth") || normalizedLower.includes("geography")) {
+    nodes[0] = { id: "1", name: "Magma Chamber", desc: "Deep reservoir of molten rock under crust" };
+    nodes[1] = { id: "2", name: "Conduit Vent", desc: "Pipe-like shaft carrying lava upwards" };
+    nodes[2] = { id: "3", name: "Crater Opening", desc: "Bowl-shaped depression at summit" };
+    nodes[3] = { id: "4", name: "Eruption Column", desc: "Searing ash cloud and molten lava flow" };
+  } else if (normalizedLower.includes("digestive") || normalizedLower.includes("food") || normalizedLower.includes("stomach")) {
+    nodes[0] = { id: "1", name: "Ingestion", desc: "Food broken down by teeth & salivary enzymes" };
+    nodes[1] = { id: "2", name: "Digestion", desc: "Acidic breakdown of proteins in stomach" };
+    nodes[2] = { id: "3", name: "Absorption", desc: "Nutrient uptake through small intestine villi" };
+    nodes[3] = { id: "4", name: "Elimination", desc: "Removal of solid waste via large intestine" };
+  }
 
-    <!-- Node 2 (Top Right) -->
-    <rect x="400" y="50" width="150" height="60" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
-    <text x="475" y="85" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#1e40af" text-anchor="middle">2. Key Structure</text>
-    <path d="M 475 110 L 380 180" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
-
-    <!-- Node 3 (Bottom Left) -->
-    <rect x="50" y="340" width="150" height="60" rx="10" fill="#fff7ed" stroke="#f97316" stroke-width="2"/>
-    <text x="125" y="375" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#7c2d12" text-anchor="middle">3. Process / Cycle</text>
-    <path d="M 220 260 L 125 340" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
-
-    <!-- Node 4 (Bottom Right) -->
-    <rect x="400" y="340" width="150" height="60" rx="10" fill="#fdf2f8" stroke="#ec4899" stroke-width="2"/>
-    <text x="475" y="375" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#831843" text-anchor="middle">4. Exam Application</text>
-    <path d="M 380 260 L 475 340" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
-
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 520" width="100%" height="100%">
     <defs>
-      <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-        <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+      <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+        <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.05" />
+      </filter>
+      <marker id="arrow-marker" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#6366f1"/>
       </marker>
+      <linearGradient id="central-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#e0e7ff"/>
+        <stop offset="100%" stop-color="#e0f2fe"/>
+      </linearGradient>
     </defs>
 
-    <!-- Title -->
-    <rect x="15" y="15" width="220" height="30" fill="white" rx="8" stroke="#cbd5e1" stroke-width="1"/>
-    <text x="25" y="35" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#475569">CONCEPT DIAGRAM</text>
+    <!-- Canvas Background -->
+    <rect width="100%" height="100%" fill="#f8fafc" rx="16"/>
+    
+    <!-- Connection lines -->
+    <path d="M 180 140 L 290 220" fill="none" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#arrow-marker)"/>
+    <path d="M 570 140 L 460 220" fill="none" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#arrow-marker)"/>
+    <path d="M 375 300 L 180 380" fill="none" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#arrow-marker)"/>
+    <path d="M 375 300 L 570 380" fill="none" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#arrow-marker)"/>
+
+    <!-- Central Topic card -->
+    <rect x="225" y="210" width="300" height="100" rx="20" fill="url(#central-bg)" stroke="#4f46e5" stroke-width="3.5" filter="url(#shadow)" />
+    <text x="375" y="255" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="900" fill="#1e1b4b" text-anchor="middle" letter-spacing="-0.5px">${cleanTitle.toUpperCase()}</text>
+    <text x="375" y="278" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="extrabold" fill="#4f46e5" text-anchor="middle" letter-spacing="1.5px">DYNAMIC ACADEMIC STUDY DIAGRAM</text>
+
+    <!-- Node 1 (Top Left) -->
+    <rect x="30" y="80" width="200" height="76" rx="14" fill="#f0fdf4" stroke="#22c55e" stroke-width="2" filter="url(#shadow)"/>
+    <text x="130" y="110" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="900" fill="#14532d" text-anchor="middle">${nodes[0].name}</text>
+    <text x="130" y="128" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="#166534" text-anchor="middle">${nodes[0].desc}</text>
+
+    <!-- Node 2 (Top Right) -->
+    <rect x="520" y="80" width="200" height="76" rx="14" fill="#eff6ff" stroke="#3b82f6" stroke-width="2" filter="url(#shadow)"/>
+    <text x="620" y="110" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="900" fill="#1e3a8a" text-anchor="middle">${nodes[1].name}</text>
+    <text x="620" y="128" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="#1e40af" text-anchor="middle">${nodes[1].desc}</text>
+
+    <!-- Node 3 (Bottom Left) -->
+    <rect x="30" y="360" width="200" height="76" rx="14" fill="#fff7ed" stroke="#f97316" stroke-width="2" filter="url(#shadow)"/>
+    <text x="130" y="390" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="900" fill="#7c2d12" text-anchor="middle">${nodes[2].name}</text>
+    <text x="130" y="408" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="#9a3412" text-anchor="middle">${nodes[2].desc}</text>
+
+    <!-- Node 4 (Bottom Right) -->
+    <rect x="520" y="360" width="200" height="76" rx="14" fill="#fdf2f8" stroke="#ec4899" stroke-width="2" filter="url(#shadow)"/>
+    <text x="620" y="390" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="900" fill="#831843" text-anchor="middle">${nodes[3].name}</text>
+    <text x="620" y="408" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="#9d174d" text-anchor="middle">${nodes[3].desc}</text>
+
+    <!-- Title Card -->
+    <g id="title-card">
+      <rect x="25" y="22" width="700" height="42" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" rx="10" filter="url(#shadow)"/>
+      <text x="45" y="48" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="950" fill="#0f172a" letter-spacing="-0.5px">${cleanTitle.toUpperCase()}</text>
+      <rect x="585" y="31" width="125" height="24" rx="6" fill="#f1f5f9" />
+      <text x="647" y="46" font-family="system-ui, sans-serif" font-size="8.5" font-weight="extrabold" fill="#475569" text-anchor="middle">🛡️ OFFLINE SAFE</text>
+    </g>
   </svg>`;
 }
 

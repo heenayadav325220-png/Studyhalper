@@ -1,22 +1,15 @@
 {
-  "name": "studyhelper",
+  "name": "react-example",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.0.0",
   "type": "module",
-  "description": "A study helper assistant for students",
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit",
-    "apk:debug": "npm run build && npx cap sync android && cd android && ./gradlew assembleDebug && cd ..",
-    "apk:release": "npm run build && npx cap sync android && cd android && ./gradlew assembleRelease && cd ..",
-    "apk:build-script": "chmod +x build-apk.sh && ./build-apk.sh",
-    "capacitor:add": "npx cap add android",
-    "capacitor:sync": "npx cap sync android",
-    "capacitor:open": "npx cap open android"
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@capacitor/core": "^8.4.0",

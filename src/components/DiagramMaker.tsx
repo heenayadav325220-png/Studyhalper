@@ -19,7 +19,8 @@ import {
   PlusCircle,
   FileImage,
   Layers,
-  Sparkle
+  Sparkle,
+  MessageSquare
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { saveUserDiagram, getUserDiagrams, deleteUserDiagram } from '../services/firebaseDb';
@@ -44,6 +45,7 @@ interface Props {
   };
   setBackgroundDiagram?: React.Dispatch<React.SetStateAction<any>>;
   onGenerateDiagram?: (prompt: string, title: string, subject: string, style: string, practiceMode: boolean) => Promise<void>;
+  onDiscussWithTutor?: (title: string) => void;
 }
 
 interface SavedDiagram {
@@ -78,7 +80,8 @@ export function DiagramMaker({
   isTagMode,
   backgroundDiagram,
   setBackgroundDiagram,
-  onGenerateDiagram
+  onGenerateDiagram,
+  onDiscussWithTutor
 }: Props) {
   // Navigation: 'create' | 'canvas' | 'history'
   const [subTab, setSubTab] = useState<'create' | 'canvas' | 'history'>('create');
@@ -394,25 +397,61 @@ export function DiagramMaker({
             
             {/* Generating Loading State card */}
             {isGenerating && (
-              <div className="bg-indigo-600 text-white p-5 rounded-3xl shadow-lg space-y-4 relative overflow-hidden border border-indigo-500 animate-pulse">
-                {/* background graphic sparkles */}
-                <div className="absolute top-2 right-2 opacity-15">
-                  <Sparkle className="w-16 h-16 animate-spin" style={{ animationDuration: '8s' }} />
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="p-2.5 bg-white/10 rounded-2xl shrink-0">
-                    <Loader2 className="w-5 h-5 animate-spin" />
+              <div className="bg-slate-900 border border-slate-800 text-white p-6 rounded-3xl shadow-xl space-y-4 relative overflow-hidden">
+                {/* Glowing background radial blurs */}
+                <div className="absolute -top-12 -right-12 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl animate-pulse" />
+                <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-violet-500/10 rounded-full blur-2xl animate-pulse" />
+                
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl shrink-0 text-indigo-400 relative">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                    <Sparkles className="w-3.5 h-3.5 absolute -top-1 -right-1 text-yellow-450 animate-bounce" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-xs font-black uppercase tracking-wider text-indigo-150">Active Background Rendering</h3>
-                    <p className="text-sm font-extrabold truncate mt-0.5">{localTitle || "Drafting Custom Blueprint"}</p>
-                    <p className="text-[10px] text-white/80 mt-1 font-bold italic">"{currentStep || 'Initializing design coordinate maps...'}"</p>
+                    <div className="flex items-center gap-2">
+                      <span className="bg-indigo-500/15 text-indigo-400 text-[8px] font-black tracking-widest px-2 py-0.5 rounded-md uppercase">
+                        Active Compiler
+                      </span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping" />
+                    </div>
+                    <p className="text-sm font-black truncate text-white mt-1.5 leading-none">{localTitle || backgroundDiagram?.title || "Drafting Academic Model"}</p>
+                    <p className="text-[10px] text-slate-400 font-extrabold uppercase mt-1">Style: <span className="text-indigo-300">{(selectedStyle || backgroundDiagram?.style || "textbook").toUpperCase()}</span></p>
                   </div>
                 </div>
-                <div className="h-1 bg-white/20 rounded-full overflow-hidden">
-                  <div className="h-full bg-white transition-all duration-300 w-2/3" />
+
+                {/* Simulated compiling grid */}
+                <div className="bg-slate-950/80 border border-slate-850 p-3 rounded-2xl font-mono text-[9px] text-slate-400 space-y-1.5 select-none shadow-inner">
+                  <div className="flex justify-between border-b border-slate-900 pb-1 shrink-0">
+                    <span className="text-slate-500">GRID RENDERING CONSOLE</span>
+                    <span className="text-indigo-400 font-bold">LIVE</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="text-slate-600">&gt;&gt;</span>
+                    <span className="text-slate-300">Mapping visual nodes and spatial layout...</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-600">&gt;&gt;</span>
+                    <span className="text-indigo-400 font-bold italic">"{currentStep || 'Initializing design coordinate maps...'}"</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-600">&gt;&gt;</span>
+                    <span className="text-emerald-400">Compiling high-contrast textbook vectors...</span>
+                  </div>
                 </div>
-                <p className="text-[9px] text-indigo-200 leading-normal font-semibold">You can safely browse other tabs or log out. The illustration will keep compiling in the server background and save automatically to your diagrams Vault!</p>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center text-[9px] font-black text-slate-400 uppercase tracking-wider">
+                    <span>Rendering Progress</span>
+                    <span className="text-indigo-400 animate-pulse">Running</span>
+                  </div>
+                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden p-[2px] border border-slate-750">
+                    <div className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full animate-pulse transition-all duration-300 w-3/4" />
+                  </div>
+                </div>
+                
+                <p className="text-[9px] text-slate-450 leading-normal font-semibold">
+                  You can safely browse other tabs. The illustration compiles securely in the server background and will save automatically to your diagrams Vault!
+                </p>
               </div>
             )}
 
@@ -556,7 +595,16 @@ export function DiagramMaker({
                   <span className="font-extrabold text-[10px] text-slate-800 truncate max-w-[150px]">{activeDiagramTitle}</span>
                 </div>
                 
-                <div className="flex items-center gap-1">
+                 <div className="flex items-center gap-1">
+                  {onDiscussWithTutor && (
+                    <button
+                      onClick={() => onDiscussWithTutor(activeDiagramTitle || "Study Diagram")}
+                      className="p-1 px-2 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-750 text-[8px] font-black uppercase flex items-center gap-1 cursor-pointer transition shadow-2xs"
+                    >
+                      <MessageSquare className="w-2.5 h-2.5" />
+                      <span>Discuss 💬</span>
+                    </button>
+                  )}
                   <button
                     onClick={handleSaveToProfile}
                     className={`p-1 px-2 rounded-lg border transition text-[8px] font-black uppercase flex items-center gap-1 cursor-pointer ${saveSuccess ? 'bg-emerald-50 border-emerald-300 text-emerald-600' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'}`}

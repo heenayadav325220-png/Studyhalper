@@ -4,7 +4,7 @@ import {
   BookOpen, Search, Volume2, VolumeX, Play, Pause, RotateCcw, 
   Download, Upload, CheckCircle2, Circle, Plus, Trash2, X, Users, 
   Award, Heart, MessageSquare, ArrowLeft, Maximize2, Mic, Camera, FilePlus, ChevronRight,
-  Menu, Settings, ChevronLeft
+  Menu, Settings, ChevronLeft, Paintbrush
 } from 'lucide-react';
 import { Subject, Note, Progress } from '../types';
 import { 
@@ -32,6 +32,7 @@ interface InteractiveToolkitProps {
   notes: Note[];
   onAddNote: (note: { title: string; content: string; subject: Subject }) => Promise<void>;
   onAddProgress: (score: number, total: number, subject: Subject) => Promise<void>;
+  onOpenDiagramMaker?: (prompt: string, title: string, subject: Subject) => void;
 }
 
 export default function InteractiveToolkit({ 
@@ -41,7 +42,8 @@ export default function InteractiveToolkit({
   user, 
   notes, 
   onAddNote, 
-  onAddProgress 
+  onAddProgress,
+  onOpenDiagramMaker
 }: InteractiveToolkitProps) {
   // Navigation
   const [activeSubTab, setActiveSubTab] = useState<'study' | 'productivity' | 'focus' | 'vocab_calc' | 'utilities'>('study');
@@ -921,6 +923,33 @@ export default function InteractiveToolkit({
                   </button>
                 );
               })}
+
+              {/* Connected Diagram Lab Link */}
+              <button
+                onClick={() => {
+                  onClose();
+                  if (onOpenDiagramMaker) {
+                    onOpenDiagramMaker("", "", "Science");
+                  }
+                }}
+                className={`w-full py-2.5 px-3 rounded-xl transition-all duration-200 flex items-center gap-3 font-black text-xs group relative border border-dashed text-indigo-600 border-indigo-200 hover:bg-indigo-50/50 mt-2
+                  ${isSidebarCollapsed ? 'md:justify-center md:px-0' : ''}
+                `}
+                title="Open Diagram Lab"
+              >
+                <span className="text-indigo-600">
+                  <Paintbrush size={15} />
+                </span>
+                <span className={`transition-all duration-300 ${isSidebarCollapsed ? 'md:hidden' : 'block'}`}>
+                  Open Diagram Lab 🎨
+                </span>
+                
+                {isSidebarCollapsed && (
+                  <div className="absolute left-full ml-3 px-2 py-1 bg-slate-900 text-white text-[9px] font-black rounded-md opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap z-50 hidden md:block shadow-md">
+                    Diagram Lab
+                  </div>
+                )}
+              </button>
             </div>
 
             {/* Toolkit Daily Usage Tracker card */}
@@ -1115,10 +1144,23 @@ export default function InteractiveToolkit({
                               </button>
                               <button 
                                 onClick={handleSaveToNotebookTab} 
-                                className="text-[10px] bg-white text-slate-700 font-bold px-2 py-1 rounded-lg border hover:bg-slate-50"
+                                className="text-[10px] bg-white text-slate-700 font-bold px-2 py-1 rounded-lg border hover:bg-slate-50 transition"
                               >
                                 Save Note 📝
                               </button>
+                              {onOpenDiagramMaker && (
+                                <button 
+                                  onClick={() => {
+                                    const title = aiResult.title || aiTopic || "Custom Concept";
+                                    const prompt = `A detailed, high-contrast textbook-grade study diagram of ${title} with academic labeling pointers.`;
+                                    onOpenDiagramMaker(prompt, title, aiSubject);
+                                  }} 
+                                  className="text-[10px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-250 font-black px-2 py-1 rounded-lg transition flex items-center gap-1.5"
+                                >
+                                  <Paintbrush size={11} />
+                                  <span>Diagram Lab 🎨</span>
+                                </button>
+                              )}
                             </div>
                           </div>
                           
