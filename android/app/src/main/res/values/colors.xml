@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App Colors - Ascend Study Theme -->
+    <color name="colorPrimary">#001a4d</color>
+    <color name="colorPrimaryDark">#001335</color>
+    <color name="colorAccent">#0066ff</color>
+    <color name="colorAccentLight">#6699ff</color>
+    
+    <!-- Splash Screen -->
+    <color name="splashScreenBackgroundColor">#001a4d</color>
+    <color name="splashScreenSpinnerColor">#0066ff</color>
+</resources>
