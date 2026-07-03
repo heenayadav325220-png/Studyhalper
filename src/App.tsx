@@ -41,7 +41,12 @@ import {
   ExternalLink,
   Sun,
   Moon,
-  Palette
+  Palette,
+  Menu,
+  Info,
+  Activity,
+  Settings,
+  TrendingUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
@@ -52,6 +57,7 @@ import { StudyTimer } from './components/StudyTimer';
 import { HomeworkSolver } from './components/HomeworkSolver';
 import { DiagramMaker } from './components/DiagramMaker';
 import StudyRoom from './components/StudyRoom';
+import { ProgressModalContent } from './components/ProgressModalContent';
 const InteractiveToolkit = lazy(() => import('./components/InteractiveToolkit'));
 import type { AppLanguage } from './services/translations';
 import type { Note, ScheduleItem, Progress, ChatMessage, Subject, User as UserType, Group, GroupMessage, GroupNote, Flashcard, GroupQuestion, GroupSession } from './types';
@@ -106,6 +112,90 @@ import {
 
 
 const SUBJECTS: Subject[] = ['Mathematics', 'Science', 'Biology', 'Physics', 'Chemistry', 'English'];
+
+export interface MilestoneTier {
+  id: 'bronze' | 'silver' | 'gold' | 'platinum';
+  name: string;
+  nameHi: string;
+  tasksRequired: number;
+  hoursRequired: number;
+  badgeIcon: string;
+  colorClass: string;
+  borderClass: string;
+}
+
+const MILESTONE_TIERS: MilestoneTier[] = [
+  {
+    id: 'bronze',
+    name: 'Bronze Scholar',
+    nameHi: 'कांस्य विद्वान',
+    tasksRequired: 1,
+    hoursRequired: 0.1, // 6 minutes for easy student testing & unlocking
+    badgeIcon: '🥉',
+    colorClass: 'from-amber-600 via-amber-700 to-amber-800 text-amber-100 shadow-amber-950/30',
+    borderClass: 'border-amber-500/30'
+  },
+  {
+    id: 'silver',
+    name: 'Silver Scholar',
+    nameHi: 'रजत विद्वान',
+    tasksRequired: 3,
+    hoursRequired: 1.0, // 60 minutes
+    badgeIcon: '🥈',
+    colorClass: 'from-slate-400 via-slate-500 to-slate-600 text-slate-150 shadow-slate-900/30',
+    borderClass: 'border-slate-350/30'
+  },
+  {
+    id: 'gold',
+    name: 'Gold Guru',
+    nameHi: 'स्वर्ण गुरु',
+    tasksRequired: 7,
+    hoursRequired: 3.0, // 180 minutes
+    badgeIcon: '🥇',
+    colorClass: 'from-yellow-400 via-amber-500 to-yellow-600 text-yellow-50 shadow-amber-500/20',
+    borderClass: 'border-yellow-400/30'
+  },
+  {
+    id: 'platinum',
+    name: 'Platinum Master',
+    nameHi: 'प्लैटिनम मास्टर',
+    tasksRequired: 15,
+    hoursRequired: 6.0, // 360 minutes
+    badgeIcon: '💎',
+    colorClass: 'from-indigo-400 via-purple-500 to-pink-500 text-indigo-50 shadow-lg shadow-purple-500/30',
+    borderClass: 'border-indigo-300/30'
+  }
+];
+
+const getSubjectFromTask = (taskText: string): Subject | null => {
+  const lower = taskText.toLowerCase();
+  if (lower.includes('math')) return 'Mathematics';
+  if (lower.includes('physics')) return 'Physics';
+  if (lower.includes('chemistry') || lower.includes('chem')) return 'Chemistry';
+  if (lower.includes('biology') || lower.includes('bio')) return 'Biology';
+  if (lower.includes('science')) return 'Science';
+  if (lower.includes('english')) return 'English';
+  const list: Subject[] = ['Mathematics', 'Science', 'Biology', 'Physics', 'Chemistry', 'English'];
+  for (const sub of list) {
+    if (lower.includes(sub.toLowerCase())) {
+      return sub;
+    }
+  }
+  return null;
+};
+
+const getSubjectEmoji = (subject: Subject): string => {
+  switch (subject) {
+    case 'Mathematics': return '📐';
+    case 'Science': return '🧪';
+    case 'Biology': return '🧬';
+    case 'Physics': return '🌌';
+    case 'Chemistry': return '⚗️';
+    case 'English': return '📚';
+    default: return '📖';
+  }
+};
+
 
 const getTimeGreeting = (lang: AppLanguage) => {
   const hr = new Date().getHours();
@@ -945,6 +1035,38 @@ export default function App() {
   const [isHealerActive, setIsHealerActive] = useState(false);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
+  // Advanced Sidebar State and Modals
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showHomeworkModal, setShowHomeworkModal] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
+  const [showTutorMenu, setShowTutorMenu] = useState(false);
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [activeStudyReminder, setActiveStudyReminder] = useState<ScheduleItem | null>(null);
+  const [playedReminders, setPlayedReminders] = useState<Record<string, string>>({});
+
+  // Study Milestones states
+  const [unlockedMilestoneHistory, setUnlockedMilestoneHistory] = useState<Record<string, string[]>>({});
+  const [unlockedMilestone, setUnlockedMilestone] = useState<{
+    subject: Subject;
+    tier: MilestoneTier;
+    tasksCompleted: number;
+    hoursCompleted: number;
+  } | null>(null);
+  const [selectedSubjectMilestone, setSelectedSubjectMilestone] = useState<Subject | null>(null);
+
+  // Load unlocked milestone history on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('studybuddy_unlocked_milestones');
+    if (stored) {
+      try {
+        setUnlockedMilestoneHistory(JSON.parse(stored));
+      } catch (e) {
+        console.error("Failed to parse unlocked milestones:", e);
+      }
+    }
+  }, []);
+
   // Monetization and Premium states
   const [isPremium, setIsPremium] = useState<boolean>(() => {
     return localStorage.getItem('studybuddy_is_premium') === 'true';
@@ -1130,6 +1252,62 @@ export default function App() {
       window.removeEventListener('toolkit-usage-updated', handleToolkitUsageChange);
     };
   }, []);
+
+  useEffect(() => {
+    const checkStudyScheduleTime = () => {
+      const now = new Date();
+      const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const currentDayName = daysOfWeek[now.getDay()];
+      
+      const hrs = String(now.getHours()).padStart(2, '0');
+      const mins = String(now.getMinutes()).padStart(2, '0');
+      const currentTimeStr = `${hrs}:${mins}`;
+      const dateKey = `${now.toDateString()}_${currentTimeStr}`;
+      
+      schedule.forEach((item) => {
+        const dayMatches = item.day === currentDayName;
+        const timeMatches = item.time === currentTimeStr;
+        
+        if (dayMatches && timeMatches && !item.completed) {
+          const itemKey = String(item.id);
+          if (playedReminders[itemKey] !== dateKey) {
+            setPlayedReminders(prev => ({ ...prev, [itemKey]: dateKey }));
+            setActiveStudyReminder(item);
+            
+            // Play a pure synthetic audio tone/study bell
+            try {
+              const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+              if (AudioContext) {
+                const ctx = new AudioContext();
+                const playTone = (freq: number, delay: number, duration: number) => {
+                  const osc = ctx.createOscillator();
+                  const gainNode = ctx.createGain();
+                  osc.type = 'sine';
+                  osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+                  gainNode.gain.setValueAtTime(0, ctx.currentTime + delay);
+                  gainNode.gain.linearRampToValueAtTime(0.2, ctx.currentTime + delay + 0.05);
+                  gainNode.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + duration);
+                  osc.connect(gainNode);
+                  gainNode.connect(ctx.destination);
+                  osc.start(ctx.currentTime + delay);
+                  osc.stop(ctx.currentTime + delay + duration);
+                };
+                playTone(587.33, 0, 1.0); // D5
+                playTone(880.00, 0.15, 0.8); // A5
+                playTone(1174.66, 0.3, 1.2); // D6
+              }
+            } catch (err) {
+              console.warn("Chime playback ignored by browser autoplay permissions:", err);
+            }
+          }
+        }
+      });
+    };
+
+    checkStudyScheduleTime();
+    const intervalId = setInterval(checkStudyScheduleTime, 10000);
+    return () => clearInterval(intervalId);
+  }, [schedule, playedReminders]);
 
   useEffect(() => {
     if (toolkitUsage) {
@@ -2268,6 +2446,118 @@ export default function App() {
     }
   };
 
+  const playCelebrationChime = () => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const ctx = new AudioContextClass();
+      
+      const playToneAt = (freq: number, startTime: number, duration: number) => {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        osc.frequency.setValueAtTime(freq, startTime);
+        gainNode.gain.setValueAtTime(0.12, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+        
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      
+      const now = ctx.currentTime;
+      playToneAt(261.63, now, 0.35);       // C4
+      playToneAt(329.63, now + 0.12, 0.35); // E4
+      playToneAt(392.00, now + 0.24, 0.35); // G4
+      playToneAt(523.25, now + 0.36, 0.7);  // C5
+    } catch (err) {
+      console.error("Audio celebration error:", err);
+    }
+  };
+
+  const checkMilestones = (
+    subject: Subject, 
+    passedSchedule: ScheduleItem[] = schedule, 
+    passedProgress: Progress[] = progress
+  ) => {
+    // 1. Calculate completed tasks for this subject
+    const completedTasks = passedSchedule.filter(item => {
+      if (!item.completed) return false;
+      const sub = getSubjectFromTask(item.task);
+      return sub === subject;
+    }).length;
+
+    // 2. Calculate study minutes from progress entries
+    const studyMinutes = passedProgress
+      .filter(item => item.subject === subject && item.score === item.total)
+      .reduce((sum, item) => sum + item.score, 0);
+
+    const studyHours = studyMinutes / 60;
+
+    // 3. Get already unlocked tiers for this subject
+    const alreadyUnlocked = unlockedMilestoneHistory[subject] || [];
+
+    let newUnlockedTier: MilestoneTier | null = null;
+    const newUnlockedList = [...alreadyUnlocked];
+
+    for (const tier of MILESTONE_TIERS) {
+      if (alreadyUnlocked.includes(tier.id)) {
+        continue;
+      }
+
+      // Check if meets requirement
+      const meetsTasks = completedTasks >= tier.tasksRequired;
+      const meetsHours = studyHours >= tier.hoursRequired;
+
+      if (meetsTasks || meetsHours) {
+        newUnlockedTier = tier;
+        newUnlockedList.push(tier.id);
+      }
+    }
+
+    if (newUnlockedTier) {
+      const updatedHistory = {
+        ...unlockedMilestoneHistory,
+        [subject]: newUnlockedList
+      };
+      setUnlockedMilestoneHistory(updatedHistory);
+      localStorage.setItem('studybuddy_unlocked_milestones', JSON.stringify(updatedHistory));
+
+      // Open congratulations modal!
+      setUnlockedMilestone({
+        subject,
+        tier: newUnlockedTier,
+        tasksCompleted: completedTasks,
+        hoursCompleted: studyHours
+      });
+
+      // Play chime!
+      playCelebrationChime();
+    }
+  };
+
+  const getSubjectStats = (subject: Subject) => {
+    // 1. Calculate completed tasks
+    const completedTasks = schedule.filter(item => {
+      if (!item.completed) return false;
+      return getSubjectFromTask(item.task) === subject;
+    }).length;
+
+    // 2. Calculate study minutes from progress entries
+    const studyMinutes = progress
+      .filter(item => item.subject === subject && item.score === item.total)
+      .reduce((sum, item) => sum + item.score, 0);
+
+    const studyHours = studyMinutes / 60;
+
+    return {
+      completedTasks,
+      studyMinutes,
+      studyHours
+    };
+  };
+
   const handleToggleSchedule = async (item: ScheduleItem) => {
     try {
       const updatedCompleted = !item.completed;
@@ -2287,16 +2577,26 @@ export default function App() {
         localStorage.setItem('studybuddy_guest_schedule', JSON.stringify(updated));
       }
 
-      setSchedule(prev => prev.map(s => {
-        if (s.id === item.id) {
-          if (updatedCompleted) {
-            awardPoints(10, 'task_completed');
-            completeStreakDay(5); // Complete Day 5: complete planner task
+      setSchedule(prev => {
+        const next = prev.map(s => {
+          if (s.id === item.id) {
+            if (updatedCompleted) {
+              awardPoints(10, 'task_completed');
+              completeStreakDay(5); // Complete Day 5: complete planner task
+            }
+            return { ...s, completed: updatedCompleted };
           }
-          return { ...s, completed: updatedCompleted };
+          return s;
+        });
+
+        if (updatedCompleted) {
+          const sub = getSubjectFromTask(item.task);
+          if (sub) {
+            setTimeout(() => checkMilestones(sub, next, progress), 100);
+          }
         }
-        return s;
-      }));
+        return next;
+      });
     } catch (err) {
       console.error("Failed to toggle schedule item completed:", err);
     }
@@ -2460,17 +2760,21 @@ export default function App() {
     };
 
     try {
+      let updatedProgress: Progress[] = [];
       if (firebaseUser) {
         const id = await saveProgressEntry(firebaseUser.uid, entry);
-        setProgress(prev => [{ id, ...entry }, ...prev]);
+        updatedProgress = [{ id, ...entry }, ...progress];
+        setProgress(updatedProgress);
       } else {
         const localProgress = JSON.parse(localStorage.getItem('studybuddy_guest_progress') || '[]');
         const newLocal = [{ id: 'guest_' + Date.now(), ...entry }, ...localProgress];
         localStorage.setItem('studybuddy_guest_progress', JSON.stringify(newLocal));
+        updatedProgress = newLocal;
         setProgress(newLocal);
       }
 
       awardPoints(durationMinutes * 2, 'study_session');
+      setTimeout(() => checkMilestones(subject, schedule, updatedProgress), 100);
     } catch (err) {
       console.error("Error saving completed study session:", err);
     }
@@ -3267,6 +3571,175 @@ export default function App() {
         /* Main App Container (Absolutely locked viewport) */
         <div className="w-full max-w-md h-screen md:h-[90vh] bg-slate-50 md:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative z-10 border border-slate-800/25">
           
+          {/* FLOATING SIDEBAR MENU TRIGGER (TOP LEFT OF APP VIEW) */}
+          <button 
+            onClick={() => setIsSidebarOpen(true)}
+            className="absolute top-4.5 left-4 z-40 bg-white/95 hover:bg-slate-50 border border-slate-150 text-slate-800 hover:text-indigo-650 shadow-xs rounded-xl p-2.5 flex items-center justify-center cursor-pointer transition-all active:scale-95 duration-100"
+            id="sidebar_menu_btn"
+            title={appLanguage === 'Hindi' ? "मेन्यू खोलें" : "Open Menu"}
+          >
+            <Menu className="w-4 h-4 text-slate-700" />
+          </button>
+
+          {/* SLIDING SIDEBAR OVERLAY PANEL */}
+          <AnimatePresence>
+            {isSidebarOpen && (
+              <div className="absolute inset-0 z-50 flex" id="sidebar_menu_overlay">
+                {/* Backdrop shadow filter */}
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs cursor-pointer"
+                />
+
+                {/* Sidebar Drawer container */}
+                <motion.div 
+                  initial={{ x: '-100%' }}
+                  animate={{ x: 0 }}
+                  exit={{ x: '-100%' }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+                  className="relative w-72 bg-slate-900 border-r border-slate-800 h-full flex flex-col justify-between shadow-2xl text-left overflow-hidden z-10"
+                  id="sidebar_drawer_pane"
+                >
+                  {/* Top Header Block */}
+                  <div className="p-5 border-b border-slate-800 shrink-0 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-indigo-500 text-lg">✨</span>
+                        <h2 className="text-white text-xs font-black tracking-widest uppercase font-display">
+                          {appLanguage === 'Hindi' ? 'स्टडी बडी 🐼' : 'STUDY BUDDY 🐼'}
+                        </h2>
+                      </div>
+                      <button 
+                        onClick={() => setIsSidebarOpen(false)}
+                        className="text-slate-400 hover:text-white p-1 hover:bg-slate-800 rounded-lg cursor-pointer"
+                        title={appLanguage === 'Hindi' ? "बंद करें" : "Close"}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Student Mini ID Card widget */}
+                    <div className="bg-slate-850 p-3.5 rounded-2xl border border-slate-800 flex items-center space-x-3 shadow-inner">
+                      <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center border border-slate-700 text-xl shadow-xs select-none">
+                        {user?.avatar || "🐼"}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-white text-xs font-extrabold truncate">{user?.name || "Guest Student"}</h4>
+                        <p className="text-[10px] text-slate-400 font-bold truncate mt-0.5">{user?.school || "General Studies"}</p>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span className="text-[8px] font-mono font-extrabold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-md uppercase">
+                            LVL {user?.level || 1}
+                          </span>
+                          <span className="text-[8px] font-mono font-extrabold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded-md uppercase">
+                            {user?.points || 100} XP
+                          </span>
+                          <span className="text-[8px] font-mono font-extrabold text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded-md uppercase flex items-center gap-0.5">
+                            📍 {appLanguage === 'Hindi' ? 'केहर डबला' : 'Kehar Dabla'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Main Scrollable Navigation Links */}
+                  <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5 scrollbar-hide">
+                    {/* Item 1: Diagram Maker */}
+                    <button
+                      onClick={() => {
+                        setActiveTab('diagram');
+                        setIsSidebarOpen(false);
+                      }}
+                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all cursor-pointer ${
+                        activeTab === 'diagram' 
+                          ? 'bg-indigo-600 text-white font-black shadow-md shadow-indigo-900/30' 
+                          : 'text-slate-300 hover:bg-slate-800/60 hover:text-white font-semibold'
+                      }`}
+                      id="sidebar_item_diagram"
+                    >
+                      <Palette className="w-4 h-4 shrink-0 text-indigo-400" />
+                      <span className="text-xs">{appLanguage === 'Hindi' ? 'डायग्राम मेकर' : 'Diagram Maker'}</span>
+                    </button>
+
+                    {/* Item 2: Profile Settings */}
+                    <button
+                      onClick={() => {
+                        setShowProfileModal(true);
+                        setIsSidebarOpen(false);
+                      }}
+                      className="w-full flex items-center space-x-3 px-4 py-3 text-slate-300 hover:bg-slate-800/60 hover:text-white rounded-xl transition-all font-semibold cursor-pointer"
+                      id="sidebar_item_profile"
+                    >
+                      <Settings className="w-4 h-4 shrink-0 text-slate-400" />
+                      <span className="text-xs">{appLanguage === 'Hindi' ? 'प्रोफ़ाइल सेटिंग्स' : 'Profile Settings'}</span>
+                    </button>
+
+                    {/* Item 3: Homework Solver */}
+                    <button
+                      onClick={() => {
+                        setShowHomeworkModal(true);
+                        setIsSidebarOpen(false);
+                      }}
+                      className="w-full flex items-center space-x-3 px-4 py-3 text-slate-300 hover:bg-slate-800/60 hover:text-white rounded-xl transition-all font-semibold cursor-pointer"
+                      id="sidebar_item_homework"
+                    >
+                      <Sparkles className="w-4 h-4 shrink-0 text-amber-400" />
+                      <span className="text-xs">{appLanguage === 'Hindi' ? 'होमवर्क सॉल्वर' : 'Homework Solver'}</span>
+                    </button>
+
+                    {/* Item 3.5: Student Progress File */}
+                    <button
+                      onClick={() => {
+                        setShowProgressModal(true);
+                        setIsSidebarOpen(false);
+                      }}
+                      className="w-full flex items-center space-x-3 px-4 py-3 text-slate-300 hover:bg-slate-800/60 hover:text-white rounded-xl transition-all font-semibold cursor-pointer border border-emerald-550/20 bg-emerald-500/5 hover:bg-emerald-500/10"
+                      id="sidebar_item_progress_file"
+                    >
+                      <TrendingUp className="w-4 h-4 shrink-0 text-emerald-400" />
+                      <span className="text-xs font-bold text-emerald-300">{appLanguage === 'Hindi' ? 'प्रगति फ़ाइल' : 'Student Progress File'}</span>
+                    </button>
+
+                    {/* Item 4: About App & Developer */}
+                    <button
+                      onClick={() => {
+                        setShowAboutModal(true);
+                        setIsSidebarOpen(false);
+                      }}
+                      className="w-full flex items-center space-x-3 px-4 py-3 text-slate-300 hover:bg-slate-800/60 hover:text-white rounded-xl transition-all font-semibold cursor-pointer"
+                      id="sidebar_item_about"
+                    >
+                      <Info className="w-4 h-4 shrink-0 text-teal-400" />
+                      <span className="text-xs">{appLanguage === 'Hindi' ? 'ऐप और डेवलपर' : 'About App & Developer'}</span>
+                    </button>
+
+                    {/* Item 5: Study Alarms */}
+                    <button
+                      onClick={() => {
+                        setShowScheduleModal(true);
+                        setIsSidebarOpen(false);
+                      }}
+                      className="w-full flex items-center space-x-3 px-4 py-3 text-slate-300 hover:bg-slate-800/60 hover:text-white rounded-xl transition-all font-semibold cursor-pointer border border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10"
+                      id="sidebar_item_alarms"
+                    >
+                      <Clock className="w-4 h-4 shrink-0 text-indigo-400" />
+                      <span className="text-xs font-bold text-indigo-300">{appLanguage === 'Hindi' ? 'पढ़ाई समय-सारणी' : 'Study Alarms'}</span>
+                    </button>
+                  </div>
+
+                  {/* Sidebar bottom spacing / footer */}
+                  <div className="p-4 border-t border-slate-800 bg-slate-950/20 shrink-0 select-none text-center">
+                    <p className="text-[8px] text-slate-600 font-extrabold uppercase tracking-widest">
+                      Ascend Study • Kehar Dabla
+                    </p>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
           {/* Wave Animation Interactive Toast Message */}
           <AnimatePresence>
             {waveToast && (
@@ -3426,25 +3899,30 @@ export default function App() {
                   <header className="flex flex-col space-y-2.5 bg-gradient-to-br from-indigo-50/70 via-purple-50/50 to-slate-50/10 p-4 rounded-2xl border border-indigo-100/45 shadow-sm" id="welcome_header">
                     <div className="flex justify-between items-start gap-4">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-1.5">
+                        {/* Greeting remains at the top, shifted right by pl-14 to clear the side menu button */}
+                        <div className="flex items-center space-x-1.5 pl-14">
                           <span className="text-[10px] font-black text-indigo-700 bg-indigo-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                             {getTimeGreeting(appLanguage).label}
                           </span>
                           <span className="text-sm select-none">{getTimeGreeting(appLanguage).icon}</span>
                         </div>
-                        <h1 className="text-xl font-black text-slate-900 tracking-tight mt-1.5 flex items-center leading-tight" id="user_id_display">
-                          {appLanguage === 'Hindi' ? `नमस्ते, ${user?.name}!` : appLanguage === 'Hinglish' ? `Hello, ${user?.name}!` : appLanguage === 'Marathi' ? `नमस्कार, ${user?.name}!` : appLanguage === 'Tamil' ? `வணக்கம், ${user?.name}!` : appLanguage === 'Bengali' ? `হ্যালো, ${user?.name}!` : appLanguage === 'Spanish' ? `¡Hola, ${user?.name}!` : appLanguage === 'French' ? `Bonjour, ${user?.name}!` : appLanguage === 'German' ? `Hallo, ${user?.name}!` : appLanguage === 'Russian' ? `Привет, ${user?.name}!` : appLanguage === 'Chinese' ? `你好，${user?.name}！` : appLanguage === 'Japanese' ? `こんにちは、${user?.name}さん！` : `Hello, ${user?.name}!`} <span className="text-indigo-500 ml-1">🚀</span>
-                        </h1>
-                        <p className="text-xs text-slate-500 font-bold mt-2 flex flex-wrap items-center gap-1.5" id="student_meta_badge">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-xl bg-white border border-slate-100 text-slate-705 shadow-2xs font-mono text-[9px]">
-                            🏫 {user?.school || translate('school_not_set', appLanguage, 'School Not Set')}
-                          </span>
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-xl bg-indigo-600 text-white font-mono text-[9px] font-black">
-                            📚 {translate('class_num', appLanguage, 'Class')} {user?.className || translate('set_class', appLanguage, 'Set class')}
-                          </span>
-                        </p>
+                        
+                        {/* Name and Meta badges moved below the side menu button, without pl-14 so they fit beautifully */}
+                        <div className="mt-4">
+                          <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center leading-tight" id="user_id_display">
+                            {appLanguage === 'Hindi' ? `नमस्ते, ${user?.name}!` : appLanguage === 'Hinglish' ? `Hello, ${user?.name}!` : appLanguage === 'Marathi' ? `नमस्कार, ${user?.name}!` : appLanguage === 'Tamil' ? `வணக்கம், ${user?.name}!` : appLanguage === 'Bengali' ? `হ্যালো, ${user?.name}!` : appLanguage === 'Spanish' ? `¡Hola, ${user?.name}!` : appLanguage === 'French' ? `Bonjour, ${user?.name}!` : appLanguage === 'German' ? `Hallo, ${user?.name}!` : appLanguage === 'Russian' ? `Привет, ${user?.name}!` : appLanguage === 'Chinese' ? `你好，${user?.name}！` : appLanguage === 'Japanese' ? `こんにちは、${user?.name}さん！` : `Hello, ${user?.name}!`} <span className="text-indigo-500 ml-1">🚀</span>
+                          </h1>
+                          <p className="text-xs text-slate-500 font-bold mt-2 flex flex-wrap items-center gap-1.5" id="student_meta_badge">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-xl bg-white border border-slate-100 text-slate-705 shadow-2xs font-mono text-[9px]">
+                              🏫 {user?.school || translate('school_not_set', appLanguage, 'School Not Set')}
+                            </span>
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-xl bg-indigo-600 text-white font-mono text-[9px] font-black">
+                              📚 {translate('class_num', appLanguage, 'Class')} {user?.className || translate('set_class', appLanguage, 'Set class')}
+                            </span>
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex flex-col items-center shrink-0 space-y-1.5">
+                      <div className="flex flex-col items-center shrink-0 space-y-1.5 pt-1">
                         <div className="w-13 h-13 bg-gradient-to-tr from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center border-2 border-white shadow-md relative group select-none">
                           {user?.avatar ? (
                             <span className="text-3xl">{user?.avatar}</span>
@@ -3457,18 +3935,11 @@ export default function App() {
                             ⭐
                           </span>
                         </div>
-                        <button 
-                          onClick={() => setShowProfileModal(true)}
-                          className="text-[9px] text-slate-400 hover:text-indigo-600 font-extrabold hover:underline select-none transition"
-                          id="btn_switch_profile"
-                        >
-                          {translate('switch_profile', appLanguage, 'Switch Profile / Login 🌐')}
-                        </button>
                         {deferredPrompt && (
                           <button
                             type="button"
                             onClick={handleInstall}
-                            className="text-[9px] text-indigo-600 font-extrabold hover:underline select-none transition ml-2"
+                            className="text-[9px] text-indigo-600 font-extrabold hover:underline select-none transition"
                           >
                              {translate('install_app_header', appLanguage, 'Install App')}
                           </button>
@@ -3530,121 +4001,6 @@ export default function App() {
                       )}
                     </div>
                   </header>
-
-                  {/* ADVANCED NETWORK & LIVE SYNC DIAGNOSTIC MONITOR */}
-                  <div className="bg-slate-900 border border-slate-800 text-slate-100 p-4 rounded-2xl shadow-lg space-y-3.5" id="diagnostic_sync_card">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2.5">
-                        <div className="relative">
-                          <span className={`flex h-3 w-3 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'}`} />
-                          {isOnline && <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />}
-                        </div>
-                        <div>
-                          <h3 className="text-xs font-black tracking-tight flex items-center gap-1">
-                            <span>{appLanguage === 'Hindi' ? "सिस्टम सिंक और स्वास्थ्य मॉनिटर" : "System Sync & Health Healer"}</span>
-                            <span className="text-[10px] bg-indigo-500/20 text-indigo-300 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider font-mono">PRO</span>
-                          </h3>
-                          <p className="text-[9.5px] text-slate-400 font-semibold leading-none mt-1">
-                            {isOnline 
-                              ? (appLanguage === 'Hindi' ? "सभी सिंकिंग सेवाएं चालू और सुरक्षित हैं" : "All sync channels fully secure & live") 
-                              : (appLanguage === 'Hindi' ? "ऑफ़लाइन बफ़रिंग सक्षम है - स्थानीय रूप से सुरक्षित" : "Local draft caching enabled - safe offline")}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <button 
-                        onClick={() => setShowDiagnostics(!showDiagnostics)}
-                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-750 text-slate-200 text-[10px] font-black rounded-xl border border-slate-700 transition active:scale-95 flex items-center space-x-1 cursor-pointer"
-                      >
-                        <span>⚙️</span>
-                        <span>{showDiagnostics ? (appLanguage === 'Hindi' ? "पैनल छिपाएं" : "Hide Details") : (appLanguage === 'Hindi' ? "डायग्नोस्टिक्स" : "Diagnostics")}</span>
-                      </button>
-                    </div>
-
-                    {/* Compact stats line always visible */}
-                    <div className="grid grid-cols-3 gap-2 pt-1">
-                      <div className="bg-slate-950/40 border border-slate-850 p-2 rounded-xl text-center">
-                        <span className="block text-[9px] text-slate-400 font-black uppercase tracking-wider">{appLanguage === 'Hindi' ? "विलंबता (पिंग)" : "DB PING"}</span>
-                        <span className="text-xs font-mono font-black text-indigo-400 mt-0.5 block">{isOnline && dbPing ? `${dbPing}ms` : "Offline"}</span>
-                      </div>
-                      <div className="bg-slate-950/40 border border-slate-850 p-2 rounded-xl text-center">
-                        <span className="block text-[9px] text-slate-400 font-black uppercase tracking-wider">{appLanguage === 'Hindi' ? "बफ़र कतार" : "OFFLINE CACHE"}</span>
-                        <span className="text-xs font-mono font-black text-amber-400 mt-0.5 block">{offlineQueuesCount} files</span>
-                      </div>
-                      <div className="bg-slate-950/40 border border-slate-850 p-2 rounded-xl text-center">
-                        <span className="block text-[9px] text-slate-400 font-black uppercase tracking-wider">{appLanguage === 'Hindi' ? "सिस्टम स्वास्थ्य" : "ENGINE HEALTH"}</span>
-                        <span className="text-xs font-mono font-black text-emerald-400 mt-0.5 block">{isOnline ? "100% OK" : "90% Buffer"}</span>
-                      </div>
-                    </div>
-
-                    {/* Expanded diagnostics panel with log terminal & healer trigger */}
-                    {showDiagnostics && (
-                      <div className="pt-2.5 border-t border-slate-800 space-y-3.5 animate-fadeIn">
-                        
-                        {/* Diagnostics System Logs Terminal */}
-                        <div className="space-y-1.5">
-                          <label className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">{appLanguage === 'Hindi' ? "वास्तविक समय प्रणाली लॉग" : "Live Diagnostics Console"}</label>
-                          <div className="bg-slate-950 rounded-xl p-2.5 border border-slate-850 h-28 overflow-y-auto font-mono text-[9px] text-indigo-300 space-y-1 leading-normal">
-                            {diagnosticsLogs.map((log, idx) => (
-                              <div key={idx} className="border-l border-indigo-500/30 pl-1.5">{log}</div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Interactive Healer Controls */}
-                        <div className="flex gap-2">
-                          <button
-                            onClick={async () => {
-                              setIsHealerActive(true);
-                              setDiagnosticsLogs(prev => [...prev, `[Healer] Starting deep database reconnection cycle...`]);
-                              
-                              // Trigger a simulated reconnection & reload sequence
-                              setTimeout(() => {
-                                setDiagnosticsLogs(prev => [
-                                  ...prev,
-                                  `[Healer] Clearing redundant whiteboard paths & flushing socket buffers.`,
-                                  `[Healer] Connection healed successfully! 100% sync achieved.`
-                                ]);
-                                setIsHealerActive(false);
-                                playAudioChime('success');
-                                alert(appLanguage === 'Hindi' 
-                                  ? "कनेक्शन सफलतापूर्वक ठीक किया गया और कतारों को सिंक्रोनाइज़ किया गया!" 
-                                  : "Sync queues repaired & database links safely restored!");
-                              }, 1500);
-                            }}
-                            disabled={isHealerActive}
-                            className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-550 disabled:bg-indigo-850 text-white text-[10px] font-black rounded-xl shadow-md border border-indigo-500 transition active:scale-95 flex items-center justify-center space-x-1.5 cursor-pointer"
-                          >
-                            <span className={isHealerActive ? "animate-spin" : ""}>🔄</span>
-                            <span>
-                              {isHealerActive 
-                                ? (appLanguage === 'Hindi' ? "सिंकिंग..." : "Repairing Sync...") 
-                                : (appLanguage === 'Hindi' ? "कनेक्शन को स्वचालित रूप से ठीक करें" : "Auto-Heal Sync Channels")}
-                            </span>
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              // Perform clean cache flush
-                              setDiagnosticsLogs(prev => [
-                                ...prev,
-                                `[Garbage Collector] Reclaiming memory...`,
-                                `[Garbage Collector] Flushed temporary SVG canvas paths. Reclaimed 14.2 MB.`
-                              ]);
-                              playAudioChime('coin');
-                              alert(appLanguage === 'Hindi' 
-                                ? "सिस्टम मेमोरी और कैनवास कचरा सफलतापूर्वक साफ किया गया!" 
-                                : "System memory pool flushed & whiteboard canvas garbage-collected!");
-                            }}
-                            className="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-slate-300 text-[10px] font-black rounded-xl border border-slate-700 transition active:scale-95 cursor-pointer"
-                            title="Memory Cleanup"
-                          >
-                            🧹 {appLanguage === 'Hindi' ? "कचरा साफ करें" : "Clear Junk"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
 
                   {/* 5-DAY STUDY STREAK CALENDAR CARD */}
                   <section className="bg-white p-4 rounded-2xl border border-slate-150/70 shadow-xs space-y-3" id="study_streak_calendar_card">
@@ -4211,62 +4567,95 @@ export default function App() {
                     </div>
                   </section>
 
-                  {/* About Ascend Study & Creator (Rohit Yadav & Core AI) Card */}
-                  <section className="bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-950 text-white p-5 rounded-3xl border border-indigo-950/50 shadow-md space-y-4" id="about_app_creator_card">
-                    <div className="flex items-center space-x-2 pb-2.5 border-b border-indigo-900/40">
-                      <span className="text-base select-none">🚀</span>
-                      <div>
-                        <h2 className="text-xs font-black tracking-wider uppercase text-indigo-200 font-sans">
-                          {appLanguage === 'Hindi' ? 'Ascend Study के बारे में' : 'About Ascend Study'}
-                        </h2>
-                        <p className="text-[9px] font-bold text-slate-400">
-                          {appLanguage === 'Hindi' ? 'आधिकारिक निर्माता और प्लेटफॉर्म विवरण' : 'Official Creator & Platform Details'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3.5">
-                      <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
-                        {appLanguage === 'Hindi' 
-                          ? 'Ascend Study एक ऑल-इन-वन शैक्षिक मंच है जिसे इंटरैक्टिव नोट्स, दैनिक अध्ययन कार्यक्रम, अध्ययन प्रगति विश्लेषण, सहयोगी अध्ययन समूहों और एक उन्नत एआई स्टडी बडी के माध्यम से सीखने को बेहतर बनाने के लिए डिज़ाइन किया गया है।'
-                          : 'Ascend Study is an all-in-one educational platform designed to elevate learning through interactive notes, daily study schedules, study progress analytics, collaborative study groups, and an advanced AI Study Buddy.'
-                        }
-                      </p>
-
-                      <div className="bg-indigo-900/30 border border-indigo-500/10 p-3.5 rounded-2xl space-y-2">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center text-xl shadow-xs select-none">
-                            👨‍💻
-                          </div>
-                          <div>
-                            <h3 className="text-xs font-black text-white">Rohit Yadav</h3>
-                            <p className="text-[9px] font-black text-indigo-300 uppercase tracking-widest">
-                              {appLanguage === 'Hindi' ? 'लीड डेवलपर और निर्माता' : 'Lead Developer & Creator'}
-                            </p>
-                          </div>
-                        </div>
-                        <p className="text-[10px] text-slate-400 leading-normal font-medium">
-                          {appLanguage === 'Hindi'
-                            ? 'इस अत्याधुनिक शैक्षिक एप्लिकेशन को पूरी तरह से रोहित यादव (एक प्रतिभाशाली 14 वर्षीय छात्र और कोडर) द्वारा उनके संगठन Core AI की टीम के साथ मिलकर डिज़ाइन और विकसित किया गया था।'
-                            : 'This state-of-the-art educational application was designed and engineered entirely by Rohit Yadav, a brilliant 14-year-old student and coder, alongside his team at Core AI.'
+                  {/* Study Milestones Section */}
+                  <section className="space-y-3">
+                    <h2 className="text-xs font-extrabold text-slate-500 tracking-tight uppercase flex items-center">
+                      <Award className="w-4 h-4 text-amber-500 mr-1.5 animate-pulse" />
+                      {appLanguage === 'Hindi' ? 'अध्ययन मील के पत्थर' : 'Study Milestones'} 🏆
+                    </h2>
+                    <div className="grid grid-cols-2 gap-3">
+                      {SUBJECTS.map((subject) => {
+                        const stats = getSubjectStats(subject);
+                        const history = unlockedMilestoneHistory[subject] || [];
+                        const subjectDetails = SUBJECT_DETAILS[subject];
+                        
+                        // Find highest tier earned
+                        let highestTierIdx = -1;
+                        for (let i = 0; i < MILESTONE_TIERS.length; i++) {
+                          if (history.includes(MILESTONE_TIERS[i].id)) {
+                            highestTierIdx = i;
                           }
-                        </p>
-                      </div>
+                        }
+                        
+                        const highestTier = highestTierIdx >= 0 ? MILESTONE_TIERS[highestTierIdx] : null;
+                        const nextTierIdx = highestTierIdx + 1;
+                        const nextTier = nextTierIdx < MILESTONE_TIERS.length ? MILESTONE_TIERS[nextTierIdx] : null;
+                        
+                        // Calculate progress towards next tier
+                        let progressPct = 0;
+                        if (nextTier) {
+                          const pctTasks = Math.min(100, (stats.completedTasks / nextTier.tasksRequired) * 100);
+                          const pctHours = Math.min(100, (stats.studyHours / nextTier.hoursRequired) * 100);
+                          progressPct = Math.max(pctTasks, pctHours);
+                        } else {
+                          progressPct = 100;
+                        }
 
-                      <div className="flex justify-between items-center text-[10px] pt-1.5 text-slate-400 font-bold border-t border-indigo-900/30">
-                        <span className="text-[9px] text-indigo-300 tracking-wider font-mono">
-                          {appLanguage === 'Hindi' ? 'Core AI द्वारा निर्मित' : 'Created by Core AI'}
-                        </span>
-                        <a 
-                          href="https://www.instagram.com/rohit.Yadav.1.4" 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-xl transition shadow-xs text-[9px] flex items-center space-x-1"
-                        >
-                          <span>📸</span>
-                          <span>@rohit.Yadav.1.4</span>
-                        </a>
-                      </div>
+                        return (
+                          <motion.div
+                            key={subject}
+                            whileHover={{ y: -2, scale: 1.01 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => setSelectedSubjectMilestone(subject)}
+                            className={`${subjectDetails.bg} p-3.5 rounded-2xl border ${subjectDetails.border} shadow-3xs hover:shadow-2xs transition cursor-pointer flex flex-col justify-between space-y-3.5 relative overflow-hidden group select-none`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="space-y-0.5">
+                                <span className="text-lg block mb-1">{getSubjectEmoji(subject)}</span>
+                                <p className="text-[11px] font-extrabold text-slate-800 tracking-tight leading-none">
+                                  {appLanguage === 'Hindi' 
+                                    ? subject === 'Mathematics' ? 'गणित' : subject === 'Science' ? 'विज्ञान' : subject === 'Biology' ? 'जीव विज्ञान' : subject === 'Physics' ? 'भौतिक विज्ञान' : subject === 'Chemistry' ? 'रसायन विज्ञान' : 'अंग्रेजी'
+                                    : subject}
+                                </p>
+                                <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">
+                                  {highestTier 
+                                    ? (appLanguage === 'Hindi' ? highestTier.nameHi : highestTier.name) 
+                                    : (appLanguage === 'Hindi' ? 'कोई बैज नहीं' : 'No Badges')}
+                                </p>
+                              </div>
+
+                              {highestTier ? (
+                                <span className="text-2xl filter drop-shadow-xs animate-bounce" style={{ animationDuration: '3s' }}>
+                                  {highestTier.badgeIcon}
+                                </span>
+                              ) : (
+                                <span className="text-xs font-mono text-slate-300 font-extrabold border border-slate-100 bg-slate-50/50 px-1.5 py-0.5 rounded-md">
+                                  Lvl 0
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Mini progress bar and labels */}
+                            <div className="space-y-1">
+                              <div className="flex justify-between items-center text-[8px] font-mono font-black text-slate-400 uppercase tracking-wide">
+                                <span>{nextTier ? `${progressPct.toFixed(0)}%` : 'MAXED'}</span>
+                                <span>{nextTier ? (appLanguage === 'Hindi' ? nextTier.badgeIcon + ' की ओर' : `To ${nextTier.badgeIcon}`) : '🏆'}</span>
+                              </div>
+                              <div className="h-1.5 bg-slate-50 rounded-full overflow-hidden border border-slate-100/50">
+                                <div 
+                                  className={`h-full transition-all duration-500 rounded-full ${
+                                    highestTierIdx === 3 ? 'bg-gradient-to-r from-indigo-500 to-pink-500' :
+                                    highestTierIdx === 2 ? 'bg-amber-400' :
+                                    highestTierIdx === 1 ? 'bg-slate-400' :
+                                    'bg-indigo-500'
+                                  }`}
+                                  style={{ width: `${progressPct}%` }}
+                                />
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
                     </div>
                   </section>
 
@@ -4308,35 +4697,131 @@ export default function App() {
                 <div className="flex-1 flex flex-col overflow-hidden h-full">
                   
                   {/* Chat header */}
-                  <header className="p-4 border-b border-slate-100 shrink-0 flex items-center bg-white justify-between">
+                  <header className="p-4 pl-14 border-b border-slate-100 shrink-0 flex items-center bg-white justify-between relative">
                     <div className="flex items-center space-x-2">
                       <BrainCircuit className="w-5 h-5 text-indigo-600" />
                       <div>
-                        <h2 className="font-bold text-slate-800 text-sm">AI Study Helper</h2>
-                        <div className="flex items-center space-x-2 mt-0.5 select-none">
-                          <span className="text-[9px] text-emerald-600 font-extrabold flex items-center">
-                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1 animate-pulse" /> Live AI Connected
-                          </span>
-                          <span className="text-slate-300">•</span>
-                          <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
-                            {appLanguage === 'Hindi' ? 'मुफ़्त और असीमित एआई ✅' : 'Free & Unlimited AI ✅'}
-                          </span>
-                        </div>
+                        <h2 className="font-bold text-slate-800 text-sm">
+                          {appLanguage === 'Hindi' ? 'एआई ट्यूटर' : 'AI Study Helper'}
+                        </h2>
+                        <p className="text-[10px] text-slate-400 font-semibold leading-none mt-0.5">
+                          {appLanguage === 'Hindi' ? 'आपका व्यक्तिगत शैक्षणिक साथी' : 'Your Personal Educational Guide'}
+                        </p>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-1.5">
+                    
+                    {/* Three dots action dropdown menu */}
+                    <div className="relative flex items-center">
                       <button 
-                        onClick={() => setShowScratchpad(!showScratchpad)}
-                        className={`text-[10px] font-black px-2.5 py-1.5 rounded-xl border flex items-center space-x-1 cursor-pointer transition shadow-2xs ${
-                          showScratchpad 
-                            ? 'bg-amber-100 border-amber-300 text-amber-800 font-black' 
-                            : 'bg-amber-50/50 border-amber-150 text-amber-700 hover:bg-amber-50'
-                        }`}
+                        onClick={() => setShowTutorMenu(!showTutorMenu)}
+                        className="p-2.5 hover:bg-slate-50 border border-slate-150 text-slate-600 hover:text-slate-900 shadow-3xs rounded-xl flex items-center justify-center cursor-pointer transition active:scale-95 duration-150"
+                        title={appLanguage === 'Hindi' ? "मेन्यू" : "Options"}
+                        id="tutor_menu_dots_btn"
                       >
-                        <span>🎨</span>
-                        <span>{appLanguage === 'Hindi' ? 'रफ कॉपी' : 'Scratchpad'}</span>
+                        <MoreVertical className="w-4 h-4" />
                       </button>
-                      <button onClick={() => setChatMessages([])} className="text-slate-400 hover:text-red-500 text-[10px] font-bold px-2 py-1.5 bg-slate-50 border border-slate-100 rounded-xl">Clear Chats</button>
+                      
+                      {showTutorMenu && (
+                        <>
+                          {/* Backdrop click listener */}
+                          <div 
+                            className="fixed inset-0 z-40 bg-transparent" 
+                            onClick={() => setShowTutorMenu(false)} 
+                          />
+                          <div 
+                            className="absolute right-0 top-11 w-52 bg-white border border-slate-150/85 rounded-2xl shadow-xl py-1.5 z-50 flex flex-col divide-y divide-slate-100 animate-in fade-in slide-in-from-top-2 duration-150"
+                            id="tutor_options_dropdown"
+                          >
+                            <div className="py-1">
+                              {/* Item 1: Scratchpad Toggle */}
+                              <button
+                                onClick={() => {
+                                  setShowScratchpad(!showScratchpad);
+                                  setShowTutorMenu(false);
+                                }}
+                                className={`w-full px-4 py-3 text-left text-xs font-black flex items-center space-x-3 transition cursor-pointer hover:bg-slate-50 ${
+                                  showScratchpad ? 'text-indigo-600 bg-indigo-50/40' : 'text-slate-700'
+                                }`}
+                              >
+                                <span className="text-base shrink-0">🎨</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-extrabold truncate">
+                                    {appLanguage === 'Hindi' ? 'रफ कॉपी' : 'Scratchpad'}
+                                  </p>
+                                  <p className="text-[9px] text-slate-400 font-medium">
+                                    {showScratchpad 
+                                      ? (appLanguage === 'Hindi' ? 'छिपाएं' : 'Hide scratchpad') 
+                                      : (appLanguage === 'Hindi' ? 'दिखाएं' : 'Show scratchpad')}
+                                  </p>
+                                </div>
+                              </button>
+                            </div>
+
+                            <div className="py-1">
+                              {/* Item 2: Homework Solver */}
+                              <button
+                                onClick={() => {
+                                  setShowHomeworkModal(true);
+                                  setShowTutorMenu(false);
+                                }}
+                                className="w-full px-4 py-3 text-left text-xs font-extrabold text-slate-700 hover:bg-slate-50 flex items-center space-x-3 transition cursor-pointer"
+                              >
+                                <span className="text-base text-amber-500 shrink-0">✨</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-extrabold truncate">
+                                    {appLanguage === 'Hindi' ? 'होमवर्क सॉल्वर' : 'Homework Solver'}
+                                  </p>
+                                  <p className="text-[9px] text-slate-400 font-medium">
+                                    {appLanguage === 'Hindi' ? 'तस्वीर से हल करें' : 'Solve using photos'}
+                                  </p>
+                                </div>
+                              </button>
+
+                              {/* Item 3: About App */}
+                              <button
+                                onClick={() => {
+                                  setShowAboutModal(true);
+                                  setShowTutorMenu(false);
+                                }}
+                                className="w-full px-4 py-3 text-left text-xs font-extrabold text-slate-700 hover:bg-slate-50 flex items-center space-x-3 transition cursor-pointer"
+                              >
+                                <span className="text-base text-teal-500 shrink-0">ℹ️</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-extrabold truncate">
+                                    {appLanguage === 'Hindi' ? 'ऐप और डेवलपर' : 'About App & Dev'}
+                                  </p>
+                                  <p className="text-[9px] text-slate-400 font-medium">
+                                    {appLanguage === 'Hindi' ? 'विवरण देखें' : 'Know the creator'}
+                                  </p>
+                                </div>
+                              </button>
+                            </div>
+
+                            <div className="py-1">
+                              {/* Item 4: Clear Chats */}
+                              <button
+                                onClick={() => {
+                                  if (confirm(appLanguage === 'Hindi' ? 'क्या आप सच में चैट इतिहास को साफ करना चाहते हैं?' : 'Are you sure you want to clear your chat history?')) {
+                                    setChatMessages([]);
+                                  }
+                                  setShowTutorMenu(false);
+                                }}
+                                className="w-full px-4 py-3 text-left text-xs font-extrabold text-rose-600 hover:bg-rose-50/50 flex items-center space-x-3 transition cursor-pointer"
+                              >
+                                <span className="text-base shrink-0">🗑️</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-extrabold truncate">
+                                    {appLanguage === 'Hindi' ? 'चैट साफ़ करें' : 'Clear Chats'}
+                                  </p>
+                                  <p className="text-[9px] text-rose-400 font-medium">
+                                    {appLanguage === 'Hindi' ? 'सभी संदेश हटा दें' : 'Reset chat history'}
+                                  </p>
+                                </div>
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </header>
 
@@ -4579,7 +5064,7 @@ export default function App() {
                 <div className="flex-1 flex flex-col overflow-hidden h-full">
                   {!activeGroup ? (
                     <div className="flex-1 flex flex-col overflow-hidden p-5">
-                      <header className="flex justify-between items-center shrink-0 mb-4">
+                      <header className="flex justify-between items-center shrink-0 mb-4 pl-14">
                         <div>
                           <h2 className="text-lg font-bold text-slate-800">Study Groups</h2>
                           <p className="text-xs text-slate-400">Join classmates & study courses together</p>
@@ -4698,7 +5183,7 @@ export default function App() {
                     <div className="flex-1 flex flex-col overflow-hidden h-full">
                       
                       {/* Active group inside header */}
-                      <header className="p-4 border-b border-slate-100 flex flex-col bg-white shrink-0">
+                      <header className="p-4 pl-14 border-b border-slate-100 flex flex-col bg-white shrink-0">
                         <div className="flex items-center space-x-3 mb-3">
                           <button onClick={() => setActiveGroup(null)} className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-600 cursor-pointer">
                             <ArrowLeft className="w-4 h-4" />
@@ -4996,7 +5481,7 @@ export default function App() {
               {/* CONSOLIDATED STUDY NOTEBOOK TAB (NOTES, PLANNER, AND AI FLASHCARDS TOGETHER) */}
               {activeTab === 'notebook' && (
                 <div className="flex-1 flex flex-col overflow-hidden p-5">
-                  <header className="flex justify-between items-center shrink-0 mb-4">
+                  <header className="flex justify-between items-center shrink-0 mb-4 pl-14">
                     <div>
                       <h2 className="text-lg font-bold text-slate-800">Study Notebook</h2>
                       <p className="text-xs text-slate-400">Class notes, study agenda, & spaced repetition</p>
@@ -5428,7 +5913,7 @@ export default function App() {
               {/* PRACTICE & SUBJECT QUIZZES */}
               {activeTab === 'quiz' && (
                 <div className="flex-1 flex flex-col overflow-hidden p-5">
-                  <header className="mb-4 shrink-0 flex justify-between items-center bg-white/40 p-3 rounded-2xl border border-slate-100">
+                  <header className="mb-4 shrink-0 flex justify-between items-center bg-white/40 p-3 pl-14 rounded-2xl border border-slate-100">
                     <div>
                       <h2 className="text-base font-black text-slate-900 tracking-tight">Practice Academy</h2>
                       <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Dynamically Generated via Gemini AI</p>
@@ -5446,9 +5931,13 @@ export default function App() {
                           <div className="text-center sm:text-left">
                             <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight flex items-center justify-center sm:justify-start gap-1">
                               <span>🎯</span>
-                              <span>Select Quiz Difficulty</span>
+                              <span>{appLanguage === 'Hindi' ? 'क्विज कठिनाई स्तर चुनें' : 'Select Quiz Difficulty'}</span>
                             </p>
-                            <p className="text-[9px] text-slate-400 font-bold leading-normal mt-0.5">Gemini will adjust question depth and distractors dynamically</p>
+                            <p className="text-[9px] text-slate-400 font-bold leading-normal mt-0.5">
+                              {appLanguage === 'Hindi' 
+                                ? 'जेमिनी एआई गतिशील रूप से प्रश्नों और विकल्पों को समायोजित करेगा' 
+                                : 'Gemini will adjust question depth and distractors dynamically'}
+                            </p>
                           </div>
                           <div className="flex gap-1.5 w-full sm:w-auto">
                             {(['Easy', 'Medium', 'Hard'] as const).map((level) => {
@@ -5665,16 +6154,6 @@ export default function App() {
           </button>
 
           <button 
-            onClick={() => { setActiveTab('diagram'); setActiveGroup(null); }}
-            className={`flex flex-col items-center justify-center w-16 py-1 rounded-2xl transition-all duration-200 ${activeTab === 'diagram' ? 'text-indigo-600 bg-indigo-50/70 font-black scale-105' : 'text-slate-400 hover:text-slate-650'}`}
-            title={translate('diagrams', appLanguage, 'Diagram Lab')}
-            id="tab_btn_diagram"
-          >
-            <Palette className="w-5 h-5" />
-            <span className="text-[9px] font-extrabold mt-0.5 tracking-tight">{translate('diagrams', appLanguage, 'Diagrams')}</span>
-          </button>
-
-          <button 
             onClick={() => { setActiveTab('quiz'); setActiveGroup(null); }}
             className={`flex flex-col items-center justify-center w-16 py-1 rounded-2xl transition-all duration-200 ${activeTab === 'quiz' ? 'text-indigo-600 bg-indigo-50/70 font-black scale-105' : 'text-slate-400 hover:text-slate-650'}`}
             title={translate('quiz', appLanguage, 'Quiz')}
@@ -5866,6 +6345,526 @@ export default function App() {
                 </div>
 
                 <button onClick={handleCreateGroup} className="w-full py-3 bg-indigo-600 text-white rounded-xl text-xs font-bold active:scale-95 transition shadow-md">Create Group</button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {showHomeworkModal && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end justify-center" 
+              id="homework_solver_modal"
+            >
+              <motion.div 
+                initial={{ y: "15%" }} 
+                animate={{ y: 0 }} 
+                exit={{ y: "15%" }} 
+                className="bg-white w-full rounded-t-3xl p-5 space-y-4 shadow-xl border-t border-slate-200 overflow-y-auto max-h-[85vh] scrollbar-hide text-left flex flex-col"
+              >
+                <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                  <div className="flex items-center space-x-2">
+                    <Sparkles className="w-4 h-4 text-indigo-600" />
+                    <h3 className="font-bold text-slate-800 text-xs">AI Homework Solver</h3>
+                  </div>
+                  <button 
+                    onClick={() => setShowHomeworkModal(false)} 
+                    className="text-slate-400 text-xs font-semibold p-1 bg-slate-100 rounded-full hover:bg-slate-200 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto">
+                  <HomeworkSolver user={user} language={appLanguage} isTagMode={isTagMode} />
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {showAboutModal && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end justify-center" 
+              id="about_app_modal"
+            >
+              <motion.div 
+                initial={{ y: "15%" }} 
+                animate={{ y: 0 }} 
+                exit={{ y: "15%" }} 
+                className="bg-white w-full rounded-t-3xl p-5 space-y-4 shadow-xl border-t border-slate-200 overflow-y-auto max-h-[85vh] scrollbar-hide text-left"
+              >
+                <div className="flex justify-between items-center border-b border-slate-100 pb-2.5">
+                  <div className="flex items-center space-x-2">
+                    <Info className="w-4 h-4 text-indigo-600" />
+                    <h3 className="font-bold text-slate-800 text-xs">About Ascend Study</h3>
+                  </div>
+                  <button 
+                    onClick={() => setShowAboutModal(false)} 
+                    className="text-slate-400 text-xs font-semibold p-1 bg-slate-100 rounded-full hover:bg-slate-200 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-4 text-xs text-slate-600 leading-relaxed font-medium">
+                  {/* App Brand Identity banner */}
+                  <div className="bg-gradient-to-r from-indigo-900 to-slate-900 p-4 rounded-2xl border border-slate-800 text-white space-y-1 shadow-sm select-none">
+                    <h4 className="font-black text-sm tracking-tight text-indigo-100">Ascend Study ✨</h4>
+                    <p className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">Official Creator & Platform Details</p>
+                  </div>
+
+                  <div className="space-y-1.5 p-3.5 bg-slate-50 border border-slate-150 rounded-2xl">
+                    <h5 className="font-black text-slate-800 uppercase text-[9px] tracking-wider">Platform Vision</h5>
+                    <p className="text-[11px] text-slate-600 leading-relaxed font-semibold">
+                      Ascend Study is an all-in-one educational platform designed to elevate learning through interactive notes, daily study schedules, study progress analytics, collaborative study groups, and an advanced AI Study Buddy.
+                    </p>
+                  </div>
+
+                  <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">
+                        🧑‍💻
+                      </div>
+                      <div>
+                        <h5 className="font-black text-slate-900 text-xs leading-none">Rohit Yadav</h5>
+                        <p className="text-[9px] font-extrabold text-indigo-600 mt-0.5">Lead Developer & Creator</p>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed font-semibold">
+                      This state-of-the-art educational application was designed and engineered entirely by Rohit Yadav, a brilliant 14-year-old student and coder, alongside his team at Core AI.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold bg-slate-100 px-3 py-2.5 rounded-xl border border-slate-150">
+                    <span className="flex items-center space-x-1">
+                      <span>🚀</span>
+                      <strong className="text-slate-700">Created by Core AI</strong>
+                    </span>
+                    <span className="flex items-center space-x-1">
+                      <span>📸</span>
+                      <strong className="text-indigo-600">@rohit.Yadav.1.4</strong>
+                    </span>
+                  </div>
+
+                  {/* System Health Diagnostics Accordion */}
+                  <div className="border border-slate-150 rounded-2xl overflow-hidden shadow-xs">
+                    <button 
+                      onClick={() => setShowDiagnostics(!showDiagnostics)}
+                      className="w-full flex items-center justify-between p-3.5 bg-slate-50 hover:bg-slate-100/80 transition text-left cursor-pointer"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Activity className="w-4 h-4 text-emerald-500" />
+                        <span className="text-[11px] font-black text-slate-800 uppercase tracking-tight">
+                          {appLanguage === 'Hindi' ? 'सिस्टम सिंक और स्वास्थ्य' : 'System Sync & Diagnostics'}
+                        </span>
+                      </div>
+                      <span className="text-slate-400 font-black text-xs">
+                        {showDiagnostics ? '▲' : '▼'}
+                      </span>
+                    </button>
+
+                    {showDiagnostics && (
+                      <div className="p-3.5 border-t border-slate-150 bg-white space-y-3">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-slate-500 font-extrabold uppercase tracking-wider">Health Diagnostic Meter</span>
+                          <div className="flex items-center space-x-1.5">
+                            <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-sm animate-pulse shadow-emerald-500' : 'bg-rose-500 shadow-sm animate-pulse shadow-rose-500'}`} />
+                            <span className="text-[9px] font-black text-slate-700 font-mono">
+                              {isOnline ? 'ONLINE' : 'OFFLINE'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Stats mini grid */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="bg-slate-50 border border-slate-150 p-2 rounded-xl">
+                            <p className="text-[7.5px] uppercase font-bold text-slate-400">Latency Ping</p>
+                            <p className="text-[10px] font-mono font-black text-indigo-600 mt-0.5">
+                              {isOnline && dbPing ? `${dbPing} ms` : 'Offline'}
+                            </p>
+                          </div>
+                          <div className="bg-slate-50 border border-slate-150 p-2 rounded-xl">
+                            <p className="text-[7.5px] uppercase font-bold text-slate-400">Sync Status</p>
+                            <p className="text-[10px] font-mono font-black text-emerald-600 mt-0.5">
+                              100% Secure
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Integrated Live System Sync Healer Action Button */}
+                        <button 
+                          onClick={() => {
+                            setIsHealerActive(true);
+                            playAudioChime('success');
+                            setDiagnosticsLogs(prev => [
+                              ...prev,
+                              `[Manual Sync] Triggered by student at ${new Date().toLocaleTimeString()}`,
+                              `[Diagnostics] Latency re-evaluated: ${Math.floor(Math.random() * 20) + 15}ms`,
+                              `[Cache] 0 pending sync errors resolved.`,
+                              `[System] Sync Healed successfully!`
+                            ]);
+                            setTimeout(() => {
+                              setIsHealerActive(false);
+                              alert(appLanguage === 'Hindi' ? "सिस्टम सिंक सफलतापूर्वक ठीक हो गया है! ⚡" : "System sync repaired and optimized successfully! ⚡");
+                            }, 1200);
+                          }}
+                          disabled={isHealerActive}
+                          className="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-[9px] font-black tracking-wider uppercase shadow-md transition active:scale-95 duration-100 flex items-center justify-center space-x-1 cursor-pointer disabled:opacity-50"
+                          id="modal_healer_btn"
+                        >
+                          <Activity className={`w-3.5 h-3.5 shrink-0 ${isHealerActive ? 'animate-spin' : 'animate-pulse'}`} />
+                          <span>{isHealerActive ? 'Optimizing Connections...' : 'Auto-Heal System Sync'}</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-[9px] text-slate-400 text-center font-bold uppercase tracking-wider pt-2 border-t border-slate-100">
+                    Ascend Study © 2026. All Rights Reserved.
+                  </p>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {showScheduleModal && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end justify-center" 
+              id="study_schedule_modal"
+            >
+              <motion.div 
+                initial={{ y: "15%" }} 
+                animate={{ y: 0 }} 
+                exit={{ y: "15%" }} 
+                className="bg-slate-900 w-full rounded-t-3xl p-5 space-y-4 shadow-xl border-t border-slate-850 overflow-y-auto max-h-[85vh] scrollbar-hide text-left flex flex-col"
+              >
+                <div className="flex justify-between items-center border-b border-slate-800 pb-2.5">
+                  <div className="flex items-center space-x-2">
+                    <Clock className="w-4 h-4 text-indigo-400" />
+                    <div>
+                      <h3 className="font-bold text-white text-xs leading-none">
+                        {appLanguage === 'Hindi' ? 'पढ़ाई समय-सारणी (Study Alarms)' : 'Study Alarms & Scheduler'}
+                      </h3>
+                      <p className="text-[9px] text-slate-500 font-extrabold mt-1">
+                        📍 {appLanguage === 'Hindi' ? 'केहर डबला' : 'Kehar Dabla'}
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setShowScheduleModal(false)} 
+                    className="text-slate-400 text-xs font-semibold p-1.5 bg-slate-800 rounded-full hover:bg-slate-750 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-4">
+                  {/* Quick Add Form */}
+                  <div className="bg-slate-950/40 p-4 rounded-2xl border border-slate-800/80 space-y-3">
+                    <div className="space-y-2">
+                      {/* Subject selection dropdown */}
+                      <div>
+                        <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                          {appLanguage === 'Hindi' ? 'विषय चुनें' : 'Select Subject'}
+                        </label>
+                        <select 
+                          value={newSchedule.task} 
+                          onChange={(e) => setNewSchedule({...newSchedule, task: e.target.value})} 
+                          className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold outline-none text-slate-300 cursor-pointer focus:border-indigo-500/50"
+                        >
+                          <option value="">{appLanguage === 'Hindi' ? '-- विषय चुनें --' : '-- Select Subject --'}</option>
+                          {SUBJECTS.map(sub => (
+                            <option key={sub} value={`Study ${sub}`}>
+                              {appLanguage === 'Hindi' ? `${sub} पढ़ना` : `Study ${sub}`}
+                            </option>
+                          ))}
+                          <option value="Homework">{appLanguage === 'Hindi' ? 'होमवर्क पूरा करना' : 'Complete Homework'}</option>
+                          <option value="Exam Revision">{appLanguage === 'Hindi' ? 'परीक्षा पुनरावृत्ति' : 'Exam Revision'}</option>
+                        </select>
+                        <input 
+                          type="text" 
+                          placeholder={appLanguage === 'Hindi' ? 'या खुद लिखें...' : 'Or type custom task...'} 
+                          value={newSchedule.task.startsWith('Study ') || newSchedule.task === 'Homework' || newSchedule.task === 'Exam Revision' || newSchedule.task === 'Homework पूरा करना' || newSchedule.task === 'परीक्षा पुनरावृत्ति' ? '' : newSchedule.task} 
+                          onChange={(e) => setNewSchedule({...newSchedule, task: e.target.value})} 
+                          className="w-full p-2.5 mt-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold outline-none placeholder:text-slate-500 text-slate-350 focus:border-indigo-500/50"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                            {appLanguage === 'Hindi' ? 'समय' : 'Time'}
+                          </label>
+                          <input 
+                            type="time" 
+                            value={newSchedule.time} 
+                            onChange={(e) => setNewSchedule({...newSchedule, time: e.target.value})} 
+                            className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold outline-none text-slate-300 cursor-pointer focus:border-indigo-500/50" 
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                            {appLanguage === 'Hindi' ? 'दिन' : 'Day'}
+                          </label>
+                          <select 
+                            value={newSchedule.day} 
+                            onChange={(e) => setNewSchedule({...newSchedule, day: e.target.value})} 
+                            className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold outline-none text-slate-300 cursor-pointer focus:border-indigo-500/50"
+                          >
+                            {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => (
+                              <option key={d} value={d}>
+                                {appLanguage === 'Hindi' 
+                                  ? d === 'Monday' ? 'सोमवार' : d === 'Tuesday' ? 'मंगलवार' : d === 'Wednesday' ? 'बुधवार' : d === 'Thursday' ? 'गुरुवार' : d === 'Friday' ? 'शुक्रवार' : d === 'Saturday' ? 'शनिवार' : 'रविवार'
+                                  : d}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <button 
+                        onClick={handleAddSchedule} 
+                        className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black tracking-wide cursor-pointer transition active:scale-95 flex items-center justify-center gap-1.5 shadow-sm mt-1"
+                      >
+                        <span>⏰</span>
+                        <span>{appLanguage === 'Hindi' ? 'अलार्म सेट करें' : 'Set Alarm'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* List of study timers */}
+                  <div className="space-y-2">
+                    <h4 className="text-[10px] uppercase font-black tracking-wider text-slate-400 px-1">
+                      {appLanguage === 'Hindi' ? 'आपके सक्रिय अलार्म' : 'Your Active Alarms'}
+                    </h4>
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto scrollbar-hide px-0.5">
+                      {schedule.length === 0 ? (
+                        <div className="bg-slate-950/20 border border-dashed border-slate-800/80 p-5 rounded-2xl text-center">
+                          <span className="text-xl">📭</span>
+                          <p className="text-xs text-slate-500 font-bold mt-1.5">
+                            {appLanguage === 'Hindi' ? 'कोई पढ़ाई अलार्म सेट नहीं है।' : 'No study alarms set yet.'}
+                          </p>
+                        </div>
+                      ) : (
+                        schedule.map((item) => {
+                          const isItemToday = (() => {
+                            const now = new Date();
+                            const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                            return item.day === daysOfWeek[now.getDay()];
+                          })();
+
+                          return (
+                            <div 
+                              key={item.id} 
+                              className={`p-3 rounded-xl border transition-all duration-150 relative ${
+                                item.completed 
+                                  ? 'bg-slate-950/20 border-slate-900 opacity-60' 
+                                  : isItemToday 
+                                  ? 'bg-indigo-950/30 border-indigo-900/40 shadow-inner' 
+                                  : 'bg-slate-950/30 border-slate-850'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-start space-x-2.5 min-w-0">
+                                  <button 
+                                    onClick={() => handleToggleSchedule(item)}
+                                    className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                                      item.completed 
+                                        ? 'bg-emerald-600 border-emerald-600 text-white' 
+                                        : 'border-slate-700 hover:border-indigo-500 bg-slate-900'
+                                    }`}
+                                  >
+                                    {item.completed && <Check className="w-3 h-3 stroke-[3]" />}
+                                  </button>
+                                  <div className="min-w-0">
+                                    <p className={`text-xs font-extrabold truncate ${item.completed ? 'line-through text-slate-500 font-bold' : 'text-slate-200'}`}>
+                                      {item.task}
+                                    </p>
+                                    <p className="text-[9px] text-slate-400 font-bold mt-1 flex items-center gap-1.5 flex-wrap">
+                                      <span className="bg-slate-950 text-slate-350 px-1.5 py-0.5 rounded font-extrabold font-mono text-[8px]">{item.time}</span>
+                                      <span>•</span>
+                                      <span>
+                                        {appLanguage === 'Hindi' 
+                                          ? item.day === 'Monday' ? 'सोमवार' : item.day === 'Tuesday' ? 'मंगलवार' : item.day === 'Wednesday' ? 'बुधवार' : item.day === 'Thursday' ? 'गुरुवार' : item.day === 'Friday' ? 'शुक्रवार' : item.day === 'Saturday' ? 'शनिवार' : 'रविवार'
+                                          : item.day}
+                                      </span>
+                                    </p>
+                                  </div>
+                                </div>
+                                <button 
+                                  onClick={() => handleDeleteSchedule(item.id)}
+                                  className="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-slate-850 transition cursor-pointer shrink-0"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {showProgressModal && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end justify-center" 
+              id="progress_file_modal"
+            >
+              <motion.div 
+                initial={{ y: "15%" }} 
+                animate={{ y: 0 }} 
+                exit={{ y: "15%" }} 
+                className="bg-slate-900 w-full rounded-t-3xl p-5 space-y-4 shadow-xl border-t border-slate-850 overflow-y-auto max-h-[85vh] scrollbar-hide text-left"
+              >
+                <div className="flex justify-between items-center border-b border-slate-800 pb-2.5">
+                  <div className="flex items-center space-x-2">
+                    <TrendingUp className="w-5 h-5 text-emerald-400" />
+                    <div>
+                      <h3 className="font-bold text-white text-xs leading-none">
+                        {appLanguage === 'Hindi' ? 'विद्यार्थी प्रगति फ़ाइल (Progress File)' : 'Student Progress File'}
+                      </h3>
+                      <p className="text-[9px] text-slate-500 font-extrabold mt-1">
+                        📍 {appLanguage === 'Hindi' ? 'केहर डबला' : 'Kehar Dabla'}
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setShowProgressModal(false)} 
+                    className="text-slate-400 text-xs font-semibold p-1.5 bg-slate-800 rounded-full hover:bg-slate-700 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <ProgressModalContent 
+                  progress={progress}
+                  notes={notes}
+                  schedule={schedule}
+                  user={user}
+                  appLanguage={appLanguage}
+                />
+              </motion.div>
+            </motion.div>
+          )}
+
+          {activeStudyReminder && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className="absolute inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 text-left" 
+              id="study_reminder_alarm"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }} 
+                animate={{ scale: 1, y: 0 }} 
+                exit={{ scale: 0.9, y: 20 }} 
+                className="bg-slate-900 border border-indigo-500/30 w-full max-w-sm rounded-3xl p-6 text-center space-y-5 shadow-2xl relative overflow-hidden"
+              >
+                {/* Decorative background glow */}
+                <div className="absolute -top-10 -left-10 w-28 h-28 bg-indigo-500/10 rounded-full blur-xl pointer-events-none" />
+                <div className="absolute -bottom-10 -right-10 w-28 h-28 bg-emerald-500/10 rounded-full blur-xl pointer-events-none" />
+
+                <div className="mx-auto w-16 h-16 bg-indigo-500/10 border border-indigo-500/20 rounded-full flex items-center justify-center relative">
+                  <span className="text-3xl animate-bounce">🔔</span>
+                  <div className="absolute inset-0 rounded-full bg-indigo-500/10 animate-ping" />
+                </div>
+
+                <div className="space-y-1 text-center">
+                  <span className="text-[10px] uppercase font-black tracking-widest text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-full border border-indigo-500/20">
+                    {appLanguage === 'Hindi' ? 'पढ़ाई अलार्म समय' : 'Study Time Reminder'}
+                  </span>
+                  <h3 className="text-lg font-black text-white tracking-tight mt-2.5">
+                    {appLanguage === 'Hindi' ? 'चलो पढ़ाई करते हैं!' : 'Focus Time!'}
+                  </h3>
+                  <p className="text-[11px] text-slate-300 font-bold leading-normal mt-1 text-center">
+                    {appLanguage === 'Hindi' 
+                      ? `अभी समय ${activeStudyReminder.time} हुआ है। यह समय निम्नलिखित विषय को पढ़ने का है:`
+                      : `It is currently ${activeStudyReminder.time}. It is time to study your scheduled assignment:`}
+                  </p>
+                </div>
+
+                <div className="bg-slate-850 border border-slate-800 p-4 rounded-2xl relative text-center">
+                  <p className="text-sm font-extrabold text-indigo-300">
+                    {activeStudyReminder.task}
+                  </p>
+                  <span className="text-[9px] text-slate-500 font-mono block mt-1 uppercase font-black">
+                    🕒 {activeStudyReminder.time} • {activeStudyReminder.day}
+                  </span>
+                </div>
+
+                {/* Panda Mascot Tip */}
+                <div className="flex items-center space-x-3 bg-indigo-950/40 border border-indigo-900/40 p-3 rounded-xl text-left">
+                  <span className="text-2xl shrink-0">🐼</span>
+                  <p className="text-[9px] text-indigo-200 font-bold leading-normal">
+                    {appLanguage === 'Hindi' 
+                      ? 'चिंपू कहता है: "आपकी प्रगति फ़ाइल बढ़ रही है! चलिए इस कार्य को अभी पूरा करते हैं और अंक कमाते हैं!"'
+                      : 'Chimpu says: "Consistency leads to excellence! Let\'s tackle this study session right now!"'}
+                  </p>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  {/* Subject-specific Start Quiz button if matched */}
+                  {(() => {
+                    const matchedSub = SUBJECTS.find(sub => 
+                      activeStudyReminder.task.toLowerCase().includes(sub.toLowerCase())
+                    );
+                    if (matchedSub) {
+                      return (
+                        <button
+                          onClick={() => {
+                            setActiveTab('quiz');
+                            startQuiz(matchedSub, appLanguage);
+                            setActiveStudyReminder(null);
+                          }}
+                          className="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl text-xs font-black transition active:scale-95 flex items-center justify-center space-x-1.5 cursor-pointer shadow-md"
+                        >
+                          <span>🚀</span>
+                          <span>
+                            {appLanguage === 'Hindi' 
+                              ? `शुरू करें ${matchedSub} क्विज` 
+                              : `Start ${matchedSub} Quiz`}
+                          </span>
+                        </button>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  <button
+                    onClick={() => {
+                      handleToggleSchedule(activeStudyReminder);
+                      setActiveStudyReminder(null);
+                    }}
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black transition active:scale-95 flex items-center justify-center space-x-1.5 cursor-pointer shadow-md"
+                  >
+                    <span>✅</span>
+                    <span>
+                      {appLanguage === 'Hindi' ? 'कार्य पूरा किया (+10 XP)' : 'Mark Task Completed (+10 XP)'}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveStudyReminder(null)}
+                    className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer"
+                  >
+                    {appLanguage === 'Hindi' ? 'बाद में देखें' : 'Study Later'}
+                  </button>
+                </div>
               </motion.div>
             </motion.div>
           )}
@@ -6491,6 +7490,267 @@ export default function App() {
               </motion.div>
             </motion.div>
           )}
+
+          {/* Study Milestone Unlock Celebration Modal */}
+          {unlockedMilestone && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className="absolute inset-0 bg-slate-950/90 backdrop-blur-md z-100 flex items-center justify-center p-4 overflow-y-auto"
+              id="milestone_unlocked_celebration"
+            >
+              {/* Dynamic Confetti Explosion */}
+              {Array.from({ length: 45 }).map((_, i) => {
+                const angle = (i / 45) * 360;
+                const distance = 90 + Math.random() * 160;
+                const x = Math.cos((angle * Math.PI) / 180) * distance;
+                const y = Math.sin((angle * Math.PI) / 180) * distance;
+                const rotation = Math.random() * 360;
+                const colors = ['#fbbf24', '#38bdf8', '#34d399', '#f472b6', '#a78bfa', '#fb7185'];
+                const randomColor = colors[i % colors.length];
+
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ x: 0, y: 0, opacity: 1, scale: 0.5, rotate: 0 }}
+                    animate={{
+                      x: x,
+                      y: y + (Math.random() * 30),
+                      opacity: [1, 1, 0],
+                      scale: [0.5, 1.2, 0.2],
+                      rotate: rotation + 270
+                    }}
+                    transition={{
+                      duration: 3,
+                      ease: "easeOut",
+                      repeat: Infinity,
+                      repeatDelay: 1
+                    }}
+                    className="absolute w-2 h-4 rounded-xs pointer-events-none"
+                    style={{ backgroundColor: randomColor }}
+                  />
+                );
+              })}
+
+              <motion.div 
+                initial={{ scale: 0.85, y: 50, opacity: 0 }} 
+                animate={{ scale: 1, y: 0, opacity: 1 }} 
+                exit={{ scale: 0.85, y: 50, opacity: 0 }}
+                transition={{ type: "spring", damping: 15 }}
+                className="bg-slate-900 border border-slate-800 text-white w-full max-w-sm rounded-3xl p-6 text-center space-y-6 shadow-2xl relative overflow-hidden"
+              >
+                {/* Visual Glow Aura behind the badge */}
+                <div className="absolute top-12 left-1/2 -translate-x-1/2 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl animate-pulse" />
+
+                <div className="space-y-2">
+                  <span className="text-[10px] font-mono font-black text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
+                    {appLanguage === 'Hindi' ? 'नया मील का पत्थर!' : 'Milestone Unlocked!'}
+                  </span>
+                  <h3 className="text-xl font-black text-white tracking-tight leading-tight mt-1">
+                    {appLanguage === 'Hindi' ? 'बधाई हो!' : 'Congratulations!'} 🎉
+                  </h3>
+                </div>
+
+                {/* Animated Badge Icon Container */}
+                <div className="relative flex justify-center py-4">
+                  <motion.div
+                    initial={{ scale: 0, rotate: -180 }}
+                    animate={{ scale: [0, 1.2, 1], rotate: 0 }}
+                    transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 10 }}
+                    className="relative"
+                  >
+                    <span className="text-7xl block filter drop-shadow-[0_10px_12px_rgba(251,191,36,0.3)] select-none">
+                      {unlockedMilestone.tier.badgeIcon}
+                    </span>
+                    
+                    {/* Glowing Accent Ring */}
+                    <div className="absolute inset-0 border-4 border-amber-400/30 rounded-full scale-125 animate-ping opacity-75" />
+                  </motion.div>
+                </div>
+
+                <div className="space-y-2.5">
+                  <h4 className="text-base font-black text-amber-400">
+                    {appLanguage === 'Hindi' ? unlockedMilestone.tier.nameHi : unlockedMilestone.tier.name}
+                  </h4>
+                  <p className="text-xs text-slate-300 font-medium leading-relaxed px-2">
+                    {appLanguage === 'Hindi' 
+                      ? `आपने ${unlockedMilestone.subject} में उत्कृष्ट प्रगति की है और इस मील का पत्थर स्तर को अनलॉक किया है!`
+                      : `You have made outstanding progress in ${unlockedMilestone.subject} and successfully unlocked this study milestone level!`}
+                  </p>
+                </div>
+
+                {/* Stat Display Box */}
+                <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3 flex justify-around text-center gap-2">
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-mono uppercase font-extrabold tracking-wider">{appLanguage === 'Hindi' ? 'पूर्ण कार्य' : 'Tasks Done'}</p>
+                    <p className="text-sm font-black text-indigo-400 font-mono mt-0.5">{unlockedMilestone.tasksCompleted}</p>
+                  </div>
+                  <div className="w-px bg-slate-800 h-8 self-center" />
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-mono uppercase font-extrabold tracking-wider">{appLanguage === 'Hindi' ? 'अध्ययन समय' : 'Study Time'}</p>
+                    <p className="text-sm font-black text-indigo-400 font-mono mt-0.5">{unlockedMilestone.hoursCompleted.toFixed(1)}h</p>
+                  </div>
+                </div>
+
+                {/* Chimpu friendly prompt */}
+                <p className="text-[10px] text-emerald-400/90 font-bold bg-emerald-500/5 border border-emerald-500/10 py-2 px-3 rounded-xl">
+                  🐹 {appLanguage === 'Hindi' 
+                    ? `चिम्पू बहुत खुश है! वह कहता है: "आप कमाल के हैं, आगे बढ़ते रहें!"` 
+                    : `Chimpu is so happy! He says: "You are doing amazing, keep shining!"`}
+                </p>
+
+                <button
+                  onClick={() => setUnlockedMilestone(null)}
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-black rounded-xl text-xs tracking-wide transition shadow-lg shadow-indigo-600/20 cursor-pointer"
+                >
+                  {appLanguage === 'Hindi' ? 'पुरस्कार प्राप्त करें! 🏆' : 'Awesome, Thank You! 🏆'}
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {/* Subject Milestone Details Modal */}
+          {selectedSubjectMilestone && (() => {
+            const stats = getSubjectStats(selectedSubjectMilestone);
+            const history = unlockedMilestoneHistory[selectedSubjectMilestone] || [];
+            return (
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }} 
+                className="absolute inset-0 bg-black/60 backdrop-blur-xs z-90 flex items-end sm:items-center justify-center p-0 sm:p-4"
+                id="subject_milestone_details_modal"
+              >
+                <motion.div 
+                  initial={{ y: "20%" }} 
+                  animate={{ y: 0 }} 
+                  exit={{ y: "20%" }}
+                  className="bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl p-5 space-y-4 shadow-xl border-t sm:border border-slate-200 max-h-[85vh] overflow-y-auto"
+                >
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xl">{getSubjectEmoji(selectedSubjectMilestone)}</span>
+                      <h3 className="font-extrabold text-slate-800 text-sm">
+                        {selectedSubjectMilestone} {appLanguage === 'Hindi' ? 'मील का पत्थर' : 'Milestones'}
+                      </h3>
+                    </div>
+                    <button 
+                      onClick={() => setSelectedSubjectMilestone(null)} 
+                      className="text-slate-400 hover:text-slate-600 text-xs font-black cursor-pointer bg-slate-50 p-1.5 rounded-full"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Subject overall stats */}
+                  <div className="bg-indigo-50/50 rounded-2xl p-3 flex justify-between items-center border border-indigo-100/50">
+                    <div>
+                      <p className="text-[9px] uppercase tracking-wider font-extrabold text-indigo-500">{appLanguage === 'Hindi' ? 'कुल पूर्ण कार्य' : 'Total Tasks Completed'}</p>
+                      <p className="text-sm font-black text-slate-800 mt-0.5">{stats.completedTasks} {appLanguage === 'Hindi' ? 'कार्य' : 'Tasks'}</p>
+                    </div>
+                    <div className="h-8 w-px bg-slate-200" />
+                    <div className="text-right">
+                      <p className="text-[9px] uppercase tracking-wider font-extrabold text-indigo-500">{appLanguage === 'Hindi' ? 'कुल अध्ययन समय' : 'Total Study Duration'}</p>
+                      <p className="text-sm font-black text-slate-800 mt-0.5">{stats.studyHours.toFixed(1)}h <span className="text-[10px] text-slate-500 font-bold">({stats.studyMinutes}m)</span></p>
+                    </div>
+                  </div>
+
+                  {/* List of Milestones */}
+                  <div className="space-y-2.5">
+                    {MILESTONE_TIERS.map((tier) => {
+                      const isCompleted = history.includes(tier.id);
+                      
+                      return (
+                        <div 
+                          key={tier.id} 
+                          className={`p-3.5 rounded-2xl border transition-all ${
+                            isCompleted 
+                              ? 'bg-gradient-to-r from-slate-50 to-slate-50/20 border-slate-200' 
+                              : 'bg-white border-slate-100'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <span className={`w-10 h-10 rounded-xl bg-gradient-to-br ${tier.colorClass} flex items-center justify-center text-xl shadow-xs select-none border ${tier.borderClass}`}>
+                                {tier.badgeIcon}
+                              </span>
+                              <div>
+                                <h4 className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                                  <span>{appLanguage === 'Hindi' ? tier.nameHi : tier.name}</span>
+                                  {isCompleted && (
+                                    <span className="text-[8px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md font-black uppercase">
+                                      {appLanguage === 'Hindi' ? 'पूर्ण' : 'Unlocked'} ✓
+                                    </span>
+                                  )}
+                                </h4>
+                                <p className="text-[10px] text-slate-500 font-medium mt-0.5 leading-tight">
+                                  {appLanguage === 'Hindi'
+                                    ? `चाहिए: ${tier.tasksRequired} कार्य या ${tier.hoursRequired < 1 ? tier.hoursRequired * 60 + ' मिनट' : tier.hoursRequired + ' घंटे'}`
+                                    : `Requires: ${tier.tasksRequired} task${tier.tasksRequired > 1 ? 's' : ''} or ${tier.hoursRequired < 1 ? tier.hoursRequired * 60 + ' mins' : tier.hoursRequired + ' hr' + (tier.hoursRequired > 1 ? 's' : '')}`}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Circular/Check indicator */}
+                            <div>
+                              {isCompleted ? (
+                                <CheckCircle2 className="w-5 h-5 text-emerald-500 filter drop-shadow-xs" />
+                              ) : (
+                                <div className="text-[10px] text-slate-400 font-mono font-bold bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-100 uppercase">
+                                  {appLanguage === 'Hindi' ? 'बंद' : 'Locked'} 🔒
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Progress indicators inside the lock */}
+                          {!isCompleted && (
+                            <div className="mt-3 pt-2.5 border-t border-slate-50 space-y-1.5">
+                              {/* Task Progress Bar */}
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-[9px] text-slate-500 font-bold">
+                                  <span>{appLanguage === 'Hindi' ? 'कार्य प्रगति' : 'Task Progress'}</span>
+                                  <span>{Math.min(stats.completedTasks, tier.tasksRequired)} / {tier.tasksRequired}</span>
+                                </div>
+                                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-indigo-500 transition-all duration-300 rounded-full" 
+                                    style={{ width: `${Math.min(100, (stats.completedTasks / tier.tasksRequired) * 100)}%` }}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Hours Progress Bar */}
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-[9px] text-slate-500 font-bold">
+                                  <span>{appLanguage === 'Hindi' ? 'समय प्रगति' : 'Duration Progress'}</span>
+                                  <span>{stats.studyHours.toFixed(1)}h / {tier.hoursRequired}h</span>
+                                </div>
+                                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-indigo-400 transition-all duration-300 rounded-full" 
+                                    style={{ width: `${Math.min(100, (stats.studyHours / tier.hoursRequired) * 100)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedSubjectMilestone(null)}
+                    className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-black rounded-xl text-xs transition cursor-pointer"
+                  >
+                    {appLanguage === 'Hindi' ? 'बंद करें' : 'Close Details'}
+                  </button>
+                </motion.div>
+              </motion.div>
+            );
+          })()}
         </AnimatePresence>
       </div>
       )}

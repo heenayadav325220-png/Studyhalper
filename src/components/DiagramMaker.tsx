@@ -334,7 +334,7 @@ export function DiagramMaker({
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-slate-50/50" id="diagram_lab_workspace">
       {/* Primary Standalone Header Sub-Tabs */}
-      <div className="bg-white border-b border-slate-150 py-3.5 px-4 shrink-0 flex flex-col space-y-3 shadow-xs">
+      <div className="bg-white border-b border-slate-150 py-3.5 px-4 pl-14 shrink-0 flex flex-col space-y-3 shadow-xs">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-100">
