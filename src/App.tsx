@@ -737,7 +737,8 @@ export default function App() {
     titleVal: string,
     subjectVal: string,
     styleVal: string,
-    practiceVal: boolean
+    practiceVal: boolean,
+    diagramTypeVal?: "svg" | "image"
   ) => {
     setBackgroundDiagram({
       status: 'generating',
@@ -748,7 +749,7 @@ export default function App() {
       practiceMode: practiceVal,
       imageUrl: null,
       explanation: '',
-      step: 'Drafting scientific illustration geometry...',
+      step: diagramTypeVal === "image" ? 'Rendering rich full-color academic illustration...' : 'Drafting scientific illustration geometry...',
       error: null,
     });
 
@@ -770,7 +771,7 @@ export default function App() {
       const finalImagePrompt = `${promptVal}. Style: ${stylePrompt}. Mode: ${modePrompt} Clear educational context, academic style, centered diagram on solid, clean high-contrast neutral background.`;
 
       // Step 1: Generate diagram image
-      const diagramImg = await generateStudyDiagram(finalImagePrompt);
+      const diagramImg = await generateStudyDiagram(finalImagePrompt, diagramTypeVal);
       if (!diagramImg) {
         throw new Error("Unable to render diagram.");
       }

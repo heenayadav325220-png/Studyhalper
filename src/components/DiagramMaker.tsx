@@ -44,7 +44,7 @@ interface Props {
     error: string | null;
   };
   setBackgroundDiagram?: React.Dispatch<React.SetStateAction<any>>;
-  onGenerateDiagram?: (prompt: string, title: string, subject: string, style: string, practiceMode: boolean) => Promise<void>;
+  onGenerateDiagram?: (prompt: string, title: string, subject: string, style: string, practiceMode: boolean, diagramType?: 'svg' | 'image') => Promise<void>;
   onDiscussWithTutor?: (title: string) => void;
 }
 
@@ -92,6 +92,7 @@ export function DiagramMaker({
   const [selectedStyle, setSelectedStyle] = useState('textbook');
   const [selectedSubject, setSelectedSubject] = useState('Science');
   const [practiceMode, setPracticeMode] = useState(false);
+  const [diagramType, setDiagramType] = useState<'svg' | 'image'>('image');
 
   // Active diagram display state
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -159,7 +160,8 @@ export function DiagramMaker({
         localTitle || localPrompt.substring(0, 30),
         selectedSubject,
         selectedStyle,
-        practiceMode
+        practiceMode,
+        diagramType
       );
     } else {
       alert("Background generation pipeline not initialized. Check your network configuration.");
@@ -517,6 +519,29 @@ export function DiagramMaker({
                         <option key={st.id} value={st.id}>{st.name}</option>
                       ))}
                     </select>
+                  </div>
+                </div>
+
+                {/* Output Format Selector */}
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Output Format</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDiagramType('image')}
+                      className={`py-2 px-3 rounded-xl border text-[11px] font-extrabold transition cursor-pointer flex flex-col items-center justify-center gap-1 ${diagramType === 'image' ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-xs' : 'bg-slate-50/50 border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      <span className="text-sm">🖼️</span>
+                      <span>Detailed Image (Rich)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDiagramType('svg')}
+                      className={`py-2 px-3 rounded-xl border text-[11px] font-extrabold transition cursor-pointer flex flex-col items-center justify-center gap-1 ${diagramType === 'svg' ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-xs' : 'bg-slate-50/50 border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      <span className="text-sm">📐</span>
+                      <span>Vector Schema (SVG)</span>
+                    </button>
                   </div>
                 </div>
 

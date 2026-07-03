@@ -867,7 +867,12 @@ function generateGuaranteedLocalSvg(prompt: string): string {
       <rect x="25" y="22" width="700" height="42" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" rx="10" filter="url(#shadow)"/>
       <text x="45" y="48" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="950" fill="#0f172a" letter-spacing="-0.5px">${cleanTitle.toUpperCase()}</text>
       <rect x="585" y="31" width="125" height="24" rx="6" fill="#f1f5f9" />
-      <text x="647" y="46" font-family="system-ui, sans-serif" font-size="8.5" font-weight="extrabold" fill="#475569" text-anchor="middle">🛡�export async function generateStudyDiagram(prompt: string, type?: "svg" | "image"): Promise<string | null> {
+      <text x="647" y="46" font-family="system-ui, sans-serif" font-size="8.5" font-weight="extrabold" fill="#475569" text-anchor="middle">🛡️ OFFLINE</text>
+    </g>
+  </svg>`;
+}
+
+export async function generateStudyDiagram(prompt: string, type?: "svg" | "image"): Promise<string | null> {
   // 1. Try secure backend server route (Primary route)
   try {
     const response = await safeFetch("/api/gemini/diagram", {
@@ -920,8 +925,8 @@ function generateGuaranteedLocalSvg(prompt: string): string {
 
     // Otherwise, or if image model failed, try to generate a beautiful vector SVG using the working text model gemini-3.5-flash
     try {
-      const svgPrompt = `You are an expert educational designer. Create a beautiful, detailed, neat, textbook-grade academic vector SVG diagram/illustration for: "${prompt}".`or SVG diagram/illustration for: "${prompt}".
-      
+      const svgPrompt = `You are an expert educational designer. Create a beautiful, detailed, neat, textbook-grade academic vector SVG diagram/illustration for: "${prompt}".
+
       Requirements:
       1. MUST be a valid, standalone <svg> element with viewBox="0 0 600 450" and width="100%" height="100%".
       2. Use a modern, ultra-clean design: soft background, precise vector shapes (rects, circles, paths), elegant colors (indigo, slate, sky, emerald), and clear, clean leader lines/arrows pointing to labels.
