@@ -86,6 +86,16 @@ service cloud.firestore {
         allow create: if isSignedIn() && request.resource.data.created_by == request.auth.uid;
         allow update: if isSignedIn();
         allow delete: if isSignedIn() && resource.data.created_by == request.auth.uid;
+
+        match /board_elements/{elementId} {
+          allow read, write: if isSignedIn();
+        }
+        match /shared_notes/{docId} {
+          allow read, write: if isSignedIn();
+        }
+        match /shared_timer/{docId} {
+          allow read, write: if isSignedIn();
+        }
       }
     }
   }

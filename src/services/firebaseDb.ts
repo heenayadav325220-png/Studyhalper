@@ -15,7 +15,8 @@ import {
   orderBy, 
   limit,
   handleFirestoreError,
-  OperationType
+  OperationType,
+  writeBatch
 } from "./firebase";
 import type { User, Note, ScheduleItem, Progress, Group, GroupMessage, GroupNote, Flashcard, GroupQuestion, GroupSession } from "../types";
 
@@ -948,4 +949,258 @@ export async function deleteUserDiagram(userId: string | number, diagramId: stri
     saveLocalDiagrams(filtered);
   }
 }
+
+// ---------------- INTERACTIVE LIVE STUDY ROOM (WHITEBOARD & WORKSPACE) ----------------
+
+export function subscribeToWhiteboard(
+  groupId: string | number,
+  sessionId: string | number,
+  callback: (elements: any[]) => void
+) {
+  if (String(groupId).startsWith("local_") || String(sessionId).startsWith("local_")) {
+    const loadLocal = () => {
+      const localElements = JSON.parse(localStorage.getItem(`studybuddy_whiteboard_${sessionId}`) || "[]");
+      callback(localElements);
+    };
+    loadLocal();
+    const handler = (e: StorageEvent) => {
+      if (e.key === `studybuddy_whiteboard_${sessionId}`) {
+        loadLocal();
+      }
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }
+
+  const colRef = collection(db, "groups", String(groupId), "sessions", String(sessionId), "board_elements");
+  const q = query(colRef, orderBy("createdAt", "asc"));
+  return onSnapshot(q, (snap) => {
+    const results: any[] = [];
+    snap.forEach((docSnap) => {
+      results.push({
+        id: docSnap.id,
+        ...docSnap.data()
+      });
+    });
+    callback(results);
+  });
+}
+
+export async function addWhiteboardElement(
+  groupId: string | number,
+  sessionId: string | number,
+  element: any
+): Promise<string> {
+  const payload = {
+    type: element.type,
+    points: element.points || null,
+    x: element.x !== undefined ? element.x : null,
+    y: element.y !== undefined ? element.y : null,
+    width: element.width !== undefined ? element.width : null,
+    height: element.height !== undefined ? element.height : null,
+    color: element.color || "#4f46e5",
+    text: element.text || "",
+    creatorId: String(element.creatorId),
+    creatorName: element.creatorName || "Student",
+    createdAt: element.createdAt || new Date().toISOString()
+  };
+
+  if (String(groupId).startsWith("local_") || String(sessionId).startsWith("local_")) {
+    const localElements = JSON.parse(localStorage.getItem(`studybuddy_whiteboard_${sessionId}`) || "[]");
+    const id = element.id || "local_elem_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
+    const newElement = { id, ...payload };
+    const existingIdx = localElements.findIndex((el: any) => el.id === element.id);
+    if (existingIdx !== -1) {
+      localElements[existingIdx] = newElement;
+    } else {
+      localElements.push(newElement);
+    }
+    localStorage.setItem(`studybuddy_whiteboard_${sessionId}`, JSON.stringify(localElements));
+    window.dispatchEvent(new StorageEvent("storage", { key: `studybuddy_whiteboard_${sessionId}` }));
+    return id;
+  }
+
+  try {
+    const id = element.id || doc(collection(db, "groups", String(groupId), "sessions", String(sessionId), "board_elements")).id;
+    const docRef = doc(db, "groups", String(groupId), "sessions", String(sessionId), "board_elements", id);
+    await setDoc(docRef, payload, { merge: true });
+    return id;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `groups/${groupId}/sessions/${sessionId}/board_elements/${element.id || "new"}`);
+  }
+}
+
+export async function deleteWhiteboardElement(
+  groupId: string | number,
+  sessionId: string | number,
+  elementId: string
+): Promise<void> {
+  if (String(groupId).startsWith("local_") || String(sessionId).startsWith("local_")) {
+    const localElements = JSON.parse(localStorage.getItem(`studybuddy_whiteboard_${sessionId}`) || "[]");
+    const filtered = localElements.filter((el: any) => el.id !== elementId);
+    localStorage.setItem(`studybuddy_whiteboard_${sessionId}`, JSON.stringify(filtered));
+    window.dispatchEvent(new StorageEvent("storage", { key: `studybuddy_whiteboard_${sessionId}` }));
+    return;
+  }
+
+  try {
+    const docRef = doc(db, "groups", String(groupId), "sessions", String(sessionId), "board_elements", elementId);
+    await deleteDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `groups/${groupId}/sessions/${sessionId}/board_elements/${elementId}`);
+  }
+}
+
+export async function clearWhiteboard(
+  groupId: string | number,
+  sessionId: string | number,
+  elementIds: string[]
+): Promise<void> {
+  if (String(groupId).startsWith("local_") || String(sessionId).startsWith("local_")) {
+    localStorage.setItem(`studybuddy_whiteboard_${sessionId}`, "[]");
+    window.dispatchEvent(new StorageEvent("storage", { key: `studybuddy_whiteboard_${sessionId}` }));
+    return;
+  }
+
+  try {
+    const batch = writeBatch(db);
+    elementIds.forEach((id) => {
+      const docRef = doc(db, "groups", String(groupId), "sessions", String(sessionId), "board_elements", id);
+      batch.delete(docRef);
+    });
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `groups/${groupId}/sessions/${sessionId}/board_elements/clear`);
+  }
+}
+
+export function subscribeToSharedNotes(
+  groupId: string | number,
+  sessionId: string | number,
+  callback: (data: { content: string; updatedAt: string; updatedBy: string } | null) => void
+) {
+  if (String(groupId).startsWith("local_") || String(sessionId).startsWith("local_")) {
+    const loadLocal = () => {
+      const localNotes = localStorage.getItem(`studybuddy_room_notes_${sessionId}`);
+      if (localNotes) {
+        callback(JSON.parse(localNotes));
+      } else {
+        callback({ content: "", updatedAt: new Date().toISOString(), updatedBy: "System" });
+      }
+    };
+    loadLocal();
+    const handler = (e: StorageEvent) => {
+      if (e.key === `studybuddy_room_notes_${sessionId}`) {
+        loadLocal();
+      }
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }
+
+  const docRef = doc(db, "groups", String(groupId), "sessions", String(sessionId), "shared_notes", "notepad");
+  return onSnapshot(docRef, (snap) => {
+    if (snap.exists()) {
+      const d = snap.data();
+      callback({
+        content: d.content || "",
+        updatedAt: d.updatedAt || new Date().toISOString(),
+        updatedBy: d.updatedBy || "Anonymous"
+      });
+    } else {
+      callback(null);
+    }
+  });
+}
+
+export async function updateSharedNotes(
+  groupId: string | number,
+  sessionId: string | number,
+  content: string,
+  updatedBy: string
+): Promise<void> {
+  const payload = {
+    content,
+    updatedAt: new Date().toISOString(),
+    updatedBy
+  };
+
+  if (String(groupId).startsWith("local_") || String(sessionId).startsWith("local_")) {
+    localStorage.setItem(`studybuddy_room_notes_${sessionId}`, JSON.stringify(payload));
+    window.dispatchEvent(new StorageEvent("storage", { key: `studybuddy_room_notes_${sessionId}` }));
+    return;
+  }
+
+  try {
+    const docRef = doc(db, "groups", String(groupId), "sessions", String(sessionId), "shared_notes", "notepad");
+    await setDoc(docRef, payload, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `groups/${groupId}/sessions/${sessionId}/shared_notes/notepad`);
+  }
+}
+
+export function subscribeToSharedTimer(
+  groupId: string | number,
+  sessionId: string | number,
+  callback: (data: { status: 'idle' | 'running' | 'paused'; timeLeft: number; duration: number; updatedAt: string } | null) => void
+) {
+  if (String(groupId).startsWith("local_") || String(sessionId).startsWith("local_")) {
+    const loadLocal = () => {
+      const localTimer = localStorage.getItem(`studybuddy_room_timer_${sessionId}`);
+      if (localTimer) {
+        callback(JSON.parse(localTimer));
+      } else {
+        callback({ status: 'idle', timeLeft: 1500, duration: 1500, updatedAt: new Date().toISOString() });
+      }
+    };
+    loadLocal();
+    const handler = (e: StorageEvent) => {
+      if (e.key === `studybuddy_room_timer_${sessionId}`) {
+        loadLocal();
+      }
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }
+
+  const docRef = doc(db, "groups", String(groupId), "sessions", String(sessionId), "shared_timer", "pomodoro");
+  return onSnapshot(docRef, (snap) => {
+    if (snap.exists()) {
+      const d = snap.data();
+      callback({
+        status: d.status || 'idle',
+        timeLeft: d.timeLeft !== undefined ? d.timeLeft : 1500,
+        duration: d.duration !== undefined ? d.duration : 1500,
+        updatedAt: d.updatedAt || new Date().toISOString()
+      });
+    } else {
+      callback(null);
+    }
+  });
+}
+
+export async function updateSharedTimer(
+  groupId: string | number,
+  sessionId: string | number,
+  timerState: { status: 'idle' | 'running' | 'paused'; timeLeft: number; duration: number }
+): Promise<void> {
+  const payload = {
+    ...timerState,
+    updatedAt: new Date().toISOString()
+  };
+
+  if (String(groupId).startsWith("local_") || String(sessionId).startsWith("local_")) {
+    localStorage.setItem(`studybuddy_room_timer_${sessionId}`, JSON.stringify(payload));
+    window.dispatchEvent(new StorageEvent("storage", { key: `studybuddy_room_timer_${sessionId}` }));
+    return;
+  }
+
+  try {
+    const docRef = doc(db, "groups", String(groupId), "sessions", String(sessionId), "shared_timer", "pomodoro");
+    await setDoc(docRef, payload, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `groups/${groupId}/sessions/${sessionId}/shared_timer/pomodoro`);
+  }
+}
+
 

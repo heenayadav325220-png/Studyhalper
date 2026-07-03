@@ -171,6 +171,49 @@
         "updated_at": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "title", "updated_by", "updated_by_name", "updated_at"]
+    },
+    "WhiteboardElement": {
+      "title": "Whiteboard Vector Element",
+      "description": "A vector drawing point, shape, text box, or sticky note on the live shared whiteboard.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["pen", "rect", "circle", "text", "sticky"] },
+        "points": { "type": "array", "description": "Array of {x, y} coordinate coordinates for pen drawing stroke." },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "color": { "type": "string" },
+        "text": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "creatorName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "type", "creatorId", "creatorName", "createdAt"]
+    },
+    "SharedNotes": {
+      "title": "Room Collaborative Notes",
+      "description": "A live-typing collaborative notepad document inside a virtual study session.",
+      "type": "object",
+      "properties": {
+        "content": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["content", "updatedAt"]
+    },
+    "SharedTimer": {
+      "title": "Room Collaborative Pomodoro",
+      "description": "Real-time state of the session-wide joint study timer.",
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["idle", "running", "paused"] },
+        "timeLeft": { "type": "integer" },
+        "duration": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["status", "timeLeft", "duration", "updatedAt"]
     }
   },
   "firestore": {
@@ -217,6 +260,18 @@
     "/groups/{groupId}/sessions/{sessionId}": {
       "schema": "GroupSession",
       "description": "Scheduled virtual live study sessions for group participants."
+    },
+    "/groups/{groupId}/sessions/{sessionId}/board_elements/{elementId}": {
+      "schema": "WhiteboardElement",
+      "description": "Dynamic vector drawing/sticky notes synchronizer for collaborative whiteboards."
+    },
+    "/groups/{groupId}/sessions/{sessionId}/shared_notes/{docId}": {
+      "schema": "SharedNotes",
+      "description": "Real-time collaborative text editor state for joint session notes."
+    },
+    "/groups/{groupId}/sessions/{sessionId}/shared_timer/{docId}": {
+      "schema": "SharedTimer",
+      "description": "Live sync of Pomodoro timer values across all virtual room participants."
     }
   }
 }
