@@ -44,6 +44,10 @@ service cloud.firestore {
       match /diagrams/{diagramId} {
         allow read, write: if isSignedIn() && request.auth.uid == userId;
       }
+
+      match /tutor_sessions/{sessionId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
     }
 
     // Group membership checker

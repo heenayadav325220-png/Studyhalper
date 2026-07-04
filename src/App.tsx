@@ -732,6 +732,8 @@ export default function App() {
   const [authOtp, setAuthOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authSuccess, setAuthSuccess] = useState<string | null>(null);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [leaderboard, setLeaderboard] = useState<{ name: string; points: number; level: number }[]>([]);
@@ -3458,15 +3460,17 @@ export default function App() {
   const handleEmailSignIn = async (e: any) => {
     e.preventDefault();
     if (!authEmail || !authPassword) return;
+    setAuthError(null);
+    setAuthSuccess(null);
     try {
       setAuthLoading(true);
       await signInWithEmailAndPassword(auth, authEmail, authPassword);
     } catch (err: any) {
       console.error(err);
       if (err?.code === 'auth/operation-not-allowed' || err?.message?.includes('operation-not-allowed')) {
-        alert("This sign-in provider (Email/Password) is not enabled in your Firebase project yet.\n\n👉 Recommended: Use 'Sign In with Google' which is fully pre-configured and works instantly!\n\nAlternatively, you can enable the Email/Password provider in the Firebase Console -> Authentication -> Sign-in method.");
+        setAuthError("This sign-in provider (Email/Password) is not enabled in your Firebase project yet.\n\n👉 Recommended: Use 'Sign In with Google' which is fully pre-configured and works instantly!");
       } else {
-        alert(err.message || "Failed to sign in. Please check details.");
+        setAuthError(err.message || "Failed to sign in. Please check details.");
       }
     } finally {
       setAuthLoading(false);
@@ -3476,15 +3480,17 @@ export default function App() {
   const handleEmailSignUp = async (e: any) => {
     e.preventDefault();
     if (!authEmail || !authPassword) return;
+    setAuthError(null);
+    setAuthSuccess(null);
     try {
       setAuthLoading(true);
       await createUserWithEmailAndPassword(auth, authEmail, authPassword);
     } catch (err: any) {
       console.error(err);
       if (err?.code === 'auth/operation-not-allowed' || err?.message?.includes('operation-not-allowed')) {
-        alert("Creating email accounts is not enabled in your Firebase project yet.\n\n👉 Recommended: Use 'Sign In with Google' which is fully pre-configured and works instantly!\n\nAlternatively, you can enable the Email/Password provider in the Firebase Console -> Authentication -> Sign-in method.");
+        setAuthError("Creating email accounts is not enabled in your Firebase project yet.\n\n👉 Recommended: Use 'Sign In with Google' which is fully pre-configured and works instantly!");
       } else {
-        alert(err.message || "Failed to register. Please try another email.");
+        setAuthError(err.message || "Failed to register. Please try another email.");
       }
     } finally {
       setAuthLoading(false);
@@ -3492,13 +3498,15 @@ export default function App() {
   };
 
   const handleGoogleSignIn = async () => {
+    setAuthError(null);
+    setAuthSuccess(null);
     try {
       setAuthLoading(true);
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "Google sign-in cancelled or failed.");
+      setAuthError(err.message || "Google sign-in cancelled or failed.");
     } finally {
       setAuthLoading(false);
     }
@@ -3506,17 +3514,20 @@ export default function App() {
 
   const handleSendOtp = () => {
     if (!authPhone) {
-      alert("Please write your phone number first!");
+      setAuthError("Please write your phone number first!");
       return;
     }
+    setAuthError(null);
     setOtpSent(true);
-    alert("Simulation: OTP Sent to " + authPhone + "! Please enter code 123456 to verify!");
+    setAuthSuccess("Simulation: OTP Sent to " + authPhone + "! Please enter code 123456 to verify!");
   };
 
   const handleVerifyOtp = async (e: any) => {
     e.preventDefault();
+    setAuthError(null);
+    setAuthSuccess(null);
     if (authOtp !== '123456' && authOtp !== '1234') {
-      alert("Invalid code! Please use code 123456 to verify simulation.");
+      setAuthError("Invalid code! Please use code 123456 to verify simulation.");
       return;
     }
     try {
@@ -3526,9 +3537,9 @@ export default function App() {
     } catch (err: any) {
       console.error(err);
       if (err?.code === 'auth/operation-not-allowed' || err?.message?.includes('operation-not-allowed')) {
-        alert("Anonymous / Phone simulation authentication is not enabled in your Firebase project yet.\n\n👉 Recommended: Use 'Sign In with Google' which is fully pre-configured and works instantly!\n\nAlternatively, you can enable the Anonymous provider in your Firebase Console -> Authentication -> Sign-in method.");
+        setAuthError("Anonymous / Phone simulation authentication is not enabled in your Firebase project yet.\n\n👉 Recommended: Use 'Sign In with Google' which works instantly!");
       } else {
-        alert("Failed to verify code.");
+        setAuthError("Failed to verify code.");
       }
     } finally {
       setAuthLoading(false);
@@ -3536,15 +3547,17 @@ export default function App() {
   };
 
   const handleGuestLogin = async () => {
+    setAuthError(null);
+    setAuthSuccess(null);
     try {
       setAuthLoading(true);
       await signInAnonymously(auth);
     } catch (err: any) {
       console.error(err);
       if (err?.code === 'auth/operation-not-allowed' || err?.message?.includes('operation-not-allowed')) {
-        alert("Guest (Anonymous) login is not enabled in your Firebase project yet.\n\n👉 Recommended: Use 'Sign In with Google' which is fully pre-configured and works instantly!\n\nAlternatively, you can enable the Anonymous provider in your Firebase Console -> Authentication -> Sign-in method.");
+        setAuthError("Guest (Anonymous) login is not enabled in your Firebase project yet.\n\n👉 Recommended: Use 'Sign In with Google' which works instantly!");
       } else {
-        alert("Guest login failed.");
+        setAuthError("Guest login failed.");
       }
     } finally {
       setAuthLoading(false);
@@ -3648,7 +3661,11 @@ export default function App() {
                  <button
                    key={tab.mode}
                    type="button"
-                   onClick={() => setAuthMode(tab.mode as any)}
+                   onClick={() => {
+                     setAuthError(null);
+                     setAuthSuccess(null);
+                     setAuthMode(tab.mode as any);
+                   }}
                    className={`py-2 px-1 text-[10px] font-black rounded-xl transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
                      authMode === tab.mode 
                        ? 'bg-gradient-to-tr from-indigo-600 to-violet-600 text-white shadow-md' 
@@ -3660,6 +3677,20 @@ export default function App() {
                  </button>
                ))}
              </div>
+
+             {authError && (
+               <div className="p-3.5 mb-4 bg-red-950/70 border border-red-900/60 text-red-200 text-[11px] font-semibold rounded-2xl leading-relaxed flex items-start gap-2.5 shadow-inner">
+                 <span className="text-sm mt-0.5">⚠️</span>
+                 <div className="flex-1 whitespace-pre-line text-left">{authError}</div>
+               </div>
+             )}
+
+             {authSuccess && (
+               <div className="p-3.5 mb-4 bg-emerald-950/70 border border-emerald-900/60 text-emerald-200 text-[11px] font-semibold rounded-2xl leading-relaxed flex items-start gap-2.5 shadow-inner">
+                 <span className="text-sm mt-0.5">✅</span>
+                 <div className="flex-1 whitespace-pre-line text-left">{authSuccess}</div>
+               </div>
+             )}
 
              <div className="bg-slate-900/50 p-5 rounded-3xl border border-slate-850 space-y-4">
                {authMode === 'login' && (

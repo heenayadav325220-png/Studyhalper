@@ -214,6 +214,19 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["status", "timeLeft", "duration", "updatedAt"]
+    },
+    "TutorSession": {
+      "title": "Tutor Session",
+      "description": "Stores personal AI tutor chatbot interaction history.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "messages": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "persona": { "type": "string" }
+      },
+      "required": ["id", "title", "messages", "createdAt"]
     }
   },
   "firestore": {
@@ -272,6 +285,10 @@
     "/groups/{groupId}/sessions/{sessionId}/shared_timer/{docId}": {
       "schema": "SharedTimer",
       "description": "Live sync of Pomodoro timer values across all virtual room participants."
+    },
+    "/users/{userId}/tutor_sessions/{sessionId}": {
+      "schema": "TutorSession",
+      "description": "AI Tutor chatbot interaction sessions per student."
     }
   }
 }
