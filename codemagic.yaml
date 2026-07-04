@@ -7,6 +7,8 @@ workflows:
       - name: Build APK
         script: |
           cd android
+          # टूटी हुई फाइल को बाईपास करके नया gradle इंस्टॉल करने की जादुई कमांड
+          gradle wrapper --gradle-version 8.0
           chmod +x gradlew
           ./gradlew assembleDebug
     artifacts:
