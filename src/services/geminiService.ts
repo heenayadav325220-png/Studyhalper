@@ -363,7 +363,9 @@ export async function getStudyAnswer(
   prompt: string, 
   imageBase64?: string, 
   studentContext?: { name: string; school: string; className: string; country?: string }, 
-  language: string = "English"
+  language: string = "English",
+  persona: 'default' | 'socratic' | 'debugger' | 'translator' | 'math' = 'default',
+  history?: { role: 'user' | 'model', text: string }[]
 ): Promise<string> {
   // 1. Try secure backend server route (Primary route)
   try {
@@ -372,7 +374,7 @@ export async function getStudyAnswer(
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ prompt, imageBase64, studentContext, language }),
+      body: JSON.stringify({ prompt, imageBase64, studentContext, language, persona, history }),
     });
 
     if (response.ok) {
@@ -395,15 +397,26 @@ export async function getStudyAnswer(
       throw new Error("Client Gemini instance could not be initialized (key missing).");
     }
 
-    const parts: any[] = [{ text: prompt }];
+    let contentsList: any[] = [];
+    if (history && Array.isArray(history)) {
+      contentsList = history.map((msg: any) => ({
+        role: msg.role === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.text }]
+      }));
+    }
+    const currentParts: any[] = [{ text: prompt }];
     if (imageBase64) {
-      parts.push({
+      currentParts.push({
         inlineData: {
           mimeType: "image/png",
           data: imageBase64.split(',')[1] || imageBase64
         }
       });
     }
+    contentsList.push({
+      role: 'user',
+      parts: currentParts
+    });
 
     let langInstruction = `Explain everything in English.`;
     if (language === "Hindi") {
@@ -447,16 +460,29 @@ export async function getStudyAnswer(
       }
     }
 
+    let personaInstruction = "";
+    if (persona === 'socratic') {
+      personaInstruction = "You are a Socratic Teacher. Never give direct, straight answers to the student immediately. Instead, always ask short, helpful guiding questions to prompt the student to think, deduce, and discover the answer themselves. Encourage their critical thinking.";
+    } else if (persona === 'debugger') {
+      personaInstruction = "You are a Code Debugger and Programming Expert. Analyze code logic, pinpoint bugs, explain syntax errors, and break down solutions step-by-step in clean formatting. Provide optimized and secure code snippets with thorough comments.";
+    } else if (persona === 'translator') {
+      personaInstruction = "You are a Language Translator & Bilingual Speaking Partner. Help the student translate phrases, explain grammar rules, clarify pronunciation tips, and practice conversational dialogue in both English and Hindi or their chosen language.";
+    } else if (persona === 'math') {
+      personaInstruction = "You are a Math Wizard. Break down all mathematical equations, proofs, and word problems into extremely clear, sequential steps. Explain the 'why' behind each step and define any variables or formulas used.";
+    } else {
+      personaInstruction = "You are an encouraging and friendly study helper/coach. Explain concepts clearly and provide step-by-step solutions.";
+    }
+
     const appInfo = "You are the AI model integrated into 'Ascend Study', an advanced, interactive study assistant platform. Ascend Study provides students with intelligent conversational learning, structured subject notes, dynamic practice quizzes, progress and daily streak tracking, study schedules/reminders, and collaborative group study circles/rooms for peer-to-peer interactive learning.";
     const creatorInfo = "Your owner, creator, and lead developer is Rohit Yadav, a brilliant 14/15-year-old student and coder who designed and developed this entire applet. Rohit is the head and founder of his developer team called 'Core AI'. If any student or user asks who created/developed you, who designed this app, or who owns you, you must proudly, clearly, and directly tell them that you were created and are owned by Rohit Yadav and his team, Core AI. You must never claim that Google, Google AI Studio, or OpenAI created or own you - they are only providers of the underlying large language model APIs, but the app itself and your persona belongs strictly to Rohit Yadav and Core AI.";
 
     const systemInstruction = studentContext 
-      ? `${appInfo} ${creatorInfo} You are an encouraging, friendly study helper/coach for a child named ${studentContext.name} who studies in ${studentContext.className} at ${studentContext.school}. ${syllabusPrompt} Keep your tone highly personalized, warm, and highly encouraging, referring to their school or name when it fits naturally. ${langInstruction}`
-      : `${appInfo} ${creatorInfo} You are a helpful study assistant. Explain concepts clearly and provide step-by-step solutions. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. If the user asks for a diagram or visual explanation, describe it clearly or suggest a visual aid. ${langInstruction}`;
+      ? `${appInfo} ${creatorInfo} ${personaInstruction} You are an encouraging, friendly study helper/coach for a child named ${studentContext.name} who studies in ${studentContext.className} at ${studentContext.school}. ${syllabusPrompt} Keep your tone highly personalized, warm, and highly encouraging, referring to their school or name when it fits naturally. ${langInstruction}`
+      : `${appInfo} ${creatorInfo} ${personaInstruction} You are a helpful study assistant. Explain concepts clearly and provide step-by-step solutions. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. If the user asks for a diagram or visual explanation, describe it clearly or suggest a visual aid. ${langInstruction}`;
 
     const response = await callClientGeminiWithRetry(ai, {
       model: "gemini-3.5-flash",
-      contents: { parts },
+      contents: contentsList,
       config: {
         systemInstruction: systemInstruction,
       },

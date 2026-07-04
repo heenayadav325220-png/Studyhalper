@@ -46,7 +46,9 @@ import {
   Info,
   Activity,
   Settings,
-  TrendingUp
+  TrendingUp,
+  Pencil,
+  Bot
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
@@ -60,7 +62,7 @@ import StudyRoom from './components/StudyRoom';
 import { ProgressModalContent } from './components/ProgressModalContent';
 const InteractiveToolkit = lazy(() => import('./components/InteractiveToolkit'));
 import type { AppLanguage } from './services/translations';
-import type { Note, ScheduleItem, Progress, ChatMessage, Subject, User as UserType, Group, GroupMessage, GroupNote, Flashcard, GroupQuestion, GroupSession } from './types';
+import type { Note, ScheduleItem, Progress, ChatMessage, Subject, User as UserType, Group, GroupMessage, GroupNote, Flashcard, GroupQuestion, GroupSession, TutorSession } from './types';
 import { 
   auth, 
   db,
@@ -107,7 +109,10 @@ import {
   subscribeToGroupSessions,
   saveGroupSession,
   rsvpGroupSession,
-  saveUserDiagram
+  saveUserDiagram,
+  getTutorSessions,
+  saveTutorSession,
+  deleteTutorSession
 } from './services/firebaseDb';
 
 
@@ -956,7 +961,25 @@ export default function App() {
   const [flashcardCountToGenerate, setFlashcardCountToGenerate] = useState(5);
 
   // Chat & interactive history states
+  const [tutorSessions, setTutorSessions] = useState<TutorSession[]>(() => {
+    const stored = localStorage.getItem('studybuddy_tutor_sessions');
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {
+        console.error("Failed to parse tutor sessions:", e);
+      }
+    }
+    return [];
+  });
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(() => {
+    const stored = localStorage.getItem('studybuddy_active_session_id');
+    return stored || null;
+  });
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isHistorySidebarOpen, setIsHistorySidebarOpen] = useState(false);
+  const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
+  const [renameSessionTitle, setRenameSessionTitle] = useState('');
   const [fullScreenMessage, setFullScreenMessage] = useState<ChatMessage | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [chatInput, setChatInput] = useState('');
@@ -983,7 +1006,7 @@ export default function App() {
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [selectedReviewNote, setSelectedReviewNote] = useState<Note | null>(null);
   const [isToolkitOpen, setIsToolkitOpen] = useState(false);
-  const [newNote, setNewNote] = useState({ title: '', content: '', subject: 'Mathematics' as Subject });
+  const [newNote, setNewNote] = useState({ title: '', content: '', subject: 'Mathematics' as Subject, understanding: 'good' as 'hard' | 'good' | 'easy' });
   const [isAddingSchedule, setIsAddingSchedule] = useState(false);
   const [newSchedule, setNewSchedule] = useState<{ task: string; time: string; day: string; category: 'Exam' | 'Homework' | 'Project' | 'Other' }>({ task: '', time: '', day: 'Monday', category: 'Homework' });
   const [badgeToast, setBadgeToast] = useState<{ badge_name: string; icon: string } | null>(null);
@@ -1054,6 +1077,97 @@ export default function App() {
     hoursCompleted: number;
   } | null>(null);
   const [selectedSubjectMilestone, setSelectedSubjectMilestone] = useState<Subject | null>(null);
+  const [sparkleSubject, setSparkleSubject] = useState<Subject | null>(null);
+
+  // Multi-session chat synchronizer
+  useEffect(() => {
+    if (tutorSessions.length === 0) {
+      const initialId = 'sess_' + Date.now();
+      const initialSession: TutorSession = {
+        id: initialId,
+        title: appLanguage === 'Hindi' ? 'नया चैट सत्र' : 'New Chat Session',
+        messages: [],
+        createdAt: new Date().toISOString(),
+        persona: 'default'
+      };
+      setTutorSessions([initialSession]);
+      setActiveSessionId(initialId);
+      localStorage.setItem('studybuddy_tutor_sessions', JSON.stringify([initialSession]));
+      localStorage.setItem('studybuddy_active_session_id', initialId);
+      setChatMessages([]);
+    } else {
+      let currentId = activeSessionId;
+      if (!currentId || !tutorSessions.some(s => s.id === currentId)) {
+        currentId = tutorSessions[0].id;
+        setActiveSessionId(currentId);
+        localStorage.setItem('studybuddy_active_session_id', currentId);
+      }
+      const activeSess = tutorSessions.find(s => s.id === currentId);
+      if (activeSess) {
+        setChatMessages(activeSess.messages || []);
+      }
+    }
+  }, [activeSessionId, tutorSessions.length, appLanguage]);
+
+  const saveTutorSessions = (updated: TutorSession[]) => {
+    setTutorSessions(updated);
+    localStorage.setItem('studybuddy_tutor_sessions', JSON.stringify(updated));
+    if (firebaseUser) {
+      updated.forEach((sess) => {
+        saveTutorSession(firebaseUser.uid, sess).catch(err => console.error("Firestore save session failed:", err));
+      });
+    }
+  };
+
+  const handleCreateSession = (customPersona: 'default' | 'socratic' | 'debugger' | 'translator' | 'math' = 'default') => {
+    const newId = 'sess_' + Date.now();
+    let title = appLanguage === 'Hindi' ? 'नया चैट सत्र' : 'New Chat Session';
+    if (customPersona === 'socratic') title = appLanguage === 'Hindi' ? 'सुकरात शिक्षक' : 'Socratic Teacher';
+    else if (customPersona === 'debugger') title = appLanguage === 'Hindi' ? 'कोड डीबगर' : 'Code Debugger';
+    else if (customPersona === 'translator') title = appLanguage === 'Hindi' ? 'अनुवादक साथी' : 'Translator Partner';
+    else if (customPersona === 'math') title = appLanguage === 'Hindi' ? 'गणित विज़ार्ड' : 'Math Wizard';
+
+    const newSession: TutorSession = {
+      id: newId,
+      title,
+      messages: [],
+      createdAt: new Date().toISOString(),
+      persona: customPersona
+    };
+    const updated = [newSession, ...tutorSessions];
+    saveTutorSessions(updated);
+    setActiveSessionId(newId);
+    localStorage.setItem('studybuddy_active_session_id', newId);
+    setChatMessages([]);
+  };
+
+  const handleDeleteSession = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = tutorSessions.filter(s => s.id !== id);
+    saveTutorSessions(updated);
+    if (firebaseUser) {
+      deleteTutorSession(firebaseUser.uid, id).catch(err => console.error("Firestore delete session failed:", err));
+    }
+    if (activeSessionId === id) {
+      const nextId = updated.length > 0 ? updated[0].id : null;
+      setActiveSessionId(nextId);
+      if (nextId) localStorage.setItem('studybuddy_active_session_id', nextId);
+      else localStorage.removeItem('studybuddy_active_session_id');
+    }
+  };
+
+  const handleRenameSession = (id: string, newTitle: string) => {
+    if (!newTitle.trim()) return;
+    const updated = tutorSessions.map(s => s.id === id ? { ...s, title: newTitle.trim() } : s);
+    saveTutorSessions(updated);
+    setRenamingSessionId(null);
+    setRenameSessionTitle('');
+  };
+
+  const handleChangeSessionPersona = (id: string, persona: 'default' | 'socratic' | 'debugger' | 'translator' | 'math') => {
+    const updated = tutorSessions.map(s => s.id === id ? { ...s, persona } : s);
+    saveTutorSessions(updated);
+  };
 
   // Load unlocked milestone history on mount
   useEffect(() => {
@@ -1367,6 +1481,17 @@ export default function App() {
               setStreakDays((dbProfile as any).streakDays);
             }
             localStorage.setItem('studybuddy_local_profile', JSON.stringify(loadedUser));
+
+            // Sync chatbot tutor sessions from Firestore
+            const syncedSessions = await getTutorSessions(fUser.uid);
+            if (syncedSessions && syncedSessions.length > 0) {
+              setTutorSessions(syncedSessions);
+              localStorage.setItem('studybuddy_tutor_sessions', JSON.stringify(syncedSessions));
+              if (syncedSessions[0]) {
+                setActiveSessionId(syncedSessions[0].id);
+                localStorage.setItem('studybuddy_active_session_id', syncedSessions[0].id);
+              }
+            }
           } else {
             // New user signed in (e.g. Google Sign-In) but doesn't have a profile yet in Firestore
             const localProfileStr = localStorage.getItem('studybuddy_local_profile');
@@ -1393,26 +1518,7 @@ export default function App() {
         }
       } else {
         setFirebaseUser(null);
-        const localProfileStr = localStorage.getItem('studybuddy_local_profile');
-        if (localProfileStr) {
-          try {
-            const parsed = JSON.parse(localProfileStr);
-            setUser(parsed);
-            if (parsed.pet) {
-              setPet(parsed.pet as any);
-            }
-            if (parsed.quests) {
-              setQuests(parsed.quests);
-            }
-            if (parsed.streakDays) {
-              setStreakDays(parsed.streakDays);
-            }
-          } catch (e) {
-            setUser(null);
-          }
-        } else {
-          setUser(null);
-        }
+        setUser(null);
       }
       setAuthChecking(false);
     });
@@ -1950,9 +2056,42 @@ export default function App() {
   const handleSendMessage = async () => {
     if (!chatInput.trim() && !selectedImage) return;
 
-    const userMsg: ChatMessage = { role: 'user', text: chatInput, image: selectedImage || undefined };
-    setChatMessages(prev => [...prev, userMsg]);
+    // Find or create active session
+    let currentSessionId = activeSessionId;
+    let sessionsCopy = [...tutorSessions];
+    let activeSess = sessionsCopy.find(s => s.id === currentSessionId);
     
+    if (!activeSess) {
+      const newId = 'sess_' + Date.now();
+      activeSess = {
+        id: newId,
+        title: appLanguage === 'Hindi' ? 'नया चैट सत्र' : 'New Chat Session',
+        messages: [],
+        createdAt: new Date().toISOString(),
+        persona: 'default'
+      };
+      sessionsCopy = [activeSess, ...sessionsCopy];
+      currentSessionId = newId;
+      setActiveSessionId(newId);
+      localStorage.setItem('studybuddy_active_session_id', newId);
+    }
+
+    const userMsg: ChatMessage = { role: 'user', text: chatInput, image: selectedImage || undefined };
+    
+    // Append to messages list
+    const updatedMessages = [...(activeSess.messages || []), userMsg];
+    activeSess.messages = updatedMessages;
+    setChatMessages(updatedMessages);
+
+    // If first message, generate a smart short title for the session
+    if (activeSess.title === 'New Chat Session' || activeSess.title === 'नया चैट सत्र' || activeSess.title === 'Socratic Teacher' || activeSess.title === 'Code Debugger' || activeSess.title === 'Translator Partner' || activeSess.title === 'Math Wizard') {
+      const words = chatInput.trim().split(/\s+/).slice(0, 4).join(' ');
+      activeSess.title = words ? words + (chatInput.trim().split(/\s+/).length > 4 ? '...' : '') : activeSess.title;
+    }
+
+    // Save early to update the list
+    saveTutorSessions(sessionsCopy);
+
     const inputCopy = chatInput;
     const imageCopy = selectedImage;
     setChatInput('');
@@ -1961,7 +2100,7 @@ export default function App() {
 
     try {
       const studentContext = user ? { name: user.name, school: user.school, className: user.className, country: user.country || 'Global' } : undefined;
-      const answer = await getStudyAnswer(inputCopy || "Discuss this homework task", imageCopy || undefined, studentContext, appLanguage);
+      const answer = await getStudyAnswer(inputCopy || "Discuss this homework task", imageCopy || undefined, studentContext, appLanguage, activeSess.persona || 'default', updatedMessages);
       let aiImage: string | undefined = undefined;
 
       if (inputCopy.toLowerCase().includes('diagram') || inputCopy.toLowerCase().includes('visualize')) {
@@ -1970,7 +2109,14 @@ export default function App() {
       }
 
       const newModelMsg: ChatMessage = { role: 'model', text: answer, image: aiImage };
-      setChatMessages(prev => [...prev, newModelMsg]);
+      
+      // Update session with AI message
+      const finalizedMessages = [...updatedMessages, newModelMsg];
+      activeSess.messages = finalizedMessages;
+      setChatMessages(finalizedMessages);
+      
+      saveTutorSessions(sessionsCopy);
+
       setFullScreenMessage(newModelMsg);
       awardPoints(10);
       completeQuest('ask_ai');
@@ -2151,11 +2297,24 @@ export default function App() {
     if (!newNote.title.trim()) return;
     try {
       let generatedId: string | number = 'local_' + Date.now();
+      
+      let initialInterval = 3;
+      let initialRepetition = 1;
+      let initialEaseFactor = 2.5;
+      
+      if (newNote.understanding === 'hard') {
+        initialInterval = 1;
+        initialEaseFactor = 2.3;
+      } else if (newNote.understanding === 'easy') {
+        initialInterval = 6;
+        initialEaseFactor = 2.7;
+      }
+
       const initialSR = {
-        interval: 1,
-        repetition: 1,
-        easeFactor: 2.5,
-        nextReviewDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        interval: initialInterval,
+        repetition: initialRepetition,
+        easeFactor: initialEaseFactor,
+        nextReviewDate: new Date(Date.now() + initialInterval * 24 * 60 * 60 * 1000).toISOString()
       };
 
       if (firebaseUser) {
@@ -2193,7 +2352,7 @@ export default function App() {
       };
       setNotes(prev => [noteItem, ...prev]);
       setIsAddingNote(false);
-      setNewNote({ title: '', content: '', subject: 'Mathematics' });
+      setNewNote({ title: '', content: '', subject: 'Mathematics', understanding: 'good' });
       awardPoints(15, 'note');
       completeStreakDay(4); // Complete Day 4: study note creation
 
@@ -2556,6 +2715,46 @@ export default function App() {
       studyMinutes,
       studyHours
     };
+  };
+
+  const playSparkleSound = () => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const ctx = new AudioContextClass();
+      const now = ctx.currentTime;
+      
+      const playChime = (freq: number, start: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0.08, start);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.3);
+        
+        osc.start(start);
+        osc.stop(start + 0.3);
+      };
+
+      playChime(523.25, now);       // C5
+      playChime(659.25, now + 0.08); // E5
+      playChime(783.99, now + 0.16); // G5
+      playChime(1046.50, now + 0.24); // C6
+    } catch (e) {
+      console.error("Sparkle sound failed:", e);
+    }
+  };
+
+  const handleMilestoneCardTap = (subject: Subject, hasUnlocked: boolean) => {
+    if (hasUnlocked) {
+      playSparkleSound();
+      setSparkleSubject(subject);
+      setTimeout(() => setSparkleSubject(null), 1000);
+    }
+    setSelectedSubjectMilestone(subject);
   };
 
   const handleToggleSchedule = async (item: ScheduleItem) => {
@@ -3423,6 +3622,248 @@ export default function App() {
               {appLanguage === 'Hindi' ? 'तैयार किया जा रहा है, कृपया प्रतीक्षा करें' : 'Preparing study environment...'}
             </p>
           </div>
+        </div>
+      ) : !firebaseUser ? (
+        <div className="w-full max-w-md h-screen md:h-[90vh] bg-slate-950 text-white md:rounded-3xl shadow-2xl flex flex-col justify-between p-6 relative z-20 border border-slate-800/80 overflow-y-auto scrollbar-hide">
+           <div className="flex-1 flex flex-col justify-center py-4 space-y-6">
+             <div className="text-center space-y-3">
+               <div className="w-16 h-16 bg-gradient-to-tr from-indigo-500 to-violet-600 rounded-3xl flex items-center justify-center mx-auto shadow-xl shadow-indigo-500/20">
+                 <GraduationCap className="w-9 h-9 text-white animate-pulse" />
+               </div>
+               <h2 className="text-3xl font-black text-white tracking-tight font-display uppercase">
+                 {appLanguage === 'Hindi' ? 'स्टडी बडी • लॉगिन' : 'Study Buddy • Login'}
+               </h2>
+               <p className="text-[10px] text-indigo-400 font-black tracking-widest uppercase bg-indigo-950/80 border border-indigo-900/50 px-4 py-1.5 rounded-full inline-block">
+                 {appLanguage === 'Hindi' ? 'फायरबेस सुरक्षित प्रवेश' : 'Firebase Secure Authentication'}
+               </p>
+             </div>
+
+             <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-900/80 rounded-2xl border border-slate-850">
+               {[
+                 { mode: 'login', icon: '✉️', label: appLanguage === 'Hindi' ? 'ईमेल' : 'Email' },
+                 { mode: 'signup', icon: '✏️', label: appLanguage === 'Hindi' ? 'रजिस्टर' : 'Register' },
+                 { mode: 'phone', icon: '📱', label: appLanguage === 'Hindi' ? 'फ़ोन' : 'Phone' },
+                 { mode: 'guest', icon: '👤', label: appLanguage === 'Hindi' ? 'गैस्ट' : 'Guest' }
+               ].map(tab => (
+                 <button
+                   key={tab.mode}
+                   type="button"
+                   onClick={() => setAuthMode(tab.mode as any)}
+                   className={`py-2 px-1 text-[10px] font-black rounded-xl transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                     authMode === tab.mode 
+                       ? 'bg-gradient-to-tr from-indigo-600 to-violet-600 text-white shadow-md' 
+                       : 'text-slate-400 hover:text-white hover:bg-slate-850/60'
+                   }`}
+                 >
+                   <span className="text-sm">{tab.icon}</span>
+                   <span>{tab.label}</span>
+                 </button>
+               ))}
+             </div>
+
+             <div className="bg-slate-900/50 p-5 rounded-3xl border border-slate-850 space-y-4">
+               {authMode === 'login' && (
+                 <form onSubmit={handleEmailSignIn} className="space-y-4">
+                   <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2">
+                     ✉️ {appLanguage === 'Hindi' ? 'ईमेल द्वारा साइन-इन' : 'Sign In via Email'}
+                   </h3>
+                   <div className="space-y-3">
+                     <div className="space-y-1">
+                       <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest block">
+                         {appLanguage === 'Hindi' ? 'ईमेल पता' : 'Email Address'}
+                       </label>
+                       <input 
+                         type="email" 
+                         required
+                         placeholder="you@school.com"
+                         value={authEmail}
+                         onChange={(e) => setAuthEmail(e.target.value)}
+                         className="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold text-white placeholder:text-slate-600 outline-none focus:border-indigo-500 transition"
+                       />
+                     </div>
+                     <div className="space-y-1">
+                       <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest block">
+                         {appLanguage === 'Hindi' ? 'पासवर्ड' : 'Password'}
+                       </label>
+                       <input 
+                         type="password" 
+                         required
+                         placeholder="••••••••"
+                         value={authPassword}
+                         onChange={(e) => setAuthPassword(e.target.value)}
+                         className="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold text-white placeholder:text-slate-600 outline-none focus:border-indigo-500 transition"
+                       />
+                     </div>
+                   </div>
+                   <button
+                     type="submit"
+                     disabled={authLoading}
+                     className="w-full py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl text-xs font-black tracking-wider uppercase shadow-md transition duration-100 disabled:opacity-50 cursor-pointer"
+                   >
+                     {authLoading ? (appLanguage === 'Hindi' ? 'सत्यापित हो रहा है...' : 'Signing In...') : (appLanguage === 'Hindi' ? 'प्रवेश करें 🚀' : 'Sign In 🚀')}
+                   </button>
+                 </form>
+               )}
+
+               {authMode === 'signup' && (
+                 <form onSubmit={handleEmailSignUp} className="space-y-4">
+                   <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2">
+                     ✏️ {appLanguage === 'Hindi' ? 'नया ईमेल खाता बनाएं' : 'Create Email Account'}
+                   </h3>
+                   <div className="space-y-3">
+                     <div className="space-y-1">
+                       <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest block">
+                         {appLanguage === 'Hindi' ? 'ईमेल पता' : 'Email Address'}
+                       </label>
+                       <input 
+                         type="email" 
+                         required
+                         placeholder="student@school.com"
+                         value={authEmail}
+                         onChange={(e) => setAuthEmail(e.target.value)}
+                         className="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold text-white placeholder:text-slate-600 outline-none focus:border-indigo-500 transition"
+                       />
+                     </div>
+                     <div className="space-y-1">
+                       <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest block">
+                         {appLanguage === 'Hindi' ? 'पासवर्ड (न्यूनतम 6 अक्षर)' : 'Password (min 6 chars)'}
+                       </label>
+                       <input 
+                         type="password" 
+                         required
+                         placeholder="••••••••"
+                         value={authPassword}
+                         onChange={(e) => setAuthPassword(e.target.value)}
+                         className="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold text-white placeholder:text-slate-600 outline-none focus:border-indigo-500 transition"
+                       />
+                     </div>
+                   </div>
+                   <button
+                     type="submit"
+                     disabled={authLoading}
+                     className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-black tracking-wider uppercase shadow-md transition duration-100 disabled:opacity-50 cursor-pointer"
+                   >
+                     {authLoading ? (appLanguage === 'Hindi' ? 'खाता बन रहा है...' : 'Creating Account...') : (appLanguage === 'Hindi' ? 'रजिस्टर करें ✨' : 'Register Account ✨')}
+                   </button>
+                 </form>
+               )}
+
+               {authMode === 'phone' && (
+                 <div className="space-y-4">
+                   <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2">
+                     📱 {appLanguage === 'Hindi' ? 'मोबाइल नंबर सत्यापन' : 'Phone Number OTP Verification'}
+                   </h3>
+                   {!otpSent ? (
+                     <div className="space-y-3">
+                       <div className="space-y-1">
+                         <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest block">
+                           {appLanguage === 'Hindi' ? 'फ़ोन नंबर (देश कोड के साथ)' : 'Phone Number (with Country Code)'}
+                         </label>
+                         <input 
+                           type="tel" 
+                           placeholder="+91 98765 43210"
+                           value={authPhone}
+                           onChange={(e) => setAuthPhone(e.target.value)}
+                           className="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold text-white placeholder:text-slate-600 outline-none focus:border-indigo-500 transition"
+                         />
+                       </div>
+                       <button
+                         type="button"
+                         onClick={handleSendOtp}
+                         disabled={authLoading}
+                         className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black tracking-wider uppercase shadow-md transition cursor-pointer"
+                       >
+                         {appLanguage === 'Hindi' ? 'ओटीपी भेजें 💬' : 'Send OTP Code 💬'}
+                       </button>
+                     </div>
+                   ) : (
+                     <form onSubmit={handleVerifyOtp} className="space-y-3">
+                       <div className="space-y-1">
+                         <label className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest block">
+                           {appLanguage === 'Hindi' ? 'ओटीपी कोड दर्ज करें' : 'Enter OTP Code'}
+                         </label>
+                         <input 
+                           type="text" 
+                           required
+                           placeholder="123456"
+                           value={authOtp}
+                           onChange={(e) => setAuthOtp(e.target.value)}
+                           className="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono font-black text-center tracking-widest text-white placeholder:text-slate-600 outline-none focus:border-indigo-500 transition"
+                         />
+                         <p className="text-[9px] text-indigo-400 font-bold text-center mt-1">
+                           {appLanguage === 'Hindi' ? 'ओटीपी: 123456 (सुरक्षित सिमुलेशन)' : 'Simulation Code: 123456'}
+                         </p>
+                       </div>
+                       <div className="flex gap-2">
+                         <button
+                           type="button"
+                           onClick={() => setOtpSent(false)}
+                           className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-black uppercase transition cursor-pointer text-center"
+                         >
+                           {appLanguage === 'Hindi' ? 'वापस' : 'Back'}
+                         </button>
+                         <button
+                           type="submit"
+                           disabled={authLoading}
+                           className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl text-xs font-black uppercase transition cursor-pointer"
+                         >
+                           {authLoading ? 'Verifying...' : (appLanguage === 'Hindi' ? 'सत्यापित करें' : 'Verify Code')}
+                         </button>
+                       </div>
+                     </form>
+                   )}
+                 </div>
+               )}
+
+               {authMode === 'guest' && (
+                 <div className="space-y-4">
+                   <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2">
+                     👤 {appLanguage === 'Hindi' ? 'अतिथि (गैस्ट) प्रवेश' : 'Guest / Anonymous Session'}
+                   </h3>
+                   <p className="text-[11px] text-slate-400 leading-relaxed font-semibold">
+                     {appLanguage === 'Hindi' 
+                       ? 'बिना किसी ईमेल या फ़ोन के सीधे ऐप में प्रवेश करें। आपका डेटा फ़ायरबेस द्वारा असाइन की गई अस्थायी आईडी में सुरक्षित रूप से सेव किया जाएगा।' 
+                       : 'Sign in instantly without providing any personal accounts. Your temporary session statistics will be persisted securely via Firebase Auth.'}
+                   </p>
+                   <button
+                     type="button"
+                     onClick={handleGuestLogin}
+                     disabled={authLoading}
+                     className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black tracking-wider uppercase shadow-md transition cursor-pointer"
+                   >
+                     {authLoading ? 'Signing In...' : (appLanguage === 'Hindi' ? 'गैस्ट लॉगिन करें 🚀' : 'Continue as Guest 🚀')}
+                   </button>
+                 </div>
+               )}
+             </div>
+
+             <div className="space-y-3">
+               <div className="flex items-center gap-2.5">
+                 <div className="h-px bg-slate-800 flex-1"></div>
+                 <span className="text-[8px] font-black uppercase tracking-widest text-slate-600">{appLanguage === 'Hindi' ? 'या' : 'OR'}</span>
+                 <div className="h-px bg-slate-800 flex-1"></div>
+               </div>
+
+               <button
+                 type="button"
+                 onClick={handleGoogleSignIn}
+                 disabled={authLoading}
+                 className="w-full py-3 bg-white hover:bg-slate-100 text-slate-900 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 shadow-lg hover:shadow-indigo-500/10 transition active:scale-95 duration-100 cursor-pointer"
+               >
+                 <svg className="w-4 h-4" viewBox="0 0 24 24">
+                   <path fill="#EA4335" d="M12 5.04c1.64 0 3.12.56 4.28 1.67l3.2-3.2C17.52 1.58 14.97 1 12 1 7.24 1 3.22 3.73 1.25 7.73l3.85 3C6.03 7.73 8.78 5.04 12 5.04z" />
+                   <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.43 3.57l3.77 2.92c2.2-2.03 3.49-5.02 3.49-8.64z" />
+                   <path fill="#FBBC05" d="M5.1 14.78c-.24-.73-.38-1.5-.38-2.28s.14-1.55.38-2.28L1.25 7.73C.45 9.33 0 11.11 0 13s.45 3.67 1.25 5.27l3.85-3.02z" />
+                   <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.92l-3.77-2.92c-1.11.75-2.53 1.19-4.19 1.19-3.22 0-5.97-2.69-6.9-5.69l-3.85 3C3.22 20.27 7.24 23 12 23z" />
+                 </svg>
+                 <span>{appLanguage === 'Hindi' ? 'गूगल के साथ आगे बढ़ें' : 'Continue with Google'}</span>
+               </button>
+             </div>
+           </div>
+
+           <div className="pt-4 border-t border-slate-900/60 text-center text-[8px] font-extrabold text-slate-700 tracking-widest uppercase">
+             Ascend Study • Powered by Firebase Auth
+           </div>
         </div>
       ) : !user ? (
         <div className="w-full max-w-md h-screen md:h-[90vh] bg-slate-50 md:rounded-3xl shadow-2xl flex flex-col overflow-y-auto p-6 relative z-20 border border-slate-800/10 scrollbar-hide">
@@ -4606,9 +5047,35 @@ export default function App() {
                             key={subject}
                             whileHover={{ y: -2, scale: 1.01 }}
                             whileTap={{ scale: 0.98 }}
-                            onClick={() => setSelectedSubjectMilestone(subject)}
+                            onClick={() => handleMilestoneCardTap(subject, highestTier !== null)}
                             className={`${subjectDetails.bg} p-3.5 rounded-2xl border ${subjectDetails.border} shadow-3xs hover:shadow-2xs transition cursor-pointer flex flex-col justify-between space-y-3.5 relative overflow-hidden group select-none`}
                           >
+                            {sparkleSubject === subject && (
+                              <span className="absolute inset-0 pointer-events-none select-none z-20 overflow-hidden block">
+                                {Array.from({ length: 10 }).map((_, idx) => {
+                                  const angle = (idx / 10) * 360;
+                                  const distance = 20 + Math.random() * 35;
+                                  const sx = Math.cos((angle * Math.PI) / 180) * distance;
+                                  const sy = Math.sin((angle * Math.PI) / 180) * distance;
+                                  return (
+                                    <motion.span
+                                      key={idx}
+                                      initial={{ opacity: 1, scale: 0.4, x: "0px", y: "0px" }}
+                                      animate={{ 
+                                        opacity: [1, 0.8, 0], 
+                                        scale: [0.4, 1.2, 0.2], 
+                                        x: `${sx}px`, 
+                                        y: `${sy}px` 
+                                      }}
+                                      transition={{ duration: 0.75, ease: "easeOut" }}
+                                      className="absolute left-[50%] top-[50%] -translate-x-1/2 -translate-y-1/2 text-sm text-amber-400 font-bold"
+                                    >
+                                      ✨
+                                    </motion.span>
+                                  );
+                                })}
+                              </span>
+                            )}
                             <div className="flex items-start justify-between">
                               <div className="space-y-0.5">
                                 <span className="text-lg block mb-1">{getSubjectEmoji(subject)}</span>
@@ -4692,369 +5159,650 @@ export default function App() {
                 </div>
               )}
 
-              {/* AI CHAT SCREEN (STUCK VIEWPORT CONSTRAINED) */}
+              {/* AI CHAT SCREEN (STUCK VIEWPORT CONSTRAINED & DEDICATED APP FEEL) */}
               {activeTab === 'chat' && (
-                <div className="flex-1 flex flex-col overflow-hidden h-full">
+                <div className="flex-1 flex overflow-hidden h-full relative bg-slate-50">
                   
-                  {/* Chat header */}
-                  <header className="p-4 pl-14 border-b border-slate-100 shrink-0 flex items-center bg-white justify-between relative">
-                    <div className="flex items-center space-x-2">
-                      <BrainCircuit className="w-5 h-5 text-indigo-600" />
-                      <div>
-                        <h2 className="font-bold text-slate-800 text-sm">
-                          {appLanguage === 'Hindi' ? 'एआई ट्यूटर' : 'AI Study Helper'}
-                        </h2>
-                        <p className="text-[10px] text-slate-400 font-semibold leading-none mt-0.5">
-                          {appLanguage === 'Hindi' ? 'आपका व्यक्तिगत शैक्षणिक साथी' : 'Your Personal Educational Guide'}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {/* Three dots action dropdown menu */}
-                    <div className="relative flex items-center">
-                      <button 
-                        onClick={() => setShowTutorMenu(!showTutorMenu)}
-                        className="p-2.5 hover:bg-slate-50 border border-slate-150 text-slate-600 hover:text-slate-900 shadow-3xs rounded-xl flex items-center justify-center cursor-pointer transition active:scale-95 duration-150"
-                        title={appLanguage === 'Hindi' ? "मेन्यू" : "Options"}
-                        id="tutor_menu_dots_btn"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-                      
-                      {showTutorMenu && (
-                        <>
-                          {/* Backdrop click listener */}
-                          <div 
-                            className="fixed inset-0 z-40 bg-transparent" 
-                            onClick={() => setShowTutorMenu(false)} 
-                          />
-                          <div 
-                            className="absolute right-0 top-11 w-52 bg-white border border-slate-150/85 rounded-2xl shadow-xl py-1.5 z-50 flex flex-col divide-y divide-slate-100 animate-in fade-in slide-in-from-top-2 duration-150"
-                            id="tutor_options_dropdown"
-                          >
-                            <div className="py-1">
-                              {/* Item 1: Scratchpad Toggle */}
-                              <button
-                                onClick={() => {
-                                  setShowScratchpad(!showScratchpad);
-                                  setShowTutorMenu(false);
-                                }}
-                                className={`w-full px-4 py-3 text-left text-xs font-black flex items-center space-x-3 transition cursor-pointer hover:bg-slate-50 ${
-                                  showScratchpad ? 'text-indigo-600 bg-indigo-50/40' : 'text-slate-700'
-                                }`}
-                              >
-                                <span className="text-base shrink-0">🎨</span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-extrabold truncate">
-                                    {appLanguage === 'Hindi' ? 'रफ कॉपी' : 'Scratchpad'}
-                                  </p>
-                                  <p className="text-[9px] text-slate-400 font-medium">
-                                    {showScratchpad 
-                                      ? (appLanguage === 'Hindi' ? 'छिपाएं' : 'Hide scratchpad') 
-                                      : (appLanguage === 'Hindi' ? 'दिखाएं' : 'Show scratchpad')}
-                                  </p>
-                                </div>
-                              </button>
-                            </div>
-
-                            <div className="py-1">
-                              {/* Item 2: Homework Solver */}
-                              <button
-                                onClick={() => {
-                                  setShowHomeworkModal(true);
-                                  setShowTutorMenu(false);
-                                }}
-                                className="w-full px-4 py-3 text-left text-xs font-extrabold text-slate-700 hover:bg-slate-50 flex items-center space-x-3 transition cursor-pointer"
-                              >
-                                <span className="text-base text-amber-500 shrink-0">✨</span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-extrabold truncate">
-                                    {appLanguage === 'Hindi' ? 'होमवर्क सॉल्वर' : 'Homework Solver'}
-                                  </p>
-                                  <p className="text-[9px] text-slate-400 font-medium">
-                                    {appLanguage === 'Hindi' ? 'तस्वीर से हल करें' : 'Solve using photos'}
-                                  </p>
-                                </div>
-                              </button>
-
-                              {/* Item 3: About App */}
-                              <button
-                                onClick={() => {
-                                  setShowAboutModal(true);
-                                  setShowTutorMenu(false);
-                                }}
-                                className="w-full px-4 py-3 text-left text-xs font-extrabold text-slate-700 hover:bg-slate-50 flex items-center space-x-3 transition cursor-pointer"
-                              >
-                                <span className="text-base text-teal-500 shrink-0">ℹ️</span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-extrabold truncate">
-                                    {appLanguage === 'Hindi' ? 'ऐप और डेवलपर' : 'About App & Dev'}
-                                  </p>
-                                  <p className="text-[9px] text-slate-400 font-medium">
-                                    {appLanguage === 'Hindi' ? 'विवरण देखें' : 'Know the creator'}
-                                  </p>
-                                </div>
-                              </button>
-                            </div>
-
-                            <div className="py-1">
-                              {/* Item 4: Clear Chats */}
-                              <button
-                                onClick={() => {
-                                  if (confirm(appLanguage === 'Hindi' ? 'क्या आप सच में चैट इतिहास को साफ करना चाहते हैं?' : 'Are you sure you want to clear your chat history?')) {
-                                    setChatMessages([]);
-                                  }
-                                  setShowTutorMenu(false);
-                                }}
-                                className="w-full px-4 py-3 text-left text-xs font-extrabold text-rose-600 hover:bg-rose-50/50 flex items-center space-x-3 transition cursor-pointer"
-                              >
-                                <span className="text-base shrink-0">🗑️</span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-extrabold truncate">
-                                    {appLanguage === 'Hindi' ? 'चैट साफ़ करें' : 'Clear Chats'}
-                                  </p>
-                                  <p className="text-[9px] text-rose-400 font-medium">
-                                    {appLanguage === 'Hindi' ? 'सभी संदेश हटा दें' : 'Reset chat history'}
-                                  </p>
-                                </div>
-                              </button>
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </header>
-
-                  {/* Doodle board container */}
-                  {showScratchpad && (
-                    <div className="bg-amber-50/70 border-b border-amber-150 p-3.5 space-y-2 select-none" id="doodle_scratchpad">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-1.5">
-                          <span className="text-xs">🎨</span>
-                          <h3 className="text-[11px] font-black text-amber-900 tracking-tight">Interactive Doodle Board / रफ़ कॉपी</h3>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {/* Brush colors selector */}
-                          {['#1e293b', '#dc2626', '#16a34a', '#2563eb'].map(c => (
-                            <button
-                              key={c}
-                              onClick={() => setBrushColor(c)}
-                              className={`w-4.5 h-4.5 rounded-full border transition ${brushColor === c ? 'ring-2 ring-amber-500 scale-110' : 'opacity-70'}`}
-                              style={{ backgroundColor: c }}
-                            />
-                          ))}
-                          <button
-                            onClick={clearCanvas}
-                            className="px-2.5 py-1 bg-white text-slate-650 hover:bg-slate-105 border border-slate-250 rounded-xl text-[10px] font-extrabold cursor-pointer transition active:scale-95"
-                          >
-                            Clear
-                          </button>
-                          <button
-                            onClick={handleSendDoodleToAI}
-                            className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black shadow-xs flex items-center space-x-1 cursor-pointer transition active:scale-95"
-                          >
-                            <span>Share with Tutor</span>
-                            <span>⚡</span>
-                          </button>
-                        </div>
-                      </div>
-                      
-                      <div className="border border-amber-250 bg-white rounded-2xl overflow-hidden shadow-inner">
-                        <canvas
-                          ref={canvasRef}
-                          onMouseDown={startDrawing}
-                          onMouseMove={draw}
-                          onMouseUp={stopDrawing}
-                          onMouseLeave={stopDrawing}
-                          onTouchStart={startDrawingTouch}
-                          onTouchMove={drawTouch}
-                          onTouchEnd={stopDrawing}
-                          className="w-full h-32 touch-none cursor-crosshair bg-white"
-                        />
-                      </div>
-                      <p className="text-[8px] md:text-[9px] text-amber-800 font-extrabold leading-none italic select-none">* Draw geometry shapes, write formulas, or sketch math issues, then click "Share with Tutor" to ask a question!</p>
-                    </div>
+                  {/* Left Sidebar Overlay on Mobile when open */}
+                  {isHistorySidebarOpen && (
+                    <div 
+                      className="fixed inset-0 bg-slate-900/30 backdrop-blur-xs z-40 md:hidden animate-fade-in"
+                      onClick={() => setIsHistorySidebarOpen(false)}
+                    />
                   )}
 
-                  {/* Chat messages queue */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-50" id="chat_scroll">
-                    {quotaExceeded && (
-                      <div className="p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/85 rounded-2xl flex items-start gap-2.5 shadow-2xs select-none">
-                        <span className="text-base shrink-0">⚠️</span>
-                        <div className="text-[10px] text-amber-950 leading-normal">
-                          <p className="font-extrabold uppercase tracking-widest text-amber-800">Free Daily AI Quota Exceeded</p>
-                          <p className="mt-0.5 text-slate-600 font-medium">This Cloud environment has reached its free limit of 20 live AI calls for today. Ascend Study has automatically switched to our high-quality **Offline Fallback System** so you can continue learning seamlessly! To enable live, unlimited AI responses, upgrade your billing plan or configure a custom Gemini API Key in the Settings {"->"} Secrets menu.</p>
-                        </div>
+                  {/* Sidebar - Chat thread history list */}
+                  <div className={`fixed inset-y-0 left-0 z-45 w-64 border-r border-slate-150/70 bg-slate-50 flex flex-col h-full transform transition-transform duration-300 ease-out md:static md:translate-x-0 shrink-0 ${isHistorySidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                    
+                    {/* Sidebar Header */}
+                    <div className="p-4 border-b border-slate-150/50 flex items-center justify-between bg-white shrink-0">
+                      <div className="flex items-center space-x-2">
+                        <MessageSquare className="w-4 h-4 text-indigo-600" />
+                        <span className="font-extrabold text-xs text-slate-800 tracking-wider uppercase">
+                          {appLanguage === 'Hindi' ? 'चैट इतिहास' : 'Chat History'}
+                        </span>
                       </div>
-                    )}
-                    {chatMessages.length === 0 && (
-                      <div className="text-center py-10 max-w-[240px] mx-auto">
-                        <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                          <BrainCircuit className="w-6 h-6 text-indigo-600" />
-                        </div>
-                        <h3 className="font-bold text-slate-800 text-sm">{translate('ai_tutor', appLanguage, 'AI Tutor')}</h3>
-                        <p className="text-slate-400 text-xs mt-1 leading-relaxed">{getChatIntroDesc(appLanguage)}</p>
-                      </div>
-                    )}
-                    {chatMessages.map((msg, i) => (
-                      <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} space-y-1.5`} id={`chat_item_${i}`}>
-                        <div 
-                          onClick={() => setFullScreenMessage(msg)}
-                          className={`max-w-[85%] rounded-3xl p-3.5 shadow-sm text-sm cursor-pointer hover:scale-[1.01] hover:shadow-md active:scale-98 transition duration-200 select-none ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-850 rounded-tl-none border border-slate-150/70'}`}
-                        >
-                          {msg.image && (
-                            <img src={msg.image} alt="Uploaded problem" className="w-full rounded-2xl mb-2 max-h-40 object-cover" />
-                          )}
-                          <div className="leading-relaxed text-xs md:text-sm whitespace-pre-wrap select-text">
-                            {renderChatMessage(msg.text)}
-                          </div>
-                          
-                          {/* Interactive blackboard visual expand link */}
-                          <div className="mt-3 pt-2.5 border-t border-slate-100/30 flex justify-between items-center text-[10px] opacity-80" style={{ pointerEvents: 'none' }}>
-                            <span className={`text-[8px] font-extrabold uppercase tracking-widest ${msg.role === 'user' ? 'text-indigo-200' : 'text-slate-400'}`}>
-                              {msg.role === 'user' ? '👤 Student' : '🤖 AI Partner'}
-                            </span>
-                            <span className={`font-black px-2 py-0.5 rounded-lg flex items-center space-x-1 shadow-2xs ${msg.role === 'user' ? 'bg-indigo-700/80 text-indigo-100' : 'bg-indigo-50 text-indigo-650'}`}>
-                              <span>{getFullscreenLabel(appLanguage)}</span>
-                              <Maximize2 className="w-2.5 h-2.5 ml-0.5" />
-                            </span>
-                          </div>
-                        </div>
-                        {msg.role === 'model' && (
-                          <div className="flex justify-start pl-1.5 pb-2 flex-wrap gap-1.5">
-                            <button
-                              onClick={() => handleSpeakMessage(msg.text)}
-                              className={`px-2.5 py-1 text-[9px] font-black rounded-xl border flex items-center space-x-1 cursor-pointer transition shadow-2xs ${
-                                speakingText === msg.text 
-                                  ? 'bg-rose-50 border-rose-250 text-rose-600 animate-pulse font-black'
-                                  : 'bg-white border-slate-100 hover:border-slate-200 text-slate-500 hover:text-indigo-600'
-                              }`}
-                            >
-                              {speakingText === msg.text ? (
-                                <>
-                                  <span className="text-[10px]">⏹️</span>
-                                  <span>Stop Reading</span>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="text-[10px]">🔊</span>
-                                  <span>{appLanguage === 'Hindi' ? 'सुनें (Read Out)' : 'Read Out'}</span>
-                                </>
-                              )}
-                            </button>
+                      <button 
+                        onClick={() => setIsHistorySidebarOpen(false)}
+                        className="md:hidden p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
 
-                            <button
+                    {/* New Chat Button */}
+                    <div className="p-3.5 shrink-0 bg-white border-b border-slate-100">
+                      <button
+                        onClick={() => {
+                          handleCreateSession('default');
+                          setIsHistorySidebarOpen(false);
+                        }}
+                        className="w-full py-2.5 px-4 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-100/50 hover:shadow-indigo-200 hover:-translate-y-0.5 transition active:scale-95 flex items-center justify-center space-x-2 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                        <span>{appLanguage === 'Hindi' ? 'नया चैट सत्र' : 'New Chat Session'}</span>
+                      </button>
+                    </div>
+
+                    {/* Scrollable list of threads */}
+                    <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                      {tutorSessions.length === 0 ? (
+                        <p className="text-[10px] text-slate-400 font-bold text-center py-8">
+                          {appLanguage === 'Hindi' ? 'कोई पुराना चैट नहीं है।' : 'No previous chat threads.'}
+                        </p>
+                      ) : (
+                        tutorSessions.map(sess => {
+                          const isActive = sess.id === activeSessionId;
+                          const isRenaming = renamingSessionId === sess.id;
+                          const sessMessagesCount = sess.messages?.length || 0;
+                          return (
+                            <div 
+                              key={sess.id}
                               onClick={() => {
-                                let extractedTitle = "Concept Diagram";
-                                const firstLine = msg.text.trim().split('\n')[0].replace(/[#*`_-]/g, '').trim();
-                                if (firstLine && firstLine.length > 3 && firstLine.length < 45) {
-                                  extractedTitle = firstLine;
-                                }
-                                setBackgroundDiagram({
-                                  status: 'idle',
-                                  prompt: `A highly detailed, textbook-grade scientific diagram of: ${extractedTitle}. High-contrast academic labeled elements, clean solid background.`,
-                                  title: extractedTitle,
-                                  subject: 'Science',
-                                  style: 'textbook',
-                                  practiceMode: false,
-                                  imageUrl: null,
-                                  explanation: '',
-                                  step: '',
-                                  error: null,
-                                });
-                                setActiveTab('diagram');
+                                setActiveSessionId(sess.id);
+                                localStorage.setItem('studybuddy_active_session_id', sess.id);
+                                setIsHistorySidebarOpen(false);
                               }}
-                              className="px-2.5 py-1 text-[9px] font-black rounded-xl border bg-white border-slate-100 hover:border-slate-200 text-slate-500 hover:text-indigo-600 cursor-pointer transition shadow-2xs flex items-center space-x-1"
+                              className={`p-3 rounded-2xl border flex flex-col transition-all cursor-pointer group select-none relative ${isActive ? 'bg-indigo-50/45 border-indigo-200/80 shadow-3xs' : 'bg-white border-slate-150/70 hover:bg-slate-100/40'}`}
                             >
-                              <span className="text-[10px]">🎨</span>
-                              <span>{appLanguage === 'Hindi' ? 'डायग्राम बनाएं' : 'Generate Diagram'}</span>
-                            </button>
+                              <div className="flex items-center justify-between gap-1.5">
+                                <div className="flex items-center space-x-2 min-w-0 flex-1">
+                                  <span className="text-xs shrink-0">💬</span>
+                                  {isRenaming ? (
+                                    <input 
+                                      type="text"
+                                      value={renameSessionTitle}
+                                      onChange={(e) => setRenameSessionTitle(e.target.value)}
+                                      onBlur={() => handleRenameSession(sess.id, renameSessionTitle)}
+                                      onKeyPress={(e) => e.key === 'Enter' && handleRenameSession(sess.id, renameSessionTitle)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      autoFocus
+                                      className="text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-lg px-2 py-0.5 w-full focus:outline-none focus:border-indigo-500"
+                                    />
+                                  ) : (
+                                    <p className={`text-xs font-black truncate ${isActive ? 'text-indigo-950' : 'text-slate-700 group-hover:text-slate-900'}`}>
+                                      {sess.title}
+                                    </p>
+                                  )}
+                                </div>
 
+                                {/* Edit & Delete hover buttons */}
+                                {!isRenaming && (
+                                  <div className="flex items-center opacity-0 group-hover:opacity-100 transition shrink-0 space-x-1 pl-1 bg-gradient-to-l from-white via-white to-transparent">
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setRenamingSessionId(sess.id);
+                                        setRenameSessionTitle(sess.title);
+                                      }}
+                                      className="p-1 hover:bg-slate-200 text-slate-500 hover:text-slate-700 rounded-md cursor-pointer"
+                                      title={appLanguage === 'Hindi' ? "नाम बदलें" : "Rename Thread"}
+                                    >
+                                      <Pencil className="w-3 h-3" />
+                                    </button>
+                                    {tutorSessions.length > 1 && (
+                                      <button 
+                                        onClick={(e) => handleDeleteSession(sess.id, e)}
+                                        className="p-1 hover:bg-rose-50 text-rose-500 hover:text-rose-700 rounded-md cursor-pointer"
+                                        title={appLanguage === 'Hindi' ? "हटाएं" : "Delete Thread"}
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Thread Metadata */}
+                              <div className="flex items-center justify-between mt-1.5 text-[9px] text-slate-400 font-bold pl-6">
+                                <span>{sessMessagesCount} {sessMessagesCount === 1 ? 'msg' : 'msgs'}</span>
+                                {sess.persona && sess.persona !== 'default' && (
+                                  <span className="text-[8px] bg-indigo-50 border border-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider scale-90 origin-right">
+                                    {sess.persona}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Clear all threads footer */}
+                    <div className="p-3.5 border-t border-slate-150/50 bg-white shrink-0">
+                      <button
+                        onClick={() => {
+                          if (confirm(appLanguage === 'Hindi' ? 'क्या आप सच में सभी चैट सत्रों को हटाना चाहते हैं?' : 'Are you sure you want to delete ALL chat sessions?')) {
+                            const initialId = 'sess_' + Date.now();
+                            const initialSession: TutorSession = {
+                              id: initialId,
+                              title: appLanguage === 'Hindi' ? 'नया चैट सत्र' : 'New Chat Session',
+                              messages: [],
+                              createdAt: new Date().toISOString(),
+                              persona: 'default'
+                            };
+                            saveTutorSessions([initialSession]);
+                            setActiveSessionId(initialId);
+                            localStorage.setItem('studybuddy_active_session_id', initialId);
+                            setChatMessages([]);
+                          }
+                        }}
+                        className="w-full py-2 text-center text-[10px] text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl border border-rose-100 font-black cursor-pointer transition duration-150"
+                      >
+                        🗑️ {appLanguage === 'Hindi' ? 'सभी चैट इतिहास हटाएं' : 'Reset All Threads'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Right Chat Main Screen Panel */}
+                  <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
+                    
+                    {/* Chat header */}
+                    <header className="p-4 border-b border-slate-100 shrink-0 flex items-center bg-white justify-between relative">
+                      <div className="flex items-center space-x-2">
+                        {/* Mobile sidebar toggle trigger */}
+                        <button 
+                          onClick={() => setIsHistorySidebarOpen(true)}
+                          className="md:hidden p-2 hover:bg-slate-50 border border-slate-150 text-slate-500 hover:text-slate-800 rounded-xl cursor-pointer mr-1"
+                          title={appLanguage === 'Hindi' ? 'इतिहास दिखाएं' : 'Show history threads'}
+                        >
+                          <Menu className="w-4 h-4" />
+                        </button>
+                        
+                        <BrainCircuit className="w-5 h-5 text-indigo-600" />
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <h2 className="font-extrabold text-slate-850 text-sm">
+                              {tutorSessions.find(s => s.id === activeSessionId)?.title || (appLanguage === 'Hindi' ? 'एआई ट्यूटर' : 'AI Study Helper')}
+                            </h2>
+                            {tutorSessions.find(s => s.id === activeSessionId)?.persona && tutorSessions.find(s => s.id === activeSessionId)?.persona !== 'default' && (
+                              <span className="text-[8px] bg-gradient-to-r from-indigo-500 to-indigo-600 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-wider shadow-3xs scale-90">
+                                {tutorSessions.find(s => s.id === activeSessionId)?.persona}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-400 font-bold leading-none mt-0.5">
+                            {tutorSessions.find(s => s.id === activeSessionId)?.persona === 'socratic' 
+                              ? (appLanguage === 'Hindi' ? 'सुकरात शिक्षक - सवाल पूछकर सोचने में मदद' : 'Socratic Style - Helping you learn by thinking')
+                              : tutorSessions.find(s => s.id === activeSessionId)?.persona === 'debugger'
+                              ? (appLanguage === 'Hindi' ? 'कोड डीबगर - प्रोग्रामिंग समस्याओं का विशेषज्ञ' : 'Debugger Style - Solving coding bugs step-by-step')
+                              : tutorSessions.find(s => s.id === activeSessionId)?.persona === 'translator'
+                              ? (appLanguage === 'Hindi' ? 'अनुवादक साथी - बातचीत और अनुवाद' : 'Language Partner - Practicing translation & talk')
+                              : tutorSessions.find(s => s.id === activeSessionId)?.persona === 'math'
+                              ? (appLanguage === 'Hindi' ? 'गणित विज़ार्ड - समीकरणों को चरण-दर-चरण हल करें' : 'Math Wizard - Solving equations step-by-step')
+                              : (appLanguage === 'Hindi' ? 'सामान्य ट्यूटर - आपका व्यक्तिगत शैक्षणिक साथी' : 'General Style - Your Personal Educational Guide')}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Three dots & Desktop History Toggle */}
+                      <div className="relative flex items-center space-x-2">
+                        {/* Desktop sidebar toggle button */}
+                        <button 
+                          onClick={() => setIsHistorySidebarOpen(!isHistorySidebarOpen)}
+                          className="hidden md:flex p-2 hover:bg-slate-50 border border-slate-150 text-slate-600 hover:text-slate-900 shadow-3xs rounded-xl items-center justify-center cursor-pointer transition active:scale-95 duration-150"
+                          title={appLanguage === 'Hindi' ? 'चैट इतिहास दिखाएं/छिपाएं' : 'Toggle history sidebar'}
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                        </button>
+
+                        <button 
+                          onClick={() => setShowTutorMenu(!showTutorMenu)}
+                          className="p-2.5 hover:bg-slate-50 border border-slate-150 text-slate-600 hover:text-slate-900 shadow-3xs rounded-xl flex items-center justify-center cursor-pointer transition active:scale-95 duration-150"
+                          title={appLanguage === 'Hindi' ? "मेन्यू" : "Options"}
+                          id="tutor_menu_dots_btn"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+                        
+                        {showTutorMenu && (
+                          <>
+                            {/* Backdrop click listener */}
+                            <div 
+                              className="fixed inset-0 z-40 bg-transparent" 
+                              onClick={() => setShowTutorMenu(false)} 
+                            />
+                            <div 
+                              className="absolute right-0 top-11 w-52 bg-white border border-slate-150/85 rounded-2xl shadow-xl py-1.5 z-50 flex flex-col divide-y divide-slate-100 animate-in fade-in slide-in-from-top-2 duration-150"
+                              id="tutor_options_dropdown"
+                            >
+                              <div className="py-1">
+                                {/* Item 1: Scratchpad Toggle */}
+                                <button
+                                  onClick={() => {
+                                    setShowScratchpad(!showScratchpad);
+                                    setShowTutorMenu(false);
+                                  }}
+                                  className={`w-full px-4 py-3 text-left text-xs font-black flex items-center space-x-3 transition cursor-pointer hover:bg-slate-50 ${
+                                    showScratchpad ? 'text-indigo-600 bg-indigo-50/40' : 'text-slate-700'
+                                  }`}
+                                >
+                                  <span className="text-base shrink-0">🎨</span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-extrabold truncate">
+                                      {appLanguage === 'Hindi' ? 'रफ कॉपी' : 'Scratchpad'}
+                                    </p>
+                                    <p className="text-[9px] text-slate-400 font-medium">
+                                      {showScratchpad 
+                                        ? (appLanguage === 'Hindi' ? 'छिपाएं' : 'Hide scratchpad') 
+                                        : (appLanguage === 'Hindi' ? 'दिखाएं' : 'Show scratchpad')}
+                                    </p>
+                                  </div>
+                                </button>
+                              </div>
+
+                              <div className="py-1">
+                                {/* Item 2: Homework Solver */}
+                                <button
+                                  onClick={() => {
+                                    setShowHomeworkModal(true);
+                                    setShowTutorMenu(false);
+                                  }}
+                                  className="w-full px-4 py-3 text-left text-xs font-extrabold text-slate-700 hover:bg-slate-50 flex items-center space-x-3 transition cursor-pointer"
+                                >
+                                  <span className="text-base text-amber-500 shrink-0">✨</span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-extrabold truncate">
+                                      {appLanguage === 'Hindi' ? 'होमवर्क सॉल्वर' : 'Homework Solver'}
+                                    </p>
+                                    <p className="text-[9px] text-slate-400 font-medium">
+                                      {appLanguage === 'Hindi' ? 'तस्वीर से हल करें' : 'Solve using photos'}
+                                    </p>
+                                  </div>
+                                </button>
+
+                                {/* Item 3: About App */}
+                                <button
+                                  onClick={() => {
+                                    setShowAboutModal(true);
+                                    setShowTutorMenu(false);
+                                  }}
+                                  className="w-full px-4 py-3 text-left text-xs font-extrabold text-slate-700 hover:bg-slate-50 flex items-center space-x-3 transition cursor-pointer"
+                                >
+                                  <span className="text-base text-teal-500 shrink-0">ℹ️</span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-extrabold truncate">
+                                      {appLanguage === 'Hindi' ? 'ऐप और डेवलपर' : 'About App & Dev'}
+                                    </p>
+                                    <p className="text-[9px] text-slate-400 font-medium">
+                                      {appLanguage === 'Hindi' ? 'विवरण देखें' : 'Know the creator'}
+                                    </p>
+                                  </div>
+                                </button>
+                              </div>
+
+                              <div className="py-1">
+                                {/* Item 4: Clear Chats */}
+                                <button
+                                  onClick={() => {
+                                    if (confirm(appLanguage === 'Hindi' ? 'क्या आप सच में वर्तमान चैट इतिहास को साफ करना चाहते हैं?' : 'Are you sure you want to clear this chat history?')) {
+                                      const activeSess = tutorSessions.find(s => s.id === activeSessionId);
+                                      if (activeSess) {
+                                        activeSess.messages = [];
+                                        saveTutorSessions([...tutorSessions]);
+                                        setChatMessages([]);
+                                      }
+                                    }
+                                    setShowTutorMenu(false);
+                                  }}
+                                  className="w-full px-4 py-3 text-left text-xs font-extrabold text-rose-600 hover:bg-rose-50/50 flex items-center space-x-3 transition cursor-pointer"
+                                >
+                                  <span className="text-base shrink-0">🗑️</span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-extrabold truncate">
+                                      {appLanguage === 'Hindi' ? 'चैट साफ़ करें' : 'Clear Chat messages'}
+                                    </p>
+                                    <p className="text-[9px] text-rose-400 font-medium">
+                                      {appLanguage === 'Hindi' ? 'संदेश हटा दें' : 'Reset current chat messages'}
+                                    </p>
+                                  </div>
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </header>
+
+                    {/* Persona Selection Pill Bar */}
+                    <div className="px-4 py-2.5 border-b border-slate-100/75 flex items-center space-x-2 overflow-x-auto bg-slate-50/40 scrollbar-none shrink-0 select-none">
+                      <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider shrink-0 mr-1.5">
+                        {appLanguage === 'Hindi' ? 'ट्यूटर शैली:' : 'Tutor Persona:'}
+                      </span>
+                      {[
+                        { id: 'default', label: appLanguage === 'Hindi' ? 'सामान्य' : 'Default', desc: appLanguage === 'Hindi' ? 'सामान्य सहायक' : 'General Study Buddy', emoji: '🤖', color: 'border-indigo-100 text-indigo-700 bg-indigo-50/40' },
+                        { id: 'socratic', label: appLanguage === 'Hindi' ? 'सुकरात' : 'Socratic', desc: appLanguage === 'Hindi' ? 'प्रश्न पूछकर सिखाने वाला' : 'Socratic Teacher', emoji: '🧠', color: 'border-emerald-100 text-emerald-700 bg-emerald-50/40' },
+                        { id: 'debugger', label: appLanguage === 'Hindi' ? 'डीबगर' : 'Debugger', desc: appLanguage === 'Hindi' ? 'कोडिंग और प्रोग्रामिंग' : 'Code Debugger', emoji: '💻', color: 'border-slate-200 text-slate-700 bg-slate-50/40' },
+                        { id: 'translator', label: appLanguage === 'Hindi' ? 'अनुवादक' : 'Translator', desc: appLanguage === 'Hindi' ? 'भाषा अनुवादक साथी' : 'Language Partner', emoji: '🗣️', color: 'border-pink-100 text-pink-700 bg-pink-50/40' },
+                        { id: 'math', label: appLanguage === 'Hindi' ? 'गणितज्ञ' : 'Math Wizard', desc: appLanguage === 'Hindi' ? 'समीकरण सॉल्वर' : 'Math Step-by-Step', emoji: '📐', color: 'border-amber-100 text-amber-700 bg-amber-50/40' }
+                      ].map(p => {
+                        const activeSess = tutorSessions.find(s => s.id === activeSessionId);
+                        const isSelected = (activeSess?.persona || 'default') === p.id;
+                        return (
+                          <button
+                            key={p.id}
+                            onClick={() => {
+                              if (activeSess) {
+                                handleChangeSessionPersona(activeSess.id, p.id as any);
+                              }
+                            }}
+                            className={`px-3 py-1.5 rounded-full border text-[10px] font-extrabold flex items-center space-x-1 cursor-pointer transition-all shrink-0 ${isSelected ? 'bg-indigo-600 text-white border-indigo-600 shadow-3xs scale-102 font-black' : 'bg-white text-slate-600 border-slate-150 hover:bg-slate-50 hover:border-slate-350'}`}
+                            title={p.desc}
+                          >
+                            <span>{p.emoji}</span>
+                            <span>{p.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Doodle board container */}
+                    {showScratchpad && (
+                      <div className="bg-amber-50/70 border-b border-amber-150 p-3.5 space-y-2 select-none" id="doodle_scratchpad">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-1.5">
+                            <span className="text-xs">🎨</span>
+                            <h3 className="text-[11px] font-black text-amber-900 tracking-tight">Interactive Doodle Board / रफ़ कॉपी</h3>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {/* Brush colors selector */}
+                            {['#1e293b', '#dc2626', '#16a34a', '#2563eb'].map(c => (
+                              <button
+                                key={c}
+                                onClick={() => setBrushColor(c)}
+                                className={`w-4.5 h-4.5 rounded-full border transition ${brushColor === c ? 'ring-2 ring-amber-500 scale-110' : 'opacity-70'}`}
+                                style={{ backgroundColor: c }}
+                              />
+                            ))}
+                            <button
+                              onClick={clearCanvas}
+                              className="px-2.5 py-1 bg-white text-slate-650 hover:bg-slate-105 border border-slate-250 rounded-xl text-[10px] font-extrabold cursor-pointer transition active:scale-95"
+                            >
+                              Clear
+                            </button>
+                            <button
+                              onClick={handleSendDoodleToAI}
+                              className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black shadow-xs flex items-center space-x-1 cursor-pointer transition active:scale-95"
+                            >
+                              <span>Share with Tutor</span>
+                              <span>⚡</span>
+                            </button>
+                          </div>
+                        </div>
+                        
+                        <div className="border border-amber-250 bg-white rounded-2xl overflow-hidden shadow-inner">
+                          <canvas
+                            ref={canvasRef}
+                            onMouseDown={startDrawing}
+                            onMouseMove={draw}
+                            onMouseUp={stopDrawing}
+                            onMouseLeave={stopDrawing}
+                            onTouchStart={startDrawingTouch}
+                            onTouchMove={drawTouch}
+                            onTouchEnd={stopDrawing}
+                            className="w-full h-32 touch-none cursor-crosshair bg-white"
+                          />
+                        </div>
+                        <p className="text-[8px] md:text-[9px] text-amber-800 font-extrabold leading-none italic select-none">* Draw geometry shapes, write formulas, or sketch math issues, then click "Share with Tutor" to ask a question!</p>
+                      </div>
+                    )}
+
+                    {/* Chat messages queue */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-50" id="chat_scroll">
+                      {quotaExceeded && (
+                        <div className="p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/85 rounded-2xl flex items-start gap-2.5 shadow-2xs select-none">
+                          <span className="text-base shrink-0">⚠️</span>
+                          <div className="text-[10px] text-amber-950 leading-normal">
+                            <p className="font-extrabold uppercase tracking-widest text-amber-800">Free Daily AI Quota Exceeded</p>
+                            <p className="mt-0.5 text-slate-600 font-medium">This Cloud environment has reached its free limit of 20 live AI calls for today. Ascend Study has automatically switched to our high-quality **Offline Fallback System** so you can continue learning seamlessly! To enable live, unlimited AI responses, upgrade your billing plan or configure a custom Gemini API Key in the Secrets menu.</p>
+                          </div>
+                        </div>
+                      )}
+                      {chatMessages.length === 0 && (
+                        <div className="text-center py-10 px-6 max-w-[320px] mx-auto flex flex-col items-center justify-center">
+                          <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mb-4 shadow-3xs">
+                            <Bot className="w-7 h-7 stroke-[2.2] text-indigo-600 animate-bounce" />
+                          </div>
+                          <h3 className="font-extrabold text-slate-850 text-base">
+                            {appLanguage === 'Hindi' ? 'एआई स्टडी पार्टनर' : 'AI Study Partner'}
+                          </h3>
+                          <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
+                            {(() => {
+                              const activeSess = tutorSessions.find(s => s.id === activeSessionId);
+                              return activeSess?.persona === 'socratic' 
+                                ? (appLanguage === 'Hindi' ? 'मुझे कोई भी विषय बताएं, मैं सवाल पूछकर आपके दिमाग को विकसित करने में मदद करूँगा!' : 'Name any topic, and I will guide you to think and learn by asking helpful questions!')
+                                : activeSess?.persona === 'debugger'
+                                ? (appLanguage === 'Hindi' ? 'अपना कोडिंग सवाल या एरर डालें, मैं उसे डीबग करूँगा और समझाऊंगा।' : 'Share your coding queries or bugs, and I will debug and explain them step-by-step!')
+                                : activeSess?.persona === 'translator'
+                                ? (appLanguage === 'Hindi' ? 'किसी भी भाषा का अनुवाद करें या बातचीत का अभ्यास करें।' : 'Translate any language, or practice having conversations together!')
+                                : activeSess?.persona === 'math'
+                                ? (appLanguage === 'Hindi' ? 'कोई भी गणित का सवाल पूछें, मैं उसे चरण-दर-चरण विस्तार से हल करूँगा!' : 'Ask any math problem, and I will solve and explain it step-by-step!')
+                                : getChatIntroDesc(appLanguage);
+                            })()}
+                          </p>
+
+                          {/* Suggestion Prompt Chips */}
+                          <div className="mt-6 w-full space-y-2">
+                            {(() => {
+                              const activeSess = tutorSessions.find(s => s.id === activeSessionId);
+                              return (activeSess?.persona === 'socratic'
+                                ? [
+                                    { t: 'Explain photosynthesis Socratically', h: 'फोटोट्रोफ्स के बारे में सिखाएं' },
+                                    { t: 'Help me understand Gravity', h: 'गुरुत्वाकर्षण को समझने में मदद करें' }
+                                  ]
+                                : activeSess?.persona === 'debugger'
+                                ? [
+                                    { t: 'Why is my React state not updating?', h: 'रिएक्ट स्टेट अपडेट क्यों नहीं हो रहा?' },
+                                    { t: 'Explain Big O notation in simple terms', h: 'बिग ओ नोटेशन क्या है?' }
+                                  ]
+                                : activeSess?.persona === 'translator'
+                                ? [
+                                    { t: 'Translate: Where is the library to Hindi', h: 'अनुवाद करें: How are you doing?' },
+                                    { t: 'Explain Hindi grammar rules of gender', h: 'हिंदी में संज्ञा और सर्वनाम सिखाएं' }
+                                  ]
+                                : activeSess?.persona === 'math'
+                                ? [
+                                    { t: 'Solve quadratic equation: x^2 - 5x + 6 = 0', h: 'क्वाड्रेटिक समीकरण हल करें: x^2 - 5x + 6 = 0' },
+                                    { t: 'What is Pythagorean theorem formula?', h: 'पाइथागोरस थ्योरम फार्मूला क्या है?' }
+                                  ]
+                                : [
+                                    { t: 'Explain Photosynthesis in detail', h: 'प्रकाश संश्लेषण (Photosynthesis) समझाएं' },
+                                    { t: 'Give me a study tip for tomorrow\'s test', h: 'कल की परीक्षा के लिए स्टडी टिप दें' }
+                                  ]
+                              ).map((item, idx) => (
+                                <button
+                                  key={idx}
+                                  onClick={() => setChatInput(appLanguage === 'Hindi' ? item.h : item.t)}
+                                  className="w-full text-left px-3.5 py-2 border border-slate-150 bg-white hover:bg-indigo-50/40 text-slate-650 hover:text-indigo-950 rounded-xl text-[11px] font-bold transition duration-200 shadow-3xs cursor-pointer truncate"
+                                >
+                                  💡 {appLanguage === 'Hindi' ? item.h : item.t}
+                                </button>
+                              ));
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                      {chatMessages.map((msg, i) => (
+                        <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} space-y-1.5`} id={`chat_item_${i}`}>
+                          <div 
+                            onClick={() => setFullScreenMessage(msg)}
+                            className={`max-w-[85%] rounded-3xl p-3.5 shadow-sm text-sm cursor-pointer hover:scale-[1.01] hover:shadow-md active:scale-98 transition duration-200 select-none ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-850 rounded-tl-none border border-slate-150/70'}`}
+                          >
                             {msg.image && (
+                              <img src={msg.image} alt="Uploaded problem" className="w-full rounded-2xl mb-2 max-h-40 object-cover" />
+                            )}
+                            <div className="leading-relaxed text-xs md:text-sm whitespace-pre-wrap select-text">
+                              {renderChatMessage(msg.text)}
+                            </div>
+                            
+                            {/* Interactive blackboard visual expand link */}
+                            <div className="mt-3 pt-2.5 border-t border-slate-100/30 flex justify-between items-center text-[10px] opacity-80" style={{ pointerEvents: 'none' }}>
+                              <span className={`text-[8px] font-extrabold uppercase tracking-widest ${msg.role === 'user' ? 'text-indigo-200' : 'text-slate-400'}`}>
+                                {msg.role === 'user' ? '👤 Student' : '🤖 AI Partner'}
+                              </span>
+                              <span className={`font-black px-2 py-0.5 rounded-lg flex items-center space-x-1 shadow-2xs ${msg.role === 'user' ? 'bg-indigo-700/80 text-indigo-100' : 'bg-indigo-50 text-indigo-650'}`}>
+                                <span>{getFullscreenLabel(appLanguage)}</span>
+                                <Maximize2 className="w-2.5 h-2.5 ml-0.5" />
+                              </span>
+                            </div>
+                          </div>
+                          {msg.role === 'model' && (
+                            <div className="flex justify-start pl-1.5 pb-2 flex-wrap gap-1.5">
+                              <button
+                                onClick={() => handleSpeakMessage(msg.text)}
+                                className={`px-2.5 py-1 text-[9px] font-black rounded-xl border flex items-center space-x-1 cursor-pointer transition shadow-2xs ${
+                                  speakingText === msg.text 
+                                    ? 'bg-rose-50 border-rose-250 text-rose-600 animate-pulse font-black'
+                                    : 'bg-white border-slate-100 hover:border-slate-200 text-slate-500 hover:text-indigo-600'
+                                }`}
+                              >
+                                {speakingText === msg.text ? (
+                                  <>
+                                    <span className="text-[10px]">⏹️</span>
+                                    <span>Stop Reading</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="text-[10px]">🔊</span>
+                                    <span>{appLanguage === 'Hindi' ? 'सुनें (Read Out)' : 'Read Out'}</span>
+                                  </>
+                                )}
+                              </button>
+
                               <button
                                 onClick={() => {
-                                  let extractedTitle = "AI Tutor Diagram";
+                                  let extractedTitle = "Concept Diagram";
                                   const firstLine = msg.text.trim().split('\n')[0].replace(/[#*`_-]/g, '').trim();
                                   if (firstLine && firstLine.length > 3 && firstLine.length < 45) {
                                     extractedTitle = firstLine;
                                   }
                                   setBackgroundDiagram({
-                                    status: 'success',
-                                    prompt: `Diagram generated by AI Tutor.`,
+                                    status: 'idle',
+                                    prompt: `A highly detailed, textbook-grade scientific diagram of: ${extractedTitle}. High-contrast academic labeled elements, clean solid background.`,
                                     title: extractedTitle,
                                     subject: 'Science',
                                     style: 'textbook',
                                     practiceMode: false,
-                                    imageUrl: msg.image,
-                                    explanation: msg.text,
+                                    imageUrl: null,
+                                    explanation: '',
                                     step: '',
                                     error: null,
                                   });
                                   setActiveTab('diagram');
                                 }}
-                                className="px-2.5 py-1 text-[9px] font-black rounded-xl border bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 cursor-pointer transition shadow-2xs flex items-center space-x-1"
+                                className="px-2.5 py-1 text-[9px] font-black rounded-xl border bg-white border-slate-100 hover:border-slate-200 text-slate-500 hover:text-indigo-600 cursor-pointer transition shadow-2xs flex items-center space-x-1"
                               >
-                                <span className="text-[10px]">🔬</span>
-                                <span>{appLanguage === 'Hindi' ? 'लैब में खोलें' : 'Open in Lab'}</span>
+                                <span className="text-[10px]">🎨</span>
+                                <span>{appLanguage === 'Hindi' ? 'डायग्राम बनाएं' : 'Generate Diagram'}</span>
                               </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    {isChatLoading && (
-                      <div className="flex justify-start animate-pulse">
-                        <div className="bg-white border border-slate-100 px-4 py-2.5 rounded-3xl rounded-tl-none flex items-center space-x-2 shadow-sm text-xs text-slate-500">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
-                          <span className="font-bold text-slate-600">{getSolvingText(appLanguage)}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Absolute pinned and locked bottom entry area */}
-                  <div className="p-3 border-t border-slate-100 bg-white shrink-0 space-y-2">
-                    {selectedImage && (
-                      <div className="relative inline-block" id="image_preview">
-                        <img src={selectedImage} alt="Problem sketch" className="w-16 h-16 rounded-xl object-cover border border-indigo-500" />
-                        <button onClick={() => setSelectedImage(null)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 shadow cursor-pointer">
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
-                    <div className="flex items-center space-x-2">
-                      <div className="flex-1 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center px-3 py-1 focus-within:border-indigo-400 focus-within:ring-1 focus-within:ring-indigo-400 relative overflow-hidden">
-                        {isListening && (
-                          <div className="absolute inset-0 bg-red-100/90 flex items-center px-3 space-x-2 z-10 transition">
-                            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping mr-1" />
-                            <span className="text-xs font-black text-red-700 animate-pulse">{getListeningLabel(appLanguage)}</span>
+                              {msg.image && (
+                                <button
+                                  onClick={() => {
+                                    let extractedTitle = "AI Tutor Diagram";
+                                    const firstLine = msg.text.trim().split('\n')[0].replace(/[#*`_-]/g, '').trim();
+                                    if (firstLine && firstLine.length > 3 && firstLine.length < 45) {
+                                      extractedTitle = firstLine;
+                                    }
+                                    setBackgroundDiagram({
+                                      status: 'success',
+                                      prompt: `Diagram generated by AI Tutor.`,
+                                      title: extractedTitle,
+                                      subject: 'Science',
+                                      style: 'textbook',
+                                      practiceMode: false,
+                                      imageUrl: msg.image,
+                                      explanation: msg.text,
+                                      step: '',
+                                      error: null,
+                                    });
+                                    setActiveTab('diagram');
+                                  }}
+                                  className="px-2.5 py-1 text-[9px] font-black rounded-xl border bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 cursor-pointer transition shadow-2xs flex items-center space-x-1"
+                                >
+                                  <span className="text-[10px]">🔬</span>
+                                  <span>{appLanguage === 'Hindi' ? 'लैब में खोलें' : 'Open in Lab'}</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {isChatLoading && (
+                        <div className="flex justify-start animate-pulse">
+                          <div className="bg-white border border-slate-100 px-4 py-2.5 rounded-3xl rounded-tl-none flex items-center space-x-2 shadow-sm text-xs text-slate-500">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                            <span className="font-bold text-slate-600">{getSolvingText(appLanguage)}</span>
                           </div>
-                        )}
-                        <input
-                          type="text"
-                          value={chatInput}
-                          onChange={(e) => setChatInput(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                          placeholder={getChatPlaceholder(appLanguage)}
-                          className="flex-1 p-2 bg-transparent focus:outline-none text-xs text-slate-800"
-                        />
-                        <button onClick={handleVoiceInput} className="text-slate-400 hover:text-red-500 p-1 cursor-pointer">
-                          <Mic className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => fileInputRef.current?.click()} className="text-slate-400 hover:text-indigo-600 p-1 cursor-pointer">
-                          <Camera className="w-4 h-4" />
-                        </button>
-                        <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
-                      </div>
-                      <button 
-                        onClick={handleSendMessage}
-                        disabled={isChatLoading}
-                        className="p-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl disabled:opacity-50 transition active:scale-95 cursor-pointer"
-                        id="send_btn"
-                      >
-                        <Send className="w-4 h-4" />
-                      </button>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Absolute pinned and locked bottom entry area */}
+                    <div className="p-3 border-t border-slate-100 bg-white shrink-0 space-y-2">
+                      {selectedImage && (
+                        <div className="relative inline-block" id="image_preview">
+                          <img src={selectedImage} alt="Problem sketch" className="w-16 h-16 rounded-xl object-cover border border-indigo-500" />
+                          <button onClick={() => setSelectedImage(null)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 shadow cursor-pointer">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                      <div className="flex items-center space-x-2">
+                        <div className="flex-1 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center px-3 py-1 focus-within:border-indigo-400 focus-within:ring-1 focus-within:ring-indigo-400 relative overflow-hidden">
+                          {isListening && (
+                            <div className="absolute inset-0 bg-red-100/90 flex items-center px-3 space-x-2 z-10 transition">
+                              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping mr-1" />
+                              <span className="text-xs font-black text-red-700 animate-pulse">{getListeningLabel(appLanguage)}</span>
+                            </div>
+                          )}
+                          <input
+                            type="text"
+                            value={chatInput}
+                            onChange={(e) => setChatInput(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                            placeholder={getChatPlaceholder(appLanguage)}
+                            className="flex-1 p-2 bg-transparent focus:outline-none text-xs text-slate-800"
+                          />
+                          <button onClick={handleVoiceInput} className="text-slate-400 hover:text-red-500 p-1 cursor-pointer">
+                            <Mic className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => fileInputRef.current?.click()} className="text-slate-400 hover:text-indigo-600 p-1 cursor-pointer">
+                            <Camera className="w-4 h-4" />
+                          </button>
+                          <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+                        </div>
+                        <button 
+                          onClick={handleSendMessage}
+                          disabled={isChatLoading}
+                          className="p-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl disabled:opacity-50 transition active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
+                          id="send_btn"
+                        >
+                          <Send className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
                   </div>
                 </div>
               )}
@@ -6269,7 +7017,49 @@ export default function App() {
                   {SUBJECTS.map(sub => <option key={sub} value={sub}>{sub}</option>)}
                 </select>
                 <textarea placeholder="Write subject content here..." value={newNote.content} onChange={(e) => setNewNote({...newNote, content: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-150 rounded-xl text-xs h-28 resize-none outline-none text-slate-700" />
-                <button onClick={handleAddNote} className="w-full py-3 bg-indigo-600 text-white rounded-xl text-xs font-bold active:scale-95 transition">Save Note</button>
+                
+                <div className="space-y-1.5 pt-1 text-left">
+                  <label className="block text-[9px] uppercase font-black text-slate-400 tracking-wider">
+                    {appLanguage === 'Hindi' ? 'प्रारंभिक समझ स्तर (स्मरण अंतराल SM-2)' : 'Initial Understanding Level (SM-2 Spaced Repetition)'}
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewNote({ ...newNote, understanding: 'hard' })}
+                      className={`py-2 px-1 rounded-xl text-[10px] font-extrabold border transition active:scale-95 cursor-pointer ${
+                        newNote.understanding === 'hard'
+                          ? 'bg-rose-50 border-rose-300 text-rose-700 shadow-sm'
+                          : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
+                      }`}
+                    >
+                      🔴 {appLanguage === 'Hindi' ? 'कठिन (1d)' : 'Hard (1d)'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewNote({ ...newNote, understanding: 'good' })}
+                      className={`py-2 px-1 rounded-xl text-[10px] font-extrabold border transition active:scale-95 cursor-pointer ${
+                        newNote.understanding === 'good'
+                          ? 'bg-indigo-50 border-indigo-300 text-indigo-700 shadow-sm'
+                          : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
+                      }`}
+                    >
+                      🔵 {appLanguage === 'Hindi' ? 'अच्छा (3d)' : 'Good (3d)'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewNote({ ...newNote, understanding: 'easy' })}
+                      className={`py-2 px-1 rounded-xl text-[10px] font-extrabold border transition active:scale-95 cursor-pointer ${
+                        newNote.understanding === 'easy'
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm'
+                          : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
+                      }`}
+                    >
+                      🟢 {appLanguage === 'Hindi' ? 'आसान (6d)' : 'Easy (6d)'}
+                    </button>
+                  </div>
+                </div>
+
+                <button onClick={handleAddNote} className="w-full py-3 bg-indigo-600 text-white rounded-xl text-xs font-bold active:scale-95 transition cursor-pointer">Save Note</button>
               </motion.div>
             </motion.div>
           )}

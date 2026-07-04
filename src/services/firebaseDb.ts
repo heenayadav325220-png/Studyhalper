@@ -18,7 +18,7 @@ import {
   OperationType,
   writeBatch
 } from "./firebase";
-import type { User, Note, ScheduleItem, Progress, Group, GroupMessage, GroupNote, Flashcard, GroupQuestion, GroupSession } from "../types";
+import type { User, Note, ScheduleItem, Progress, Group, GroupMessage, GroupNote, Flashcard, GroupQuestion, GroupSession, TutorSession } from "../types";
 
 /**
  * Validates connection to Firestore as required by firebase-integration skill.
@@ -1202,5 +1202,55 @@ export async function updateSharedTimer(
     handleFirestoreError(error, OperationType.WRITE, `groups/${groupId}/sessions/${sessionId}/shared_timer/pomodoro`);
   }
 }
+
+// ---------------- AI TUTOR CHAT SESSIONS ----------------
+
+export async function getTutorSessions(userId: string | number): Promise<TutorSession[]> {
+  try {
+    const colRef = collection(db, "users", String(userId), "tutor_sessions");
+    const snap = await getDocs(colRef);
+    const results: TutorSession[] = [];
+    snap.forEach((docSnap) => {
+      const d = docSnap.data();
+      results.push({
+        id: docSnap.id,
+        title: d.title || "Untitled Session",
+        messages: d.messages || [],
+        createdAt: d.createdAt || new Date().toISOString(),
+        persona: d.persona || 'default'
+      });
+    });
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } catch (err) {
+    console.error("Error getting tutor sessions:", err);
+    return [];
+  }
+}
+
+export async function saveTutorSession(userId: string | number, session: TutorSession): Promise<void> {
+  try {
+    const docRef = doc(db, "users", String(userId), "tutor_sessions", String(session.id));
+    const payload = {
+      title: session.title || "Untitled Session",
+      messages: session.messages || [],
+      createdAt: session.createdAt || new Date().toISOString(),
+      persona: session.persona || 'default',
+      updatedAt: new Date().toISOString()
+    };
+    await setDoc(docRef, payload, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `users/${userId}/tutor_sessions/${session.id}`);
+  }
+}
+
+export async function deleteTutorSession(userId: string | number, sessionId: string): Promise<void> {
+  try {
+    const docRef = doc(db, "users", String(userId), "tutor_sessions", String(sessionId));
+    await deleteDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `users/${userId}/tutor_sessions/${sessionId}`);
+  }
+}
+
 
 

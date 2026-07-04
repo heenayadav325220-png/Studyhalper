@@ -92,6 +92,14 @@ export interface ChatMessage {
   image?: string;
 }
 
+export interface TutorSession {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: string;
+  persona?: 'default' | 'socratic' | 'debugger' | 'translator' | 'math';
+}
+
 export interface Group {
   id: string | number;
   name: string;
