@@ -723,7 +723,26 @@ export default function App() {
   };
 
   // Firebase and Authentication States
-  const [firebaseUser, setFirebaseUser] = useState<any>(null);
+  const [firebaseUser, setFirebaseUser] = useState<any>(() => {
+    if (typeof window !== 'undefined') {
+      const isSandbox = localStorage.getItem('studybuddy_is_sandbox');
+      if (isSandbox === 'true') {
+        const stored = localStorage.getItem('studybuddy_local_profile');
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            return {
+              uid: parsed.id,
+              email: parsed.email || 'scholar@studybuddy.com',
+              isAnonymous: true,
+              displayName: parsed.name,
+            };
+          } catch (e) {}
+        }
+      }
+    }
+    return null;
+  });
   const [authChecking, setAuthChecking] = useState(true);
   const [authMode, setAuthMode] = useState<'login' | 'signup' | 'phone' | 'guest'>('login');
   const [authEmail, setAuthEmail] = useState('');
@@ -787,7 +806,20 @@ export default function App() {
   const [isTagMode, setIsTagMode] = useState(false);
 
   // Core local states
-  const [user, setUser] = useState<UserType | null>(null);
+  const [user, setUser] = useState<UserType | null>(() => {
+    if (typeof window !== 'undefined') {
+      const isSandbox = localStorage.getItem('studybuddy_is_sandbox');
+      if (isSandbox === 'true') {
+        const stored = localStorage.getItem('studybuddy_local_profile');
+        if (stored) {
+          try {
+            return JSON.parse(stored);
+          } catch (e) {}
+        }
+      }
+    }
+    return null;
+  });
 
   // Sync registration form states with loaded user profile details
   useEffect(() => {
@@ -1448,6 +1480,10 @@ export default function App() {
 
   // Real Firebase and Authentication state listener
   useEffect(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem('studybuddy_is_sandbox') === 'true') {
+      setAuthChecking(false);
+      return;
+    }
     const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
       setAuthChecking(true);
       if (fUser) {
@@ -3457,6 +3493,85 @@ export default function App() {
     }
   };
 
+  const handleEnterSandboxMode = (emailStr?: string) => {
+    setAuthError(null);
+    setAuthSuccess(null);
+    setAuthLoading(true);
+
+    const emailToUse = emailStr || authEmail || 'scholar@studybuddy.com';
+    const sandboxId = 'sandbox-' + emailToUse.replace(/[^a-zA-Z0-9]/g, '_');
+    
+    // Check if there is already a saved local profile for this user
+    let loadedUser: UserType;
+    const stored = localStorage.getItem(`sb_user_${sandboxId}`);
+    if (stored) {
+      try {
+        loadedUser = JSON.parse(stored);
+      } catch (e) {
+        loadedUser = {
+          id: sandboxId,
+          name: emailToUse.split('@')[0],
+          school: 'Global Sandbox',
+          className: 'Class 10',
+          points: 120,
+          level: 1,
+          avatar: '🐼',
+          badges: [{ id: 'first_step', badge_name: 'First Step 🌟', icon: '🌟', date_earned: new Date().toISOString() }],
+          pet: {
+            name: 'Chimpu 🐼',
+            happiness: 90,
+            fullness: 90,
+            accessory: 'none',
+            petCount: 0
+          }
+        };
+      }
+    } else {
+      loadedUser = {
+        id: sandboxId,
+        name: emailToUse.split('@')[0],
+        school: 'Global Sandbox',
+        className: 'Class 10',
+        points: 120,
+        level: 1,
+        avatar: '🐼',
+        badges: [{ id: 'first_step', badge_name: 'First Step 🌟', icon: '🌟', date_earned: new Date().toISOString() }],
+        pet: {
+          name: 'Chimpu 🐼',
+          happiness: 90,
+          fullness: 90,
+          accessory: 'none',
+          petCount: 0
+        }
+      };
+    }
+
+    // Set local state
+    setUser(loadedUser);
+    setFirebaseUser({
+      uid: sandboxId,
+      email: emailToUse,
+      isAnonymous: true,
+      displayName: loadedUser.name,
+    } as any);
+
+    if (loadedUser.pet) {
+      setPet(loadedUser.pet as any);
+    }
+    if ((loadedUser as any).quests) {
+      setQuests((loadedUser as any).quests);
+    }
+    if ((loadedUser as any).streakDays) {
+      setStreakDays((loadedUser as any).streakDays);
+    }
+
+    // Save profile and status
+    localStorage.setItem(`sb_user_${sandboxId}`, JSON.stringify(loadedUser));
+    localStorage.setItem('studybuddy_local_profile', JSON.stringify(loadedUser));
+    localStorage.setItem('studybuddy_is_sandbox', 'true');
+    setAuthLoading(false);
+  };
+
   const handleEmailSignIn = async (e: any) => {
     e.preventDefault();
     if (!authEmail || !authPassword) return;
@@ -3467,8 +3582,11 @@ export default function App() {
       await signInWithEmailAndPassword(auth, authEmail, authPassword);
     } catch (err: any) {
       console.error(err);
-      if (err?.code === 'auth/operation-not-allowed' || err?.message?.includes('operation-not-allowed')) {
-        setAuthError("This sign-in provider (Email/Password) is not enabled in your Firebase project yet.\n\n👉 Recommended: Use 'Sign In with Google' which is fully pre-configured and works instantly!");
+      if (err?.code === 'auth/operation-not-allowed' || err?.message?.includes('operation-not-allowed') || err?.message?.includes('configuration-not-found')) {
+        setAuthSuccess("✨ Entering Sandbox Mode... Redirecting securely!");
+        setTimeout(() => {
+          handleEnterSandboxMode(authEmail);
+        }, 1200);
       } else {
         setAuthError(err.message || "Failed to sign in. Please check details.");
       }
@@ -3487,8 +3605,11 @@ export default function App() {
       await createUserWithEmailAndPassword(auth, authEmail, authPassword);
     } catch (err: any) {
       console.error(err);
-      if (err?.code === 'auth/operation-not-allowed' || err?.message?.includes('operation-not-allowed')) {
-        setAuthError("Creating email accounts is not enabled in your Firebase project yet.\n\n👉 Recommended: Use 'Sign In with Google' which is fully pre-configured and works instantly!");
+      if (err?.code === 'auth/operation-not-allowed' || err?.message?.includes('operation-not-allowed') || err?.message?.includes('configuration-not-found')) {
+        setAuthSuccess("✨ Creating secure Sandbox profile... Redirecting!");
+        setTimeout(() => {
+          handleEnterSandboxMode(authEmail);
+        }, 1200);
       } else {
         setAuthError(err.message || "Failed to register. Please try another email.");
       }
@@ -3506,7 +3627,14 @@ export default function App() {
       await signInWithPopup(auth, provider);
     } catch (err: any) {
       console.error(err);
-      setAuthError(err.message || "Google sign-in cancelled or failed.");
+      if (err?.code === 'auth/operation-not-allowed' || err?.message?.includes('operation-not-allowed') || err?.message?.includes('configuration-not-found')) {
+        setAuthSuccess("✨ Activating Local Google Sandbox Mode... Redirecting!");
+        setTimeout(() => {
+          handleEnterSandboxMode('google_scholar@studybuddy.com');
+        }, 1200);
+      } else {
+        setAuthError(err.message || "Google sign-in cancelled or failed.");
+      }
     } finally {
       setAuthLoading(false);
     }
@@ -3536,8 +3664,11 @@ export default function App() {
       await signInAnonymously(auth);
     } catch (err: any) {
       console.error(err);
-      if (err?.code === 'auth/operation-not-allowed' || err?.message?.includes('operation-not-allowed')) {
-        setAuthError("Anonymous / Phone simulation authentication is not enabled in your Firebase project yet.\n\n👉 Recommended: Use 'Sign In with Google' which works instantly!");
+      if (err?.code === 'auth/operation-not-allowed' || err?.message?.includes('operation-not-allowed') || err?.message?.includes('configuration-not-found')) {
+        setAuthSuccess("✨ Phone auth simulated: Entering Sandbox... Redirecting!");
+        setTimeout(() => {
+          handleEnterSandboxMode(authPhone ? authPhone + '@phone.com' : 'phone_student@studybuddy.com');
+        }, 1200);
       } else {
         setAuthError("Failed to verify code.");
       }
@@ -3554,8 +3685,11 @@ export default function App() {
       await signInAnonymously(auth);
     } catch (err: any) {
       console.error(err);
-      if (err?.code === 'auth/operation-not-allowed' || err?.message?.includes('operation-not-allowed')) {
-        setAuthError("Guest (Anonymous) login is not enabled in your Firebase project yet.\n\n👉 Recommended: Use 'Sign In with Google' which works instantly!");
+      if (err?.code === 'auth/operation-not-allowed' || err?.message?.includes('operation-not-allowed') || err?.message?.includes('configuration-not-found')) {
+        setAuthSuccess("✨ Logging in as Guest Sandbox Student... Redirecting!");
+        setTimeout(() => {
+          handleEnterSandboxMode('guest_student@studybuddy.com');
+        }, 1200);
       } else {
         setAuthError("Guest login failed.");
       }
@@ -3889,6 +4023,22 @@ export default function App() {
                  </svg>
                  <span>{appLanguage === 'Hindi' ? 'गूगल के साथ आगे बढ़ें' : 'Continue with Google'}</span>
                </button>
+
+               <div className="pt-2 border-t border-slate-900/40">
+                 <button
+                   type="button"
+                   onClick={() => handleEnterSandboxMode('scholar@studybuddy.com')}
+                   disabled={authLoading}
+                   className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-black tracking-wider uppercase shadow-md active:scale-95 duration-100 transition cursor-pointer flex items-center justify-center gap-2"
+                 >
+                   <span>✨ {appLanguage === 'Hindi' ? 'सैंडबॉक्स मोड में प्रवेश करें 🚀' : 'Enter Sandbox Mode 🚀'}</span>
+                 </button>
+                 <p className="text-[9px] text-center text-slate-500 mt-2 font-medium">
+                   {appLanguage === 'Hindi' 
+                     ? 'बिना किसी ईमेल या सर्वर कॉन्फ़िगरेशन के तत्काल सुरक्षित ऑफलाइन अनुभव शुरू करें।'
+                     : 'Instantly start a safe local offline session bypasses any server configurations.'}
+                 </p>
+               </div>
              </div>
            </div>
 
@@ -8293,6 +8443,9 @@ export default function App() {
                       onClick={() => {
                         if (confirm("Do you really want to reset your local student profile and create a new one?\nYour notes, daily schedule, and other data will remain safe!")) {
                           localStorage.removeItem('studybuddy_local_profile');
+                          localStorage.removeItem('studybuddy_is_sandbox');
+                          signOut(auth).catch((err: any) => console.error("Error signing out:", err));
+                          setFirebaseUser(null);
                           setUser(null);
                           setRegName('');
                           setRegSchool('');

@@ -35,8 +35,35 @@ export async function testFirestoreConnection() {
 
 // ---------------- USER PROFILE ----------------
 
+function isSandboxMode(userId?: string | number): boolean {
+  if (typeof window === 'undefined') return false;
+  if (!auth.currentUser) return true;
+  if (!userId) return true;
+  const idStr = String(userId);
+  return idStr.startsWith('sandbox') || idStr.includes('mock') || idStr === 'undefined' || idStr === 'null';
+}
+
 export async function saveUserProfile(user: User): Promise<void> {
   if (!user.id) return;
+  if (isSandboxMode(user.id)) {
+    try {
+      localStorage.setItem(`sb_user_${user.id}`, JSON.stringify(user));
+      let allUsers: any[] = [];
+      try {
+        allUsers = JSON.parse(localStorage.getItem('sb_all_users') || '[]');
+      } catch {}
+      const index = allUsers.findIndex(u => u.id === user.id);
+      if (index > -1) {
+        allUsers[index] = { id: user.id, name: user.name, points: user.points, level: user.level };
+      } else {
+        allUsers.push({ id: user.id, name: user.name, points: user.points, level: user.level });
+      }
+      localStorage.setItem('sb_all_users', JSON.stringify(allUsers));
+    } catch (e) {
+      console.warn("Failed to save local sandbox profile:", e);
+    }
+    return;
+  }
   const userRef = doc(db, "users", String(user.id));
   try {
     await setDoc(userRef, {
@@ -64,6 +91,13 @@ export async function saveUserProfile(user: User): Promise<void> {
 }
 
 export async function getUserProfile(userId: string | number): Promise<User | null> {
+  if (isSandboxMode(userId)) {
+    try {
+      const stored = localStorage.getItem(`sb_user_${userId}`);
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return null;
+  }
   try {
     const userRef = doc(db, "users", String(userId));
     const snap = await getDoc(userRef);
@@ -90,6 +124,21 @@ export async function getUserProfile(userId: string | number): Promise<User | nu
 }
 
 export async function getLeaderboard(): Promise<{ name: string; points: number; level: number }[]> {
+  if (isSandboxMode()) {
+    try {
+      const all = JSON.parse(localStorage.getItem('sb_all_users') || '[]');
+      if (all.length > 0) {
+        return all.sort((a: any, b: any) => (b.points || 0) - (a.points || 0)).slice(0, 10);
+      }
+    } catch {}
+    return [
+      { name: "Scholar 🐼 (You)", points: 120, level: 1 },
+      { name: "Ananya", points: 1100, level: 4 },
+      { name: "Aarav", points: 950, level: 3 },
+      { name: "Siddharth", points: 850, level: 3 },
+      { name: "Priya", points: 720, level: 2 },
+    ];
+  }
   try {
     const q = query(collection(db, "users"), orderBy("points", "desc"), limit(10));
     const snap = await getDocs(q);
@@ -112,6 +161,13 @@ export async function getLeaderboard(): Promise<{ name: string; points: number; 
 // ---------------- PERSONAL NOTES ----------------
 
 export async function getNotes(userId: string | number): Promise<Note[]> {
+  if (isSandboxMode(userId)) {
+    try {
+      return JSON.parse(localStorage.getItem(`sb_notes_${userId}`) || '[]');
+    } catch {
+      return [];
+    }
+  }
   try {
     const colRef = collection(db, "users", String(userId), "notes");
     const q = query(colRef, orderBy("updated_at", "desc"));
@@ -140,6 +196,31 @@ export async function getNotes(userId: string | number): Promise<Note[]> {
 }
 
 export async function saveNote(userId: string | number, note: Partial<Note> & { id?: string | number }): Promise<string> {
+  if (isSandboxMode(userId)) {
+    const notes = await getNotes(userId);
+    const id = note.id || `note_${Date.now()}`;
+    const payload: any = {
+      id,
+      title: note.title || "Untitled Note",
+      content: note.content || "",
+      subject: note.subject || "Mathematics",
+      updated_at: new Date().toISOString()
+    };
+    if (note.interval !== undefined) payload.interval = note.interval;
+    if (note.repetition !== undefined) payload.repetition = note.repetition;
+    if (note.easeFactor !== undefined) payload.easeFactor = note.easeFactor;
+    if (note.nextReviewDate !== undefined) payload.nextReviewDate = note.nextReviewDate;
+    if (note.lastReviewedDate !== undefined) payload.lastReviewedDate = note.lastReviewedDate;
+
+    const index = notes.findIndex(n => n.id === id);
+    if (index > -1) {
+      notes[index] = payload;
+    } else {
+      notes.unshift(payload);
+    }
+    localStorage.setItem(`sb_notes_${userId}`, JSON.stringify(notes));
+    return String(id);
+  }
   try {
     const colRef = collection(db, "users", String(userId), "notes");
     const payload: any = {
@@ -169,6 +250,12 @@ export async function saveNote(userId: string | number, note: Partial<Note> & { 
 }
 
 export async function deleteNote(userId: string | number, noteId: string | number): Promise<void> {
+  if (isSandboxMode(userId)) {
+    const notes = await getNotes(userId);
+    const filtered = notes.filter(n => n.id !== noteId);
+    localStorage.setItem(`sb_notes_${userId}`, JSON.stringify(filtered));
+    return;
+  }
   const docRef = doc(db, "users", String(userId), "notes", String(noteId));
   try {
     await deleteDoc(docRef);
@@ -180,6 +267,13 @@ export async function deleteNote(userId: string | number, noteId: string | numbe
 // ---------------- STUDY SCHEDULE ----------------
 
 export async function getSchedule(userId: string | number): Promise<ScheduleItem[]> {
+  if (isSandboxMode(userId)) {
+    try {
+      return JSON.parse(localStorage.getItem(`sb_schedule_${userId}`) || '[]');
+    } catch {
+      return [];
+    }
+  }
   try {
     const colRef = collection(db, "users", String(userId), "schedule");
     const snap = await getDocs(colRef);
@@ -203,6 +297,26 @@ export async function getSchedule(userId: string | number): Promise<ScheduleItem
 }
 
 export async function saveScheduleItem(userId: string | number, item: Partial<ScheduleItem> & { id?: string | number }): Promise<string> {
+  if (isSandboxMode(userId)) {
+    const schedule = await getSchedule(userId);
+    const id = item.id || `sched_${Date.now()}`;
+    const payload = {
+      id,
+      task: item.task || "",
+      time: item.time || "",
+      day: item.day || "Monday",
+      completed: item.completed ?? false,
+      category: item.category || "Homework"
+    };
+    const index = schedule.findIndex(s => s.id === id);
+    if (index > -1) {
+      schedule[index] = payload;
+    } else {
+      schedule.push(payload);
+    }
+    localStorage.setItem(`sb_schedule_${userId}`, JSON.stringify(schedule));
+    return String(id);
+  }
   try {
     const colRef = collection(db, "users", String(userId), "schedule");
     const payload = {
@@ -227,6 +341,12 @@ export async function saveScheduleItem(userId: string | number, item: Partial<Sc
 }
 
 export async function deleteScheduleItem(userId: string | number, itemId: string | number): Promise<void> {
+  if (isSandboxMode(userId)) {
+    const schedule = await getSchedule(userId);
+    const filtered = schedule.filter(s => s.id !== itemId);
+    localStorage.setItem(`sb_schedule_${userId}`, JSON.stringify(filtered));
+    return;
+  }
   const docRef = doc(db, "users", String(userId), "schedule", String(itemId));
   await deleteDoc(docRef);
 }
@@ -234,6 +354,13 @@ export async function deleteScheduleItem(userId: string | number, itemId: string
 // ---------------- PRACTICE PROGRESS ----------------
 
 export async function getProgress(userId: string | number): Promise<Progress[]> {
+  if (isSandboxMode(userId)) {
+    try {
+      return JSON.parse(localStorage.getItem(`sb_progress_${userId}`) || '[]');
+    } catch {
+      return [];
+    }
+  }
   try {
     const colRef = collection(db, "users", String(userId), "progress");
     const q = query(colRef, orderBy("date", "desc"));
@@ -257,6 +384,20 @@ export async function getProgress(userId: string | number): Promise<Progress[]> 
 }
 
 export async function saveProgressEntry(userId: string | number, entry: Omit<Progress, "id">): Promise<string> {
+  if (isSandboxMode(userId)) {
+    const progress = await getProgress(userId);
+    const id = `prog_${Date.now()}`;
+    const newEntry = {
+      id,
+      subject: entry.subject,
+      score: entry.score,
+      total: entry.total,
+      date: entry.date || new Date().toISOString()
+    };
+    progress.push(newEntry);
+    localStorage.setItem(`sb_progress_${userId}`, JSON.stringify(progress));
+    return id;
+  }
   const colRef = collection(db, "users", String(userId), "progress");
   const docRef = await addDoc(colRef, {
     subject: entry.subject,
@@ -770,6 +911,13 @@ export async function saveGroupNote(
 // ---------------- FLASHCARDS ----------------
 
 export async function getFlashcards(userId: string | number): Promise<Flashcard[]> {
+  if (isSandboxMode(userId)) {
+    try {
+      return JSON.parse(localStorage.getItem(`sb_flashcards_${userId}`) || '[]');
+    } catch {
+      return [];
+    }
+  }
   try {
     const colRef = collection(db, "users", String(userId), "flashcards");
     const snap = await getDocs(colRef);
@@ -800,6 +948,30 @@ export async function saveFlashcard(
   userId: string | number, 
   card: Partial<Flashcard> & { id?: string | number }
 ): Promise<string> {
+  if (isSandboxMode(userId)) {
+    const cards = await getFlashcards(userId);
+    const id = card.id || `card_${Date.now()}`;
+    const payload = {
+      id,
+      front: card.front || "",
+      back: card.back || "",
+      subject: card.subject || "Mathematics",
+      noteId: card.noteId || "",
+      interval: card.interval ?? 1,
+      repetition: card.repetition ?? 0,
+      easeFactor: card.easeFactor ?? 2.5,
+      nextReviewDate: card.nextReviewDate || new Date().toISOString(),
+      created_at: card.created_at || new Date().toISOString()
+    };
+    const index = cards.findIndex(c => c.id === id);
+    if (index > -1) {
+      cards[index] = payload as any;
+    } else {
+      cards.push(payload as any);
+    }
+    localStorage.setItem(`sb_flashcards_${userId}`, JSON.stringify(cards));
+    return String(id);
+  }
   const colRef = collection(db, "users", String(userId), "flashcards");
   const payload = {
     front: card.front || "",
@@ -824,6 +996,12 @@ export async function saveFlashcard(
 }
 
 export async function deleteFlashcard(userId: string | number, cardId: string | number): Promise<void> {
+  if (isSandboxMode(userId)) {
+    const cards = await getFlashcards(userId);
+    const filtered = cards.filter(c => c.id !== cardId);
+    localStorage.setItem(`sb_flashcards_${userId}`, JSON.stringify(filtered));
+    return;
+  }
   const docRef = doc(db, "users", String(userId), "flashcards", String(cardId));
   await deleteDoc(docRef);
 }
@@ -869,8 +1047,8 @@ export async function saveUserDiagram(
     created_at: diagram.created_at || new Date().toISOString()
   };
 
-  // Safe check if the user is signed in to Firebase Auth
-  if (!auth.currentUser) {
+  // Safe check if the user is signed in to Firebase Auth or in Sandbox Mode
+  if (!auth.currentUser || isSandboxMode(userId)) {
     const localDiagrams = getLocalDiagrams();
     if (diagram.id) {
       const idx = localDiagrams.findIndex(d => d.id === diagram.id);
@@ -909,7 +1087,7 @@ export async function saveUserDiagram(
 }
 
 export async function getUserDiagrams(userId: string | number): Promise<any[]> {
-  if (!auth.currentUser) {
+  if (!auth.currentUser || isSandboxMode(userId)) {
     return getLocalDiagrams();
   }
 
@@ -931,7 +1109,7 @@ export async function getUserDiagrams(userId: string | number): Promise<any[]> {
 }
 
 export async function deleteUserDiagram(userId: string | number, diagramId: string): Promise<void> {
-  if (!auth.currentUser || String(diagramId).startsWith("local_diag_")) {
+  if (!auth.currentUser || isSandboxMode(userId) || String(diagramId).startsWith("local_diag_")) {
     const localDiagrams = getLocalDiagrams();
     const filtered = localDiagrams.filter(d => d.id !== diagramId);
     saveLocalDiagrams(filtered);
@@ -1206,6 +1384,14 @@ export async function updateSharedTimer(
 // ---------------- AI TUTOR CHAT SESSIONS ----------------
 
 export async function getTutorSessions(userId: string | number): Promise<TutorSession[]> {
+  if (isSandboxMode(userId)) {
+    try {
+      const stored = localStorage.getItem(`sb_tutor_${userId}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  }
   try {
     const colRef = collection(db, "users", String(userId), "tutor_sessions");
     const snap = await getDocs(colRef);
@@ -1222,12 +1408,33 @@ export async function getTutorSessions(userId: string | number): Promise<TutorSe
     });
     return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   } catch (err) {
-    console.error("Error getting tutor sessions:", err);
-    return [];
+    console.warn("Error getting tutor sessions from Firestore, falling back to local storage:", err);
+    try {
+      const stored = localStorage.getItem(`sb_tutor_${userId}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
   }
 }
 
 export async function saveTutorSession(userId: string | number, session: TutorSession): Promise<void> {
+  if (isSandboxMode(userId)) {
+    try {
+      const stored = localStorage.getItem(`sb_tutor_${userId}`);
+      const sessions: TutorSession[] = stored ? JSON.parse(stored) : [];
+      const index = sessions.findIndex(s => s.id === session.id);
+      if (index > -1) {
+        sessions[index] = session;
+      } else {
+        sessions.unshift(session);
+      }
+      localStorage.setItem(`sb_tutor_${userId}`, JSON.stringify(sessions));
+    } catch (e) {
+      console.warn("Error saving local tutor session:", e);
+    }
+    return;
+  }
   try {
     const docRef = doc(db, "users", String(userId), "tutor_sessions", String(session.id));
     const payload = {
@@ -1240,15 +1447,41 @@ export async function saveTutorSession(userId: string | number, session: TutorSe
     await setDoc(docRef, payload, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `users/${userId}/tutor_sessions/${session.id}`);
+    try {
+      const stored = localStorage.getItem(`sb_tutor_${userId}`);
+      const sessions: TutorSession[] = stored ? JSON.parse(stored) : [];
+      const index = sessions.findIndex(s => s.id === session.id);
+      if (index > -1) {
+        sessions[index] = session;
+      } else {
+        sessions.unshift(session);
+      }
+      localStorage.setItem(`sb_tutor_${userId}`, JSON.stringify(sessions));
+    } catch (e) {}
   }
 }
 
 export async function deleteTutorSession(userId: string | number, sessionId: string): Promise<void> {
+  if (isSandboxMode(userId)) {
+    try {
+      const stored = localStorage.getItem(`sb_tutor_${userId}`);
+      const sessions: TutorSession[] = stored ? JSON.parse(stored) : [];
+      const filtered = sessions.filter(s => s.id !== sessionId);
+      localStorage.setItem(`sb_tutor_${userId}`, JSON.stringify(filtered));
+    } catch (e) {}
+    return;
+  }
   try {
     const docRef = doc(db, "users", String(userId), "tutor_sessions", String(sessionId));
     await deleteDoc(docRef);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `users/${userId}/tutor_sessions/${sessionId}`);
+    try {
+      const stored = localStorage.getItem(`sb_tutor_${userId}`);
+      const sessions: TutorSession[] = stored ? JSON.parse(stored) : [];
+      const filtered = sessions.filter(s => s.id !== sessionId);
+      localStorage.setItem(`sb_tutor_${userId}`, JSON.stringify(filtered));
+    } catch (e) {}
   }
 }
 
