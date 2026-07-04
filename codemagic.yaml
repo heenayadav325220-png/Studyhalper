@@ -1,0 +1,12 @@
+workflows:
+  android-build:
+    name: Build Android APK
+    environment:
+      node: latest
+    scripts:
+      - name: Build APK
+        script: |
+          cd android
+          ./gradlew assembleDebug
+    artifacts:
+      - android/app/build/outputs/apk/debug/*.apk
