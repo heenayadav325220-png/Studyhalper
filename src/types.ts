@@ -186,3 +186,12 @@ export interface Flashcard {
   created_at: string;
 }
 
+export interface Feedback {
+  id: string;
+  userId: string;
+  userName: string;
+  rating: number;
+  suggestions: string;
+  createdAt: any; // Can be Date, string, or serverTimestamp Object
+}
+

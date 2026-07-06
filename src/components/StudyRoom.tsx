@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Paintbrush, Square, Circle as CircleIcon, Type, StickyNote, Eraser, 
   Trash2, Play, Pause, RotateCcw, MessageSquare, FileText, Users, 
-  Send, Clock, Sparkles, Check, ChevronRight, CheckCircle2, RefreshCw
+  Send, Clock, Sparkles, Check, ChevronRight, ChevronLeft, CheckCircle2, RefreshCw
 } from 'lucide-react';
 import { 
   subscribeToWhiteboard, 
@@ -73,6 +73,8 @@ export default function StudyRoom({ session, groupId, user, appLanguage, onClose
 
   // Sound effects toggles (mocked for focus state)
   const [studyMusic, setStudyMusic] = useState<boolean>(false);
+  const [currentTrackIdx, setCurrentTrackIdx] = useState<number>(0);
+  const [focusVolume, setFocusVolume] = useState<number>(0.15);
   const [audioStream, setAudioStream] = useState<any | null>(null);
 
   // 1. Subscribe to whiteboard elements
@@ -550,34 +552,128 @@ export default function StudyRoom({ session, groupId, user, appLanguage, onClose
           </div>
 
           {/* Quick Ambient Sound Generator for Focus */}
-          <div className="p-3 border-t border-slate-850 space-y-2 hidden md:block bg-slate-950/20">
-            <h4 className="text-[9px] font-black uppercase tracking-wider text-slate-500">{isHindi ? "एकाग्रता ध्वनियाँ" : "Focus Ambience"}</h4>
-            <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-850">
-              <span className="text-xs font-bold text-slate-300">🎵 {isHindi ? "धीमी संगीत" : "Lofi Music"}</span>
-              <button 
-                onClick={() => {
-                  setStudyMusic(!studyMusic);
-                  // Mock study track trigger
-                  try {
-                    const id = 'lofi-audio-player';
-                    let el = document.getElementById(id) as HTMLAudioElement;
-                    if (!el) {
-                      el = document.createElement('audio');
-                      el.id = id;
-                      el.src = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
-                      el.loop = true;
-                      el.volume = 0.15;
-                      document.body.appendChild(el);
-                    }
-                    if (!studyMusic) el.play();
-                    else el.pause();
-                  } catch (e) {}
-                }} 
-                className={`px-2 py-1 text-[10px] font-black rounded-lg transition ${studyMusic ? 'bg-indigo-600 text-white shadow-xs' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
-              >
-                {studyMusic ? (isHindi ? "चालू" : "ON") : (isHindi ? "बंद" : "OFF")}
-              </button>
-            </div>
+          <div className="p-3 border-t border-slate-850 space-y-2.5 hidden md:block bg-slate-950/20">
+            <h4 className="text-[9px] font-black uppercase tracking-wider text-slate-500">{isHindi ? "एकाग्रता ध्वनियाँ" : "Focus Ambience Deck"}</h4>
+            
+            {(() => {
+              const focusTracks = [
+                { id: 'lofi_1', name: isHindi ? 'लो-फाई चिल्स 🎧' : 'Lofi Chills 🎧', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
+                { id: 'lofi_2', name: isHindi ? 'कॉस्मिक मेलोडी 🌌' : 'Cosmic Melody 🌌', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
+                { id: 'lofi_3', name: isHindi ? 'अन्वेषण संगीत 🧭' : 'Explorer Beats 🧭', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3' },
+                { id: 'lofi_4', name: isHindi ? 'ध्यान राग 🧘' : 'Zen Meditation 🧘', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3' }
+              ];
+              return (
+                <div className="space-y-2 p-2.5 rounded-xl bg-slate-900 border border-slate-850 shadow-inner">
+                  {/* Track Selector Row */}
+                  <div className="flex items-center justify-between gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const prevIdx = (currentTrackIdx - 1 + focusTracks.length) % focusTracks.length;
+                        setCurrentTrackIdx(prevIdx);
+                        try {
+                          const id = 'lofi-audio-player';
+                          const el = document.getElementById(id) as HTMLAudioElement;
+                          if (el) {
+                            el.src = focusTracks[prevIdx].url;
+                            if (studyMusic) {
+                              el.play().catch(e => console.log(e));
+                            }
+                          }
+                        } catch (err) {}
+                      }}
+                      className="p-1 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg cursor-pointer transition"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                    </button>
+                    
+                    <span className="text-[10px] font-extrabold text-indigo-300 text-center flex-1 truncate">
+                      {focusTracks[currentTrackIdx].name}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextIdx = (currentTrackIdx + 1) % focusTracks.length;
+                        setCurrentTrackIdx(nextIdx);
+                        try {
+                          const id = 'lofi-audio-player';
+                          const el = document.getElementById(id) as HTMLAudioElement;
+                          if (el) {
+                            el.src = focusTracks[nextIdx].url;
+                            if (studyMusic) {
+                              el.play().catch(e => console.log(e));
+                            }
+                          }
+                        } catch (err) {}
+                      }}
+                      className="p-1 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg cursor-pointer transition"
+                    >
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Controls and Volume Sliders */}
+                  <div className="flex items-center gap-2 pt-1 border-t border-slate-800/60">
+                    <button 
+                      onClick={() => {
+                        const nextPlayState = !studyMusic;
+                        setStudyMusic(nextPlayState);
+                        try {
+                          const id = 'lofi-audio-player';
+                          let el = document.getElementById(id) as HTMLAudioElement;
+                          if (!el) {
+                            el = document.createElement('audio');
+                            el.id = id;
+                            el.src = focusTracks[currentTrackIdx].url;
+                            el.loop = true;
+                            el.volume = focusVolume;
+                            document.body.appendChild(el);
+                          }
+                          if (nextPlayState) {
+                            el.volume = focusVolume;
+                            el.play().catch(e => console.log(e));
+                          } else {
+                            el.pause();
+                          }
+                        } catch (e) {}
+                      }} 
+                      className={`p-1.5 rounded-lg transition shrink-0 cursor-pointer ${studyMusic ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                      title={studyMusic ? (isHindi ? "रोकें" : "Pause") : (isHindi ? "चलाएं" : "Play")}
+                    >
+                      {studyMusic ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                    </button>
+
+                    {/* Volume slider */}
+                    <div className="flex-1 flex items-center gap-1">
+                      <span className="text-[10px] text-slate-500">🔈</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={focusVolume}
+                        onChange={(e) => {
+                          const vol = parseFloat(e.target.value);
+                          setFocusVolume(vol);
+                          try {
+                            const id = 'lofi-audio-player';
+                            const el = document.getElementById(id) as HTMLAudioElement;
+                            if (el) {
+                              el.volume = vol;
+                            }
+                          } catch (err) {}
+                        }}
+                        className="w-full accent-indigo-500 h-1 rounded-full cursor-pointer bg-slate-800"
+                      />
+                      <span className="text-[9px] font-mono text-slate-400 w-6 text-right">
+                        {Math.round(focusVolume * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </section>
 

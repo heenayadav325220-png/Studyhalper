@@ -227,9 +227,27 @@
         "persona": { "type": "string" }
       },
       "required": ["id", "title", "messages", "createdAt"]
+    },
+    "Feedback": {
+      "title": "User Feedback",
+      "description": "Stores user experience ratings and suggested new features.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier of the feedback." },
+        "userId": { "type": "string", "description": "UID of the user submitting the feedback." },
+        "userName": { "type": "string", "description": "Name of the user submitting the feedback." },
+        "rating": { "type": "integer", "description": "The experience rating from 1 to 5." },
+        "suggestions": { "type": "string", "description": "User suggestions and requested features." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of submission." }
+      },
+      "required": ["id", "userId", "userName", "rating", "suggestions", "createdAt"]
     }
   },
   "firestore": {
+    "/feedback/{feedbackId}": {
+      "schema": "Feedback",
+      "description": "Collection of user feedback, experience ratings, and suggestions."
+    },
     "/users/{userId}": {
       "schema": "User",
       "description": "Primary user profile document containing student information."

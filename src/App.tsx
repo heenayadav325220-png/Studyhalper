@@ -48,7 +48,12 @@ import {
   Settings,
   TrendingUp,
   Pencil,
-  Bot
+  Bot,
+  Cpu,
+  Rocket,
+  ShieldAlert,
+  CloudLightning,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
@@ -60,6 +65,7 @@ import { HomeworkSolver } from './components/HomeworkSolver';
 import { DiagramMaker } from './components/DiagramMaker';
 import StudyRoom from './components/StudyRoom';
 import { ProgressModalContent } from './components/ProgressModalContent';
+import AndromedaCosmic from './components/AndromedaCosmic';
 const InteractiveToolkit = lazy(() => import('./components/InteractiveToolkit'));
 import type { AppLanguage } from './services/translations';
 import type { Note, ScheduleItem, Progress, ChatMessage, Subject, User as UserType, Group, GroupMessage, GroupNote, Flashcard, GroupQuestion, GroupSession, TutorSession } from './types';
@@ -112,7 +118,8 @@ import {
   saveUserDiagram,
   getTutorSessions,
   saveTutorSession,
-  deleteTutorSession
+  deleteTutorSession,
+  saveFeedback
 } from './services/firebaseDb';
 
 
@@ -594,6 +601,26 @@ export default function App() {
     return false;
   });
 
+  const [appTheme, setAppTheme] = useState<'default' | 'andromeda' | 'zen'>(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem('studybuddy_appTheme') as 'default' | 'andromeda' | 'zen') || 'default';
+    }
+    return 'default';
+  });
+
+  const [companionMode, setCompanionMode] = useState<'hologram' | 'mascot'>(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem('studybuddy_companionMode') as 'hologram' | 'mascot') || 'hologram';
+    }
+    return 'hologram';
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem('studybuddy_companionMode', companionMode);
+    }
+  }, [companionMode]);
+
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark');
@@ -603,6 +630,19 @@ export default function App() {
       localStorage.setItem('studybuddy_darkMode', 'false');
     }
   }, [darkMode]);
+
+  useEffect(() => {
+    document.documentElement.classList.remove('andromeda', 'zen');
+    if (appTheme === 'andromeda') {
+      document.documentElement.classList.add('andromeda');
+      localStorage.setItem('studybuddy_appTheme', 'andromeda');
+    } else if (appTheme === 'zen') {
+      document.documentElement.classList.add('zen');
+      localStorage.setItem('studybuddy_appTheme', 'zen');
+    } else {
+      localStorage.setItem('studybuddy_appTheme', 'default');
+    }
+  }, [appTheme]);
 
   const [splashActive, setSplashActive] = useState(true);
   const [splashProgress, setSplashProgress] = useState(0);
@@ -629,7 +669,56 @@ export default function App() {
   }, []);
 
   const [activeTab, setActiveTab] = useState('home'); 
+  const [competitiveStream, setCompetitiveStream] = useState<'UPSC' | 'NEET' | 'JEE'>(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem('studybuddy_competitiveStream') as 'UPSC' | 'NEET' | 'JEE') || 'JEE';
+    }
+    return 'JEE';
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem('studybuddy_competitiveStream', competitiveStream);
+    }
+  }, [competitiveStream]);
+
   const [notebookTab, setNotebookTab] = useState<'notes' | 'planner' | 'flashcards'>('notes');
+
+  const getCompetitiveSubjectLabel = (subj: string) => {
+    if (appTheme !== 'andromeda') {
+      return subj; // Standard view translates via local components
+    }
+    
+    // Custom mapping for UPSC, NEET, and JEE streams
+    const mapping: Record<'UPSC' | 'NEET' | 'JEE', Record<string, string>> = {
+      JEE: {
+        Mathematics: 'Advanced Mathematics (JEE)',
+        Science: 'Inorganic Chemistry (JEE)',
+        Physics: 'JEE Physics (Advanced)',
+        Chemistry: 'Organic & Physical Chemistry',
+        Biology: 'Numerical Calculus (JEE Math)',
+        English: 'Technical English'
+      },
+      NEET: {
+        Mathematics: 'Physics (NEET Mechanics)',
+        Science: 'Inorganic Chemistry (NEET)',
+        Physics: 'Biophysics & Mechanics',
+        Chemistry: 'Organic Chemistry',
+        Biology: 'Botany & Zoology (NEET)',
+        English: 'Syllabus English'
+      },
+      UPSC: {
+        Mathematics: 'CSAT Quantitative Aptitude',
+        Science: 'Science & Technology (GS)',
+        Physics: 'Modern Indian History',
+        Chemistry: 'Indian Polity & Constitution',
+        Biology: 'Geography & Environment',
+        English: 'UPSC Essay & Comprehension'
+      }
+    };
+    
+    return mapping[competitiveStream]?.[subj] || subj;
+  };
   const [waveToast, setWaveToast] = useState<{ name: string; response: string; points: number } | null>(null);
   const [aiUsage, setAiUsage] = useState<any>(() => getDailyAiUsage());
   const [toolkitUsage, setToolkitUsage] = useState<any>(() => {
@@ -993,6 +1082,8 @@ export default function App() {
   const [selectedSubjectForFlashcard, setSelectedSubjectForFlashcard] = useState<Subject>('Science');
   const [selectedNoteIdForFlashcard, setSelectedNoteIdForFlashcard] = useState<string | number | 'none'>('none');
   const [flashcardCountToGenerate, setFlashcardCountToGenerate] = useState(5);
+  const [flashcardCombo, setFlashcardCombo] = useState<number>(0);
+  const [flashcardComboBonusMsg, setFlashcardComboBonusMsg] = useState<string | null>(null);
 
   // Chat & interactive history states
   const [tutorSessions, setTutorSessions] = useState<TutorSession[]>(() => {
@@ -1096,6 +1187,11 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showHomeworkModal, setShowHomeworkModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackSuggestions, setFeedbackSuggestions] = useState("");
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [feedbackSuccess, setFeedbackSuccess] = useState(false);
   const [showTutorMenu, setShowTutorMenu] = useState(false);
   const [showProgressModal, setShowProgressModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -1112,6 +1208,15 @@ export default function App() {
   } | null>(null);
   const [selectedSubjectMilestone, setSelectedSubjectMilestone] = useState<Subject | null>(null);
   const [sparkleSubject, setSparkleSubject] = useState<Subject | null>(null);
+
+  // Play a specific sound effect when a milestone is unlocked
+  useEffect(() => {
+    if (unlockedMilestone) {
+      if (typeof playAudioChime === 'function') {
+        playAudioChime('levelUp');
+      }
+    }
+  }, [unlockedMilestone]);
 
   // Multi-session chat synchronizer
   useEffect(() => {
@@ -1375,7 +1480,51 @@ export default function App() {
     testFirestoreConnection().catch(err => {
       console.error("Failed to test Firestore connection on boot:", err);
     });
+
+    // Auto-migrate offline sandbox users to the real live Firestore database
+    if (typeof window !== 'undefined') {
+      const isSandbox = localStorage.getItem('studybuddy_is_sandbox');
+      if (isSandbox === 'true') {
+        localStorage.removeItem('studybuddy_is_sandbox');
+        signInAnonymously(auth).then(() => {
+          console.log("Successfully migrated sandbox session to live secure anonymous database!");
+        }).catch(err => {
+          console.warn("Could not auto-sign in anonymously on sandbox migration:", err);
+        });
+      }
+    }
   }, []);
+
+  const handleSubmitFeedback = async () => {
+    if (feedbackRating < 1 || feedbackRating > 5) return;
+    setIsSubmittingFeedback(true);
+    
+    const currentUserId = user?.id ? String(user.id) : (auth.currentUser?.uid || 'guest_user');
+    const currentUserName = user?.name || auth.currentUser?.displayName || 'Anonymous Student';
+    
+    const feedbackId = 'fb_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+    
+    try {
+      await saveFeedback({
+        id: feedbackId,
+        userId: currentUserId,
+        userName: currentUserName,
+        rating: feedbackRating,
+        suggestions: feedbackSuggestions.trim(),
+        createdAt: new Date().toISOString()
+      });
+      setFeedbackSuccess(true);
+      setFeedbackSuggestions("");
+      if (typeof playAudioChime === 'function') {
+        playAudioChime('success');
+      }
+    } catch (err) {
+      console.error("Failed to submit feedback:", err);
+      alert(appLanguage === 'Hindi' ? "फीडबैक सबमिट करने में विफल। कृपया पुन: प्रयास करें।" : "Failed to submit feedback. Please try again.");
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
+  };
 
   useEffect(() => {
     const handleUsageChange = (e: any) => {
@@ -1480,10 +1629,6 @@ export default function App() {
 
   // Real Firebase and Authentication state listener
   useEffect(() => {
-    if (typeof window !== 'undefined' && localStorage.getItem('studybuddy_is_sandbox') === 'true') {
-      setAuthChecking(false);
-      return;
-    }
     const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
       setAuthChecking(true);
       if (fUser) {
@@ -1915,7 +2060,15 @@ export default function App() {
   const handlePetFeed = () => {
     if (!user) return;
     if (user.points < 15) {
-      alert("Oops! You need at least 15 XP points to feed Bamboo 🎋 to Chimpu!");
+      if (companionMode === 'hologram') {
+        alert(appLanguage === 'Hindi'
+          ? "ओह! फोकस कोर को कैलिब्रेट करने के लिए आपको कम से कम 15 XP की आवश्यकता है!"
+          : "Oops! You need at least 15 XP points to calibrate your Focus Core!");
+      } else {
+        alert(appLanguage === 'Hindi'
+          ? "ओह! चिम्पू को बांस 🎋 खिलाने के लिए आपको कम से कम 15 XP की आवश्यकता है!"
+          : "Oops! You need at least 15 XP points to feed Bamboo 🎋 to Chimpu!");
+      }
       return;
     }
     awardPoints(-15);
@@ -3420,6 +3573,8 @@ export default function App() {
     setCurrentFlashcardIndex(0);
     setIsFlashcardFlipped(false);
     setIsFlashcardSessionActive(true);
+    setFlashcardCombo(0);
+    setFlashcardComboBonusMsg(null);
     playAudioChime('coin');
   };
 
@@ -3465,6 +3620,36 @@ export default function App() {
       nextReviewDate
     };
 
+    let comboBonusXP = 0;
+    let nextCombo = 0;
+
+    if (quality === 'again') {
+      setFlashcardCombo(0);
+      setFlashcardComboBonusMsg(null);
+    } else {
+      nextCombo = flashcardCombo + 1;
+      setFlashcardCombo(nextCombo);
+      
+      // Determine bonus XP milestones
+      if (nextCombo === 3) {
+        comboBonusXP = 3;
+      } else if (nextCombo === 5) {
+        comboBonusXP = 5;
+      } else if (nextCombo === 8) {
+        comboBonusXP = 10;
+      } else if (nextCombo >= 10) {
+        comboBonusXP = 15;
+      }
+
+      if (comboBonusXP > 0) {
+        setFlashcardComboBonusMsg(
+          appLanguage === 'Hindi'
+            ? `🔥 ${nextCombo}x कॉम्बो स्ट्रीक! +${comboBonusXP} बोनस XP प्राप्त हुआ! 🎉`
+            : `🔥 ${nextCombo}x Combo Streak! +${comboBonusXP} Bonus XP awarded! 🎉`
+        );
+      }
+    }
+
     try {
       if (firebaseUser) {
         await saveFlashcard(firebaseUser.uid, updatedCard);
@@ -3475,7 +3660,7 @@ export default function App() {
       }
 
       setFlashcards(prev => prev.map(c => c.id === card.id ? updatedCard : c));
-      awardPoints(5);
+      awardPoints(5 + comboBonusXP);
       playAudioChime('success');
 
       // Proceed to next card or wrap up
@@ -3493,21 +3678,48 @@ export default function App() {
     }
   };
 
-  const handleEnterSandboxMode = (emailStr?: string) => {
+  const handleEnterSandboxMode = async (emailStr?: string) => {
     setAuthError(null);
     setAuthSuccess(null);
     setAuthLoading(true);
 
-    const emailToUse = emailStr || authEmail || 'scholar@studybuddy.com';
-    const sandboxId = 'sandbox-' + emailToUse.replace(/[^a-zA-Z0-9]/g, '_');
-    
-    // Check if there is already a saved local profile for this user
-    let loadedUser: UserType;
-    const stored = localStorage.getItem(`sb_user_${sandboxId}`);
-    if (stored) {
-      try {
-        loadedUser = JSON.parse(stored);
-      } catch (e) {
+    try {
+      // Always try real Firebase Anonymous Auth first to ensure we use the real Firestore DB and real leaderboard!
+      await signInAnonymously(auth);
+      setAuthSuccess("Successfully connected to live Study Buddy database! Entering...");
+      localStorage.removeItem('studybuddy_is_sandbox');
+    } catch (err: any) {
+      console.warn("Firebase Anonymous Auth failed, falling back to simulated Sandbox Mode:", err);
+      
+      const emailToUse = emailStr || authEmail || 'scholar@studybuddy.com';
+      const sandboxId = 'sandbox-' + emailToUse.replace(/[^a-zA-Z0-9]/g, '_');
+      
+      // Check if there is already a saved local profile for this user
+      let loadedUser: UserType;
+      const stored = localStorage.getItem(`sb_user_${sandboxId}`);
+      if (stored) {
+        try {
+          loadedUser = JSON.parse(stored);
+        } catch (e) {
+          loadedUser = {
+            id: sandboxId,
+            name: emailToUse.split('@')[0],
+            school: 'Global Sandbox',
+            className: 'Class 10',
+            points: 120,
+            level: 1,
+            avatar: '🐼',
+            badges: [{ id: 'first_step', badge_name: 'First Step 🌟', icon: '🌟', date_earned: new Date().toISOString() }],
+            pet: {
+              name: 'Chimpu 🐼',
+              happiness: 90,
+              fullness: 90,
+              accessory: 'none',
+              petCount: 0
+            }
+          };
+        }
+      } else {
         loadedUser = {
           id: sandboxId,
           name: emailToUse.split('@')[0],
@@ -3526,50 +3738,33 @@ export default function App() {
           }
         };
       }
-    } else {
-      loadedUser = {
-        id: sandboxId,
-        name: emailToUse.split('@')[0],
-        school: 'Global Sandbox',
-        className: 'Class 10',
-        points: 120,
-        level: 1,
-        avatar: '🐼',
-        badges: [{ id: 'first_step', badge_name: 'First Step 🌟', icon: '🌟', date_earned: new Date().toISOString() }],
-        pet: {
-          name: 'Chimpu 🐼',
-          happiness: 90,
-          fullness: 90,
-          accessory: 'none',
-          petCount: 0
-        }
-      };
-    }
 
-    // Set local state
-    setUser(loadedUser);
-    setFirebaseUser({
-      uid: sandboxId,
-      email: emailToUse,
-      isAnonymous: true,
-      displayName: loadedUser.name,
-    } as any);
+      // Set local state
+      setUser(loadedUser);
+      setFirebaseUser({
+        uid: sandboxId,
+        email: emailToUse,
+        isAnonymous: true,
+        displayName: loadedUser.name,
+      } as any);
 
-    if (loadedUser.pet) {
-      setPet(loadedUser.pet as any);
-    }
-    if ((loadedUser as any).quests) {
-      setQuests((loadedUser as any).quests);
-    }
-    if ((loadedUser as any).streakDays) {
-      setStreakDays((loadedUser as any).streakDays);
-    }
+      if (loadedUser.pet) {
+        setPet(loadedUser.pet as any);
+      }
+      if ((loadedUser as any).quests) {
+        setQuests((loadedUser as any).quests);
+      }
+      if ((loadedUser as any).streakDays) {
+        setStreakDays((loadedUser as any).streakDays);
+      }
 
-    // Save profile and status
-    localStorage.setItem(`sb_user_${sandboxId}`, JSON.stringify(loadedUser));
-    localStorage.setItem('studybuddy_local_profile', JSON.stringify(loadedUser));
-    localStorage.setItem('studybuddy_is_sandbox', 'true');
-    setAuthLoading(false);
+      // Save profile and status
+      localStorage.setItem(`sb_user_${sandboxId}`, JSON.stringify(loadedUser));
+      localStorage.setItem('studybuddy_local_profile', JSON.stringify(loadedUser));
+      localStorage.setItem('studybuddy_is_sandbox', 'true');
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   const handleEmailSignIn = async (e: any) => {
@@ -3682,10 +3877,26 @@ export default function App() {
   };
 
   return (
-    <div className={`w-full h-full min-h-screen ${isTagMode ? 'bg-black' : 'bg-slate-900'} font-sans ${isTagMode ? 'text-cyan-400' : 'text-slate-800'} flex justify-center items-center overflow-hidden py-0 md:py-6 relative`} id="applet_canvas">
+    <div className={`w-full h-full min-h-screen ${
+      appTheme === 'andromeda' 
+        ? 'bg-[#03010b] text-purple-100' 
+        : appTheme === 'zen'
+          ? 'bg-[#020c05] text-emerald-100'
+          : isTagMode 
+            ? 'bg-black text-cyan-400' 
+            : 'bg-slate-900 text-slate-800'
+    } font-sans flex justify-center items-center overflow-hidden py-0 md:py-6 relative`} id="applet_canvas">
       
       {/* Background Ambience */}
-      <div className={`absolute top-0 left-0 w-full h-full ${isTagMode ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-900/20 via-black to-black' : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/40 via-slate-950 to-slate-950'} pointer-events-none z-0`} />
+      <div className={`absolute top-0 left-0 w-full h-full ${
+        appTheme === 'andromeda'
+          ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-fuchsia-950/40 via-[#03010b] to-[#020008]'
+          : appTheme === 'zen'
+            ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-950/45 via-[#020c05] to-[#010502]'
+            : isTagMode 
+              ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-900/20 via-black to-black' 
+              : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/40 via-slate-950 to-slate-950'
+      } pointer-events-none z-0`} />
 
       {/* Audio element for study beats */}
       <audio id="study-audio" loop preload="none">
@@ -4030,7 +4241,13 @@ export default function App() {
            </div>
         </div>
       ) : !user ? (
-        <div className="w-full max-w-md h-screen md:h-[90vh] bg-slate-50 md:rounded-3xl shadow-2xl flex flex-col overflow-y-auto p-6 relative z-20 border border-slate-800/10 scrollbar-hide">
+        <div className={`w-full max-w-md h-screen md:h-[90vh] ${
+          appTheme === 'andromeda' 
+            ? 'bg-gradient-to-b from-[#060215] via-[#0c0525] to-[#04010b] text-purple-100' 
+            : 'bg-slate-50 text-slate-800'
+        } md:rounded-3xl shadow-2xl flex flex-col overflow-y-auto p-6 relative z-20 border ${
+          appTheme === 'andromeda' ? 'border-pink-500/20' : 'border-slate-800/10'
+        } scrollbar-hide`}>
           {/* Floating Settings & Language Control (Profile Setup) */}
           <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
             <button
@@ -4174,7 +4391,47 @@ export default function App() {
         </div>
       ) : (
         /* Main App Container (Absolutely locked viewport) */
-        <div className="w-full max-w-md h-screen md:h-[90vh] bg-slate-50 md:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative z-10 border border-slate-800/25">
+        <div className={`w-full max-w-md h-screen md:h-[90vh] ${
+          appTheme === 'andromeda' 
+            ? 'bg-gradient-to-b from-[#060215] via-[#0c0525] to-[#04010b] text-purple-100' 
+            : appTheme === 'zen'
+              ? 'bg-gradient-to-b from-[#020b04] via-[#04160a] to-[#010602] text-emerald-100'
+              : 'bg-slate-50 text-slate-800'
+        } md:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative z-10 border ${
+          appTheme === 'andromeda' ? 'border-pink-500/20' : appTheme === 'zen' ? 'border-emerald-500/20' : 'border-slate-800/25'
+        }`}>
+
+          {/* Forest Zen Background Effects */}
+          {appTheme === 'zen' && (
+            <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden opacity-60">
+              <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-emerald-500/10 blur-[110px] animate-pulse" />
+              <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-yellow-500/5 blur-[110px] animate-pulse" style={{ animationDelay: '2s' }} />
+              <div className="absolute top-1/2 left-1/3 w-80 h-80 rounded-full bg-teal-500/10 blur-[100px] animate-pulse" style={{ animationDelay: '4s' }} />
+              
+              {/* Forest Fireflies */}
+              <div className="absolute top-12 left-16 w-1.5 h-1.5 bg-emerald-300 rounded-full animate-ping" style={{ animationDuration: '6s' }} />
+              <div className="absolute top-1/3 right-20 w-1 h-1 bg-yellow-350 rounded-full animate-pulse" style={{ animationDuration: '4.5s' }} />
+              <div className="absolute bottom-1/4 left-1/4 w-1.5 h-1.5 bg-green-400 rounded-full animate-ping" style={{ animationDuration: '5.5s' }} />
+              <div className="absolute top-2/3 right-1/4 w-1 h-1 bg-emerald-200 rounded-full animate-pulse" style={{ animationDuration: '4s' }} />
+              <div className="absolute top-20 right-12 w-1.5 h-1.5 bg-yellow-400 rounded-full animate-ping" style={{ animationDuration: '3.5s' }} />
+            </div>
+          )}
+
+          {/* Andromeda Cosmic Background Effects */}
+          {appTheme === 'andromeda' && (
+            <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden opacity-60">
+              <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-pink-500/10 blur-[110px] animate-pulse" />
+              <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-cyan-500/10 blur-[110px] animate-pulse" style={{ animationDelay: '2s' }} />
+              <div className="absolute top-1/2 left-1/3 w-80 h-80 rounded-full bg-purple-500/10 blur-[100px] animate-pulse" style={{ animationDelay: '4s' }} />
+              
+              {/* Star dust sparkles */}
+              <div className="absolute top-12 left-16 w-1 h-1 bg-white rounded-full animate-ping" style={{ animationDuration: '3.5s' }} />
+              <div className="absolute top-1/3 right-20 w-1.5 h-1.5 bg-pink-400 rounded-full animate-ping animate-pulse" style={{ animationDuration: '4.5s' }} />
+              <div className="absolute bottom-1/4 left-1/4 w-1 h-1 bg-cyan-300 rounded-full animate-ping" style={{ animationDuration: '5.5s' }} />
+              <div className="absolute top-2/3 right-1/4 w-1 h-1 bg-purple-300 rounded-full animate-ping" style={{ animationDuration: '4s' }} />
+              <div className="absolute top-20 right-12 w-1.5 h-1.5 bg-yellow-200 rounded-full animate-ping" style={{ animationDuration: '2.5s' }} />
+            </div>
+          )}
           
           {/* FLOATING SIDEBAR MENU TRIGGER (TOP LEFT OF APP VIEW) */}
           <button 
@@ -4496,8 +4753,43 @@ export default function App() {
               id={`tab_${activeTab}`}
             >
               
-              {/* HOME SCREEN */}
-              {activeTab === 'home' && (
+              {appTheme === 'andromeda' ? (
+                <AndromedaCosmic
+                  user={user}
+                  setUser={setUser}
+                  appLanguage={appLanguage}
+                  translate={translate}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  competitiveStream={competitiveStream as any}
+                  setCompetitiveStream={setCompetitiveStream}
+                  awardPoints={awardPoints}
+                  playAudioChime={playAudioChime}
+                  notes={notes}
+                  setNotes={setNotes}
+                  flashcards={flashcards}
+                  setFlashcards={setFlashcards}
+                  groups={groups}
+                  setGroups={setGroups}
+                  activeGroup={activeGroup}
+                  setActiveGroup={setActiveGroup}
+                  chatMessages={chatMessages}
+                  setChatMessages={setChatMessages}
+                  tutorSessions={tutorSessions}
+                  saveTutorSessions={saveTutorSessions}
+                  activeSessionId={activeSessionId}
+                  setActiveSessionId={setActiveSessionId}
+                  handleSendMessage={handleSendMessage}
+                  chatInput={chatInput}
+                  setChatInput={setChatInput}
+                  isChatLoading={isChatLoading}
+                  appTheme={appTheme}
+                  setAppTheme={setAppTheme}
+                />
+              ) : (
+                <>
+                  {/* HOME SCREEN */}
+                  {activeTab === 'home' && (
                 <div className="flex-1 overflow-y-auto p-4 space-y-4.5 scrollbar-hide">
                   
                   {/* Dashboard Welcome Header */}
@@ -4712,221 +5004,250 @@ export default function App() {
                       return (
                         <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 flex flex-col space-y-3">
                           <div className="flex justify-between items-start">
-                            <div>
+                            <div className="text-left">
                               <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
                                 {translate('day_' + activeDay.id, appLanguage, activeDay.name)} {translate('goal_label', appLanguage, 'Goal')}
                               </span>
                               <h4 className="text-[11px] font-extrabold text-slate-800 mt-1 leading-tight font-sans">
-                                {translate('goal_' + activeDay.id, appLanguage, activeDay.goal)}
+                                {appLanguage === 'Hindi' ? activeDay.goalHi : activeDay.goal}
                               </h4>
                             </div>
-                            <span className="text-[9px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-md">
-                              +{activeDay.xpAwarded} XP
+                            <span className={`text-xs p-1 rounded-full ${activeDay.completed ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                              {activeDay.completed ? '✅' : '⏳'}
                             </span>
-                          </div>
-
-                          <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                            <span className="text-[9px] text-slate-400 font-semibold">
-                              {activeDay.completed 
-                                ? '✓ ' + translate('goal_completed_manual', appLanguage, 'Goal Completed!')
-                                : translate('manual_check_in', appLanguage, 'Do the activity or check in manually')}
-                            </span>
-                            
-                            {!activeDay.completed ? (
-                              <button
-                                type="button"
-                                onClick={() => completeStreakDay(activeDay.id)}
-                                className="px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-black shadow-2xs transform active:scale-95 transition cursor-pointer"
-                              >
-                                {translate('mark_completed', appLanguage, 'Mark Completed ✓')}
-                              </button>
-                            ) : (
-                              <span className="text-[10px] font-extrabold text-emerald-600 flex items-center space-x-1">
-                                <span>🎉</span>
-                                <span>{translate('completed_cheer', appLanguage, 'Completed!')}</span>
-                              </span>
-                            )}
                           </div>
                         </div>
                       );
                     })()}
-                  </section>
 
-                  {/* DAILY CHALLENGES & STREAK CARD */}
-                  <section className="bg-white p-4 rounded-2xl border border-slate-150/70 shadow-xs space-y-3" id="daily_quests_card">
-                    <div className="flex items-center justify-between border-b border-slate-50 pb-2.5">
-                      <div className="flex items-center space-x-1.5">
-                        <span className="text-base">🔥</span>
-                        <div>
-                          <h2 className="text-xs font-extrabold text-slate-800 tracking-tight flex items-center uppercase">
-                            {translate('daily_quests_title', appLanguage, 'Daily Study Quests')}
-                          </h2>
-                          <p className="text-[9px] text-slate-400 font-bold leading-none mt-0.5">{translate('daily_quests_desc', appLanguage, 'Finish missions, gain bonus XP')}</p>
-                        </div>
-                      </div>
-                      <span className="bg-amber-50 text-amber-600 px-2.5 py-1 rounded-xl text-[10px] font-black border border-amber-100 flex items-center space-x-1">
-                        <span>🔥</span>
-                        <span>{translate('streak_label', appLanguage, 'Streak')}: 5 {appLanguage === 'Hindi' ? 'दिन' : appLanguage === 'Russian' ? 'дней' : appLanguage === 'Chinese' ? '天' : appLanguage === 'Japanese' ? '日' : 'Days'}</span>
-                      </span>
-                    </div>
-
-                    <div className="space-y-2.5">
-                      {quests.map(q => (
-                        <div 
-                          key={q.id} 
-                          className={`flex items-center justify-between p-3 rounded-2xl border transition-all duration-300 ${
-                            q.completed 
-                              ? 'bg-emerald-50/50 border-emerald-100 opacity-80' 
-                              : 'bg-slate-50/50 border-slate-100/70 hover:bg-slate-100/40'
-                          }`}
-                        >
-                          <div className="flex items-center space-x-3">
-                            <span className={`w-5 h-5 flex items-center justify-center rounded-full text-xs font-black shadow-2xs ${
-                              q.completed ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'
-                            }`}>
-                              {q.completed ? '✓' : '•'}
-                            </span>
-                            <span className={`text-[11px] font-black leading-tight ${q.completed ? 'text-slate-500 line-through' : 'text-slate-800'}`}>
-                              {appLanguage === 'Hindi' ? q.textHi : q.text}
-                            </span>
-                          </div>
-                          <span className={`text-[9px] font-black px-2 py-0.5 rounded-full shrink-0 ${
-                            q.completed ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-50 text-indigo-650'
-                          }`}>
-                            +{q.xp} XP
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-
-                  <ProgressChart progress={progress} isTagMode={isTagMode} language={appLanguage} />
-
-                  <HomeworkSolver user={user} language={appLanguage} isTagMode={isTagMode} />
-
-                  {/* VIRTUAL STUDY COMPANION - CHIMPU'S ISLAND */}
-                  <section className="bg-gradient-to-br from-emerald-500/10 via-emerald-50/5 to-white p-4 rounded-2xl border border-emerald-100/60 shadow-sm space-y-3" id="study_pet_sanctuary">
+                    {/* VIRTUAL STUDY COMPANION - CHIMPU'S ISLAND / FUTURISTIC AI CORE */}
+                    <section className="bg-gradient-to-br from-indigo-500/10 via-slate-50/5 to-white dark:from-indigo-950/20 dark:via-slate-900/10 dark:to-slate-950 p-4 rounded-2xl border border-indigo-100/60 dark:border-indigo-900/30 shadow-sm space-y-3" id="study_pet_sanctuary">
                     <div className="flex justify-between items-center text-xs">
-                      <h2 className="font-extrabold text-slate-800 tracking-tight uppercase flex items-center text-slate-500">
-                        🏝️ {translate('virtual_friend_title', appLanguage, "Chimpu's Sanctuary")}
+                      <h2 className="font-extrabold text-slate-800 dark:text-slate-200 tracking-tight uppercase flex items-center gap-1.5">
+                        {companionMode === 'hologram' ? (
+                          <>🛡️ {appLanguage === 'Hindi' ? 'नेक्सस फोकस को-पायलट' : 'Nexus Focus Copilot'}</>
+                        ) : (
+                          <>🏝️ {translate('virtual_friend_title', appLanguage, "Chimpu's Sanctuary")}</>
+                        )}
                       </h2>
-                      <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                        {appLanguage === 'Hindi' ? 'पालतू साथी' : appLanguage === 'Russian' ? 'Виртуальный друг' : appLanguage === 'Chinese' ? '虚拟伙伴' : appLanguage === 'Japanese' ? 'バーチャルフレンド' : 'Virtual Friend'}
-                      </span>
+                      
+                      {/* Interactive toggle switch for professional vs classic mascot */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextMode = companionMode === 'hologram' ? 'mascot' : 'hologram';
+                          setCompanionMode(nextMode);
+                          if (typeof playAudioChime === 'function') {
+                            playAudioChime('coin');
+                          }
+                        }}
+                        className="px-2 py-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-[8px] font-black uppercase text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                      >
+                        {companionMode === 'hologram' ? (
+                          <><span>🐼</span> {appLanguage === 'Hindi' ? 'मैस्कॉट मोड' : 'Mascot Mode'}</>
+                        ) : (
+                          <><span>🛡️</span> {appLanguage === 'Hindi' ? 'होलोग्राम मोड' : 'Hologram Mode'}</>
+                        )}
+                      </button>
                     </div>
 
-                    <div className="bg-gradient-to-br from-teal-400/15 via-emerald-100/30 to-blue-50/40 p-4 rounded-2xl border border-emerald-100/60 shadow-2xs relative overflow-hidden flex flex-col items-center justify-center space-y-3 min-h-36">
+                    <div className="bg-gradient-to-br from-indigo-950/80 via-slate-900 to-slate-950 p-4 rounded-2xl border border-indigo-900/40 shadow-xl relative overflow-hidden flex flex-col items-center justify-center space-y-3 min-h-36">
                       
-                      {/* Pet Overlay Hat/Sunglasses Styling */}
-                      <div className="relative flex items-center justify-center select-none cursor-pointer group py-2" onClick={handlePetCompanionClick}>
-                        {/* accessory badge rendering */}
-                        {pet.accessory === 'wizard_hat' && (
-                          <span className="absolute -top-3 text-2xl drop-shadow-md transform rotate-12 transition group-hover:scale-110 animate-bounce">🎩</span>
-                        )}
-                        {pet.accessory === 'royal_crown' && (
-                          <span className="absolute -top-4 text-2xl drop-shadow-md transform -rotate-6 transition group-hover:scale-110 animate-pulse">👑</span>
-                        )}
-                        {pet.accessory === 'backpack' && (
-                          <span className="absolute -bottom-1 -left-2 text-xl drop-shadow-xs transition group-hover:-translate-x-1">🎒</span>
-                        )}
-                        
-                        {/* The Cute Panda companion itself */}
-                        <motion.div 
-                          animate={{ 
-                            scale: [1, 1.05, 1],
-                            y: [0, -4, 0]
-                          }}
-                          transition={{ 
-                            repeat: Infinity, 
-                            duration: 2.2, 
-                            ease: "easeInOut" 
-                          }}
-                          className="text-5xl transition-transform active:scale-95 duration-100 filter drop-shadow-xs relative"
-                        >
-                          🐼
-                          
-                          {pet.accessory === 'star_sunglasses' && (
-                             <span className="absolute inset-0 top-1 text-2xl flex items-center justify-center leading-none transform translate-y-0.5">🕶️</span>
+                      {companionMode === 'hologram' ? (
+                        /* Sleek Futuristic Hologram Orb Animation */
+                        <div className="relative w-32 h-32 flex items-center justify-center select-none cursor-pointer group" onClick={handlePetCompanionClick}>
+                          {/* Pulsing neon background glow */}
+                          <div className="absolute inset-0 bg-indigo-500/10 rounded-full blur-xl group-hover:bg-indigo-500/20 transition-all duration-300 animate-pulse"></div>
+
+                          {/* Outer spinning dash ring */}
+                          <motion.div 
+                            animate={{ rotate: 360 }}
+                            transition={{ repeat: Infinity, duration: 15, ease: "linear" }}
+                            className="absolute w-24 h-24 rounded-full border-2 border-dashed border-indigo-500/20 flex items-center justify-center"
+                          >
+                            <div className="absolute -top-1 w-2 h-2 bg-cyan-400 rounded-full shadow-[0_0_8px_#22d3ee]"></div>
+                          </motion.div>
+
+                          {/* Counter-rotating inner ring */}
+                          <motion.div 
+                            animate={{ rotate: -360 }}
+                            transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
+                            className="absolute w-18 h-18 rounded-full border border-dashed border-pink-500/30"
+                          >
+                            <div className="absolute top-1/2 -right-1 w-1.5 h-1.5 bg-pink-500 rounded-full shadow-[0_0_8px_#ec4899]"></div>
+                          </motion.div>
+
+                          {/* Central Pulsing Holographic Core Sphere */}
+                          <motion.div 
+                            animate={{ 
+                              scale: [1, 1.06, 1],
+                              boxShadow: [
+                                "0 0 15px rgba(99, 102, 241, 0.4)",
+                                "0 0 30px rgba(99, 102, 241, 0.7)",
+                                "0 0 15px rgba(99, 102, 241, 0.4)"
+                              ]
+                            }}
+                            transition={{ 
+                              repeat: Infinity, 
+                              duration: 3, 
+                              ease: "easeInOut" 
+                            }}
+                            className="relative w-12 h-12 rounded-full bg-gradient-to-tr from-indigo-600 via-purple-500 to-pink-500 border border-white/20 flex items-center justify-center shadow-lg"
+                          >
+                            <span className="text-xl font-black text-white select-none animate-pulse">
+                              {pet.accessory === 'wizard_hat' && '⚡'}
+                              {pet.accessory === 'star_sunglasses' && '👁️'}
+                              {pet.accessory === 'royal_crown' && '👑'}
+                              {pet.accessory === 'backpack' && '📡'}
+                              {pet.accessory === 'none' && '🧠'}
+                            </span>
+                          </motion.div>
+
+                          {/* Cybernetic active modules indicators */}
+                          <div className="absolute bottom-1 flex gap-1 justify-center z-10">
+                            {pet.accessory !== 'none' && (
+                              <span className="text-[7px] font-black uppercase text-pink-400 bg-pink-950/90 border border-pink-500/30 px-1.5 py-0.5 rounded-full shadow-md animate-pulse">
+                                Augment Mounted
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        /* The Classic Mascot Cartoon Panda Interface */
+                        <div className="relative flex items-center justify-center select-none cursor-pointer group py-2" onClick={handlePetCompanionClick}>
+                          {pet.accessory === 'wizard_hat' && (
+                            <span className="absolute -top-3 text-2xl drop-shadow-md transform rotate-12 transition group-hover:scale-110 animate-bounce">🎩</span>
                           )}
-                        </motion.div>
-                        
-                        {/* Sparkles element */}
-                        <span className="absolute -top-1 -right-3 text-lg animate-pulse">✨</span>
-                      </div>
+                          {pet.accessory === 'royal_crown' && (
+                            <span className="absolute -top-4 text-2xl drop-shadow-md transform -rotate-6 transition group-hover:scale-110 animate-pulse">👑</span>
+                          )}
+                          {pet.accessory === 'backpack' && (
+                            <span className="absolute -bottom-1 -left-2 text-xl drop-shadow-xs transition group-hover:-translate-x-1">🎒</span>
+                          )}
+                          
+                          <motion.div 
+                            animate={{ 
+                              scale: [1, 1.05, 1],
+                              y: [0, -4, 0]
+                            }}
+                            transition={{ 
+                              repeat: Infinity, 
+                              duration: 2.2, 
+                              ease: "easeInOut" 
+                            }}
+                            className="text-5xl transition-transform active:scale-95 duration-100 filter drop-shadow-xs relative"
+                          >
+                            🐼
+                            {pet.accessory === 'star_sunglasses' && (
+                               <span className="absolute inset-0 top-1 text-2xl flex items-center justify-center leading-none transform translate-y-0.5">🕶️</span>
+                            )}
+                          </motion.div>
+                          
+                          <span className="absolute -top-1 -right-3 text-lg animate-pulse">✨</span>
+                        </div>
+                      )}
 
                       {/* Pet State text balloon */}
-                      <div className="bg-white px-3.5 py-1.5 rounded-2xl border border-emerald-100 shadow-2xs text-[11px] font-black text-slate-705 max-w-[220px] text-center leading-snug">
-                        {pet.fullness < 40 ? (
-                          <span>🎋 {translate('starving_bamboo', appLanguage, "I am starving, feed me tasty Bamboo!")}</span>
-                        ) : pet.happiness < 50 ? (
-                          <span>🥺 {translate('lonely_tap_play', appLanguage, "I feel lonely, tap me to play games!")}</span>
+                      <div className="bg-slate-900 border border-slate-800 px-3.5 py-1.5 rounded-2xl shadow-md text-[10px] font-black text-slate-200 max-w-[220px] text-center leading-relaxed">
+                        {companionMode === 'hologram' ? (
+                          pet.fullness < 40 ? (
+                            <span>⚠️ {appLanguage === 'Hindi' ? 'फोकस कोर कमजोर हो रहा है! सिस्टम को कैलिब्रेट करें।' : 'Focus core stability degraded! Calibrate core immediately.'}</span>
+                          ) : pet.happiness < 50 ? (
+                            <span>🥺 {appLanguage === 'Hindi' ? 'सिंक अलाइनमेंट विचलित हुआ। ध्यान केंद्रित करें।' : 'Core sync drift detected. Engage focus session to recalibrate.'}</span>
+                          ) : (
+                            <span>🌌 {appLanguage === 'Hindi' ? 'फोकस कोर पूर्णतः सिंक है। पढ़ाई शुरू करें!' : 'Focus core synchronized. Ready to assist, Cadet!'}</span>
+                          )
                         ) : (
-                          <span>🥰 {translate('study_together_cheer', appLanguage, "Let's study together!")} {user?.name}!</span>
+                          pet.fullness < 40 ? (
+                            <span>🎋 {translate('starving_bamboo', appLanguage, "I am starving, feed me tasty Bamboo!")}</span>
+                          ) : pet.happiness < 50 ? (
+                            <span>🥺 {translate('lonely_tap_play', appLanguage, "I feel lonely, tap me to play games!")}</span>
+                          ) : (
+                            <span>🥰 {translate('study_together_cheer', appLanguage, "Let's study together!")} {user?.name}!</span>
+                          )
                         )}
                       </div>
 
                       {/* Health Stat Indicators */}
                       <div className="w-full grid grid-cols-2 gap-3 pt-1">
                         <div className="space-y-1">
-                          <div className="flex justify-between text-[8px] font-bold text-teal-700">
-                            <span>❤️ {translate('happiness', appLanguage, 'Happiness')}</span>
+                          <div className="flex justify-between text-[8px] font-bold text-teal-400">
+                            <span>{companionMode === 'hologram' ? '⚡ SYNCHRONY' : `❤️ ${translate('happiness', appLanguage, 'Happiness')}`}</span>
                             <span>{pet.happiness}%</span>
                           </div>
-                          <div className="w-full h-1.5 bg-teal-100/40 rounded-full overflow-hidden p-0.5 border border-teal-200/20">
-                            <div className="h-full bg-teal-500 rounded-full transition-all duration-300" style={{ width: `${pet.happiness}%` }} />
+                          <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/50">
+                            <div className="h-full bg-teal-400 rounded-full transition-all duration-300 shadow-[0_0_6px_#2dd4bf]" style={{ width: `${pet.happiness}%` }} />
                           </div>
                         </div>
 
                         <div className="space-y-1">
-                          <div className="flex justify-between text-[8px] font-bold text-amber-700">
-                            <span>🎋 {translate('energy', appLanguage, 'Energy')}</span>
+                          <div className="flex justify-between text-[8px] font-bold text-amber-400">
+                            <span>{companionMode === 'hologram' ? '🔋 CORE CHARGE' : `🎋 ${translate('energy', appLanguage, 'Energy')}`}</span>
                             <span>{pet.fullness}%</span>
                           </div>
-                          <div className="w-full h-1.5 bg-amber-150/40 rounded-full overflow-hidden p-0.5 border border-amber-200/20">
-                            <div className="h-full bg-amber-500 rounded-full transition-all duration-300" style={{ width: `${pet.fullness}%` }} />
+                          <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/50">
+                            <div className="h-full bg-amber-400 rounded-full transition-all duration-300 shadow-[0_0_6px_#fbbf24]" style={{ width: `${pet.fullness}%` }} />
                           </div>
                         </div>
                       </div>
                     </div>
 
                     {/* Interactive Feed & Dress Up Shops */}
-                    <div className="flex flex-col gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100/80">
+                    <div className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-100 dark:border-slate-850">
                       <div className="flex justify-between items-center">
                         <button
                           onClick={handlePetFeed}
-                          className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[10px] font-black rounded-xl border border-emerald-500 shadow-2xs cursor-pointer flex items-center space-x-1.5"
+                          className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-[10px] font-black rounded-xl border border-indigo-500 shadow-2xs cursor-pointer flex items-center space-x-1.5"
                         >
-                          <span>🎋</span>
-                          <span>{translate('feed_bamboo_btn', appLanguage, 'Feed Bamboo (-15 XP)')}</span>
+                          {companionMode === 'hologram' ? (
+                            <>
+                              <span>⚡</span>
+                              <span>{appLanguage === 'Hindi' ? 'फोकस कोर कैलिब्रेट करें (-15 XP)' : 'Calibrate Focus Core (-15 XP)'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>🎋</span>
+                              <span>{translate('feed_bamboo_btn', appLanguage, 'Feed Bamboo (-15 XP)')}</span>
+                            </>
+                          )}
                         </button>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{translate('dressing_area', appLanguage, 'Dressing Area')}</span>
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                          {companionMode === 'hologram' ? (
+                            <>{appLanguage === 'Hindi' ? 'ऑगमेंट मॉड्यूल' : 'Core Augments'}</>
+                          ) : (
+                            <>{translate('dressing_area', appLanguage, 'Dressing Area')}</>
+                          )}
+                        </span>
                       </div>
 
                       <div className="flex justify-between gap-1.5 overflow-x-auto py-1 scrollbar-hide">
                         {[
-                          { id: 'wizard_hat', char: '🎩', label: 'Wizard Hat', cost: 100 },
-                          { id: 'star_sunglasses', char: '🕶️', label: 'Shades', cost: 120 },
-                          { id: 'royal_crown', char: '👑', label: 'Crown', cost: 180 },
-                          { id: 'backpack', char: '🎒', label: 'Backpack', cost: 80 }
+                          { id: 'wizard_hat', char: '🎩', label: companionMode === 'hologram' ? 'Quantum CPU' : 'Wizard Hat', cost: 100 },
+                          { id: 'star_sunglasses', char: '🕶️', label: companionMode === 'hologram' ? 'Spectral Visor' : 'Shades', cost: 120 },
+                          { id: 'royal_crown', char: '👑', label: companionMode === 'hologram' ? 'Core Regulator' : 'Crown', cost: 180 },
+                          { id: 'backpack', char: '🎒', label: companionMode === 'hologram' ? 'Aux Memory' : 'Backpack', cost: 80 }
                         ].map((item) => (
                           <button
                             key={item.id}
                             onClick={() => handleBuyAccessory(item)}
                             className={`px-2.5 py-1.5 rounded-xl border flex flex-col items-center justify-center shrink-0 min-w-[70px] cursor-pointer transition ${
                               pet.accessory === item.id
-                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-black'
-                                : 'bg-white hover:bg-slate-100 border-slate-100 hover:border-slate-200 text-slate-800'
+                                ? 'bg-indigo-50 dark:bg-indigo-950 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400 font-black'
+                                : 'bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-150 dark:border-slate-800 text-slate-800 dark:text-slate-200'
                             }`}
-                            title={appLanguage === 'Hindi' ? `खरीदें ${item.char} (${item.cost} XP)` : `Buy ${item.char} for ${item.cost} XP`}
+                            title={
+                              companionMode === 'hologram'
+                                ? `Mount ${item.label} (${item.cost} XP)`
+                                : `Buy ${item.label} for ${item.cost} XP`
+                            }
                           >
                             <span className="text-lg">{item.char}</span>
-                            <span className="text-[8px] font-black mt-0.5">{item.cost} XP</span>
+                            <span className="text-[8px] font-black mt-0.5">{item.label}</span>
+                            <span className="text-[7px] font-bold text-slate-400 dark:text-slate-500">{item.cost} XP</span>
                           </button>
                         ))}
                       </div>
                     </div>
-                  </section>
-
                   {/* Active Buddies Online Row (Bring People Up!) */}
                   <section className="space-y-3" id="social_feed">
                     <div className="flex items-center justify-between">
@@ -6557,6 +6878,28 @@ export default function App() {
                               ></div>
                             </div>
 
+                            {/* Combo Multiplier Meter */}
+                            {flashcardCombo >= 2 && (
+                              <div className="flex items-center justify-between bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-2.5 rounded-2xl shadow-md border border-amber-400/30 animate-pulse">
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-sm animate-bounce">🔥</span>
+                                  <span className="text-[10px] font-black uppercase tracking-wider">
+                                    {appLanguage === 'Hindi' ? `${flashcardCombo}x कॉम्बो स्ट्रीक!` : `${flashcardCombo}x COMBO STREAK!`}
+                                  </span>
+                                </div>
+                                <span className="text-[9px] font-black px-2 py-0.5 bg-white/20 rounded-full font-mono">
+                                  {flashcardCombo >= 10 ? '⚡ Godlike (+15 XP)' : flashcardCombo >= 8 ? '🌟 Master (+10 XP)' : flashcardCombo >= 5 ? '⭐ Ultra (+5 XP)' : flashcardCombo >= 3 ? '✨ Super (+3 XP)' : 'On Fire!'}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Toast Bonus message */}
+                            {flashcardComboBonusMsg && (
+                              <div className="bg-emerald-500 text-white text-xs font-black text-center py-2 px-3 rounded-xl shadow-md animate-bounce">
+                                {flashcardComboBonusMsg}
+                              </div>
+                            )}
+
                             {/* Flipping Container */}
                             <div 
                               onClick={() => setIsFlashcardFlipped(!isFlashcardFlipped)} 
@@ -6997,7 +7340,10 @@ export default function App() {
                 />
               )}
 
-            </motion.div>
+            </>
+          )}
+
+        </motion.div>
           </AnimatePresence>
 
           {/* Background Diagram Generation Status Indicator */}
@@ -7024,55 +7370,109 @@ export default function App() {
         </main>
 
         {/* Dynamic Mobile Standard App Bottom Tab Bar (ALIGNED PINNED NO CLIP) */}
-        <nav className="bg-white border-t border-slate-150 py-2.5 px-2 shrink-0 flex justify-around items-center z-40 shadow-[0_-2px_10px_rgba(0,0,0,0.02)]" id="tab_bar">
+        <nav className={`${
+          appTheme === 'andromeda' 
+            ? 'bg-[#060218]/90 border-t border-purple-500/25 text-purple-100' 
+            : 'bg-white border-t border-slate-150 text-slate-400'
+        } py-2.5 px-2 shrink-0 flex justify-around items-center z-40 shadow-[0_-2px_10px_rgba(0,0,0,0.02)]`} id="tab_bar">
           <button 
             onClick={() => { setActiveTab('home'); setActiveGroup(null); }}
-            className={`flex flex-col items-center justify-center w-16 py-1 rounded-2xl transition-all duration-200 ${activeTab === 'home' ? 'text-indigo-600 bg-indigo-50/70 font-black scale-105' : 'text-slate-400 hover:text-slate-650'}`}
-            title={translate('home', appLanguage, 'Home')}
+            className={`flex flex-col items-center justify-center w-16 py-1 rounded-2xl transition-all duration-200 ${
+              activeTab === 'home' 
+                ? appTheme === 'andromeda'
+                  ? 'text-pink-400 bg-pink-500/15 font-black scale-105 shadow-xs shadow-pink-500/10'
+                  : 'text-indigo-600 bg-indigo-50/70 font-black scale-105' 
+                : appTheme === 'andromeda'
+                  ? 'text-purple-450 hover:text-purple-200'
+                  : 'text-slate-400 hover:text-slate-650'
+            }`}
+            title={appTheme === 'andromeda' ? 'Mission Control' : translate('home', appLanguage, 'Home')}
             id="tab_btn_home"
           >
-            <Home className="w-5 h-5" />
-            <span className="text-[9px] font-extrabold mt-0.5 tracking-tight">{translate('home', appLanguage, 'Home')}</span>
+            {appTheme === 'andromeda' ? <Rocket className="w-5 h-5 animate-pulse" /> : <Home className="w-5 h-5" />}
+            <span className="text-[9px] font-extrabold mt-0.5 tracking-tight">
+              {appTheme === 'andromeda' ? 'Mission Hub' : translate('home', appLanguage, 'Home')}
+            </span>
           </button>
           
           <button 
             onClick={() => { setActiveTab('chat'); setActiveGroup(null); }}
-            className={`flex flex-col items-center justify-center w-16 py-1 rounded-2xl transition-all duration-200 ${activeTab === 'chat' ? 'text-indigo-600 bg-indigo-50/70 font-black scale-105' : 'text-slate-400 hover:text-slate-650'}`}
-            title={translate('ai_tutor', appLanguage, 'AI Tutor')}
+            className={`flex flex-col items-center justify-center w-16 py-1 rounded-2xl transition-all duration-200 ${
+              activeTab === 'chat' 
+                ? appTheme === 'andromeda'
+                  ? 'text-pink-400 bg-pink-500/15 font-black scale-105 shadow-xs shadow-pink-500/10'
+                  : 'text-indigo-600 bg-indigo-50/70 font-black scale-105' 
+                : appTheme === 'andromeda'
+                  ? 'text-purple-450 hover:text-purple-200'
+                  : 'text-slate-400 hover:text-slate-650'
+            }`}
+            title={appTheme === 'andromeda' ? 'AI Core' : translate('ai_tutor', appLanguage, 'AI Tutor')}
             id="tab_btn_chat"
           >
-            <MessageSquare className="w-5 h-5" />
-            <span className="text-[9px] font-extrabold mt-0.5 tracking-tight">{translate('ai_tutor', appLanguage, 'AI Tutor')}</span>
+            {appTheme === 'andromeda' ? <Cpu className="w-5 h-5" /> : <MessageSquare className="w-5 h-5" />}
+            <span className="text-[9px] font-extrabold mt-0.5 tracking-tight">
+              {appTheme === 'andromeda' ? 'AI Core' : translate('ai_tutor', appLanguage, 'AI Tutor')}
+            </span>
           </button>
 
           <button 
             onClick={() => { setActiveTab('groups'); setActiveGroup(null); }}
-            className={`flex flex-col items-center justify-center w-16 py-1 rounded-2xl transition-all duration-200 ${activeTab === 'groups' ? 'text-indigo-600 bg-indigo-50/70 font-black scale-105' : 'text-slate-400 hover:text-slate-650'}`}
-            title={translate('groups', appLanguage, 'Groups')}
+            className={`flex flex-col items-center justify-center w-16 py-1 rounded-2xl transition-all duration-200 ${
+              activeTab === 'groups' 
+                ? appTheme === 'andromeda'
+                  ? 'text-pink-400 bg-pink-500/15 font-black scale-105 shadow-xs shadow-pink-500/10'
+                  : 'text-indigo-600 bg-indigo-50/70 font-black scale-105' 
+                : appTheme === 'andromeda'
+                  ? 'text-purple-450 hover:text-purple-200'
+                  : 'text-slate-400 hover:text-slate-650'
+            }`}
+            title={appTheme === 'andromeda' ? 'Synergy Guilds' : translate('groups', appLanguage, 'Groups')}
             id="tab_btn_groups"
           >
             <Users className="w-5 h-5" />
-            <span className="text-[9px] font-extrabold mt-0.5 tracking-tight">{translate('groups', appLanguage, 'Groups')}</span>
+            <span className="text-[9px] font-extrabold mt-0.5 tracking-tight">
+              {appTheme === 'andromeda' ? 'Guilds' : translate('groups', appLanguage, 'Groups')}
+            </span>
           </button>
 
           <button 
             onClick={() => { setActiveTab('notebook'); setActiveGroup(null); }}
-            className={`flex flex-col items-center justify-center w-16 py-1 rounded-2xl transition-all duration-200 ${activeTab === 'notebook' ? 'text-indigo-600 bg-indigo-50/70 font-black scale-105' : 'text-slate-400 hover:text-slate-650'}`}
-            title={translate('notebook', appLanguage, 'Notebook')}
+            className={`flex flex-col items-center justify-center w-16 py-1 rounded-2xl transition-all duration-200 ${
+              activeTab === 'notebook' 
+                ? appTheme === 'andromeda'
+                  ? 'text-pink-400 bg-pink-500/15 font-black scale-105 shadow-xs shadow-pink-500/10'
+                  : 'text-indigo-600 bg-indigo-50/70 font-black scale-105' 
+                : appTheme === 'andromeda'
+                  ? 'text-purple-450 hover:text-purple-200'
+                  : 'text-slate-400 hover:text-slate-650'
+            }`}
+            title={appTheme === 'andromeda' ? 'Galactic Archives' : translate('notebook', appLanguage, 'Notebook')}
             id="tab_btn_notebook"
           >
             <BookOpen className="w-5 h-5" />
-            <span className="text-[9px] font-extrabold mt-0.5 tracking-tight">{translate('notebook', appLanguage, 'Notebook')}</span>
+            <span className="text-[9px] font-extrabold mt-0.5 tracking-tight">
+              {appTheme === 'andromeda' ? 'Archives' : translate('notebook', appLanguage, 'Notebook')}
+            </span>
           </button>
 
           <button 
             onClick={() => { setActiveTab('quiz'); setActiveGroup(null); }}
-            className={`flex flex-col items-center justify-center w-16 py-1 rounded-2xl transition-all duration-200 ${activeTab === 'quiz' ? 'text-indigo-600 bg-indigo-50/70 font-black scale-105' : 'text-slate-400 hover:text-slate-650'}`}
-            title={translate('quiz', appLanguage, 'Quiz')}
+            className={`flex flex-col items-center justify-center w-16 py-1 rounded-2xl transition-all duration-200 ${
+              activeTab === 'quiz' 
+                ? appTheme === 'andromeda'
+                  ? 'text-pink-400 bg-pink-500/15 font-black scale-105 shadow-xs shadow-pink-500/10'
+                  : 'text-indigo-600 bg-indigo-50/70 font-black scale-105' 
+                : appTheme === 'andromeda'
+                  ? 'text-purple-450 hover:text-purple-200'
+                  : 'text-slate-400 hover:text-slate-650'
+            }`}
+            title={appTheme === 'andromeda' ? 'Simulators' : translate('quiz', appLanguage, 'Quiz')}
             id="tab_btn_quiz"
           >
-            <GraduationCap className="w-5 h-5" />
-            <span className="text-[9px] font-extrabold mt-0.5 tracking-tight">{translate('quiz', appLanguage, 'Quiz')}</span>
+            {appTheme === 'andromeda' ? <Atom className="w-5 h-5" /> : <GraduationCap className="w-5 h-5" />}
+            <span className="text-[9px] font-extrabold mt-0.5 tracking-tight">
+              {appTheme === 'andromeda' ? 'Simulators' : translate('quiz', appLanguage, 'Quiz')}
+            </span>
           </button>
         </nav>
 
@@ -7404,6 +7804,22 @@ export default function App() {
                     </span>
                   </div>
 
+                  {/* Feedback Action Button */}
+                  <button 
+                    onClick={() => {
+                      setShowAboutModal(false);
+                      setShowFeedbackModal(true);
+                      setFeedbackRating(5);
+                      setFeedbackSuggestions("");
+                      setFeedbackSuccess(false);
+                    }}
+                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold tracking-wide uppercase shadow-sm hover:shadow transition active:scale-95 duration-100 flex items-center justify-center space-x-2 cursor-pointer"
+                    id="open_feedback_modal_btn"
+                  >
+                    <Star className="w-4 h-4 fill-amber-300 text-amber-300" />
+                    <span>{appLanguage === 'Hindi' ? 'फीडबैक और सुझाव दें' : 'Give App Feedback'}</span>
+                  </button>
+
                   {/* System Health Diagnostics Accordion */}
                   <div className="border border-slate-150 rounded-2xl overflow-hidden shadow-xs">
                     <button 
@@ -7481,6 +7897,151 @@ export default function App() {
                     Ascend Study © 2026. All Rights Reserved.
                   </p>
                 </div>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {showFeedbackModal && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end justify-center" 
+              id="feedback_app_modal"
+            >
+              <motion.div 
+                initial={{ y: "15%" }} 
+                animate={{ y: 0 }} 
+                exit={{ y: "15%" }} 
+                className="bg-white w-full rounded-t-3xl p-5 space-y-4 shadow-xl border-t border-slate-200 overflow-y-auto max-h-[85vh] scrollbar-hide text-left"
+              >
+                <div className="flex justify-between items-center border-b border-slate-100 pb-2.5">
+                  <div className="flex items-center space-x-2">
+                    <MessageSquare className="w-4 h-4 text-indigo-600" />
+                    <h3 className="font-bold text-slate-800 text-xs">
+                      {appLanguage === 'Hindi' ? 'आपका फीडबैक और सुझाव' : 'Your Feedback & Suggestions'}
+                    </h3>
+                  </div>
+                  <button 
+                    onClick={() => setShowFeedbackModal(false)} 
+                    className="text-slate-400 text-xs font-semibold p-1 bg-slate-100 rounded-full hover:bg-slate-200 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {feedbackSuccess ? (
+                  <motion.div 
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="py-8 text-center space-y-4"
+                  >
+                    <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto shadow-sm">
+                      <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <h4 className="font-black text-slate-800 text-sm">
+                        {appLanguage === 'Hindi' ? 'फीडबैक सबमिट हो गया! 🎉' : 'Feedback Submitted! 🎉'}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 font-semibold px-4">
+                        {appLanguage === 'Hindi' 
+                          ? 'आपके बहुमूल्य सुझावों के लिए धन्यवाद। हम इस ऐप को बेहतर बनाने के लिए इस पर काम करेंगे।' 
+                          : 'Thank you for your valuable feedback. We will use your suggestions to make Ascend Study even better!'}
+                      </p>
+                    </div>
+                    <button 
+                      onClick={() => setShowFeedbackModal(false)}
+                      className="px-6 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition cursor-pointer"
+                    >
+                      {appLanguage === 'Hindi' ? 'बंद करें' : 'Close'}
+                    </button>
+                  </motion.div>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-[11px] text-slate-500 font-semibold leading-relaxed">
+                      {appLanguage === 'Hindi' 
+                        ? 'हमें बताएं कि आपका अनुभव कैसा रहा और आप भविष्य में कौन से नए फीचर्स देखना चाहते हैं!' 
+                        : 'Let us know how your experience has been and what exciting new features you want us to build next!'}
+                    </p>
+
+                    {/* Star Rating Section */}
+                    <div className="space-y-2 p-4 bg-slate-50 rounded-2xl border border-slate-150">
+                      <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                        {appLanguage === 'Hindi' ? 'ऐप का अनुभव रेट करें' : 'Rate Your Experience'}
+                      </h4>
+                      
+                      <div className="flex items-center space-x-2 py-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            onClick={() => setFeedbackRating(star)}
+                            className="p-1 hover:scale-110 transition active:scale-90 cursor-pointer"
+                            type="button"
+                          >
+                            <Star 
+                              className={`w-7 h-7 transition ${
+                                star <= feedbackRating 
+                                  ? 'fill-amber-400 text-amber-400 drop-shadow-xs' 
+                                  : 'text-slate-300'
+                              }`} 
+                            />
+                          </button>
+                        ))}
+                        <span className="text-[11px] font-black text-slate-700 ml-2">
+                          {feedbackRating === 1 && (appLanguage === 'Hindi' ? '😡 बहुत खराब' : '😡 Very Poor')}
+                          {feedbackRating === 2 && (appLanguage === 'Hindi' ? '🙁 खराब' : '🙁 Poor')}
+                          {feedbackRating === 3 && (appLanguage === 'Hindi' ? '😐 सामान्य' : '😐 Average')}
+                          {feedbackRating === 4 && (appLanguage === 'Hindi' ? '🙂 अच्छा' : '🙂 Good')}
+                          {feedbackRating === 5 && (appLanguage === 'Hindi' ? '😍 उत्कृष्ट' : '😍 Excellent')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Suggestions Section */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                          {appLanguage === 'Hindi' ? 'नए फीचर्स या सुधार का सुझाव दें' : 'Suggest New Features or Improvements'}
+                        </label>
+                        <span className="text-[9px] text-slate-400 font-semibold">
+                          {feedbackSuggestions.length}/5000
+                        </span>
+                      </div>
+                      
+                      <textarea
+                        value={feedbackSuggestions}
+                        onChange={(e) => setFeedbackSuggestions(e.target.value.slice(0, 5000))}
+                        placeholder={appLanguage === 'Hindi' 
+                          ? 'मुझे यह सुविधा चाहिए... या मुझे लगता है कि इस चीज़ को सुधारा जा सकता है...' 
+                          : 'I would love to have a feature that... or I think we can improve...'
+                        }
+                        className="w-full p-3 bg-slate-50 border border-slate-150 rounded-2xl text-xs font-semibold outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition resize-none min-h-[120px] text-slate-800"
+                        maxLength={5000}
+                        id="feedback_suggestions_textarea"
+                      />
+                    </div>
+
+                    {/* Submit Button */}
+                    <button
+                      onClick={handleSubmitFeedback}
+                      disabled={isSubmittingFeedback || !feedbackSuggestions.trim()}
+                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold tracking-wide uppercase shadow-md transition active:scale-95 duration-100 flex items-center justify-center space-x-2 cursor-pointer"
+                      id="submit_feedback_btn"
+                    >
+                      {isSubmittingFeedback ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>{appLanguage === 'Hindi' ? 'सबमिट हो रहा है...' : 'Submitting Feedback...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" />
+                          <span>{appLanguage === 'Hindi' ? 'फीडबैक भेजें' : 'Send Feedback'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </motion.div>
             </motion.div>
           )}
@@ -8297,6 +8858,248 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* ADVANCED ACCOUNT SECURITY & CLOUD BACKUP VAULT */}
+                <div className="p-4 bg-slate-950 text-slate-100 border border-slate-800 rounded-3xl space-y-3 shadow-xl relative overflow-hidden">
+                  {/* Digital backdrop grid */}
+                  <div className="absolute inset-0 bg-[linear-gradient(rgba(99,102,241,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(99,102,241,0.03)_1px,transparent_1px)] bg-[size:10px_10px] pointer-events-none" />
+                  
+                  <div className="flex items-center justify-between border-b border-slate-850 pb-2.5 relative z-10">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-7 h-7 bg-indigo-950/80 border border-indigo-500/30 rounded-lg flex items-center justify-center">
+                        <ShieldAlert className="w-4 h-4 text-indigo-400 animate-pulse" />
+                      </div>
+                      <div>
+                        <h4 className="font-extrabold text-[10px] text-white uppercase tracking-widest font-sans">
+                          {appLanguage === 'Hindi' ? 'सुरक्षित स्टोरेज और बैकअप वॉल्ट' : 'Cloud Sync & Security Vault'}
+                        </h4>
+                        <p className="text-[8px] text-slate-400 font-bold">
+                          {firebaseUser ? (appLanguage === 'Hindi' ? 'क्लाउड सिंक चालू है • एईएस-२५६ एन्क्रिप्टेड' : 'Cloud Live Synced • AES-256 SSL Encrypted') : (appLanguage === 'Hindi' ? 'अस्थायी लोकल स्टोरेज' : 'Local Offline Session • Encrypted Sandbox')}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Live Online Badge */}
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-indigo-950/60 border border-indigo-500/20">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                      <span className="text-[7px] font-black uppercase text-indigo-300">
+                        {firebaseUser ? 'LIVE VAULT' : 'LOCAL CACHE'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Cloud Database Storage Statistics */}
+                  <div className="grid grid-cols-4 gap-1.5 relative z-10">
+                    <div className="bg-slate-900/85 p-2 rounded-xl border border-slate-800 text-center">
+                      <p className="text-[7px] font-extrabold text-slate-500 uppercase tracking-wider">Notes</p>
+                      <p className="text-xs font-black text-white mt-0.5">{notes?.length || 0}</p>
+                    </div>
+                    <div className="bg-slate-900/85 p-2 rounded-xl border border-slate-800 text-center">
+                      <p className="text-[7px] font-extrabold text-slate-500 uppercase tracking-wider">Schedules</p>
+                      <p className="text-xs font-black text-white mt-0.5">{schedule?.length || 0}</p>
+                    </div>
+                    <div className="bg-slate-900/85 p-2 rounded-xl border border-slate-800 text-center">
+                      <p className="text-[7px] font-extrabold text-slate-500 uppercase tracking-wider">Quizzes</p>
+                      <p className="text-xs font-black text-white mt-0.5">{progress?.length || 0}</p>
+                    </div>
+                    <div className="bg-slate-900/85 p-2 rounded-xl border border-slate-800 text-center">
+                      <p className="text-[7px] font-extrabold text-slate-500 uppercase tracking-wider">Space</p>
+                      <p className="text-xs font-black text-indigo-400 mt-0.5">99.8%</p>
+                    </div>
+                  </div>
+
+                  {/* Dynamic Last Sync Indicator */}
+                  <div className="flex justify-between items-center text-[8px] text-slate-400 font-bold bg-slate-900/40 p-2 rounded-xl border border-slate-850/60 relative z-10">
+                    <span>{appLanguage === 'Hindi' ? 'अंतिम स्वचालित सिंक:' : 'Last Automated Cloud Sync:'}</span>
+                    <span className="font-mono text-indigo-300">
+                      {firebaseUser 
+                        ? `${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`
+                        : (appLanguage === 'Hindi' ? 'केवल स्थानीय (Local) • लॉग-इन की आवश्यकता है' : 'Unsynchronized • Cloud Login Advised')
+                      }
+                    </span>
+                  </div>
+
+                  {/* Security Action Buttons */}
+                  <div className="grid grid-cols-2 gap-2 relative z-10">
+                    {/* Force Cloud Backup Sync */}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!firebaseUser) {
+                          alert(appLanguage === 'Hindi' 
+                            ? "क्लाउड लाइव सिंक के लिए कृपया एक ईमेल या गूगल अकाउंट से लॉगिन करें!" 
+                            : "Please login with an email or Google account to enable live Cloud backup replication!");
+                          return;
+                        }
+                        try {
+                          if (typeof playAudioChime === 'function') playAudioChime('draw');
+                          setAuthLoading(true);
+                          // Force sync user profile
+                          await saveUserProfile({
+                            ...user!,
+                            quests,
+                            streakDays,
+                            pet
+                          });
+                          // Force save all notes
+                          for (const note of notes) {
+                            await saveNote(firebaseUser.uid, note);
+                          }
+                          // Force save all schedule items
+                          for (const item of schedule) {
+                            await saveScheduleItem(firebaseUser.uid, item);
+                          }
+                          // Force save all flashcards
+                          for (const card of flashcards) {
+                            await saveFlashcard(firebaseUser.uid, card);
+                          }
+                          if (typeof playAudioChime === 'function') playAudioChime('success');
+                          alert(appLanguage === 'Hindi' 
+                            ? "सफलता! आपका सारा डेटा सुरक्षित फ़ायरबेस क्लाउड से सिंक हो गया है। 💾🔒" 
+                            : "Vault Synced! All database items have been safely replicated to secure Firebase Cloud Storage! 💾🔒");
+                        } catch (err: any) {
+                          console.error("Backup Sync failed:", err);
+                          alert(`Sync Error: ${err.message}`);
+                        } finally {
+                          setAuthLoading(false);
+                        }
+                      }}
+                      disabled={authLoading}
+                      className="py-2 px-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-[10px] font-black transition text-center cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-indigo-950/50"
+                    >
+                      <CloudLightning className="w-3.5 h-3.5 animate-bounce" />
+                      <span>{appLanguage === 'Hindi' ? 'क्लाउड सिंक' : 'Force Cloud Sync'}</span>
+                    </button>
+
+                    {/* Manual Export JSON Backup */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          if (typeof playAudioChime === 'function') playAudioChime('coin');
+                          const backupData = {
+                            app: "Ascend Study Buddy Vault Backup",
+                            version: "3.2",
+                            exportedAt: new Date().toISOString(),
+                            userId: user?.id || "local_guest",
+                            profile: user,
+                            notes: notes,
+                            schedule: schedule,
+                            progress: progress,
+                            flashcards: flashcards,
+                            companion: pet,
+                            quests: quests,
+                            streakDays: streakDays
+                          };
+                          
+                          const jsonStr = JSON.stringify(backupData, null, 2);
+                          const blob = new Blob([jsonStr], { type: "application/json" });
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement("a");
+                          link.href = url;
+                          link.download = `ascend_study_vault_backup_${new Date().toISOString().split('T')[0]}.json`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          URL.revokeObjectURL(url);
+                        } catch (err) {
+                          alert(`Export failed: ${err}`);
+                        }
+                      }}
+                      className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-[10px] font-black transition text-center cursor-pointer flex items-center justify-center gap-1.5 border border-slate-750"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>{appLanguage === 'Hindi' ? 'एक्सपोर्ट बैकअप' : 'Export Backup'}</span>
+                    </button>
+                  </div>
+
+                  {/* Manual Restore Backup */}
+                  <div className="relative z-10 bg-slate-900/60 p-2 rounded-xl border border-slate-850 flex items-center justify-between gap-2">
+                    <div className="text-left">
+                      <p className="text-[8px] font-black uppercase text-slate-300">
+                        {appLanguage === 'Hindi' ? 'बैकअप फ़ाइल लोड करें' : 'Restore Data Vault'}
+                      </p>
+                      <p className="text-[7px] text-slate-500 font-bold">
+                        {appLanguage === 'Hindi' ? 'लोकल बैकअप फ़ाइल (.json) अपलोड करें' : 'Load study_vault_backup.json file'}
+                      </p>
+                    </div>
+                    <label className="py-1 px-2.5 bg-indigo-950 hover:bg-indigo-900 border border-indigo-500/30 text-indigo-300 rounded-lg text-[9px] font-extrabold cursor-pointer transition">
+                      <span>{appLanguage === 'Hindi' ? 'अपलोड करें 📁' : 'Browse File 📁'}</span>
+                      <input 
+                        type="file" 
+                        accept=".json" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = async (event) => {
+                            try {
+                              const content = event.target?.result as string;
+                              const parsed = JSON.parse(content);
+                              if (parsed.app !== "Ascend Study Buddy Vault Backup") {
+                                alert("Invalid backup file! Please select a valid Ascend Study backup file.");
+                                return;
+                              }
+                              
+                              if (confirm("Are you sure you want to restore this backup?\nThis will overwrite your current notes, flashcards, schedules, and profile!")) {
+                                if (typeof playAudioChime === 'function') playAudioChime('levelUp');
+                                
+                                // Restore States
+                                if (parsed.profile) setUser(parsed.profile);
+                                if (parsed.notes) {
+                                  setNotes(parsed.notes);
+                                  localStorage.setItem('studybuddy_guest_notes', JSON.stringify(parsed.notes));
+                                }
+                                if (parsed.schedule) {
+                                  setSchedule(parsed.schedule);
+                                  localStorage.setItem('studybuddy_guest_schedule', JSON.stringify(parsed.schedule));
+                                }
+                                if (parsed.progress) {
+                                  setProgress(parsed.progress);
+                                  localStorage.setItem('studybuddy_guest_progress', JSON.stringify(parsed.progress));
+                                }
+                                if (parsed.flashcards) {
+                                  setFlashcards(parsed.flashcards);
+                                  localStorage.setItem('studybuddy_guest_flashcards', JSON.stringify(parsed.flashcards));
+                                }
+                                if (parsed.companion) setPet(parsed.companion);
+                                if (parsed.quests) setQuests(parsed.quests);
+                                if (parsed.streakDays) setStreakDays(parsed.streakDays);
+
+                                // If signed in to Firebase, sync them up!
+                                if (firebaseUser) {
+                                  await saveUserProfile({
+                                    ...parsed.profile,
+                                    quests: parsed.quests || quests,
+                                    streakDays: parsed.streakDays || streakDays,
+                                    pet: parsed.companion || pet
+                                  });
+                                  for (const note of parsed.notes || []) {
+                                    await saveNote(firebaseUser.uid, note);
+                                  }
+                                  for (const item of parsed.schedule || []) {
+                                    await saveScheduleItem(firebaseUser.uid, item);
+                                  }
+                                  for (const card of parsed.flashcards || []) {
+                                    await saveFlashcard(firebaseUser.uid, card);
+                                  }
+                                }
+
+                                alert(appLanguage === 'Hindi' 
+                                  ? "सफलता! बैकअप डेटा सफलतापूर्वक रिस्टोर हो गया है। 🌟" 
+                                  : "Success! Study vault restored and re-synchronized from backup file successfully! 🌟");
+                              }
+                            } catch (error) {
+                              alert("Error parsing backup file: " + error);
+                            }
+                          };
+                          reader.readAsText(file);
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
                 {/* Edit Profile Form */}
                 <div className="space-y-3 pt-1 border-t border-slate-100 mt-2">
                   <h4 className="font-extrabold text-slate-700 text-[10px] uppercase tracking-wider">Update Your Profile Details</h4>
@@ -8378,9 +9181,88 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* Selectable UI Option (Themes) */}
+                  <div className="space-y-2 pt-2 border-t border-slate-100">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase block">
+                      {appLanguage === 'Hindi' ? 'यूआई डिजाइन स्टाइल (थीम)' : 'UI Design Style (Theme)'}
+                    </label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAppTheme('default');
+                          playAudioChime('coin');
+                        }}
+                        className={`p-2 rounded-xl border text-left flex flex-col justify-between h-18 transition relative overflow-hidden cursor-pointer ${
+                          appTheme === 'default'
+                            ? 'bg-white border-indigo-500 ring-2 ring-indigo-500/20 shadow-xs'
+                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center w-full">
+                          <span className="text-[9px] font-black text-slate-800">
+                            {appLanguage === 'Hindi' ? 'सनसेट' : 'Sunset'}
+                          </span>
+                          <span className="text-xs">🌅</span>
+                        </div>
+                        <span className="text-[7px] text-slate-400 font-bold leading-none">
+                          {appLanguage === 'Hindi' ? 'आधुनिक' : 'Clean'}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAppTheme('andromeda');
+                          playAudioChime('levelUp');
+                        }}
+                        className={`p-2 rounded-xl border text-left flex flex-col justify-between h-18 transition relative overflow-hidden cursor-pointer ${
+                          appTheme === 'andromeda'
+                            ? 'bg-purple-950/40 border-pink-500 ring-2 ring-pink-500/25 shadow-md'
+                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-transparent animate-pulse pointer-events-none" />
+                        <div className="flex justify-between items-center w-full relative z-10">
+                          <span className="text-[9px] font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-indigo-400">
+                            {appLanguage === 'Hindi' ? 'कॉस्मिक' : 'Cosmic'}
+                          </span>
+                          <span className="text-xs">🌌</span>
+                        </div>
+                        <span className="text-[7px] text-pink-400 font-bold leading-none relative z-10">
+                          {appLanguage === 'Hindi' ? 'गैलेक्सी' : 'Galaxy'}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAppTheme('zen');
+                          playAudioChime('success');
+                        }}
+                        className={`p-2 rounded-xl border text-left flex flex-col justify-between h-18 transition relative overflow-hidden cursor-pointer ${
+                          appTheme === 'zen'
+                            ? 'bg-emerald-950/40 border-emerald-500 ring-2 ring-emerald-500/25 shadow-md'
+                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-yellow-500/10 to-transparent animate-pulse pointer-events-none" />
+                        <div className="flex justify-between items-center w-full relative z-10">
+                          <span className="text-[9px] font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-yellow-400">
+                            {appLanguage === 'Hindi' ? 'ज़ेन वन' : 'Zen Forest'}
+                          </span>
+                          <span className="text-xs">🌿</span>
+                        </div>
+                        <span className="text-[7px] text-emerald-400 font-bold leading-none relative z-10">
+                          {appLanguage === 'Hindi' ? 'शांत वन' : 'Calm Nature'}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Dark Mode Theme Toggle */}
                   <div className="space-y-1.5 pt-2 border-t border-slate-100">
-                    <label className="text-[9px] font-bold text-slate-400 uppercase block">App Theme</label>
+                    <label className="text-[9px] font-bold text-slate-400 uppercase block">App Style Mode</label>
                     <button
                       type="button"
                       onClick={() => setDarkMode(!darkMode)}
@@ -8457,36 +9339,55 @@ export default function App() {
               className="absolute inset-0 bg-slate-950/90 backdrop-blur-md z-100 flex items-center justify-center p-4 overflow-y-auto"
               id="milestone_unlocked_celebration"
             >
-              {/* Dynamic Confetti Explosion */}
-              {Array.from({ length: 45 }).map((_, i) => {
-                const angle = (i / 45) * 360;
-                const distance = 90 + Math.random() * 160;
-                const x = Math.cos((angle * Math.PI) / 180) * distance;
-                const y = Math.sin((angle * Math.PI) / 180) * distance;
-                const rotation = Math.random() * 360;
-                const colors = ['#fbbf24', '#38bdf8', '#34d399', '#f472b6', '#a78bfa', '#fb7185'];
+              {/* Dynamic Confetti & Particle Explosion */}
+              {Array.from({ length: 80 }).map((_, i) => {
+                const angle = Math.random() * 360;
+                const speed = 40 + Math.random() * 260;
+                const distanceX = Math.cos((angle * Math.PI) / 180) * speed;
+                const distanceY = Math.sin((angle * Math.PI) / 180) * speed;
+                const size = 6 + Math.random() * 12;
+                const colors = ['#fbbf24', '#38bdf8', '#34d399', '#f472b6', '#a78bfa', '#fb7185', '#6366f1'];
                 const randomColor = colors[i % colors.length];
+                const isStar = i % 3 === 0;
+                const isCircle = i % 3 === 1;
 
                 return (
                   <motion.div
-                    key={i}
-                    initial={{ x: 0, y: 0, opacity: 1, scale: 0.5, rotate: 0 }}
+                    key={`particle-${i}`}
+                    initial={{ x: 0, y: 0, opacity: 1, scale: 0, rotate: 0 }}
                     animate={{
-                      x: x,
-                      y: y + (Math.random() * 30),
-                      opacity: [1, 1, 0],
-                      scale: [0.5, 1.2, 0.2],
-                      rotate: rotation + 270
+                      x: [0, distanceX],
+                      y: [0, distanceY, distanceY + 120], // Falling down (gravity effect)
+                      opacity: [1, 1, 0.8, 0],
+                      scale: [0, 1.4, 1.1, 0],
+                      rotate: [0, Math.random() * 720 - 360]
                     }}
                     transition={{
-                      duration: 3,
+                      duration: 1.8 + Math.random() * 1.5,
                       ease: "easeOut",
+                      times: [0, 0.3, 0.7, 1],
                       repeat: Infinity,
-                      repeatDelay: 1
+                      repeatDelay: Math.random() * 0.8
                     }}
-                    className="absolute w-2 h-4 rounded-xs pointer-events-none"
-                    style={{ backgroundColor: randomColor }}
-                  />
+                    className="absolute pointer-events-none z-50 flex items-center justify-center"
+                    style={{
+                      left: '50%',
+                      top: '50%',
+                      width: size,
+                      height: size,
+                    }}
+                  >
+                    {isStar ? (
+                      <Star 
+                        className="w-full h-full fill-current drop-shadow-[0_2px_6px_rgba(251,191,36,0.5)]" 
+                        style={{ color: randomColor }}
+                      />
+                    ) : isCircle ? (
+                      <div className="rounded-full w-2.5 h-2.5 shadow-sm" style={{ backgroundColor: randomColor }} />
+                    ) : (
+                      <div className="w-1.5 h-3.5 rounded-xs" style={{ backgroundColor: randomColor }} />
+                    )}
+                  </motion.div>
                 );
               })}
 

@@ -16,9 +16,10 @@ import {
   limit,
   handleFirestoreError,
   OperationType,
-  writeBatch
+  writeBatch,
+  serverTimestamp
 } from "./firebase";
-import type { User, Note, ScheduleItem, Progress, Group, GroupMessage, GroupNote, Flashcard, GroupQuestion, GroupSession, TutorSession } from "../types";
+import type { User, Note, ScheduleItem, Progress, Group, GroupMessage, GroupNote, Flashcard, GroupQuestion, GroupSession, TutorSession, Feedback } from "../types";
 
 /**
  * Validates connection to Firestore as required by firebase-integration skill.
@@ -1437,13 +1438,15 @@ export async function saveTutorSession(userId: string | number, session: TutorSe
   }
   try {
     const docRef = doc(db, "users", String(userId), "tutor_sessions", String(session.id));
-    const payload = {
+    const rawPayload = {
       title: session.title || "Untitled Session",
       messages: session.messages || [],
       createdAt: session.createdAt || new Date().toISOString(),
       persona: session.persona || 'default',
       updatedAt: new Date().toISOString()
     };
+    // Strip out any undefined values recursively (e.g. m.image can be undefined)
+    const payload = JSON.parse(JSON.stringify(rawPayload));
     await setDoc(docRef, payload, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `users/${userId}/tutor_sessions/${session.id}`);
@@ -1482,6 +1485,36 @@ export async function deleteTutorSession(userId: string | number, sessionId: str
       const filtered = sessions.filter(s => s.id !== sessionId);
       localStorage.setItem(`sb_tutor_${userId}`, JSON.stringify(filtered));
     } catch (e) {}
+  }
+}
+
+export async function saveFeedback(feedback: Feedback): Promise<void> {
+  if (isSandboxMode(feedback.userId)) {
+    try {
+      const stored = localStorage.getItem('sb_feedback') || '[]';
+      const feedbacks = JSON.parse(stored);
+      feedbacks.push({
+        ...feedback,
+        createdAt: new Date().toISOString()
+      });
+      localStorage.setItem('sb_feedback', JSON.stringify(feedbacks));
+    } catch (e) {
+      console.warn("Failed to save local sandbox feedback:", e);
+    }
+    return;
+  }
+  try {
+    const docRef = doc(db, "feedback", feedback.id);
+    await setDoc(docRef, {
+      id: feedback.id,
+      userId: feedback.userId,
+      userName: feedback.userName,
+      rating: Number(feedback.rating),
+      suggestions: feedback.suggestions,
+      createdAt: serverTimestamp()
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `feedback/${feedback.id}`);
   }
 }
 

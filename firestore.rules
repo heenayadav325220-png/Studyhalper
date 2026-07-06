@@ -102,5 +102,20 @@ service cloud.firestore {
         }
       }
     }
+
+    // Feedback collection
+    match /feedback/{feedbackId} {
+      allow create: if isSignedIn()
+        && isValidId(feedbackId)
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.userName is string
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        && request.resource.data.suggestions is string
+        && request.resource.data.suggestions.size() <= 5000
+        && request.resource.data.createdAt == request.time;
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
   }
 }
