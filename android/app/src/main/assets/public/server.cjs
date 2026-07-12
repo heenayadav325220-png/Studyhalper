@@ -697,10 +697,12 @@ function getFallbackAnswer(prompt, studentContext) {
 }
 
 // server.ts
-var import_better_sqlite3 = __toESM(require("better-sqlite3"), 1);
 var import_app = require("firebase-admin/app");
 var import_auth = require("firebase-admin/auth");
 var import_fs = __toESM(require("fs"), 1);
+var import_module = require("module");
+var import_meta = {};
+var require2 = (0, import_module.createRequire)(import_meta.url);
 import_dotenv.default.config();
 try {
   const configPath = import_path.default.join(process.cwd(), "firebase-applet-config.json");
@@ -727,8 +729,16 @@ if (process.env.VERCEL) {
   db = new MockDatabase();
 } else {
   try {
-    db = new import_better_sqlite3.default("studybuddy.db");
+    const DatabaseConstructor = require2("better-sqlite3");
+    db = new DatabaseConstructor("studybuddy.db");
     console.log("Successfully connected to SQLite database (studybuddy.db).");
+    try {
+      db.pragma("journal_mode = WAL");
+      db.pragma("synchronous = NORMAL");
+      console.log("Enabled Write-Ahead Logging (WAL) and synchronous=NORMAL for peak SQLite scalability.");
+    } catch (pe) {
+      console.warn("Could not set database pragmas:", pe);
+    }
   } catch (err) {
     console.warn("better-sqlite3 could not be loaded, falling back to MockDatabase:", err);
     db = new MockDatabase();
@@ -831,7 +841,19 @@ function getGeminiClient() {
 }
 async function callGeminiWithRetryAndFailover(ai, params, retries = 3, delay = 1e3) {
   const isImageModel = params.model.indexOf("image") !== -1;
-  const candidates = isImageModel ? [params.model, "gemini-2.5-flash-image", "gemini-3.1-flash-image"] : [params.model, "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
+  const hasModelsPrefix = params.model.startsWith("models/");
+  const baseCandidates = isImageModel ? [params.model, "gemini-3.1-flash-lite-image", "gemini-3.1-flash-image"] : [
+    params.model,
+    "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-flash-latest"
+  ];
+  const candidates = baseCandidates.map((m) => {
+    if (hasModelsPrefix && !m.startsWith("models/")) {
+      return `models/${m}`;
+    }
+    return m;
+  });
   const modelsToTry = candidates.filter((item, index) => candidates.indexOf(item) === index);
   let lastError = null;
   for (const modelCandidate of modelsToTry) {
@@ -851,13 +873,37 @@ async function callGeminiWithRetryAndFailover(ai, params, retries = 3, delay = 1
         lastError = error;
         const errorMsg = error.message || String(error);
         const isTransient = error.status === 503 || error.statusCode === 503 || error.code === 503 || errorMsg.includes("503") || errorMsg.includes("UNAVAILABLE") || errorMsg.includes("high demand") || errorMsg.includes("temporary");
-        if (isTransient && currentRetries > 0) {
-          console.warn(`[Server Gemini Retry] Model ${modelCandidate} failed (${errorMsg}). Retrying in ${currentDelay}ms...`);
+        const isQuota = error.status === 429 || error.statusCode === 429 || error.code === 429 || errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("quota") || errorMsg.includes("limit");
+        const currentModelIndex = modelsToTry.indexOf(modelCandidate);
+        const hasNextCandidate = currentModelIndex < modelsToTry.length - 1;
+        if (isQuota && hasNextCandidate) {
+          console.warn(`[Gemini Bridge] Model ${modelCandidate} hit rate limit. Trying fallback candidate model...`);
+          break;
+        } else if (isQuota && currentRetries > 0) {
+          let waitTimeMs = 5e3;
+          const match = errorMsg.match(/Please retry in ([\d\.]+)s/i);
+          if (match && match[1]) {
+            const seconds = parseFloat(match[1]);
+            if (!isNaN(seconds)) {
+              waitTimeMs = Math.ceil(seconds * 1e3) + 1500;
+            }
+          } else {
+            waitTimeMs = currentDelay * 3;
+          }
+          if (waitTimeMs > 25e3) {
+            waitTimeMs = 25e3;
+          }
+          console.warn(`[Gemini Bridge] Model ${modelCandidate} rate limited. Waiting ${waitTimeMs}ms before retry...`);
+          await new Promise((resolve) => setTimeout(resolve, waitTimeMs));
+          currentRetries--;
+          currentDelay *= 2;
+        } else if (isTransient && currentRetries > 0) {
+          console.warn(`[Gemini Bridge] Model ${modelCandidate} temporarily unavailable. Retrying in ${currentDelay}ms...`);
           await new Promise((resolve) => setTimeout(resolve, currentDelay));
           currentRetries--;
           currentDelay *= 2;
         } else {
-          console.warn(`[Server Gemini Fail] Call failed for model ${modelCandidate}:`, errorMsg);
+          console.warn(`[Gemini Bridge] Model ${modelCandidate} skipped. Transitioning to next candidate...`);
           break;
         }
       }
@@ -1147,17 +1193,28 @@ app.put("/api/groups/notes/:noteId", (req, res) => {
   }
 });
 app.post("/api/gemini/answer", async (req, res) => {
-  const { prompt, imageBase64, studentContext, language } = req.body;
+  const { prompt, imageBase64, studentContext, language, persona, history } = req.body;
   try {
-    const parts = [{ text: prompt }];
+    let contentsList = [];
+    if (history && Array.isArray(history)) {
+      contentsList = history.map((msg) => ({
+        role: msg.role === "user" ? "user" : "model",
+        parts: [{ text: msg.text }]
+      }));
+    }
+    const currentParts = [{ text: prompt }];
     if (imageBase64) {
-      parts.push({
+      currentParts.push({
         inlineData: {
           mimeType: "image/png",
           data: imageBase64.split(",")[1] || imageBase64
         }
       });
     }
+    contentsList.push({
+      role: "user",
+      parts: currentParts
+    });
     let languagePrompt = "";
     if (language === "Hindi") {
       languagePrompt = "Please respond entirely in clear, friendly Hindi language (using proper Devanagari script), offering simple student-friendly examples.";
@@ -1202,13 +1259,25 @@ app.post("/api/gemini/answer", async (req, res) => {
         syllabusPrompt = `You must follow an internationally recognized global curriculum standard such as the International Baccalaureate (IB) or Cambridge Assessment International Education (CIE) suitable for grade/class ${className}.`;
       }
     }
+    let personaInstruction = "";
+    if (persona === "socratic") {
+      personaInstruction = "You are a Socratic Teacher. Never give direct, straight answers to the student immediately. Instead, always ask short, helpful guiding questions to prompt the student to think, deduce, and discover the answer themselves. Encourage their critical thinking.";
+    } else if (persona === "debugger") {
+      personaInstruction = "You are a Code Debugger and Programming Expert. Analyze code logic, pinpoint bugs, explain syntax errors, and break down solutions step-by-step in clean formatting. Provide optimized and secure code snippets with thorough comments.";
+    } else if (persona === "translator") {
+      personaInstruction = "You are a Language Translator & Bilingual Speaking Partner. Help the student translate phrases, explain grammar rules, clarify pronunciation tips, and practice conversational dialogue in both English and Hindi or their chosen language.";
+    } else if (persona === "math") {
+      personaInstruction = "You are a Math Wizard. Break down all mathematical equations, proofs, and word problems into extremely clear, sequential steps. Explain the 'why' behind each step and define any variables or formulas used.";
+    } else {
+      personaInstruction = "You are an encouraging and friendly study helper/coach. Explain concepts clearly and provide step-by-step solutions.";
+    }
     const appInfo = "You are the AI model integrated into 'Ascend Study', an advanced, interactive study assistant platform. Ascend Study provides students with intelligent conversational learning, structured subject notes, dynamic practice quizzes, progress and daily streak tracking, study schedules/reminders, and collaborative group study circles/rooms for peer-to-peer interactive learning.";
     const creatorInfo = "Your owner, creator, and lead developer is Rohit Yadav, a brilliant 14/15-year-old student and coder who designed and developed this entire applet. Rohit is the head and founder of his developer team called 'Core AI'. If any student or user asks who created/developed you, who designed this app, or who owns you, you must proudly, clearly, and directly tell them that you were created and are owned by Rohit Yadav and his team, Core AI. You must never claim that Google, Google AI Studio, or OpenAI created or own you - they are only providers of the underlying large language model APIs, but the app itself and your persona belongs strictly to Rohit Yadav and Core AI.";
-    const systemInstruction = studentContext ? `${appInfo} ${creatorInfo} You are an encouraging, friendly study helper/coach for a child named ${studentContext.name} who studies in class ${studentContext.className} at ${studentContext.school}. ${syllabusPrompt} Keep your tone highly personalized, warm, and highly encouraging, referring to their school or name when it fits naturally. ${languagePrompt}` : `${appInfo} ${creatorInfo} You are a helpful study assistant. Explain concepts clearly and provide step-by-step solutions. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. If the user asks for a diagram or visual explanation, describe it clearly or suggest a visual aid. ${languagePrompt}`;
+    const systemInstruction = studentContext ? `${appInfo} ${creatorInfo} ${personaInstruction} You are an encouraging, friendly study helper/coach for a child named ${studentContext.name} who studies in class ${studentContext.className} at ${studentContext.school}. ${syllabusPrompt} Keep your tone highly personalized, warm, and highly encouraging, referring to their school or name when it fits naturally. ${languagePrompt}` : `${appInfo} ${creatorInfo} ${personaInstruction} You are a helpful study assistant. Explain concepts clearly and provide step-by-step solutions. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. If the user asks for a diagram or visual explanation, describe it clearly or suggest a visual aid. ${languagePrompt}`;
     const ai = getGeminiClient();
     const response = await callGeminiWithRetryAndFailover(ai, {
       model: "gemini-3.5-flash",
-      contents: { parts },
+      contents: contentsList,
       config: {
         systemInstruction
       }
@@ -1221,33 +1290,880 @@ app.post("/api/gemini/answer", async (req, res) => {
     res.json({ text: fallbackText });
   }
 });
-app.post("/api/gemini/diagram", async (req, res) => {
-  const { prompt } = req.body;
-  try {
-    const ai = getGeminiClient();
-    const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-2.5-flash-image",
-      contents: [{ text: `Educational diagram or illustration for: ${prompt}. Clear, academic style, labeled if necessary.` }],
-      config: {
-        imageConfig: {
-          aspectRatio: "1:1"
-        }
+function generateGuaranteedLocalSvg(prompt) {
+  const normalized = (prompt || "").toLowerCase();
+  if (normalized.includes("water cycle")) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="100%" height="100%">
+      <!-- Background -->
+      <rect width="600" height="400" fill="#f8fafc" rx="16"/>
+      <rect width="600" height="150" y="250" fill="#e0f2fe" rx="0"/>
+      
+      <!-- Ocean -->
+      <path d="M 0 320 Q 150 310 300 320 T 600 320 L 600 400 L 0 400 Z" fill="#0284c7"/>
+      <path d="M 0 340 Q 150 330 300 340 T 600 340 L 600 400 L 0 400 Z" fill="#0369a1"/>
+      
+      <!-- Mountains -->
+      <path d="M 350 320 L 450 180 L 520 260 L 600 150 L 600 320 Z" fill="#64748b"/>
+      <path d="M 430 208 L 450 180 L 470 208 Z" fill="#f1f5f9"/>
+      <path d="M 570 190 L 600 150 L 600 210 Z" fill="#f1f5f9"/>
+
+      <!-- Sun -->
+      <circle cx="80" cy="80" r="30" fill="#eab308" />
+      <line x1="80" y1="35" x2="80" y2="20" stroke="#eab308" stroke-width="4"/>
+      <line x1="80" y1="125" x2="80" y2="140" stroke="#eab308" stroke-width="4"/>
+      <line x1="35" y1="80" x2="20" y2="80" stroke="#eab308" stroke-width="4"/>
+      <line x1="125" y1="80" x2="140" y2="80" stroke="#eab308" stroke-width="4"/>
+      
+      <!-- Clouds -->
+      <path d="M 240 100 a 20 20 0 0 1 30 -10 a 25 25 0 0 1 45 5 a 20 20 0 0 1 15 25 l -90 0 z" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="2"/>
+      <path d="M 440 100 a 20 20 0 0 1 30 -10 a 25 25 0 0 1 45 5 a 20 20 0 0 1 15 25 l -90 0 z" fill="#94a3b8" stroke="#475569" stroke-width="2"/>
+
+      <!-- Rain -->
+      <line x1="460" y1="140" x2="450" y2="160" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 4"/>
+      <line x1="480" y1="140" x2="470" y2="160" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 4"/>
+      <line x1="500" y1="140" x2="490" y2="160" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 4"/>
+      
+      <!-- Arrows (Cycles) -->
+      <!-- Evaporation -->
+      <path d="M 120 290 Q 140 230 180 190" fill="none" stroke="#f97316" stroke-width="3" stroke-dasharray="5 5" marker-end="url(#arrow-orange)"/>
+      <text x="130" y="220" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#ea580c">1. Evaporation</text>
+
+      <!-- Condensation -->
+      <path d="M 280 90 Q 350 80 400 90" fill="none" stroke="#2563eb" stroke-width="3" stroke-dasharray="5 5" marker-end="url(#arrow-blue)"/>
+      <text x="310" y="75" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#1d4ed8">2. Condensation</text>
+
+      <!-- Precipitation -->
+      <path d="M 500 170 Q 520 230 490 280" fill="none" stroke="#0284c7" stroke-width="3" stroke-dasharray="5 5" marker-end="url(#arrow-blue)"/>
+      <text x="515" y="230" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0369a1">3. Precipitation</text>
+
+      <!-- Collection / Runoff -->
+      <path d="M 420 310 Q 260 350 160 340" fill="none" stroke="#0d9488" stroke-width="3" stroke-dasharray="5 5" marker-end="url(#arrow-teal)"/>
+      <text x="260" y="360" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0f766e">4. Surface Runoff</text>
+      
+      <!-- Definitions -->
+      <defs>
+        <marker id="arrow-orange" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#ea580c"/>
+        </marker>
+        <marker id="arrow-blue" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#1d4ed8"/>
+        </marker>
+        <marker id="arrow-teal" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f766e"/>
+        </marker>
+      </defs>
+
+      <!-- Label title -->
+      <rect x="15" y="15" width="220" height="30" fill="white" rx="8" opacity="0.9" stroke="#e2e8f0" stroke-width="1"/>
+      <text x="25" y="35" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#0f172a">THE WATER CYCLE DIAGRAM</text>
+    </svg>`;
+  }
+  if (normalized.includes("heart") || normalized.includes("cardiac")) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
+      <rect width="600" height="450" fill="#fff5f5" rx="16"/>
+      
+      <!-- Heart outline and muscle -->
+      <path d="M 300 130 C 230 60 140 100 140 190 C 140 280 250 350 300 390 C 350 350 460 280 460 190 C 460 100 370 60 300 130 Z" fill="#e11d48" stroke="#be123c" stroke-width="6"/>
+      
+      <!-- Left Ventricle cavity inside -->
+      <path d="M 300 200 C 270 170 200 200 200 250 C 200 300 270 330 300 360 Z" fill="#9f1239" opacity="0.6"/>
+      <!-- Right Ventricle cavity inside -->
+      <path d="M 300 200 C 330 170 400 200 400 250 C 400 300 330 330 300 360 Z" fill="#1e3a8a" opacity="0.6"/>
+
+      <!-- Septum divider line -->
+      <line x1="300" y1="180" x2="300" y2="380" stroke="#be123c" stroke-width="8" stroke-linecap="round"/>
+
+      <!-- Aorta arch (red arch on top) -->
+      <path d="M 280 140 Q 280 60 340 70 Q 380 80 370 140" fill="none" stroke="#e11d48" stroke-width="24" stroke-linecap="round"/>
+      <line x1="320" y1="65" x2="320" y2="40" stroke="#e11d48" stroke-width="12"/>
+      <line x1="350" y1="70" x2="350" y2="45" stroke="#e11d48" stroke-width="12"/>
+
+      <!-- Vena Cava (blue tube on left) -->
+      <rect x="180" y="70" width="20" height="110" rx="6" fill="#2563eb" stroke="#1d4ed8" stroke-width="3"/>
+      
+      <!-- Labels with pointer dots -->
+      <!-- Aorta -->
+      <circle cx="340" cy="70" r="4" fill="#1e293b"/>
+      <line x1="340" y1="70" x2="450" y2="50" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="460" y="54" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0f172a">Aorta (Main Artery)</text>
+
+      <!-- Left Atrium -->
+      <circle cx="360" cy="180" r="4" fill="#1e293b"/>
+      <line x1="360" y1="180" x2="480" y2="160" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="490" y="164" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0f172a">Left Atrium</text>
+
+      <!-- Right Atrium -->
+      <circle cx="230" cy="180" r="4" fill="#1e293b"/>
+      <line x1="230" y1="180" x2="80" y2="160" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="15" y="164" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0f172a">Right Atrium</text>
+
+      <!-- Left Ventricle -->
+      <circle cx="350" cy="280" r="4" fill="#1e293b"/>
+      <line x1="350" y1="280" x2="480" y2="300" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="490" y="304" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0f172a">Left Ventricle</text>
+
+      <!-- Right Ventricle -->
+      <circle cx="250" cy="280" r="4" fill="#1e293b"/>
+      <line x1="250" y1="280" x2="80" y2="300" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="5" y="304" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0f172a">Right Ventricle</text>
+
+      <!-- Title -->
+      <rect x="200" y="15" width="200" height="30" fill="white" rx="8" stroke="#fca5a5" stroke-width="1"/>
+      <text x="300" y="35" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#9f1239" text-anchor="middle">ANATOMY OF THE HEART</text>
+    </svg>`;
+  }
+  if (normalized.includes("cell")) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
+      <rect width="600" height="450" fill="#f0fdf4" rx="16"/>
+      
+      <!-- Cell Wall (Outer Hexagon-like path) -->
+      <polygon points="120,80 480,60 520,240 450,380 150,400 80,240" fill="#86efac" stroke="#166534" stroke-width="8" stroke-linejoin="round"/>
+      <!-- Cell Membrane (Inner) -->
+      <polygon points="128,88 472,69 510,238 442,372 156,391 90,238" fill="#bbf7d0" stroke="#15803d" stroke-width="3" stroke-linejoin="round"/>
+      
+      <!-- Cytoplasm filling -->
+      <polygon points="135,95 465,78 500,235 435,365 162,382 98,235" fill="#f0fdf4"/>
+
+      <!-- Large Central Vacuole (blue blob) -->
+      <path d="M 180 180 Q 250 140 350 170 T 400 280 T 250 340 T 150 250 Z" fill="#e0f2fe" stroke="#38bdf8" stroke-width="3"/>
+      <text x="250" y="240" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#0369a1">Central Vacuole</text>
+
+      <!-- Nucleus (Purple circle with nucleolus inside) -->
+      <circle cx="410" cy="140" r="45" fill="#f3e8ff" stroke="#7e22ce" stroke-width="3"/>
+      <circle cx="420" cy="130" r="18" fill="#c084fc" stroke="#6b21a8" stroke-width="2"/>
+      <text x="410" y="175" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#6b21a8" text-anchor="middle">Nucleus</text>
+
+      <!-- Chloroplasts (Green ovals with lines) -->
+      <g transform="translate(140, 110) rotate(15)">
+        <ellipse cx="0" cy="0" rx="22" ry="12" fill="#22c55e" stroke="#14532d" stroke-width="2"/>
+        <line x1="-15" y1="0" x2="15" y2="0" stroke="#14532d" stroke-width="1.5"/>
+      </g>
+      <g transform="translate(160, 340) rotate(-30)">
+        <ellipse cx="0" cy="0" rx="22" ry="12" fill="#22c55e" stroke="#14532d" stroke-width="2"/>
+        <line x1="-15" y1="0" x2="15" y2="0" stroke="#14532d" stroke-width="1.5"/>
+      </g>
+      <g transform="translate(460, 310) rotate(45)">
+        <ellipse cx="0" cy="0" rx="22" ry="12" fill="#22c55e" stroke="#14532d" stroke-width="2"/>
+        <line x1="-15" y1="0" x2="15" y2="0" stroke="#14532d" stroke-width="1.5"/>
+      </g>
+
+      <!-- Mitochondria (Orange ovals with zigzag) -->
+      <g transform="translate(280, 110) rotate(-20)">
+        <ellipse cx="0" cy="0" rx="20" ry="10" fill="#f97316" stroke="#7c2d12" stroke-width="2"/>
+        <path d="M -15 0 Q -10 5 -5 -3 T 5 5 T 15 -2" fill="none" stroke="#7c2d12" stroke-width="1.5"/>
+      </g>
+      <g transform="translate(350, 350) rotate(10)">
+        <ellipse cx="0" cy="0" rx="20" ry="10" fill="#f97316" stroke="#7c2d12" stroke-width="2"/>
+        <path d="M -15 0 Q -10 5 -5 -3 T 5 5 T 15 -2" fill="none" stroke="#7c2d12" stroke-width="1.5"/>
+      </g>
+
+      <!-- Labels with lines -->
+      <!-- Cell Wall -->
+      <circle cx="100" cy="160" r="4" fill="#14532d"/>
+      <line x1="100" y1="160" x2="30" y2="130" stroke="#14532d" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="25" y="115" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#14532d">Cell Wall</text>
+
+      <!-- Chloroplast -->
+      <circle cx="140" cy="110" r="4" fill="#14532d"/>
+      <line x1="140" y1="110" x2="50" y2="70" stroke="#14532d" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="45" y="55" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#14532d">Chloroplast</text>
+
+      <!-- Mitochondrion -->
+      <circle cx="280" cy="110" r="4" fill="#7c2d12"/>
+      <line x1="280" y1="110" x2="280" y2="40" stroke="#7c2d12" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="280" y="30" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#7c2d12" text-anchor="middle">Mitochondrion</text>
+
+      <!-- Title -->
+      <rect x="15" y="15" width="220" height="30" fill="white" rx="8" stroke="#bbf7d0" stroke-width="1"/>
+      <text x="25" y="35" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#166534">PLANT CELL STRUCTURE</text>
+    </svg>`;
+  }
+  if (normalized.includes("atom")) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
+      <rect width="600" height="450" fill="#faf5ff" rx="16"/>
+      
+      <!-- Orbital Shell ellipses -->
+      <ellipse cx="300" cy="225" rx="200" ry="80" fill="none" stroke="#a855f7" stroke-width="2" opacity="0.6" transform="rotate(30, 300, 225)"/>
+      <ellipse cx="300" cy="225" rx="200" ry="80" fill="none" stroke="#a855f7" stroke-width="2" opacity="0.6" transform="rotate(-30, 300, 225)"/>
+      <ellipse cx="300" cy="225" rx="200" ry="80" fill="none" stroke="#a855f7" stroke-width="2" opacity="0.6" transform="rotate(90, 300, 225)"/>
+
+      <!-- Electrons (Blue orbiting balls) -->
+      <!-- On Shell 1 (30 deg) -->
+      <circle cx="150" cy="140" r="8" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
+      <circle cx="450" cy="310" r="8" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
+      
+      <!-- On Shell 2 (-30 deg) -->
+      <circle cx="150" cy="310" r="8" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
+      <circle cx="450" cy="140" r="8" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
+
+      <!-- On Shell 3 (90 deg) -->
+      <circle cx="300" cy="45" r="8" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
+      <circle cx="300" cy="405" r="8" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
+
+      <!-- Nucleus Cluster (Protons & Neutrons) -->
+      <g transform="translate(300, 225)">
+        <!-- Neutrons (Gray) -->
+        <circle cx="-10" cy="-10" r="14" fill="#94a3b8" stroke="#475569" stroke-width="1.5"/>
+        <circle cx="12" cy="8" r="14" fill="#94a3b8" stroke="#475569" stroke-width="1.5"/>
+        <circle cx="-12" cy="14" r="14" fill="#94a3b8" stroke="#475569" stroke-width="1.5"/>
+        
+        <!-- Protons (Rose/Red with '+') -->
+        <circle cx="8" cy="-12" r="14" fill="#f43f5e" stroke="#be123c" stroke-width="1.5"/>
+        <text x="8" y="-3" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="white" text-anchor="middle">+</text>
+
+        <circle cx="-5" cy="5" r="14" fill="#f43f5e" stroke="#be123c" stroke-width="1.5"/>
+        <text x="-5" y="14" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="white" text-anchor="middle">+</text>
+
+        <circle cx="14" cy="-3" r="14" fill="#f43f5e" stroke="#be123c" stroke-width="1.5"/>
+        <text x="14" y="6" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="white" text-anchor="middle">+</text>
+      </g>
+
+      <!-- Labels -->
+      <!-- Electron -->
+      <line x1="150" y1="140" x2="80" y2="90" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="75" y="80" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#1d4ed8">Electron (- negative charge)</text>
+
+      <!-- Proton -->
+      <line x1="308" y1="213" x2="480" y2="180" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="490" y="184" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#be123c">Proton (+ positive charge)</text>
+
+      <!-- Neutron -->
+      <line x1="312" y1="233" x2="480" y2="270" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="490" y="274" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#475569">Neutron (Neutral / no charge)</text>
+
+      <!-- Orbital Shell -->
+      <line x1="430" y1="200" x2="480" y2="100" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="490" y="104" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#6b21a8">Electron Orbit / Shell</text>
+
+      <!-- Title -->
+      <rect x="200" y="15" width="200" height="30" fill="white" rx="8" stroke="#d8b4fe" stroke-width="1"/>
+      <text x="300" y="35" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#6b21a8" text-anchor="middle">STRUCTURE OF AN ATOM</text>
+    </svg>`;
+  }
+  if (normalized.includes("circuit") || normalized.includes("ohm") || normalized.includes("physics")) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
+      <rect width="600" height="450" fill="#f8fafc" rx="16"/>
+      
+      <!-- Wires / circuit loop outline -->
+      <rect x="150" y="100" width="300" height="250" fill="none" stroke="#334155" stroke-width="4"/>
+
+      <!-- Battery on left wire -->
+      <g transform="translate(150, 225)">
+        <line x1="0" y1="-30" x2="0" y2="30" stroke="#334155" stroke-width="4"/>
+        <line x1="-20" y1="-15" x2="20" y2="-15" stroke="#0f172a" stroke-width="6"/>
+        <line x1="-10" y1="-5" x2="10" y2="-5" stroke="#0f172a" stroke-width="3"/>
+        <line x1="-20" y1="5" x2="20" y2="5" stroke="#0f172a" stroke-width="6"/>
+        <line x1="-10" y1="15" x2="10" y2="15" stroke="#0f172a" stroke-width="3"/>
+        <text x="30" y="-15" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#0f172a">+</text>
+        <text x="30" y="15" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#0f172a">-</text>
+        <text x="-50" y="5" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0284c7">Battery (V)</text>
+      </g>
+
+      <!-- Resistor on top wire (zigzag) -->
+      <g transform="translate(300, 100)">
+        <rect x="-40" y="-15" width="80" height="30" fill="#fed7aa" stroke="#ea580c" stroke-width="3" rx="4"/>
+        <line x1="-40" y1="0" x2="40" y2="0" stroke="#ea580c" stroke-width="2" stroke-dasharray="8 4"/>
+        <text x="0" y="5" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#ea580c" text-anchor="middle">Resistor (R)</text>
+      </g>
+
+      <!-- Switch on bottom wire -->
+      <g transform="translate(300, 350)">
+        <circle cx="-30" cy="0" r="6" fill="#334155"/>
+        <circle cx="30" cy="0" r="6" fill="#334155"/>
+        <line x1="-30" y1="0" x2="20" y2="-20" stroke="#334155" stroke-width="4" stroke-linecap="round"/>
+        <text x="0" y="25" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#334155" text-anchor="middle">Open Switch</text>
+      </g>
+
+      <!-- Ammeter on right wire -->
+      <g transform="translate(450, 225)">
+        <circle cx="0" cy="0" r="22" fill="#e0f2fe" stroke="#0284c7" stroke-width="3"/>
+        <text x="0" y="5" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#0369a1" text-anchor="middle">A</text>
+        <text x="40" y="5" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0369a1">Ammeter</text>
+      </g>
+
+      <!-- Title -->
+      <rect x="15" y="15" width="250" height="30" fill="white" rx="8" stroke="#cbd5e1" stroke-width="1"/>
+      <text x="25" y="35" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#1e293b">SCHEMATIC CIRCUIT DIAGRAM</text>
+    </svg>`;
+  }
+  const cleanTitle = prompt.replace(/[#*`_-]/g, "").trim().substring(0, 35) || "Custom Concept";
+  const normalizedLower = cleanTitle.toLowerCase();
+  const nodes = [
+    { id: "1", name: "Core Structure", desc: `Basic structural components of ${cleanTitle}` },
+    { id: "2", name: "Primary Function", desc: `The active biological, chemical or physical role` },
+    { id: "3", name: "System Mechanism", desc: `How it interacts with surrounding processes` },
+    { id: "4", name: "Practical Application", desc: `Real-world experiment or standard exam focus` }
+  ];
+  if (normalizedLower.includes("photosynthesis")) {
+    nodes[0] = { id: "1", name: "Light Absorption", desc: "Chlorophyll absorbs red/blue light energy" };
+    nodes[1] = { id: "2", name: "Water Splitting", desc: "Photolysis of H2O releases oxygen gas" };
+    nodes[2] = { id: "3", name: "Carbon Fixation", desc: "CO2 is captured in the Calvin cycle" };
+    nodes[3] = { id: "4", name: "Glucose Synthesis", desc: "High-energy sugars stored as starch" };
+  } else if (normalizedLower.includes("respiration")) {
+    nodes[0] = { id: "1", name: "Glycolysis", desc: "Glucose split into pyruvate in cytosol" };
+    nodes[1] = { id: "2", name: "Krebs Cycle", desc: "Acetyl-CoA oxidized, releasing CO2" };
+    nodes[2] = { id: "3", name: "Electron Transport", desc: "Proton gradient drives ATP synthesis" };
+    nodes[3] = { id: "4", name: "Energy Output", desc: "Cells harvest approx 36 ATP molecules" };
+  } else if (normalizedLower.includes("atom") || normalizedLower.includes("element") || normalizedLower.includes("structure")) {
+    nodes[0] = { id: "1", name: "Protons & Neutrons", desc: "Heavy subatomic particles inside nucleus" };
+    nodes[1] = { id: "2", name: "Electron Orbitals", desc: "Negative charge clouds orbiting shell" };
+    nodes[2] = { id: "3", name: "Valence Shell", desc: "Outer electrons determining bonding" };
+    nodes[3] = { id: "4", name: "Atomic Mass", desc: "Sum of protons/neutrons in nucleus" };
+  } else if (normalizedLower.includes("brain") || normalizedLower.includes("nervous")) {
+    nodes[0] = { id: "1", name: "Cerebrum", desc: "Handles conscious thought and memory" };
+    nodes[1] = { id: "2", name: "Cerebellum", desc: "Coordinates balance and posture" };
+    nodes[2] = { id: "3", name: "Brain Stem", desc: "Controls autonomic heart rate & breath" };
+    nodes[3] = { id: "4", name: "Neural Pathways", desc: "Transmits impulses via spinal cord" };
+  } else if (normalizedLower.includes("volcano") || normalizedLower.includes("earth") || normalizedLower.includes("geography")) {
+    nodes[0] = { id: "1", name: "Magma Chamber", desc: "Deep reservoir of molten rock under crust" };
+    nodes[1] = { id: "2", name: "Conduit Vent", desc: "Pipe-like shaft carrying lava upwards" };
+    nodes[2] = { id: "3", name: "Crater Opening", desc: "Bowl-shaped depression at summit" };
+    nodes[3] = { id: "4", name: "Eruption Column", desc: "Searing ash cloud and molten lava flow" };
+  } else if (normalizedLower.includes("digestive") || normalizedLower.includes("food") || normalizedLower.includes("stomach")) {
+    nodes[0] = { id: "1", name: "Ingestion", desc: "Food broken down by teeth & salivary enzymes" };
+    nodes[1] = { id: "2", name: "Digestion", desc: "Acidic breakdown of proteins in stomach" };
+    nodes[2] = { id: "3", name: "Absorption", desc: "Nutrient uptake through small intestine villi" };
+    nodes[3] = { id: "4", name: "Elimination", desc: "Removal of solid waste via large intestine" };
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 520" width="100%" height="100%">
+    <defs>
+      <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+        <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.05" />
+      </filter>
+      <marker id="arrow-marker" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#6366f1"/>
+      </marker>
+      <linearGradient id="central-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#e0e7ff"/>
+        <stop offset="100%" stop-color="#e0f2fe"/>
+      </linearGradient>
+    </defs>
+
+    <!-- Canvas Background -->
+    <rect width="100%" height="100%" fill="#f8fafc" rx="16"/>
+    
+    <!-- Connection lines -->
+    <path d="M 180 140 L 290 220" fill="none" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#arrow-marker)"/>
+    <path d="M 570 140 L 460 220" fill="none" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#arrow-marker)"/>
+    <path d="M 375 300 L 180 380" fill="none" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#arrow-marker)"/>
+    <path d="M 375 300 L 570 380" fill="none" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#arrow-marker)"/>
+
+    <!-- Central Topic card -->
+    <rect x="225" y="210" width="300" height="100" rx="20" fill="url(#central-bg)" stroke="#4f46e5" stroke-width="3.5" filter="url(#shadow)" />
+    <text x="375" y="255" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="900" fill="#1e1b4b" text-anchor="middle" letter-spacing="-0.5px">${cleanTitle.toUpperCase()}</text>
+    <text x="375" y="278" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="extrabold" fill="#4f46e5" text-anchor="middle" letter-spacing="1.5px">DYNAMIC ACADEMIC STUDY DIAGRAM</text>
+
+    <!-- Node 1 (Top Left) -->
+    <rect x="30" y="80" width="200" height="76" rx="14" fill="#f0fdf4" stroke="#22c55e" stroke-width="2" filter="url(#shadow)"/>
+    <text x="130" y="110" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="900" fill="#14532d" text-anchor="middle">${nodes[0].name}</text>
+    <text x="130" y="128" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="#166534" text-anchor="middle">${nodes[0].desc}</text>
+
+    <!-- Node 2 (Top Right) -->
+    <rect x="520" y="80" width="200" height="76" rx="14" fill="#eff6ff" stroke="#3b82f6" stroke-width="2" filter="url(#shadow)"/>
+    <text x="620" y="110" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="900" fill="#1e3a8a" text-anchor="middle">${nodes[1].name}</text>
+    <text x="620" y="128" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="#1e40af" text-anchor="middle">${nodes[1].desc}</text>
+
+    <!-- Node 3 (Bottom Left) -->
+    <rect x="30" y="360" width="200" height="76" rx="14" fill="#fff7ed" stroke="#f97316" stroke-width="2" filter="url(#shadow)"/>
+    <text x="130" y="390" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="900" fill="#7c2d12" text-anchor="middle">${nodes[2].name}</text>
+    <text x="130" y="408" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="#9a3412" text-anchor="middle">${nodes[2].desc}</text>
+
+    <!-- Node 4 (Bottom Right) -->
+    <rect x="520" y="360" width="200" height="76" rx="14" fill="#fdf2f8" stroke="#ec4899" stroke-width="2" filter="url(#shadow)"/>
+    <text x="620" y="390" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="900" fill="#831843" text-anchor="middle">${nodes[3].name}</text>
+    <text x="620" y="408" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="#9d174d" text-anchor="middle">${nodes[3].desc}</text>
+
+    <!-- Title Card -->
+    <g id="title-card">
+      <rect x="25" y="22" width="700" height="42" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" rx="10" filter="url(#shadow)"/>
+      <text x="45" y="48" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="950" fill="#0f172a" letter-spacing="-0.5px">${cleanTitle.toUpperCase()}</text>
+      <rect x="585" y="31" width="125" height="24" rx="6" fill="#f1f5f9" />
+      <text x="647" y="46" font-family="system-ui, sans-serif" font-size="8.5" font-weight="extrabold" fill="#475569" text-anchor="middle">\u{1F6E1}\uFE0F OFFLINE SAFE</text>
+    </g>
+  </svg>`;
+}
+function getNodeColors(colorName, theme) {
+  const defaultColors = {
+    fill: "#ffffff",
+    stroke: "#94a3b8",
+    title: "#334155",
+    desc: "#64748b"
+  };
+  const palettes = {
+    textbook: {
+      indigo: { fill: "#f0f2fe", stroke: "#6366f1", title: "#312e81", desc: "#4338ca" },
+      emerald: { fill: "#ecfdf5", stroke: "#10b981", title: "#064e3b", desc: "#047857" },
+      amber: { fill: "#fffbeb", stroke: "#f59e0b", title: "#78350f", desc: "#b45309" },
+      sky: { fill: "#f0f9ff", stroke: "#0ea5e9", title: "#0c4a6e", desc: "#0369a1" },
+      rose: { fill: "#fff1f2", stroke: "#f43f5e", title: "#4c0519", desc: "#be123c" },
+      violet: { fill: "#faf5ff", stroke: "#a855f7", title: "#3b0764", desc: "#7e22ce" },
+      teal: { fill: "#f0fdfa", stroke: "#14b8a6", title: "#115e59", desc: "#0f766e" }
+    },
+    blueprint: {
+      indigo: { fill: "#0a1d37", stroke: "#4f46e5", title: "#ffffff", desc: "#93c5fd" },
+      emerald: { fill: "#0a261f", stroke: "#10b981", title: "#ffffff", desc: "#86efac" },
+      amber: { fill: "#211a0d", stroke: "#f59e0b", title: "#ffffff", desc: "#fde047" },
+      sky: { fill: "#051f33", stroke: "#0ea5e9", title: "#ffffff", desc: "#7dd3fc" },
+      rose: { fill: "#290c12", stroke: "#f43f5e", title: "#ffffff", desc: "#fda4af" },
+      violet: { fill: "#1a0b2e", stroke: "#a855f7", title: "#ffffff", desc: "#d8b4fe" },
+      teal: { fill: "#05221e", stroke: "#14b8a6", title: "#ffffff", desc: "#99f6e4" }
+    },
+    chalkboard: {
+      indigo: { fill: "rgba(255,255,255,0.05)", stroke: "#a5b4fc", title: "#e0e7ff", desc: "#c7d2fe" },
+      emerald: { fill: "rgba(255,255,255,0.05)", stroke: "#6ee7b7", title: "#ecfdf5", desc: "#a7f3d0" },
+      amber: { fill: "rgba(255,255,255,0.05)", stroke: "#fde047", title: "#fef9c3", desc: "#fef08a" },
+      sky: { fill: "rgba(255,255,255,0.05)", stroke: "#7dd3fc", title: "#e0f2fe", desc: "#bae6fd" },
+      rose: { fill: "rgba(255,255,255,0.05)", stroke: "#fca5a5", title: "#ffe4e6", desc: "#fecdd3" },
+      violet: { fill: "rgba(255,255,255,0.05)", stroke: "#d8b4fe", title: "#faf5ff", desc: "#e9d5ff" },
+      teal: { fill: "rgba(255,255,255,0.05)", stroke: "#99f6e4", title: "#f0fdfa", desc: "#ccfbf1" }
+    },
+    pencil: {
+      indigo: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
+      emerald: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
+      amber: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
+      sky: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
+      rose: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
+      violet: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
+      teal: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" }
+    },
+    infographic: {
+      indigo: { fill: "#ffffff", stroke: "#6366f1", title: "#312e81", desc: "#4f46e5" },
+      emerald: { fill: "#ffffff", stroke: "#10b981", title: "#064e3b", desc: "#10b981" },
+      amber: { fill: "#ffffff", stroke: "#f59e0b", title: "#78350f", desc: "#d97706" },
+      sky: { fill: "#ffffff", stroke: "#0ea5e9", title: "#0c4a6e", desc: "#0284c7" },
+      rose: { fill: "#ffffff", stroke: "#f43f5e", title: "#4c0519", desc: "#e11d48" },
+      violet: { fill: "#ffffff", stroke: "#a855f7", title: "#3b0764", desc: "#9333ea" },
+      teal: { fill: "#ffffff", stroke: "#14b8a6", title: "#115e59", desc: "#0d9488" }
+    }
+  };
+  const themePalette = palettes[theme] || palettes.textbook;
+  return themePalette[colorName] || themePalette.indigo || defaultColors;
+}
+function buildSvgFromDiagramData(data, style, isPracticeMode) {
+  const title = data.title || "Study Diagram";
+  const subtitle = data.subtitle || "Concept Map";
+  const nodes = data.nodes || [];
+  const connections = data.connections || [];
+  const totalNodes = nodes.length;
+  const layout = data.layout || "central";
+  nodes.forEach((node, idx) => {
+    if (layout === "cycle") {
+      const angle = idx / totalNodes * 2 * Math.PI - Math.PI / 2;
+      node.x = 375 + Math.cos(angle) * 220;
+      node.y = 275 + Math.sin(angle) * 125;
+    } else if (layout === "flow") {
+      const colSpacing = 650 / (totalNodes || 1);
+      node.x = 50 + idx * colSpacing + colSpacing / 2;
+      node.y = 275 + (idx % 2 === 0 ? -60 : 60);
+    } else if (layout === "hierarchy") {
+      if (idx === 0) {
+        node.x = 375;
+        node.y = 130;
+      } else {
+        const remainingCount = totalNodes - 1;
+        const colSpacing = 650 / (remainingCount || 1);
+        node.x = 50 + (idx - 1) * colSpacing + colSpacing / 2;
+        node.y = 370;
       }
-    });
-    let imageUrl = null;
-    if (response.candidates?.[0]?.content?.parts) {
-      for (const part of response.candidates[0].content.parts) {
-        if (part.inlineData) {
-          imageUrl = `data:image/png;base64,${part.inlineData.data}`;
-          break;
-        }
+    } else if (layout === "split") {
+      const half = Math.ceil(totalNodes / 2);
+      if (idx < half) {
+        const rowSpacing = 320 / (half || 1);
+        node.x = 180;
+        node.y = 140 + idx * rowSpacing + rowSpacing / 2;
+      } else {
+        const rightIdx = idx - half;
+        const rightCount = totalNodes - half;
+        const rowSpacing = 320 / (rightCount || 1);
+        node.x = 570;
+        node.y = 140 + rightIdx * rowSpacing + rowSpacing / 2;
+      }
+    } else {
+      if (idx === 0) {
+        node.x = 375;
+        node.y = 275;
+      } else {
+        const remainingCount = totalNodes - 1;
+        const angle = (idx - 1) / remainingCount * 2 * Math.PI;
+        node.x = 375 + Math.cos(angle) * 220;
+        node.y = 275 + Math.sin(angle) * 125;
       }
     }
-    res.json({ imageUrl });
+  });
+  let bgFill = "#f8fafc";
+  let titleColor = "#0f172a";
+  let subtitleColor = "#475569";
+  let gridLines = "";
+  let lineColor = "#64748b";
+  let lineDash = "";
+  let cardShadow = 'filter="url(#shadow)"';
+  let cardRx = "14";
+  let arrowFill = "#64748b";
+  if (style === "blueprint") {
+    bgFill = "#0a132b";
+    titleColor = "#00e5ff";
+    subtitleColor = "#8ecae6";
+    lineColor = "#00b4d8";
+    arrowFill = "#00b4d8";
+    cardShadow = "";
+    cardRx = "4";
+    gridLines = `
+      <defs>
+        <pattern id="blueprint-grid" width="30" height="30" patternUnits="userSpaceOnUse">
+          <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#1c2541" stroke-width="0.5"/>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#blueprint-grid)" rx="16" />
+    `;
+  } else if (style === "chalkboard") {
+    bgFill = "#0f1d13";
+    titleColor = "#fef9c3";
+    subtitleColor = "#cbd5e1";
+    lineColor = "#a7f3d0";
+    arrowFill = "#a7f3d0";
+    cardShadow = "";
+    cardRx = "8";
+    lineDash = 'stroke-dasharray="4 4"';
+    gridLines = `
+      <path d="M 20 40 Q 300 15 700 40" fill="none" stroke="rgba(255,255,255,0.02)" stroke-width="2"/>
+      <path d="M 50 480 Q 400 450 720 470" fill="none" stroke="rgba(255,255,255,0.01)" stroke-width="1.5"/>
+    `;
+  } else if (style === "pencil") {
+    bgFill = "#ffffff";
+    titleColor = "#1e293b";
+    subtitleColor = "#475569";
+    lineColor = "#1e293b";
+    arrowFill = "#1e293b";
+    cardShadow = "";
+    cardRx = "0";
+  } else if (style === "infographic") {
+    bgFill = "url(#info-bg)";
+    titleColor = "#1e1b4b";
+    subtitleColor = "#4338ca";
+    lineColor = "#cbd5e1";
+    arrowFill = "#cbd5e1";
+    gridLines = `
+      <defs>
+        <linearGradient id="info-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#faf5ff"/>
+          <stop offset="100%" stop-color="#eff6ff"/>
+        </linearGradient>
+      </defs>
+    `;
+  }
+  let svgHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 520" width="100%" height="100%">
+    <defs>
+      <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+        <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.05" />
+      </filter>
+      <marker id="arrow-marker" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="${arrowFill}"/>
+      </marker>
+    </defs>
+
+    <!-- Canvas Background -->
+    <rect width="100%" height="100%" fill="${bgFill}" rx="16"/>
+    ${gridLines}
+
+    <!-- Connection Lines / Arrows -->
+    <g id="connections">
+  `;
+  connections.forEach((conn) => {
+    const fromNode = nodes.find((n) => String(n.id) === String(conn.from));
+    const toNode = nodes.find((n) => String(n.id) === String(conn.to));
+    if (fromNode && toNode) {
+      const dx = toNode.x - fromNode.x;
+      const dy = toNode.y - fromNode.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const ratioStart = 50 / dist;
+      const ratioEnd = 58 / dist;
+      const startX = fromNode.x + dx * ratioStart;
+      const startY = fromNode.y + dy * ratioStart;
+      const endX = toNode.x - dx * ratioEnd;
+      const endY = toNode.y - dy * ratioEnd;
+      svgHtml += `
+        <path d="M ${startX} ${startY} L ${endX} ${endY}" fill="none" stroke="${lineColor}" stroke-width="2" ${lineDash} marker-end="url(#arrow-marker)"/>
+      `;
+      if (conn.label) {
+        const midX = (startX + endX) / 2;
+        const midY = (startY + endY) / 2;
+        const pillBg = style === "blueprint" ? "#1c2541" : style === "chalkboard" ? "#1e293b" : "#ffffff";
+        const pillText = style === "blueprint" ? "#8ecae6" : style === "chalkboard" ? "#a7f3d0" : "#475569";
+        const pillBorder = style === "blueprint" ? "#00b4d8" : style === "chalkboard" ? "none" : "#e2e8f0";
+        svgHtml += `
+          <g>
+            <rect x="${midX - 60}" y="${midY - 10}" width="120" height="20" rx="4" fill="${pillBg}" stroke="${pillBorder}" stroke-width="0.5"/>
+            <text x="${midX}" y="${midY + 4}" font-family="system-ui, sans-serif" font-size="9" fill="${pillText}" text-anchor="middle" font-weight="bold">${conn.label}</text>
+          </g>
+        `;
+      }
+    }
+  });
+  svgHtml += `</g>
+<g id="nodes">`;
+  nodes.forEach((node, idx) => {
+    const colors = getNodeColors(node.color || "indigo", style);
+    const cardW = 166;
+    const cardH = 76;
+    const rx = node.x - cardW / 2;
+    const ry = node.y - cardH / 2;
+    svgHtml += `
+      <!-- Node Card ${node.id} -->
+      <g id="node-${node.id}">
+        <rect x="${rx}" y="${ry}" width="${cardW}" height="${cardH}" rx="${cardRx}" fill="${colors.fill}" stroke="${colors.stroke}" stroke-width="2" ${cardShadow}/>
+    `;
+    if (style === "infographic") {
+      svgHtml += `
+        <rect x="${rx}" y="${ry}" width="6" height="${cardH}" rx="3" fill="${colors.stroke}" />
+      `;
+    }
+    if (isPracticeMode) {
+      const badgeR = 14;
+      const badgeY = ry + 24;
+      svgHtml += `
+        <!-- Self-Test Blank Badge -->
+        <circle cx="${node.x}" cy="${badgeY}" r="${badgeR}" fill="${colors.stroke}" />
+        <text x="${node.x}" y="${badgeY + 4}" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="extrabold" fill="#ffffff" text-anchor="middle">${idx + 1}</text>
+        
+        <!-- Part Description -->
+        <text x="${node.x}" y="${ry + 54}" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="${colors.desc}" text-anchor="middle" font-weight="medium">${node.description || "Identify this component"}</text>
+      `;
+    } else {
+      let displayName = node.name || "Component";
+      if (displayName.length > 22) {
+        displayName = displayName.substring(0, 20) + "...";
+      }
+      let descLine1 = node.description || "";
+      let descLine2 = "";
+      if (descLine1.length > 32) {
+        const words = descLine1.split(" ");
+        let buildLine = "";
+        let breakIndex = 0;
+        for (let i = 0; i < words.length; i++) {
+          if ((buildLine + " " + words[i]).length > 30) {
+            breakIndex = i;
+            break;
+          }
+          buildLine += (i === 0 ? "" : " ") + words[i];
+        }
+        descLine1 = buildLine;
+        descLine2 = words.slice(breakIndex).join(" ");
+        if (descLine2.length > 32) {
+          descLine2 = descLine2.substring(0, 29) + "...";
+        }
+      }
+      svgHtml += `
+        <!-- Part Name -->
+        <text x="${node.x}" y="${ry + 26}" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="extrabold" fill="${colors.title}" text-anchor="middle">${displayName}</text>
+        
+        <!-- Part Description Line 1 -->
+        <text x="${node.x}" y="${ry + 44}" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="${colors.desc}" text-anchor="middle">${descLine1}</text>
+      `;
+      if (descLine2) {
+        svgHtml += `
+          <!-- Part Description Line 2 -->
+          <text x="${node.x}" y="${ry + 56}" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="${colors.desc}" text-anchor="middle">${descLine2}</text>
+        `;
+      }
+    }
+    svgHtml += `</g>`;
+  });
+  const titleBg = style === "blueprint" ? "#101b35" : style === "chalkboard" ? "#0f1d13" : "#ffffff";
+  const titleBorder = style === "blueprint" ? "#00b4d8" : style === "chalkboard" ? "#a7f3d0" : "#e2e8f0";
+  const titleBorderW = style === "chalkboard" ? "0" : "1";
+  svgHtml += `
+    </g>
+    
+    <!-- Title Card -->
+    <g id="title-card">
+      <rect x="25" y="22" width="700" height="52" fill="${titleBg}" stroke="${titleBorder}" stroke-width="${titleBorderW}" rx="10" ${cardShadow}/>
+      <text x="50" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="900" fill="${titleColor}" letter-spacing="-0.5px">${title.toUpperCase()}</text>
+      <text x="50" y="61" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="bold" fill="${subtitleColor}" opacity="0.85">${subtitle.toUpperCase()}</text>
+  `;
+  if (isPracticeMode) {
+    svgHtml += `
+      <rect x="525" y="32" width="175" height="30" rx="6" fill="#e11d48" />
+      <text x="612" y="50" font-family="system-ui, sans-serif" font-size="10" font-weight="extrabold" fill="#ffffff" text-anchor="middle">\u{1F9E0} SELF-TEST ACTIVE</text>
+    `;
+  } else {
+    const badgeText = `\u{1F3A8} ${style.toUpperCase()} VIEW`;
+    const badgeFill = style === "blueprint" ? "#003566" : style === "chalkboard" ? "#143a22" : "#f1f5f9";
+    const badgeTextCol = style === "blueprint" ? "#00f5ff" : style === "chalkboard" ? "#a7f3d0" : "#475569";
+    svgHtml += `
+      <rect x="575" y="32" width="125" height="30" rx="6" fill="${badgeFill}" />
+      <text x="637" y="50" font-family="system-ui, sans-serif" font-size="9" font-weight="extrabold" fill="${badgeTextCol}" text-anchor="middle">${badgeText}</text>
+    `;
+  }
+  svgHtml += `
+    </g>
+  </svg>`;
+  return svgHtml;
+}
+app.post("/api/gemini/diagram", async (req, res) => {
+  const { prompt, type } = req.body;
+  const promptLower = (prompt || "").toLowerCase();
+  let selectedStyle = "textbook";
+  if (promptLower.includes("blueprint")) {
+    selectedStyle = "blueprint";
+  } else if (promptLower.includes("chalkboard")) {
+    selectedStyle = "chalkboard";
+  } else if (promptLower.includes("pencil")) {
+    selectedStyle = "pencil";
+  } else if (promptLower.includes("infographic")) {
+    selectedStyle = "infographic";
+  }
+  const isPracticeMode = promptLower.includes("blank self-test practice") || promptLower.includes("\u2460") || promptLower.includes("practice mode");
+  if (type === "image") {
+    try {
+      const ai = getGeminiClient();
+      console.log(`[Gemini Bridge] Generating rich educational illustration for: "${prompt}" using image model.`);
+      const response = await callGeminiWithRetryAndFailover(ai, {
+        model: "gemini-3.1-flash-lite-image",
+        contents: [{ text: `A highly detailed, beautiful, textbook-grade full-color graphic educational diagram or illustration showing: ${prompt}. High-contrast academic illustration, clear markings, rich 3D texture, suitable for scientific learning, solid clean neutral background.` }],
+        config: {
+          imageConfig: {
+            aspectRatio: "1:1"
+          }
+        }
+      });
+      let imageUrl = null;
+      if (response.candidates?.[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            imageUrl = `data:image/png;base64,${part.inlineData.data}`;
+            break;
+          }
+        }
+      }
+      if (imageUrl) {
+        return res.json({ imageUrl, isSvg: false });
+      }
+    } catch (imageErr) {
+      console.warn("[Gemini Bridge] Direct image generation failed, falling back to SVG schema path...", imageErr.message || imageErr);
+    }
+  }
+  try {
+    const ai = getGeminiClient();
+    const jsonPrompt = `You are an expert academic illustrator and curriculum designer.
+    Analyze the following topic and create a comprehensive, clean, structured educational conceptual diagram: "${prompt}".
+    
+    Generate a JSON response that breaks down this diagram into specific nodes (labeled parts) and connections (flows/cycles/relationships) that are highly educational.
+    
+    Return ONLY valid JSON with the following structure:
+    {
+      "title": "Clear, concise academic title of the diagram",
+      "subtitle": "Brief subtitle explaining the visual structure",
+      "layout": "cycle" | "flow" | "central" | "hierarchy" | "split",
+      "nodes": [
+        {
+          "id": "1",
+          "name": "Name of part/step (e.g. Evaporation, Mitochondria, Crust)",
+          "description": "Short, clear 1-sentence educational purpose or definition of this component",
+          "color": "indigo" | "emerald" | "amber" | "sky" | "rose" | "violet" | "teal"
+        }
+      ],
+      "connections": [
+        {
+          "from": "node_id_1",
+          "to": "node_id_2",
+          "label": "Action/flow description (e.g. 'Heated by sun', 'Synthesizes ATP')"
+        }
+      ]
+    }
+    
+    Rules:
+    - Use "cycle" layout for repeating circular processes (e.g. water cycles, life cycles).
+    - Use "flow" layout for sequential step-by-step processes, pathways, or timelines.
+    - Use "central" or "hierarchy" layout for structural components or parts listing.
+    - Keep descriptions clear, concise, and highly informative.`;
+    const jsonResponse = await callGeminiWithRetryAndFailover(ai, {
+      model: "gemini-3.5-flash",
+      contents: jsonPrompt,
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+    let rawText = jsonResponse.text || "";
+    rawText = rawText.trim();
+    if (rawText.startsWith("```")) {
+      rawText = rawText.replace(/^```[a-zA-Z]*\n/, "").replace(/\n```$/, "").trim();
+    }
+    const data = JSON.parse(rawText);
+    if (data && data.nodes && data.nodes.length > 0) {
+      const svgCode = buildSvgFromDiagramData(data, selectedStyle, isPracticeMode);
+      const base64Svg = Buffer.from(svgCode).toString("base64");
+      const imageUrl = `data:image/svg+xml;base64,${base64Svg}`;
+      return res.json({ imageUrl, isSvg: true });
+    } else {
+      throw new Error("Parsed JSON did not contain valid diagram nodes.");
+    }
   } catch (err) {
-    console.warn("Gemini diagram error (returning null gracefully):", err.message || err);
-    handleRouteError(res, err);
-    res.json({ imageUrl: null });
+    console.warn("[Gemini Bridge] Primary JSON Diagram path failed or rate-limited. Trying standard text-to-SVG direct fallback...", err.message || err);
+    try {
+      const ai = getGeminiClient();
+      const svgPrompt = `You are an expert educational designer. Create a beautiful, detailed, neat, textbook-grade academic vector SVG diagram/illustration for: "${prompt}".
+      
+      Requirements:
+      1. MUST be a valid, standalone <svg> element with viewBox="0 0 600 450" and width="100%" height="100%".
+      2. Use a modern, ultra-clean design: soft background, precise vector shapes (rects, circles, paths), elegant colors (indigo, slate, sky, emerald), and clear, clean leader lines/arrows pointing to labels.
+      3. Include prominent, highly readable, clear textbook labels for all major parts of the diagram using <text> elements (font-family="system-ui, -apple-system, sans-serif" and proper sizing/contrast).
+      4. Make it highly detailed, professional, and visually appealing.
+      5. Output ONLY the raw SVG code. No markdown formatting (like \`\`\`xml or \`\`\`svg), no leading/trailing commentary, no explanations. It must start with <svg and end with </svg>.`;
+      const svgResponse = await callGeminiWithRetryAndFailover(ai, {
+        model: "gemini-3.1-flash-lite",
+        contents: svgPrompt
+      });
+      let svgCode = svgResponse.text || "";
+      svgCode = svgCode.trim();
+      if (svgCode.startsWith("```")) {
+        svgCode = svgCode.replace(/^```[a-zA-Z]*\n/, "").replace(/\n```$/, "").trim();
+      }
+      if (svgCode.includes("<svg")) {
+        const base64Svg = Buffer.from(svgCode).toString("base64");
+        const imageUrl = `data:image/svg+xml;base64,${base64Svg}`;
+        return res.json({ imageUrl, isSvg: true });
+      } else {
+        throw new Error("Raw SVG fallback did not produce a valid svg tag.");
+      }
+    } catch (svgErr) {
+      console.warn("[Gemini Bridge] SVG fallback also failed. Trying standard image model fallback...", svgErr.message || svgErr);
+      try {
+        const ai = getGeminiClient();
+        const response = await callGeminiWithRetryAndFailover(ai, {
+          model: "gemini-3.1-flash-lite-image",
+          contents: [{ text: `Educational diagram or illustration for: ${prompt}. Clear, academic style, labeled if necessary.` }],
+          config: {
+            imageConfig: {
+              aspectRatio: "1:1"
+            }
+          }
+        });
+        let imageUrl = null;
+        if (response.candidates?.[0]?.content?.parts) {
+          for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData) {
+              imageUrl = `data:image/png;base64,${part.inlineData.data}`;
+              break;
+            }
+          }
+        }
+        if (imageUrl) {
+          return res.json({ imageUrl, isSvg: false });
+        } else {
+          throw new Error("No inline data returned from fallback image model.");
+        }
+      } catch (imgErr) {
+        console.warn("[Gemini Bridge] Image fallback failed. Generating guaranteed local SVG template...", imgErr.message || imgErr);
+      }
+    }
+  }
+  try {
+    const fallbackSvg = generateGuaranteedLocalSvg(prompt);
+    const base64Svg = Buffer.from(fallbackSvg).toString("base64");
+    res.json({ imageUrl: `data:image/svg+xml;base64,${base64Svg}`, isSvg: true });
+  } catch (localErr) {
+    console.error("[Gemini Bridge] Guaranteed local fallback SVG conversion failed:", localErr.message || localErr);
+    res.status(500).json({ error: "Failed to generate any diagram." });
   }
 });
 app.post("/api/gemini/notes-generator", async (req, res) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import { 
   Sparkles, BrainCircuit, GraduationCap, Clock, FileText, Calculator, 
   BookOpen, Search, Volume2, VolumeX, Play, Pause, RotateCcw, 
@@ -35,7 +35,7 @@ interface InteractiveToolkitProps {
   onOpenDiagramMaker?: (prompt: string, title: string, subject: Subject) => void;
 }
 
-export default function InteractiveToolkit({ 
+const InteractiveToolkit = memo(function InteractiveToolkit({ 
   onClose, 
   appLanguage, 
   firebaseUser, 
@@ -1913,4 +1913,6 @@ export default function InteractiveToolkit({
 
     </div>
   );
-}
+});
+
+export default InteractiveToolkit;

@@ -261,3 +261,34 @@
   border-color: rgba(232, 121, 249, 0.18) !important;
 }
 
+/* ==========================================================
+   PERFORMANCE & SMOOTHNESS OPTIMIZATIONS (Anti-Lag Engine)
+   ========================================================== */
+
+/* Force GPU rendering path for interactive and animated components */
+.gpu-layer {
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  will-change: transform, opacity;
+}
+
+/* Optimize rendering of off-screen list elements (Leaderboards, Group Chats, Notes List) */
+.lazy-render {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 120px; /* Guessing average height of cards */
+}
+
+/* Smooth kinetic scrolling for iOS/Android WebView wrapper clients */
+.smooth-scroll {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Optimizes paint times for images and icons */
+.optimize-paint {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  transform: translateZ(0);
+}
+

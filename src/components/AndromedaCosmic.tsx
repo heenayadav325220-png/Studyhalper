@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Rocket, Cpu, Sparkles, BookOpen, Users, GraduationCap, X, Plus, Info, 
@@ -42,7 +42,7 @@ interface AndromedaCosmicProps {
   setAppTheme: (theme: string) => void;
 }
 
-export default function AndromedaCosmic({
+const AndromedaCosmic = memo(function AndromedaCosmic({
   user,
   setUser,
   appLanguage,
@@ -1212,4 +1212,6 @@ export default function AndromedaCosmic({
 
     </div>
   );
-}
+});
+
+export default AndromedaCosmic;

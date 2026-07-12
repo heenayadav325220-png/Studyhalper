@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import { 
   X, Paintbrush, Square, Circle as CircleIcon, Type, StickyNote, Eraser, 
   Trash2, Play, Pause, RotateCcw, MessageSquare, FileText, Users, 
@@ -26,7 +26,7 @@ interface StudyRoomProps {
   onClose: () => void;
 }
 
-export default function StudyRoom({ session, groupId, user, appLanguage, onClose }: StudyRoomProps) {
+const StudyRoom = memo(function StudyRoom({ session, groupId, user, appLanguage, onClose }: StudyRoomProps) {
   const isHindi = appLanguage === 'Hindi';
 
   // Navigation tabs: whiteboard, notes, chat
@@ -1066,4 +1066,6 @@ export default function StudyRoom({ session, groupId, user, appLanguage, onClose
       </main>
     </div>
   );
-}
+});
+
+export default StudyRoom;

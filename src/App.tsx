@@ -65,6 +65,7 @@ import { HomeworkSolver } from './components/HomeworkSolver';
 import { DiagramMaker } from './components/DiagramMaker';
 import StudyRoom from './components/StudyRoom';
 import { ProgressModalContent } from './components/ProgressModalContent';
+import { SplashScreen } from './components/SplashScreen';
 import AndromedaCosmic from './components/AndromedaCosmic';
 const InteractiveToolkit = lazy(() => import('./components/InteractiveToolkit'));
 import type { AppLanguage } from './services/translations';
@@ -648,22 +649,17 @@ export default function App() {
   const [splashProgress, setSplashProgress] = useState(0);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setSplashActive(false);
-    }, 1500);
-
     const interval = setInterval(() => {
       setSplashProgress(prev => {
         if (prev >= 100) {
           clearInterval(interval);
           return 100;
         }
-        return prev + 5;
+        return prev + 2; // slow down progress bar to sync beautifully over 3.5s duration
       });
     }, 70);
 
     return () => {
-      clearTimeout(timer);
       clearInterval(interval);
     };
   }, []);
@@ -3887,6 +3883,17 @@ export default function App() {
             : 'bg-slate-900 text-slate-800'
     } font-sans flex justify-center items-center overflow-hidden py-0 md:py-6 relative`} id="applet_canvas">
       
+      {/* Premium Full-Screen Dedicated Splash Screen overlay */}
+      <AnimatePresence>
+        {splashActive && (
+          <SplashScreen 
+            language={appLanguage} 
+            onComplete={() => setSplashActive(false)} 
+            duration={3800} 
+          />
+        )}
+      </AnimatePresence>
+
       {/* Background Ambience */}
       <div className={`absolute top-0 left-0 w-full h-full ${
         appTheme === 'andromeda'
@@ -4507,7 +4514,7 @@ export default function App() {
                   </div>
 
                   {/* Main Scrollable Navigation Links */}
-                  <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5 scrollbar-hide">
+                  <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5 scrollbar-hide smooth-scroll">
                     {/* Item 1: Diagram Maker */}
                     <button
                       onClick={() => {
@@ -4790,7 +4797,7 @@ export default function App() {
                 <>
                   {/* HOME SCREEN */}
                   {activeTab === 'home' && (
-                <div className="flex-1 overflow-y-auto p-4 space-y-4.5 scrollbar-hide">
+                <div className="flex-1 overflow-y-auto p-4 space-y-4.5 scrollbar-hide smooth-scroll">
                   
                   {/* Dashboard Welcome Header */}
                   <header className="flex flex-col space-y-2.5 bg-gradient-to-br from-indigo-50/70 via-purple-50/50 to-slate-50/10 p-4 rounded-2xl border border-indigo-100/45 shadow-sm" id="welcome_header">
@@ -5019,6 +5026,7 @@ export default function App() {
                         </div>
                       );
                     })()}
+                  </section>
 
                     {/* VIRTUAL STUDY COMPANION - CHIMPU'S ISLAND / FUTURISTIC AI CORE */}
                     <section className="bg-gradient-to-br from-indigo-500/10 via-slate-50/5 to-white dark:from-indigo-950/20 dark:via-slate-900/10 dark:to-slate-950 p-4 rounded-2xl border border-indigo-100/60 dark:border-indigo-900/30 shadow-sm space-y-3" id="study_pet_sanctuary">
@@ -5248,6 +5256,7 @@ export default function App() {
                         ))}
                       </div>
                     </div>
+                  </section>
                   {/* Active Buddies Online Row (Bring People Up!) */}
                   <section className="space-y-3" id="social_feed">
                     <div className="flex items-center justify-between">
@@ -6053,7 +6062,7 @@ export default function App() {
                     )}
 
                     {/* Chat messages queue */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-50" id="chat_scroll">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-50 smooth-scroll" id="chat_scroll">
                       {quotaExceeded && (
                         <div className="p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/85 rounded-2xl flex items-start gap-2.5 shadow-2xs select-none">
                           <span className="text-base shrink-0">⚠️</span>
@@ -6446,7 +6455,7 @@ export default function App() {
                       </header>
 
                       {/* Inner Group View Tabs */}
-                      <div className="flex-1 overflow-y-auto p-4 bg-slate-50" id="group_tab_pane">
+                      <div className="flex-1 overflow-y-auto p-4 bg-slate-50 smooth-scroll" id="group_tab_pane">
                         {groupTab === 'chat' && (
                           <div className="space-y-3.5">
                             {(groupMessages[activeGroup.id] || []).length === 0 ? (
@@ -6760,7 +6769,7 @@ export default function App() {
                   </div>
 
                   {/* Scrollable workspace core */}
-                  <div className="flex-1 overflow-y-auto scrollbar-hide pr-1" id="notebook_content">
+                  <div className="flex-1 overflow-y-auto scrollbar-hide pr-1 smooth-scroll" id="notebook_content">
                     {notebookTab === 'notes' && (
                       <div className="space-y-4 pt-1 pb-4">
                         {notes.map((note, idx) => {
@@ -7178,7 +7187,7 @@ export default function App() {
                     </span>
                   </header>
 
-                  <div className="flex-1 overflow-y-auto scrollbar-hide" id="quiz_feed">
+                  <div className="flex-1 overflow-y-auto scrollbar-hide smooth-scroll" id="quiz_feed">
                     {!quizSubject ? (
                       <>
                         {/* Difficulty Selector */}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { getStudyAnswer } from '../services/geminiService';
 import { AppLanguage, translate } from '../services/translations';
 import { User as UserType } from '../types';
@@ -9,7 +9,7 @@ interface Props {
   isTagMode: boolean;
 }
 
-export function HomeworkSolver({ user, language, isTagMode }: Props) {
+export const HomeworkSolver = memo(function HomeworkSolver({ user, language, isTagMode }: Props) {
   const [prompt, setPrompt] = useState('');
   const [answer, setAnswer] = useState('');
   const [loading, setLoading] = useState(false);
@@ -56,4 +56,4 @@ export function HomeworkSolver({ user, language, isTagMode }: Props) {
       )}
     </div>
   );
-}
+});

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { 
   Image as ImageIcon, 
   Paintbrush, 
@@ -74,7 +74,7 @@ const STYLES = [
   { id: "infographic", name: "Colorful Infographic", promptSuffix: "Minimalist, high-contrast, modern colorful infographic vectors with bold typography pointers." }
 ];
 
-export function DiagramMaker({ 
+export const DiagramMaker = memo(function DiagramMaker({ 
   user, 
   language, 
   isTagMode,
@@ -800,4 +800,4 @@ export function DiagramMaker({
       </div>
     </div>
   );
-}
+});

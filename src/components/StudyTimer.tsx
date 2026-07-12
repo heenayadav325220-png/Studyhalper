@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { Play, Pause, RotateCcw } from 'lucide-react';
 import { Subject } from '../types';
 import { AppLanguage, translate } from '../services/translations';
@@ -20,7 +20,7 @@ const SUBJECT_KEYS: Record<Subject, string> = {
   'English': 'subject_english'
 };
 
-export function StudyTimer({ isTagMode, language, onSessionComplete }: StudyTimerProps) {
+export const StudyTimer = memo(function StudyTimer({ isTagMode, language, onSessionComplete }: StudyTimerProps) {
   const [selectedSubject, setSelectedSubject] = useState<Subject>('Mathematics');
   const [seconds, setSeconds] = useState(25 * 60);
   const [isActive, setIsActive] = useState(false);
@@ -130,4 +130,4 @@ export function StudyTimer({ isTagMode, language, onSessionComplete }: StudyTime
       </div>
     </div>
   );
-}
+});

@@ -6,10 +6,12 @@ import { Server } from "socket.io";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import { FALLBACK_QUIZZES, getFallbackAnswer } from "./src/services/fallbackData";
-import DatabaseConstructor from "better-sqlite3";
 import { initializeApp as initAdminApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import fs from "fs";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
 
 dotenv.config();
 
@@ -42,6 +44,7 @@ if (process.env.VERCEL) {
   db = new MockDatabase();
 } else {
   try {
+    const DatabaseConstructor = require("better-sqlite3");
     db = new DatabaseConstructor("studybuddy.db");
     console.log("Successfully connected to SQLite database (studybuddy.db).");
     try {
