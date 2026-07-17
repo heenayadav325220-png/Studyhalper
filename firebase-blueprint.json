@@ -1,312 +1,238 @@
 {
   "entities": {
-    "User": {
-      "title": "User Profile",
-      "description": "Stores student profile information, points, level, and companion pet state.",
+    "user": {
+      "title": "User",
+      "description": "User profile with gamification stats, XP, streak, language and pet details",
       "type": "object",
       "properties": {
-        "uid": { "type": "string", "description": "The unique user authentication ID." },
-        "name": { "type": "string", "description": "Name of the student." },
-        "school": { "type": "string", "description": "School of the student." },
-        "className": { "type": "string", "description": "The grade or class level of the student." },
-        "points": { "type": "integer", "description": "Gamification points earned." },
-        "level": { "type": "integer", "description": "Current educational level." },
-        "avatar": { "type": "string", "description": "Elected emoji or icon avatar representing the student." },
-        "badges": { "type": "array", "description": "Array of unlocked achievement badges." },
-        "pet": { "type": "object", "description": "The state of the student's virtual companion pet." }
-      },
-      "required": ["uid", "name", "school", "className"]
-    },
-    "Note": {
-      "title": "Student Note",
-      "description": "A single personal notebook note.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string", "description": "Unique identifier of the note." },
-        "title": { "type": "string", "description": "Title of the note." },
-        "content": { "type": "string", "description": "Rich text or markdown content of the note." },
-        "subject": { "type": "string", "description": "Academic subject category of the note." },
-        "updated_at": { "type": "string", "format": "date-time", "description": "Last updated timestamp." },
-        "interval": { "type": "integer", "description": "Current spaced repetition review interval in days." },
-        "repetition": { "type": "integer", "description": "Consecutive successful spaced repetition reviews." },
-        "easeFactor": { "type": "number", "description": "Spaced repetition difficulty multiplier factor." },
-        "nextReviewDate": { "type": "string", "format": "date-time", "description": "Scheduled timestamp for the next review." },
-        "lastReviewedDate": { "type": "string", "format": "date-time", "description": "Timestamp when this note was last reviewed." }
-      },
-      "required": ["id", "title", "subject", "updated_at"]
-    },
-    "ScheduleItem": {
-      "title": "Schedule Planner Item",
-      "description": "An entry in the student's homework planner calendar.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string", "description": "Unique identifier of the task." },
-        "task": { "type": "string", "description": "Task or homework description." },
-        "time": { "type": "string", "description": "Time scheduled for the task." },
-        "day": { "type": "string", "description": "Day of the week scheduled." },
-        "completed": { "type": "boolean", "description": "Completion flag." }
-      },
-      "required": ["id", "task", "time", "day", "completed"]
-    },
-    "ProgressEntry": {
-      "title": "Quiz Performance Log",
-      "description": "Records student practice quiz results to track progress.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "subject": { "type": "string" },
-        "score": { "type": "integer" },
-        "total": { "type": "integer" },
-        "date": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "subject", "score", "total", "date"]
-    },
-    "StudyDiagram": {
-      "title": "Study Diagram",
-      "description": "An AI-generated academic diagram or illustration saved by the user.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string", "description": "Unique identifier of the saved diagram." },
-        "title": { "type": "string", "description": "Title of the diagram." },
-        "prompt": { "type": "string", "description": "AI prompt used to generate this diagram." },
-        "imageUrl": { "type": "string", "description": "The base64 encoded png image data url." },
-        "explanation": { "type": "string", "description": "AI explanation and study points for the diagram." },
-        "subject": { "type": "string", "description": "Academic subject category of the diagram." },
-        "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp." }
-      },
-      "required": ["id", "title", "imageUrl", "created_at"]
-    },
-    "StudyGroup": {
-      "title": "Study Group",
-      "description": "A collaborative study group created by a student.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "description": { "type": "string" },
-        "created_by": { "type": "string" },
-        "created_at": { "type": "string", "format": "date-time" },
-        "subject": { "type": "string", "description": "Subject category of the study group." },
-        "course": { "type": "string", "description": "Specific course or class name." }
-      },
-      "required": ["id", "name", "created_by", "created_at"]
-    },
-    "GroupQuestion": {
-      "title": "Group Question",
-      "description": "A question posted to the group, which can receive answers/comments.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "title": { "type": "string" },
-        "content": { "type": "string" },
-        "asked_by": { "type": "string" },
-        "asked_by_name": { "type": "string" },
-        "created_at": { "type": "string", "format": "date-time" },
-        "answers": {
-          "type": "array",
-          "description": "Array of answers posted by other members."
+        "uid": {
+          "type": "string",
+          "description": "Unique user ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the user"
+        },
+        "xp": {
+          "type": "integer",
+          "description": "Total XP earned"
+        },
+        "level": {
+          "type": "integer",
+          "description": "Current student level"
+        },
+        "streak": {
+          "type": "integer",
+          "description": "Consecutive study days streak"
+        },
+        "petLevel": {
+          "type": "integer",
+          "description": "Current pet companion level"
+        },
+        "petXp": {
+          "type": "integer",
+          "description": "Current pet companion XP"
+        },
+        "petName": {
+          "type": "string",
+          "description": "Name of the study pet companion"
+        },
+        "language": {
+          "type": "string",
+          "description": "UI language preference (en or hi)"
+        },
+        "lastActive": {
+          "type": "string",
+          "description": "ISO string of last activity timestamp"
         }
       },
-      "required": ["id", "title", "content", "asked_by", "asked_by_name", "created_at"]
+      "required": ["uid", "name", "xp", "level", "streak", "petLevel", "petXp", "petName", "language", "lastActive"]
     },
-    "GroupSession": {
-      "title": "Group Study Session",
-      "description": "A scheduled virtual study session with RSVP capabilities.",
+    "chatMessage": {
+      "title": "ChatMessage",
+      "description": "Real-time group chat messages for study collaboration",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "title": { "type": "string" },
-        "topic": { "type": "string" },
-        "date": { "type": "string" },
-        "time": { "type": "string" },
-        "duration": { "type": "integer" },
-        "meeting_platform": { "type": "string" },
-        "meeting_link": { "type": "string" },
-        "created_by": { "type": "string" },
-        "created_by_name": { "type": "string" },
-        "created_at": { "type": "string", "format": "date-time" },
-        "rsvps": {
-          "type": "array",
-          "description": "Attendee status markers."
+        "id": {
+          "type": "string",
+          "description": "Unique message ID"
+        },
+        "roomId": {
+          "type": "string",
+          "description": "Study room identifier"
+        },
+        "senderId": {
+          "type": "string",
+          "description": "Sender user ID"
+        },
+        "senderName": {
+          "type": "string",
+          "description": "Sender display name"
+        },
+        "text": {
+          "type": "string",
+          "description": "Content of the message"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "ISO string of message timestamp"
         }
       },
-      "required": ["id", "title", "topic", "date", "time", "duration", "meeting_platform", "created_by", "created_by_name", "created_at"]
+      "required": ["id", "roomId", "senderId", "senderName", "text", "timestamp"]
     },
-    "GroupMember": {
-      "title": "Study Group Member",
-      "description": "Details of a user belonging to a study group.",
+    "whiteboardElement": {
+      "title": "WhiteboardElement",
+      "description": "A single drawing or text element on the real-time shared whiteboard",
       "type": "object",
       "properties": {
-        "uid": { "type": "string" },
-        "name": { "type": "string" },
-        "role": { "type": "string", "enum": ["admin", "member"] },
-        "joined_at": { "type": "string", "format": "date-time" }
+        "id": {
+          "type": "string",
+          "description": "Unique element ID"
+        },
+        "roomId": {
+          "type": "string",
+          "description": "Study room identifier"
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of element (path, rect, circle, text)"
+        },
+        "color": {
+          "type": "string",
+          "description": "Hex color of the element"
+        },
+        "thickness": {
+          "type": "integer",
+          "description": "Line stroke width"
+        },
+        "points": {
+          "type": "string",
+          "description": "JSON serialized coordinates list for path or geometry details"
+        },
+        "text": {
+          "type": "string",
+          "description": "Text value for text elements"
+        },
+        "senderId": {
+          "type": "string",
+          "description": "Creator user ID"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "ISO string of element creation"
+        }
       },
-      "required": ["uid", "name", "role", "joined_at"]
+      "required": ["id", "roomId", "type", "color", "thickness", "points", "senderId", "timestamp"]
     },
-    "GroupMessage": {
-      "title": "Study Group Message",
-      "description": "A real-time text message sent inside a study group.",
+    "mockExam": {
+      "title": "MockExam",
+      "description": "AI-generated exam structure and user submissions",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "user_id": { "type": "string" },
-        "user_name": { "type": "string" },
-        "text": { "type": "string" },
-        "image": { "type": "string" },
-        "created_at": { "type": "string", "format": "date-time" }
+        "id": {
+          "type": "string",
+          "description": "Unique exam ID"
+        },
+        "userId": {
+          "type": "string",
+          "description": "ID of user taking the exam"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Exam subject"
+        },
+        "topic": {
+          "type": "string",
+          "description": "Exam topic"
+        },
+        "questionsJson": {
+          "type": "string",
+          "description": "JSON serialized list of questions and options"
+        },
+        "submittedAnswersJson": {
+          "type": "string",
+          "description": "JSON serialized list of submitted answers"
+        },
+        "score": {
+          "type": "integer",
+          "description": "Calculated score (0 to 100)"
+        },
+        "completed": {
+          "type": "boolean",
+          "description": "Whether exam is completed and graded"
+        },
+        "feedback": {
+          "type": "string",
+          "description": "AI structured study feedback"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "ISO string of exam timestamp"
+        }
       },
-      "required": ["id", "user_id", "user_name", "created_at"]
+      "required": ["id", "userId", "subject", "topic", "questionsJson", "submittedAnswersJson", "score", "completed", "feedback", "timestamp"]
     },
-    "GroupNote": {
-      "title": "Group Shared Note",
-      "description": "A collaborative group note readable and editable by all group members.",
+    "studyDocument": {
+      "title": "StudyDocument",
+      "description": "Study notes and summaries with AI analysis and visual explanation details",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "title": { "type": "string" },
-        "content": { "type": "string" },
-        "updated_by": { "type": "string" },
-        "updated_by_name": { "type": "string" },
-        "updated_at": { "type": "string", "format": "date-time" }
+        "id": {
+          "type": "string",
+          "description": "Unique document ID"
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "ID of document owner"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the document"
+        },
+        "content": {
+          "type": "string",
+          "description": "Rich text study notes or raw transcript"
+        },
+        "summary": {
+          "type": "string",
+          "description": "AI generated concise summary"
+        },
+        "tagsJson": {
+          "type": "string",
+          "description": "JSON serialized tag array"
+        },
+        "isShared": {
+          "type": "boolean",
+          "description": "Whether notes are shared publicly/group"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "ISO string of document creation"
+        }
       },
-      "required": ["id", "title", "updated_by", "updated_by_name", "updated_at"]
-    },
-    "WhiteboardElement": {
-      "title": "Whiteboard Vector Element",
-      "description": "A vector drawing point, shape, text box, or sticky note on the live shared whiteboard.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "type": { "type": "string", "enum": ["pen", "rect", "circle", "text", "sticky"] },
-        "points": { "type": "array", "description": "Array of {x, y} coordinate coordinates for pen drawing stroke." },
-        "x": { "type": "number" },
-        "y": { "type": "number" },
-        "width": { "type": "number" },
-        "height": { "type": "number" },
-        "color": { "type": "string" },
-        "text": { "type": "string" },
-        "creatorId": { "type": "string" },
-        "creatorName": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "type", "creatorId", "creatorName", "createdAt"]
-    },
-    "SharedNotes": {
-      "title": "Room Collaborative Notes",
-      "description": "A live-typing collaborative notepad document inside a virtual study session.",
-      "type": "object",
-      "properties": {
-        "content": { "type": "string" },
-        "updatedAt": { "type": "string", "format": "date-time" },
-        "updatedBy": { "type": "string" }
-      },
-      "required": ["content", "updatedAt"]
-    },
-    "SharedTimer": {
-      "title": "Room Collaborative Pomodoro",
-      "description": "Real-time state of the session-wide joint study timer.",
-      "type": "object",
-      "properties": {
-        "status": { "type": "string", "enum": ["idle", "running", "paused"] },
-        "timeLeft": { "type": "integer" },
-        "duration": { "type": "integer" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["status", "timeLeft", "duration", "updatedAt"]
-    },
-    "TutorSession": {
-      "title": "Tutor Session",
-      "description": "Stores personal AI tutor chatbot interaction history.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "title": { "type": "string" },
-        "messages": { "type": "array" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "persona": { "type": "string" }
-      },
-      "required": ["id", "title", "messages", "createdAt"]
-    },
-    "Feedback": {
-      "title": "User Feedback",
-      "description": "Stores user experience ratings and suggested new features.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string", "description": "Unique identifier of the feedback." },
-        "userId": { "type": "string", "description": "UID of the user submitting the feedback." },
-        "userName": { "type": "string", "description": "Name of the user submitting the feedback." },
-        "rating": { "type": "integer", "description": "The experience rating from 1 to 5." },
-        "suggestions": { "type": "string", "description": "User suggestions and requested features." },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of submission." }
-      },
-      "required": ["id", "userId", "userName", "rating", "suggestions", "createdAt"]
+      "required": ["id", "ownerId", "title", "content", "summary", "tagsJson", "isShared", "timestamp"]
     }
   },
   "firestore": {
-    "/feedback/{feedbackId}": {
-      "schema": "Feedback",
-      "description": "Collection of user feedback, experience ratings, and suggestions."
+    "users/{userId}": {
+      "schema": "user",
+      "description": "Collection storing user profiles and gamification stats"
     },
-    "/users/{userId}": {
-      "schema": "User",
-      "description": "Primary user profile document containing student information."
+    "rooms/{roomId}/chats/{chatId}": {
+      "schema": "chatMessage",
+      "description": "Real-time group chat messages nested under collaborative rooms"
     },
-    "/users/{userId}/notes/{noteId}": {
-      "schema": "Note",
-      "description": "User's personal study notebooks collection."
+    "rooms/{roomId}/whiteboard/{elementId}": {
+      "schema": "whiteboardElement",
+      "description": "Real-time vector whiteboard elements for study drawing"
     },
-    "/users/{userId}/schedule/{scheduleId}": {
-      "schema": "ScheduleItem",
-      "description": "Planner calendar schedule list."
+    "exams/{examId}": {
+      "schema": "mockExam",
+      "description": "AI-generated exam evaluations and responses"
     },
-    "/users/{userId}/progress/{progressId}": {
-      "schema": "ProgressEntry",
-      "description": "Log of practice quiz scores."
-    },
-    "/users/{userId}/diagrams/{diagramId}": {
-      "schema": "StudyDiagram",
-      "description": "User's personal saved study diagrams and illustrations."
-    },
-    "/groups/{groupId}": {
-      "schema": "StudyGroup",
-      "description": "Interactive, multi-user cooperative groups."
-    },
-    "/groups/{groupId}/members/{memberId}": {
-      "schema": "GroupMember",
-      "description": "A student who is joined in the group."
-    },
-    "/groups/{groupId}/messages/{messageId}": {
-      "schema": "GroupMessage",
-      "description": "A secure real-time message stream for the group."
-    },
-    "/groups/{groupId}/notes/{noteId}": {
-      "schema": "GroupNote",
-      "description": "Shared notebook for brainstorming and task distribution inside study groups."
-    },
-    "/groups/{groupId}/questions/{questionId}": {
-      "schema": "GroupQuestion",
-      "description": "Interactive questions and academic peer help boards within the group."
-    },
-    "/groups/{groupId}/sessions/{sessionId}": {
-      "schema": "GroupSession",
-      "description": "Scheduled virtual live study sessions for group participants."
-    },
-    "/groups/{groupId}/sessions/{sessionId}/board_elements/{elementId}": {
-      "schema": "WhiteboardElement",
-      "description": "Dynamic vector drawing/sticky notes synchronizer for collaborative whiteboards."
-    },
-    "/groups/{groupId}/sessions/{sessionId}/shared_notes/{docId}": {
-      "schema": "SharedNotes",
-      "description": "Real-time collaborative text editor state for joint session notes."
-    },
-    "/groups/{groupId}/sessions/{sessionId}/shared_timer/{docId}": {
-      "schema": "SharedTimer",
-      "description": "Live sync of Pomodoro timer values across all virtual room participants."
-    },
-    "/users/{userId}/tutor_sessions/{sessionId}": {
-      "schema": "TutorSession",
-      "description": "AI Tutor chatbot interaction sessions per student."
+    "documents/{docId}": {
+      "schema": "studyDocument",
+      "description": "Core educational study documents and notes"
     }
   }
 }

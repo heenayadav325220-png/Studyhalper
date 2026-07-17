@@ -1,9 +1,9 @@
 {
-  "name": "Remix: StudyBuddy AI",
-  "description": "A modern AI-powered study assistant for students to solve homework, take notes, and plan studies.",
+  "name": "ASCEND STUDY",
+  "description": "Remix Study Buddy - An advanced, ultra-modern full-stack educational assistant that empowers students with interactive features, group collaboration, visual study aids, mock exams, and persistent game mechanics (XP, streaks, quests, pet levels) synced in real-time.",
   "requestFramePermissions": [
-    "microphone",
-    "camera"
+    "camera",
+    "microphone"
   ],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

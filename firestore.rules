@@ -1,121 +1,20 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Global Helpers
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function isValidId(id) {
-      return id is string && id.size() > 0 && id.size() <= 128;
-    }
-
-    // Test collection for connection validation
-    match /test/{docId} {
-      allow read, write: if true;
-    }
-
-    // Users collection and sub-collections
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && request.auth.uid == userId;
-
-      match /notes/{noteId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
-      }
-
-      match /schedule/{scheduleId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
-      }
-
-      match /progress/{progressId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
-      }
-
-      match /flashcards/{cardId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
-      }
-
-      match /diagrams/{diagramId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
-      }
-
-      match /tutor_sessions/{sessionId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
-      }
+      allow read, write: if request.auth != null;
     }
-
-    // Group membership checker
-    function isGroupMember(groupId) {
-      return isSignedIn() && exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
+    match /rooms/{roomId}/chats/{chatId} {
+      allow read, write: if request.auth != null;
     }
-
-    // Groups collection
-    match /groups/{groupId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && (resource.data.created_by == request.auth.uid || isGroupMember(groupId));
-
-      // Sub-collections inside study groups
-      match /members/{memberId} {
-        allow read: if isSignedIn();
-        allow write: if isSignedIn() && (memberId == request.auth.uid || isGroupMember(groupId));
-      }
-
-      match /messages/{messageId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn() && request.resource.data.user_id == request.auth.uid;
-        allow update, delete: if isSignedIn() && resource.data.user_id == request.auth.uid;
-      }
-
-      match /notes/{noteId} {
-        allow read: if isSignedIn();
-        allow write: if isSignedIn();
-      }
-
-      match /questions/{questionId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn() && request.resource.data.asked_by == request.auth.uid;
-        allow update: if isSignedIn();
-        allow delete: if isSignedIn() && resource.data.asked_by == request.auth.uid;
-      }
-
-      match /sessions/{sessionId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn() && request.resource.data.created_by == request.auth.uid;
-        allow update: if isSignedIn();
-        allow delete: if isSignedIn() && resource.data.created_by == request.auth.uid;
-
-        match /board_elements/{elementId} {
-          allow read, write: if isSignedIn();
-        }
-        match /shared_notes/{docId} {
-          allow read, write: if isSignedIn();
-        }
-        match /shared_timer/{docId} {
-          allow read, write: if isSignedIn();
-        }
-      }
+    match /rooms/{roomId}/whiteboard/{elementId} {
+      allow read, write: if request.auth != null;
     }
-
-    // Feedback collection
-    match /feedback/{feedbackId} {
-      allow create: if isSignedIn()
-        && isValidId(feedbackId)
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.userName is string
-        && request.resource.data.rating is int
-        && request.resource.data.rating >= 1
-        && request.resource.data.rating <= 5
-        && request.resource.data.suggestions is string
-        && request.resource.data.suggestions.size() <= 5000
-        && request.resource.data.createdAt == request.time;
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+    match /exams/{examId} {
+      allow read, write: if request.auth != null;
+    }
+    match /documents/{docId} {
+      allow read, write: if request.auth != null;
     }
   }
 }

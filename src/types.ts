@@ -1,197 +1,64 @@
-export type Subject = 'Mathematics' | 'Science' | 'Biology' | 'Physics' | 'Chemistry' | 'English';
-
-export interface Quest {
-  id: string;
-  text: string;
-  textHi: string;
+export interface UserProfile {
+  uid: string;
+  name: string;
   xp: number;
-  completed: boolean;
-}
-
-export interface StreakDay {
-  id: number;
-  name: string;
-  nameHi: string;
-  label: string;
-  labelHi: string;
-  goal: string;
-  goalHi: string;
-  completed: boolean;
-  xpAwarded: number;
-}
-
-export interface User {
-  id: string | number;
-  name: string;
-  school: string;
-  className: string;
-  points: number;
   level: number;
-  avatar?: string;
-  country?: string; // e.g. 'United States' | 'Russia' | 'India' | 'China' | 'United Kingdom' | 'Global'
-  badges: Badge[];
-  weeklyGoal?: number;
-  completedThisWeek?: number;
-  pet?: {
-    name: string;
-    happiness: number;
-    fullness: number;
-    accessory: string;
-    petCount: number;
-  };
-  quests?: Quest[];
-  streakDays?: StreakDay[];
-}
-
-export interface Badge {
-  id: string | number;
-  badge_name: string;
-  icon: string;
-  date_earned: string;
-}
-
-export interface LeaderboardEntry {
-  name: string;
-  points: number;
-  level: number;
-}
-
-export interface Note {
-  id: string | number;
-  title: string;
-  content: string;
-  subject: Subject;
-  updated_at: string;
-  interval?: number;
-  repetition?: number;
-  easeFactor?: number;
-  nextReviewDate?: string;
-  lastReviewedDate?: string;
-}
-
-export interface ScheduleItem {
-  id: string | number;
-  task: string;
-  time: string;
-  day: string;
-  completed: boolean;
-  category?: 'Exam' | 'Homework' | 'Project' | 'Other';
-}
-
-export interface Progress {
-  id: string | number;
-  subject: Subject;
-  score: number;
-  total: number;
-  date: string;
+  streak: number;
+  petLevel: number;
+  petXp: number;
+  petName: string;
+  language: 'en' | 'hi';
+  lastActive: string;
 }
 
 export interface ChatMessage {
-  role: 'user' | 'model';
-  text: string;
-  image?: string;
-}
-
-export interface TutorSession {
   id: string;
-  title: string;
-  messages: ChatMessage[];
-  createdAt: string;
-  persona?: 'default' | 'socratic' | 'debugger' | 'translator' | 'math';
-}
-
-export interface Group {
-  id: string | number;
-  name: string;
-  description: string;
-  created_by: string | number;
-  created_at: string;
-  member_count?: number;
-  subject?: string;
-  course?: string;
-}
-
-export interface GroupMessage {
-  id: string | number;
-  group_id: string | number;
-  user_id: string | number;
-  user_name: string;
+  roomId: string;
+  senderId: string;
+  senderName: string;
   text: string;
-  image?: string;
-  created_at: string;
+  timestamp: string;
 }
 
-export interface GroupNote {
-  id: string | number;
-  group_id: string | number;
-  title: string;
-  content: string;
-  updated_by: string | number;
-  updated_by_name: string;
-  updated_at: string;
+export interface WhiteboardElement {
+  id: string;
+  roomId: string;
+  type: 'path' | 'rect' | 'circle' | 'text';
+  color: string;
+  thickness: number;
+  points: string; // JSON array of points [{x, y}, ...] or start/end
+  text?: string;
+  senderId: string;
+  timestamp: string;
 }
 
-export interface GroupQuestionAnswer {
-  id: string | number;
-  user_id: string | number;
-  user_name: string;
-  text: string;
-  created_at: string;
-}
-
-export interface GroupQuestion {
-  id: string | number;
-  group_id: string | number;
-  title: string;
-  content: string;
-  asked_by: string | number;
-  asked_by_name: string;
-  created_at: string;
-  answers?: GroupQuestionAnswer[];
-}
-
-export interface GroupSessionAttendee {
-  user_id: string | number;
-  user_name: string;
-  status: 'yes' | 'no' | 'maybe';
-}
-
-export interface GroupSession {
-  id: string | number;
-  group_id: string | number;
-  title: string;
-  topic: string;
-  date: string;
-  time: string;
-  duration: number; // in minutes
-  meeting_platform: string; // Zoom, Google Meet, Microsoft Teams, Jitsi, etc.
-  meeting_link?: string;
-  created_by: string | number;
-  created_by_name: string;
-  created_at: string;
-  rsvps?: GroupSessionAttendee[];
-}
-
-export interface Flashcard {
-  id: string | number;
-  userId?: string | number;
-  front: string;
-  back: string;
-  subject: Subject;
-  noteId?: string | number;
-  interval: number;
-  repetition: number;
-  easeFactor: number;
-  nextReviewDate: string;
-  created_at: string;
-}
-
-export interface Feedback {
+export interface MockExam {
   id: string;
   userId: string;
-  userName: string;
-  rating: number;
-  suggestions: string;
-  createdAt: any; // Can be Date, string, or serverTimestamp Object
+  subject: string;
+  topic: string;
+  questionsJson: string; // JSON array of questions
+  submittedAnswersJson: string; // JSON array of answers
+  score: number;
+  completed: boolean;
+  feedback: string;
+  timestamp: string;
 }
 
+export interface StudyDocument {
+  id: string;
+  ownerId: string;
+  title: string;
+  content: string;
+  summary: string;
+  tagsJson: string; // JSON array of tags
+  isShared: boolean;
+  timestamp: string;
+}
+
+export interface ExamQuestion {
+  questionText: string;
+  options: string[];
+  correctOptionIndex: number;
+  explanation: string;
+}
