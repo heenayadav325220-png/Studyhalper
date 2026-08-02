@@ -1,161 +1,332 @@
-import { initializeApp } from 'firebase/app';
-import {
-  getFirestore,
-  doc,
-  setDoc,
-  getDoc,
-  collection,
-  onSnapshot,
-  addDoc,
-  query,
-  orderBy,
-  deleteDoc,
-  getDocs,
-  where
-} from 'firebase/firestore';
-import { getAuth, signInAnonymously, onAuthStateChanged, User } from 'firebase/auth';
-import { UserProfile, ChatMessage, WhiteboardElement, MockExam, StudyDocument } from '../types';
+import { 
+  db, 
+  collection, 
+  doc, 
+  setDoc, 
+  deleteDoc, 
+  getDocs, 
+  onSnapshot, 
+  query, 
+  where, 
+  orderBy 
+} from './firebase';
+import type { UserProfile, RoomChatMessage, WhiteboardElement, MockExam, StudyDocument } from '../types';
 
-// Load values directly from firebase-applet-config.json
-const firebaseConfig = {
-  projectId: "planar-surfer-plkqp",
-  appId: "1:45675025134:web:56f8bbbc7780f37dff19ff",
-  apiKey: "AIzaSyDabGlcgDJHqvvPGGuecGnogqHztNvS-Kc",
-  authDomain: "planar-surfer-plkqp.firebaseapp.com",
-  firestoreDatabaseId: "ai-studio-remixstudybuddya-041806f4-3ae7-4c23-ad72-bf4baedde267",
-  storageBucket: "planar-surfer-plkqp.firebasestorage.app",
-  messagingSenderId: "45675025134",
-};
+// Fallback Helper: Is user offline or Firestore uninitialized?
+const isOffline = () => !navigator.onLine;
 
-// Initialize Firebase App
-const app = initializeApp(firebaseConfig);
-
-// Initialize Firestore
-export const db = getFirestore(app);
-
-// Initialize Auth
-export const auth = getAuth(app);
-
-// Helper to handle Auth
-export async function authenticateAnonymously(onUserReady: (user: User) => void) {
-  onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      onUserReady(user);
-    } else {
-      try {
-        const credential = await signInAnonymously(auth);
-        if (credential.user) {
-          onUserReady(credential.user);
-        }
-      } catch (err) {
-        console.error("Firebase auth error:", err);
-      }
-    }
-  });
-}
-
-// User Profile Service
-export async function getUserProfile(uid: string): Promise<UserProfile | null> {
-  const docRef = doc(db, 'users', uid);
-  const snap = await getDoc(docRef);
-  if (snap.exists()) {
-    return snap.data() as UserProfile;
+// --- USER PROFILE ---
+export function subscribeUserProfile(userId: string, callback: (profile: UserProfile | null) => void) {
+  if (!db) {
+    callback(null);
+    return () => {};
   }
-  return null;
-}
-
-export async function saveUserProfile(profile: UserProfile): Promise<void> {
-  const docRef = doc(db, 'users', profile.uid);
-  await setDoc(docRef, profile, { merge: true });
-}
-
-// real-time synchronization of chats
-export function subscribeToChats(roomId: string, callback: (messages: ChatMessage[]) => void) {
-  const collRef = collection(db, 'rooms', roomId, 'chats');
-  const q = query(collRef, orderBy('timestamp', 'asc'));
-  return onSnapshot(q, (snapshot) => {
-    const chats: ChatMessage[] = [];
-    snapshot.forEach((d) => {
-      chats.push({ id: d.id, ...d.data() } as ChatMessage);
-    });
-    callback(chats);
-  }, (err) => {
-    console.error("Chats subscription error:", err);
-  });
-}
-
-export async function sendChatMessage(roomId: string, message: Omit<ChatMessage, 'id'>) {
-  const collRef = collection(db, 'rooms', roomId, 'chats');
-  await addDoc(collRef, message);
-}
-
-// real-time synchronization of whiteboard elements
-export function subscribeToWhiteboard(roomId: string, callback: (elements: WhiteboardElement[]) => void) {
-  const collRef = collection(db, 'rooms', roomId, 'whiteboard');
-  const q = query(collRef, orderBy('timestamp', 'asc'));
-  return onSnapshot(q, (snapshot) => {
-    const elements: WhiteboardElement[] = [];
-    snapshot.forEach((d) => {
-      elements.push({ id: d.id, ...d.data() } as WhiteboardElement);
-    });
-    callback(elements);
-  }, (err) => {
-    console.error("Whiteboard subscription error:", err);
-  });
-}
-
-export async function addWhiteboardElement(roomId: string, element: Omit<WhiteboardElement, 'id'>) {
-  const collRef = collection(db, 'rooms', roomId, 'whiteboard');
-  const docRef = await addDoc(collRef, element);
-  return docRef.id;
-}
-
-export async function clearWhiteboardRoom(roomId: string) {
-  const collRef = collection(db, 'rooms', roomId, 'whiteboard');
-  const snapshot = await getDocs(collRef);
-  const batchPromises = snapshot.docs.map((d) => deleteDoc(d.ref));
-  await Promise.all(batchPromises);
-}
-
-// real-time synchronization/listing of mock exams
-export function subscribeToExams(userId: string, callback: (exams: MockExam[]) => void) {
-  const collRef = collection(db, 'exams');
-  const q = query(collRef, where('userId', '==', userId), orderBy('timestamp', 'desc'));
-  return onSnapshot(q, (snapshot) => {
-    const exams: MockExam[] = [];
-    snapshot.forEach((d) => {
-      exams.push({ id: d.id, ...d.data() } as MockExam);
-    });
-    callback(exams);
-  }, (err) => {
-    console.error("Exams subscription error:", err);
-  });
-}
-
-export async function saveMockExam(exam: MockExam) {
-  const docRef = doc(db, 'exams', exam.id);
-  await setDoc(docRef, exam);
-}
-
-// real-time synchronization/listing of study documents
-export function subscribeToDocuments(userId: string, callback: (docs: StudyDocument[]) => void) {
-  const collRef = collection(db, 'documents');
-  const q = query(collRef, orderBy('timestamp', 'desc')); // Subscribe to all so we support "shared" too
-  return onSnapshot(q, (snapshot) => {
-    const docs: StudyDocument[] = [];
-    snapshot.forEach((d) => {
-      const data = d.data() as StudyDocument;
-      if (data.ownerId === userId || data.isShared) {
-        docs.push({ ...data, id: d.id });
+  try {
+    const userRef = doc(db, "users", userId);
+    return onSnapshot(userRef, (snapshot) => {
+      if (snapshot.exists()) {
+        callback(snapshot.data() as UserProfile);
+      } else {
+        callback(null);
       }
+    }, (error) => {
+      console.warn("UserProfile snapshot error, falling back:", error);
+      callback(null);
     });
-    callback(docs);
-  }, (err) => {
-    console.error("Documents subscription error:", err);
-  });
+  } catch (err) {
+    console.warn("Failed to subscribe user profile:", err);
+    callback(null);
+    return () => {};
+  }
 }
 
-export async function saveStudyDocument(docItem: StudyDocument) {
-  const docRef = doc(db, 'documents', docItem.id);
-  await setDoc(docRef, docItem);
+export async function updateUserProfile(userId: string, profile: Partial<UserProfile>): Promise<void> {
+  // Always persist to localStorage for seamless fallback
+  try {
+    const local = localStorage.getItem(`user_profile_${userId}`);
+    const parsed = local ? JSON.parse(local) : {};
+    const updated = { ...parsed, ...profile, lastActive: new Date().toISOString() };
+    localStorage.setItem(`user_profile_${userId}`, JSON.stringify(updated));
+  } catch (e) {
+    console.warn("Failed to write user profile to localStorage:", e);
+  }
+
+  if (!db || isOffline()) {
+    return;
+  }
+  try {
+    const userRef = doc(db, "users", userId);
+    await setDoc(userRef, { ...profile, lastActive: new Date().toISOString() }, { merge: true });
+  } catch (err) {
+    console.warn("Firestore updateUserProfile warning:", err);
+  }
+}
+
+// --- STUDY ROOM CHATS ---
+export function subscribeToChats(roomId: string, callback: (messages: RoomChatMessage[]) => void) {
+  if (!db) {
+    callback([]);
+    return () => {};
+  }
+  try {
+    const chatsRef = collection(db, `rooms/${roomId}/chats`);
+    const q = query(chatsRef, orderBy("timestamp", "asc"));
+    return onSnapshot(q, (snapshot) => {
+      const messages: RoomChatMessage[] = [];
+      snapshot.forEach((d) => {
+        messages.push({ id: d.id, ...d.data() } as RoomChatMessage);
+      });
+      callback(messages);
+    }, (error) => {
+      console.warn("Chats snapshot error:", error);
+      callback([]);
+    });
+  } catch (err) {
+    console.warn("Failed to subscribe to chats:", err);
+    callback([]);
+    return () => {};
+  }
+}
+
+export async function sendGroupMessage(roomId: string, text: string, senderId: string, senderName: string): Promise<void> {
+  const msgId = doc(collection(db || {}, "temp")).id;
+  const newMessage: RoomChatMessage = {
+    id: msgId,
+    roomId,
+    senderId,
+    senderName,
+    text,
+    timestamp: new Date().toISOString()
+  };
+
+  if (!db || isOffline()) {
+    const key = `local_chats_${roomId}`;
+    const local = JSON.parse(localStorage.getItem(key) || "[]");
+    local.push(newMessage);
+    localStorage.setItem(key, JSON.stringify(local));
+    return;
+  }
+
+  try {
+    const chatsRef = collection(db, `rooms/${roomId}/chats`);
+    await setDoc(doc(chatsRef, msgId), newMessage);
+  } catch (err) {
+    console.error("Error sending group message:", err);
+  }
+}
+
+// --- REAL-TIME CANVAS WHITEBOARD ---
+export function subscribeToWhiteboard(roomId: string, callback: (elements: WhiteboardElement[]) => void) {
+  if (!db) {
+    callback([]);
+    return () => {};
+  }
+  try {
+    const wbRef = collection(db, `rooms/${roomId}/whiteboard`);
+    const q = query(wbRef, orderBy("timestamp", "asc"));
+    return onSnapshot(q, (snapshot) => {
+      const elements: WhiteboardElement[] = [];
+      snapshot.forEach((d) => {
+        elements.push({ id: d.id, ...d.data() } as WhiteboardElement);
+      });
+      callback(elements);
+    }, (error) => {
+      console.warn("Whiteboard snapshot error:", error);
+      callback([]);
+    });
+  } catch (err) {
+    console.warn("Failed to subscribe to whiteboard:", err);
+    callback([]);
+    return () => {};
+  }
+}
+
+export async function addWhiteboardElement(roomId: string, element: Omit<WhiteboardElement, 'id' | 'timestamp'>): Promise<void> {
+  const elemId = doc(collection(db || {}, "temp")).id;
+  const newElement: WhiteboardElement = {
+    id: elemId,
+    ...element,
+    timestamp: new Date().toISOString()
+  };
+
+  if (!db || isOffline()) {
+    const key = `local_wb_${roomId}`;
+    const local = JSON.parse(localStorage.getItem(key) || "[]");
+    local.push(newElement);
+    localStorage.setItem(key, JSON.stringify(local));
+    return;
+  }
+
+  try {
+    const wbRef = doc(db, `rooms/${roomId}/whiteboard`, elemId);
+    await setDoc(wbRef, newElement);
+  } catch (err) {
+    console.error("Error adding whiteboard element:", err);
+  }
+}
+
+export async function deleteWhiteboardElement(roomId: string, elementId: string): Promise<void> {
+  if (!db || isOffline()) {
+    const key = `local_wb_${roomId}`;
+    const local = JSON.parse(localStorage.getItem(key) || "[]") as WhiteboardElement[];
+    const filtered = local.filter(e => e.id !== elementId);
+    localStorage.setItem(key, JSON.stringify(filtered));
+    return;
+  }
+  try {
+    const wbRef = doc(db, `rooms/${roomId}/whiteboard`, elementId);
+    await deleteDoc(wbRef);
+  } catch (err) {
+    console.error("Error deleting whiteboard element:", err);
+  }
+}
+
+export async function clearWhiteboardRoom(roomId: string): Promise<void> {
+  if (!db || isOffline()) {
+    localStorage.setItem(`local_wb_${roomId}`, "[]");
+    return;
+  }
+  try {
+    const wbRef = collection(db, `rooms/${roomId}/whiteboard`);
+    const snapshot = await getDocs(wbRef);
+    snapshot.forEach(async (d) => {
+      await deleteDoc(doc(db, `rooms/${roomId}/whiteboard`, d.id));
+    });
+  } catch (err) {
+    console.error("Error clearing whiteboard room:", err);
+  }
+}
+
+// --- MOCK EXAMS ---
+export function subscribeToMockExams(userId: string, callback: (exams: MockExam[]) => void) {
+  if (!db) {
+    callback([]);
+    return () => {};
+  }
+  try {
+    const examsRef = collection(db, "exams");
+    const q = query(examsRef, where("userId", "==", userId), orderBy("timestamp", "desc"));
+    return onSnapshot(q, (snapshot) => {
+      const exams: MockExam[] = [];
+      snapshot.forEach((d) => {
+        exams.push({ id: d.id, ...d.data() } as MockExam);
+      });
+      callback(exams);
+    }, (error) => {
+      console.warn("MockExams snapshot error:", error);
+      callback([]);
+    });
+  } catch (err) {
+    console.warn("Failed to subscribe to mock exams:", err);
+    callback([]);
+    return () => {};
+  }
+}
+
+export async function saveMockExam(exam: MockExam): Promise<void> {
+  const cleanExam: MockExam = {
+    id: exam.id || 'exam_' + Date.now(),
+    userId: exam.userId || 'user_rohit_101',
+    subject: exam.subject || 'General',
+    topic: exam.topic || 'General Topic',
+    questionsJson: exam.questionsJson || '[]',
+    submittedAnswersJson: exam.submittedAnswersJson || '{}',
+    score: typeof exam.score === 'number' ? exam.score : 0,
+    completed: Boolean(exam.completed),
+    feedback: exam.feedback || '',
+    timestamp: exam.timestamp || new Date().toISOString()
+  };
+
+  if (!db || isOffline()) {
+    const key = `local_exams_${cleanExam.userId}`;
+    const local = JSON.parse(localStorage.getItem(key) || "[]") as MockExam[];
+    const index = local.findIndex(e => e.id === cleanExam.id);
+    if (index >= 0) {
+      local[index] = cleanExam;
+    } else {
+      local.unshift(cleanExam);
+    }
+    localStorage.setItem(key, JSON.stringify(local));
+    return;
+  }
+  try {
+    const examRef = doc(db, "exams", cleanExam.id);
+    await setDoc(examRef, cleanExam);
+  } catch (err) {
+    console.error("Error saving mock exam:", err);
+  }
+}
+
+// --- STUDY DOCUMENTS ---
+export function subscribeToStudyDocuments(ownerId: string, callback: (docs: StudyDocument[]) => void) {
+  if (!db || !ownerId) {
+    callback([]);
+    return () => {};
+  }
+  try {
+    const docsRef = collection(db, "documents");
+    const q = query(docsRef, where("ownerId", "==", ownerId), orderBy("timestamp", "desc"));
+    return onSnapshot(q, (snapshot) => {
+      const documents: StudyDocument[] = [];
+      snapshot.forEach((d) => {
+        documents.push({ id: d.id, ...d.data() } as StudyDocument);
+      });
+      callback(documents);
+    }, (error) => {
+      console.warn("StudyDocuments snapshot error:", error);
+      callback([]);
+    });
+  } catch (err) {
+    console.warn("Failed to subscribe to study documents:", err);
+    callback([]);
+    return () => {};
+  }
+}
+
+export async function saveStudyDocument(document: StudyDocument): Promise<void> {
+  const cleanDoc: StudyDocument = {
+    id: document.id || 'doc_' + Date.now(),
+    ownerId: document.ownerId || 'user_rohit_101',
+    title: document.title || 'Untitled Note',
+    content: document.content || '',
+    summary: document.summary || '',
+    tagsJson: document.tagsJson || '[]',
+    isShared: Boolean(document.isShared),
+    timestamp: document.timestamp || new Date().toISOString()
+  };
+
+  if (!db || isOffline()) {
+    const key = `local_docs_${cleanDoc.ownerId}`;
+    const local = JSON.parse(localStorage.getItem(key) || "[]") as StudyDocument[];
+    const index = local.findIndex(d => d.id === cleanDoc.id);
+    if (index >= 0) {
+      local[index] = cleanDoc;
+    } else {
+      local.unshift(cleanDoc);
+    }
+    localStorage.setItem(key, JSON.stringify(local));
+    return;
+  }
+  try {
+    const docRef = doc(db, "documents", cleanDoc.id);
+    await setDoc(docRef, cleanDoc);
+  } catch (err) {
+    console.error("Error saving study document:", err);
+  }
+}
+
+export async function deleteStudyDocument(ownerId: string, documentId: string): Promise<void> {
+  if (!db || isOffline()) {
+    const key = `local_docs_${ownerId}`;
+    const local = JSON.parse(localStorage.getItem(key) || "[]") as StudyDocument[];
+    const filtered = local.filter(d => d.id !== documentId);
+    localStorage.setItem(key, JSON.stringify(filtered));
+    return;
+  }
+  try {
+    const docRef = doc(db, "documents", documentId);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.error("Error deleting study document:", err);
+  }
 }

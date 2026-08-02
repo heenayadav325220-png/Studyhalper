@@ -1,0 +1,2079 @@
+import{
+c as mt,r as l,i as ss,g as is,j as e,A as ls,M as as,S as ue,B as de,a as st,b as os,R as ns,V as k,d as rs,C as it,e as cs,X as lt,f as ps,h as at,D as ot,P as nt,k as ms,l as us,m as ds,n as xs,o as Ns,T as rt,U as bs,p as fs,s as hs,q as vs,t as gs,u as ks,v as Ts,w as js,x as xe,y as ct,z as Es}
+from"./index-CPm6MPqE.js";
+/**
+ * @license lucide-react v0.546.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const Is=[["rect",{
+width:"16",height:"20",x:"4",y:"2",rx:"2",key:"1nb95v"}
+],["line",{
+x1:"8",x2:"16",y1:"6",y2:"6",key:"x4nwl0"}
+],["line",{
+x1:"16",x2:"16",y1:"14",y2:"18",key:"wjye3r"}
+],["path",{
+d:"M16 10h.01",key:"1m94wz"}
+],["path",{
+d:"M12 10h.01",key:"1nrarc"}
+],["path",{
+d:"M8 10h.01",key:"19clt8"}
+],["path",{
+d:"M12 14h.01",key:"1etili"}
+],["path",{
+d:"M8 14h.01",key:"6423bh"}
+],["path",{
+d:"M12 18h.01",key:"mhygvu"}
+],["path",{
+d:"M8 18h.01",key:"lrp35t"}
+]],pt=mt("calculator",Is);
+/**
+ * @license lucide-react v0.546.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const ys=[["path",{
+d:"M12 3v12",key:"1x0j5s"}
+],["path",{
+d:"m17 8-5-5-5 5",key:"7q97r8"}
+],["path",{
+d:"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4",key:"ih7n3h"}
+]],Ds=mt("upload",ys),Rs=l.memo(function({
+onClose:Ne,appLanguage:r,firebaseUser:ws,user:T,notes:be,onAddNote:fe,onAddProgress:he,onOpenDiagramMaker:_}
+){
+var Xe,Ke,Ze,et,tt;
+const[j,ut]=l.useState("study"),[ve,L]=l.useState(!1),[u,dt]=l.useState(!1),[p,xt]=l.useState("notes"),[E,ge]=l.useState(""),[f,Nt]=l.useState("Science"),[I,bt]=l.useState("10"),[ke,ft]=l.useState("Simple"),[G,Te]=l.useState(!1),[ht,je]=l.useState(!1),[vt,Ee]=l.useState(!1),[a,H]=l.useState(null),[W,Ie]=l.useState("visual"),[gt,ye]=l.useState({
+}
+),[h,$]=l.useState(null),[De,Ve]=l.useState(!1);
+l.useEffect(()=>{
+if(p==="mindmap"&&a&&a.children){
+const t={
+}
+;
+a.children.forEach((s,i)=>{
+t[`child-${
+i}
+`]=!0}
+),ye(t),$(null)}
+}
+,[a,p]);
+const we=async t=>{
+if(t){
+Ve(!0),$({
+nodeName:t,explanation:""}
+);
+try{
+const s=`Explain the concept or subtopic "${
+t}
+" in the context of our study topic "${
+E}
+" for class/grade ${
+I}
+ level. Give a 2-sentence simple, clear explanation in ${
+r}
+.`,i=await ct(s,void 0,void 0,r);
+$({
+nodeName:t,explanation:i}
+)}
+catch(s){
+console.error(s),$({
+nodeName:t,explanation:r==="Hindi"?"स्पष्टीकरण लोड करने में असमर्थ। कृपया पुनः प्रयास करें।":"Unable to load explanation. Please try again."}
+)}
+finally{
+Ve(!1)}
+}
+}
+,kt=async(t,s)=>{
+if(s)try{
+await fe({
+title:t,content:`### ${
+t}
+
+
+${
+s}
+
+
+*Generated from Mindmap of topic: **${
+E}
+**.*`,subject:f}
+),alert(r==="Hindi"?`✅ "${
+t}
+" को आपके नोटबुक में सफलतापूर्वक जोड़ दिया गया है!`:`✅ "${
+t}
+" has been successfully added to your Notebook!`)}
+catch(i){
+console.error(i),alert(r==="Hindi"?"नोट सहेजने में विफल।":"Failed to save note.")}
+}
+,[Se,Tt]=l.useState(""),[Y,jt]=l.useState(null),[Et,It]=l.useState(ss),[c,yt]=l.useState(()=>is());
+l.useEffect(()=>{
+const t=s=>{
+var i;
+It(((i=s.detail)==null?void 0:i.exceeded)??!1)}
+;
+return window.addEventListener("ai-quota-state-changed",t),()=>{
+window.removeEventListener("ai-quota-state-changed",t)}
+}
+,[]),l.useEffect(()=>{
+const t=s=>{
+s.detail&&yt(s.detail)}
+;
+return window.addEventListener("toolkit-usage-updated",t),()=>{
+window.removeEventListener("toolkit-usage-updated",t)}
+}
+,[]);
+const[X,Dt]=l.useState("Science"),[Ce,Vt]=l.useState("10"),[A,K]=l.useState(!1),[v,wt]=l.useState([]),[Z,$e]=l.useState(!1),[ee,Ae]=l.useState([]),[St,te]=l.useState(!1),[U,Me]=l.useState(0),[Ct,Ss]=l.useState(300),b=l.useRef(null),[y,$t]=l.useState(""),[ze,Re]=l.useState(!1),[d,Pe]=l.useState(null),[g,Fe]=l.useState(()=>JSON.parse(localStorage.getItem("studybuddy_vocab_list")||"[]")),[Oe,M]=l.useState("0"),[Cs,$s]=l.useState(0),[_e,At]=l.useState(""),Mt=[{
+title:"Quadratic Formula",subject:"Mathematics",expr:"x = (-b ± √(b² - 4ac)) / 2a",desc:"Finds the roots of a quadratic equation ax² + bx + c = 0."}
+,{
+title:"Area of Circle",subject:"Mathematics",expr:"A = πr²",desc:"Calculates total area enclosed by a circle of radius r."}
+,{
+title:"Newton's Second Law",subject:"Physics",expr:"F = ma",desc:"Force equals mass multiplied by acceleration."}
+,{
+title:"Einstein's Energy-Mass Equivalence",subject:"Physics",expr:"E = mc²",desc:"Relates mass (m) and energy (E) using the constant speed of light (c)."}
+,{
+title:"Ideal Gas Law",subject:"Chemistry",expr:"PV = nRT",desc:"Relates pressure, volume, gas amount, temperature, and gas constant."}
+,{
+title:"Pythagorean Theorem",subject:"Mathematics",expr:"a² + b² = c²",desc:"In a right-angled triangle, hypotenuse squared is the sum of other two sides squared."}
+],[D,q]=l.useState(()=>JSON.parse(localStorage.getItem("studybuddy_daily_goals")||'[{
+"id":"1","text":"Solve 5 algebra issues","completed":false}
+,{
+"id":"2","text":"Revise Science summary","completed":false}
+]')),[se,Le]=l.useState(""),[z,ie]=l.useState(()=>JSON.parse(localStorage.getItem("studybuddy_exams_list")||"[]")),[R,le]=l.useState({
+subject:"Mathematics",date:"",title:""}
+),[Ge,He]=l.useState([{
+id:"rain",name:"Gentle Rain",icon:"🌧️",audioUrl:"https://assets.mixkit.co/active_storage/sfx/2533/2533-84.wav",playing:!1,volume:50}
+,{
+id:"forest",name:"Forest Birds",icon:"🌲",audioUrl:"https://assets.mixkit.co/active_storage/sfx/1113/1113-84.wav",playing:!1,volume:50}
+,{
+id:"lofi",name:"Lofi Chords",icon:"🎸",audioUrl:"https://assets.mixkit.co/active_storage/sfx/123/123.wav",playing:!1,volume:50}
+,{
+id:"cafe",name:"Coffee Shop",icon:"☕",audioUrl:"https://assets.mixkit.co/active_storage/sfx/1441/1441-84.wav",playing:!1,volume:50}
+]),x=l.useRef({
+}
+),[m,zt]=l.useState(!1),[B,Ue]=l.useState(1500),[P,ae]=l.useState(!1),[Rt,Pt]=l.useState(""),N=l.useRef(null),[V,qe]=l.useState(()=>JSON.parse(localStorage.getItem("studybuddy_friends")||`[
+      {
+"id":"f1","name":"Aanya Sharma","online":true,"xp":1250,"chat":[]}
+,
+      {
+"id":"f2","name":"Vivaan Patel","online":false,"xp":980,"chat":[]}
+,
+      {
+"id":"f3","name":"Ishita Roy","online":true,"xp":1500,"chat":[]}
+
+    ]`)),[w,Ft]=l.useState(null),[oe,Be]=l.useState(""),[F,ne]=l.useState(()=>JSON.parse(localStorage.getItem("studybuddy_revision_spaced")||"[]")),[re,ce]=l.useState(!1),[As,Ms]=l.useState(!1),[Ot,J]=l.useState(!1),pe=l.useRef(null);
+l.useEffect(()=>{
+localStorage.setItem("studybuddy_vocab_list",JSON.stringify(g))}
+,[g]),l.useEffect(()=>{
+localStorage.setItem("studybuddy_daily_goals",JSON.stringify(D))}
+,[D]),l.useEffect(()=>{
+localStorage.setItem("studybuddy_exams_list",JSON.stringify(z))}
+,[z]),l.useEffect(()=>{
+localStorage.setItem("studybuddy_friends",JSON.stringify(V))}
+,[V]),l.useEffect(()=>{
+localStorage.setItem("studybuddy_revision_spaced",JSON.stringify(F))}
+,[F]),l.useEffect(()=>()=>{
+Object.values(x.current).forEach(t=>{
+t&&typeof t.pause=="function"&&t.pause()}
+),b.current&&clearInterval(b.current),N.current&&clearInterval(N.current)}
+,[]);
+const Je=(t,s)=>{
+He(i=>i.map(o=>o.id===t?(x.current[t]&&(x.current[t].volume=s/100),{
+...o,volume:s}
+):o))}
+,Qe=t=>{
+He(s=>s.map(i=>{
+if(i.id===t){
+const o=!i.playing;
+if(o){
+if(!x.current[t]){
+const n=new Audio(i.audioUrl);
+n.loop=!0,x.current[t]=n}
+x.current[t].volume=i.volume/100,x.current[t].play().catch(n=>console.log("Audio play error",n))}
+else x.current[t]&&x.current[t].pause();
+return{
+...i,playing:o}
+}
+return i}
+))}
+;
+l.useEffect(()=>(A&&U>0&&(b.current=setInterval(()=>{
+Me(t=>t<=1?(clearInterval(b.current),Ye(),0):t-1)}
+,1e3)),()=>{
+b.current&&clearInterval(b.current)}
+),[A,U]),l.useEffect(()=>(P&&B>0?N.current=setInterval(()=>{
+Ue(t=>t<=1?(ae(!1),N.current&&clearInterval(N.current),alert("⏰ Great job! You completed your distraction-free study session!"),0):t-1)}
+,1e3):!P&&N.current&&clearInterval(N.current),()=>{
+N.current&&clearInterval(N.current)}
+),[P,B]);
+const _t=()=>{
+const t=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(!t){
+alert("Speech recognition is not supported in this browser. Please try Chrome/Edge.");
+return}
+if(!pe.current){
+const s=new t;
+s.continuous=!1,s.lang=r==="Hindi"?"hi-IN":"en-US",s.onresult=async i=>{
+const o=i.results[0][0].transcript;
+ge(o),J(!1),We(o)}
+,s.onerror=()=>J(!1),s.onend=()=>J(!1),pe.current=s}
+J(!0),pe.current.start()}
+,Q=t=>{
+if(!window.speechSynthesis){
+alert("TTS not supported in this browser.");
+return}
+if(re){
+window.speechSynthesis.cancel(),ce(!1);
+return}
+const s=t.replace(/[#*`_-]/g,"").substring(0,500),i=new SpeechSynthesisUtterance(s);
+i.onend=()=>ce(!1),ce(!0),window.speechSynthesis.speak(i)}
+,We=async t=>{
+if(ht||G){
+alert("Please wait 3 seconds between requests to protect the server!");
+return}
+const s=t||E;
+if(!s&&p!=="pdf"&&p!=="ocr"){
+alert("Please specify a topic or text first!");
+return}
+if(c.count>=c.limit){
+alert(r==="Hindi"?"⚠️ आपके एडवांस्ड टूलकिट की दैनिक सीमा (50 मैसेजेस) समाप्त हो गई है। कृपया कल पुनः प्रयास करें या अन्य सामान्य असीमित (unlimited) सुविधाओं का उपयोग करें।":"⚠️ Your daily Advanced Toolkit limit of 50 messages has been reached. Please try again tomorrow or enjoy our other unlimited app features!");
+return}
+je(!0),setTimeout(()=>{
+je(!1)}
+,3e3),Te(!0),H(null);
+try{
+let i=null;
+p==="notes"?i=await fs(s,f,I):p==="summarize"?i=await hs(s):p==="explain"?i=await vs(s,f,I,ke):p==="mindmap"?i=await gs(s):p==="qpaper"?i=await ks(s,f,I):p==="ocr"?i=await Ts(Y||""):p==="pdf"&&(i=await js(Se)),i?(H(i),xe(),setTimeout(()=>{
+window.dispatchEvent(new CustomEvent("studybuddy-trigger-ad"))}
+,1500)):(alert("Failed to reach Gemini API model. Running internal offline generator."),H({
+title:"Offline Concept Overview",content:`### ${
+s}
+
+
+Here is an automated overview of **${
+s}
+** for standard ${
+I}
+ syllabus studies. Please check connection to use real-time AI reasoning.`}
+))}
+catch(i){
+console.error(i),alert("AI Service is temporarily busy. Try again.")}
+finally{
+Te(!1)}
+}
+,Lt=async()=>{
+if(vt||Z){
+alert("Please wait 3 seconds between requests to protect the server!");
+return}
+if(c.count>=c.limit){
+alert(r==="Hindi"?"⚠️ आपके एडवांस्ड टूलकिट की दैनिक सीमा (50 मैसेजेस) समाप्त हो गई है। कृपया कल पुनः प्रयास करें या अन्य सामान्य असीमित (unlimited) सुविधाओं का उपयोग करें।":"⚠️ Your daily Advanced Toolkit limit of 50 messages has been reached. Please try again tomorrow or enjoy our other unlimited app features!");
+return}
+Ee(!0),setTimeout(()=>{
+Ee(!1)}
+,3e3),$e(!0),K(!1),te(!1);
+try{
+const t=await Es(X,{
+name:(T==null?void 0:T.name)||"Rohit",school:(T==null?void 0:T.school)||"Core School",className:Ce}
+,r,"Hard");
+t&&t.length>0?(wt(t),Ae(new Array(t.length).fill(-1)),Me(Ct),K(!0),xe(),setTimeout(()=>{
+window.dispatchEvent(new CustomEvent("studybuddy-trigger-ad"))}
+,1500)):alert("Could not generate mock questions. Using fallback exam database.")}
+catch(t){
+console.error(t)}
+finally{
+$e(!1)}
+}
+,Ye=async()=>{
+K(!1),te(!0),b.current&&clearInterval(b.current);
+let t=0;
+v.forEach((i,o)=>{
+ee[o]===i.answer&&t++}
+);
+const s=t*30;
+he&&await he(t,v.length,X),alert(`📝 Test Completed! Score: ${
+t}
+/${
+v.length}
+. You earned +${
+s}
+ XP points for your study progress!`)}
+,Gt=async()=>{
+if(y){
+if(c.count>=c.limit){
+alert(r==="Hindi"?"⚠️ आपके एडवांस्ड टूलकिट की दैनिक सीमा (50 मैसेजेस) समाप्त हो गई है। कृपया कल पुनः प्रयास करें या अन्य सामान्य असीमित (unlimited) सुविधाओं का उपयोग करें।":"⚠️ Your daily Advanced Toolkit limit of 50 messages has been reached. Please try again tomorrow or enjoy our other unlimited app features!");
+return}
+Re(!0);
+try{
+const t=`Define the word: "${
+y}
+". Provide: Part of Speech, precise academic definition, 2 synonyms, and 1 example sentence. Format your response ONLY as valid JSON in this structure: {
+"word": "${
+y}
+", "partOfSpeech": "...", "definition": "...", "synonyms": ["...", "..."], "example": "..."}
+`,s=await ct(t,void 0,void 0,"English");
+if(s){
+let i=s.trim();
+i.startsWith("```json")?i=i.substring(7):i.startsWith("```")&&(i=i.substring(3)),i.endsWith("```")&&(i=i.substring(0,i.length-3));
+const o=JSON.parse(i.trim());
+Pe(o),xe()}
+}
+catch(t){
+console.error(t),Pe({
+word:y,partOfSpeech:"noun",definition:"A useful study word looked up for active learning.",synonyms:["knowledge","term"],example:`We registered ${
+y}
+ inside our core Vocabulary Builder deck.`}
+)}
+finally{
+Re(!1)}
+}
+}
+,Ht=()=>{
+d&&(g.some(t=>t.word.toLowerCase()===d.word.toLowerCase())||(Fe(t=>[...t,d]),alert("Saved word successfully!")))}
+,Ut=t=>{
+if(t==="C")M("0");
+else if(t==="DEL")M(s=>s.length>1?s.slice(0,-1):"0");
+else if(t==="=")try{
+let s=Oe.replace(/sin\(/g,"Math.sin(").replace(/cos\(/g,"Math.cos(").replace(/tan\(/g,"Math.tan(").replace(/log\(/g,"Math.log10(").replace(/ln\(/g,"Math.log(").replace(/pi/g,"Math.PI").replace(/e/g,"Math.E").replace(/\^/g,"**");
+const i=new Function(`return ${
+s}
+`)();
+M(Number(i).toFixed(4).replace(/\.?0+$/,""))}
+catch{
+M("Error")}
+else M(s=>s==="0"||s==="Error"?t:s+t)}
+,qt=()=>{
+se.trim()&&(q(t=>[...t,{
+id:Date.now().toString(),text:se,completed:!1}
+]),Le(""))}
+,Bt=t=>{
+q(s=>s.map(i=>{
+if(i.id===t){
+const o=!i.completed;
+return o&&alert("🎯 Goal completed! +15 XP points logged!"),{
+...i,completed:o}
+}
+return i}
+))}
+,Jt=()=>{
+!R.title||!R.date||(ie(t=>[...t,{
+id:Date.now().toString(),...R}
+]),le({
+subject:"Mathematics",date:"",title:""}
+))}
+,Qt=t=>{
+ie(s=>s.filter(i=>i.id!==t))}
+,Wt=t=>{
+const s=new Date(t).getTime()-new Date().getTime(),i=Math.ceil(s/(1e3*60*60*24));
+return i>0?`${
+i}
+ days left`:i===0?"Today!":"Passed"}
+,Yt=()=>{
+const t="data:text/json;
+charset=utf-8,"+encodeURIComponent(JSON.stringify({
+goals:D,exams:z,vocabList:g,revisionNotes:F,friendsList:V}
+)),s=document.createElement("a");
+s.setAttribute("href",t),s.setAttribute("download",`studybuddy_cloud_backup_${
+Date.now()}
+.json`),document.body.appendChild(s),s.click(),s.remove()}
+,Xt=t=>{
+const s=new FileReader;
+t.target.files&&t.target.files[0]&&(s.readAsText(t.target.files[0],"UTF-8"),s.onload=i=>{
+var o;
+try{
+const n=JSON.parse((o=i.target)==null?void 0:o.result);
+n.goals&&q(n.goals),n.exams&&ie(n.exams),n.vocabList&&Fe(n.vocabList),n.revisionNotes&&ne(n.revisionNotes),n.friendsList&&qe(n.friendsList),alert("🎉 Core backup restored successfully!")}
+catch{
+alert("Invalid backup file structure.")}
+}
+)}
+,Kt=()=>{
+!oe.trim()||!w||(qe(t=>t.map(s=>{
+if(s.id===w){
+const i=[...s.chat,`Me: ${
+oe}
+`,"Buddy: That sounds like a solid study plan! Keep pushing!"];
+return{
+...s,chat:i}
+}
+return s}
+)),Be(""))}
+,Zt=async()=>{
+if(!a)return;
+const t=a.title||E||"AI Note Card";
+let s=a.content||a.summary||a.explanation||"";
+typeof a=="object"&&a.summary&&(s=a.summary),typeof a=="object"&&a.explanation&&(s=a.explanation),await fe({
+title:t,content:s,subject:f}
+),alert("📝 Study Note successfully saved in your notebook library!")}
+,es=(t,s)=>{
+const i=[1,7,30],o=F.find(O=>O.noteId===t);
+let n=0;
+o&&(n=Math.min(o.stage+1,i.length-1));
+const S=i[n],C=new Date;
+C.setDate(C.getDate()+S),ne(o?O=>O.map(me=>me.noteId===t?{
+...me,stage:n,nextDate:C.toISOString().split("T")[0]}
+:me):O=>[...O,{
+noteId:t,title:s,nextDate:C.toISOString().split("T")[0],stage:n}
+]),alert(`📅 Revision logged! Spaced review set for ${
+S}
+ day(s) from now.`)}
+,ts=t=>{
+var i;
+const s=(i=t.target.files)==null?void 0:i[0];
+if(s){
+const o=new FileReader;
+o.onload=()=>{
+jt(o.result)}
+,o.readAsDataURL(s)}
+}
+;
+return e.jsxDEV("div",{
+className:`fixed inset-0 z-50 flex flex-col w-screen h-screen overflow-hidden transition-colors duration-300 ${
+m?"bg-slate-950 text-cyan-300":"bg-slate-50 text-slate-800"}
+`,id:"toolkit_page",children:[e.jsxDEV("header",{
+className:`px-4 py-3 border-b flex justify-between items-center shrink-0 shadow-sm z-10 transition-colors duration-200
+        ${
+m?"bg-slate-900 border-slate-800 text-cyan-400":"bg-white border-slate-100 text-slate-800"}
+`,children:[e.jsxDEV("div",{
+className:"flex items-center gap-1.5",children:[e.jsxDEV("button",{
+onClick:Ne,className:`p-2 rounded-full transition-all duration-200 active:scale-95 flex items-center justify-center mr-1
+              ${
+m?"hover:bg-slate-800 text-cyan-400 hover:text-cyan-300":"hover:bg-slate-100 text-slate-500 hover:text-slate-800"}
+`,title:"Back to Home",children:e.jsxDEV(ls,{
+size:18}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:748,columnNumber:13}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:740,columnNumber:11}
+,this),e.jsxDEV("button",{
+onClick:()=>L(!0),className:`p-2 rounded-full transition-all duration-200 active:scale-95 flex items-center justify-center md:hidden mr-1
+              ${
+m?"hover:bg-slate-800 text-cyan-400 hover:text-cyan-300":"hover:bg-slate-100 text-slate-500 hover:text-slate-800"}
+`,title:"Open Navigation",children:e.jsxDEV(as,{
+size:18}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:760,columnNumber:13}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:752,columnNumber:11}
+,this),e.jsxDEV("div",{
+className:"flex items-center gap-2",children:[e.jsxDEV(ue,{
+className:`w-5 h-5 ${
+m?"text-cyan-400":"text-indigo-600"}
+ animate-pulse`}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:765,columnNumber:13}
+,this),e.jsxDEV("div",{
+children:[e.jsxDEV("h1",{
+className:`font-black text-sm sm:text-base tracking-tight leading-none ${
+m?"text-cyan-300":"text-slate-800"}
+`,children:"Advanced Study Toolkit"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:767,columnNumber:15}
+,this),e.jsxDEV("p",{
+className:`text-[9px] font-bold mt-0.5 leading-none hidden sm:block ${
+m?"text-slate-500":"text-slate-400"}
+`,children:"Comprehensive AI tools, practice engines & focus dashboard"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:770,columnNumber:15}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:766,columnNumber:13}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:764,columnNumber:11}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:738,columnNumber:9}
+,this),e.jsxDEV("div",{
+className:"flex items-center gap-1.5 sm:gap-2",children:[e.jsxDEV("div",{
+className:`hidden md:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border select-none text-[10px] font-black uppercase tracking-wider
+            ${
+m?"bg-cyan-950/40 border-cyan-500/20 text-cyan-400":"bg-amber-50 border-amber-200 text-amber-800"}
+`,children:[e.jsxDEV(de,{
+size:12,className:c.count>=c.limit*.8?"animate-pulse":""}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:785,columnNumber:13}
+,this),e.jsxDEV("span",{
+children:r==="Hindi"?`टूलकिट: ${
+c.count}
+/${
+c.limit}
+ प्रयुक्त`:`Toolkit: ${
+c.count}
+/${
+c.limit}
+ Used`}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:786,columnNumber:13}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:780,columnNumber:11}
+,this),e.jsxDEV("button",{
+onClick:()=>zt(!m),className:`text-[10px] font-black uppercase px-2.5 py-1.5 sm:px-3 rounded-xl border transition-all duration-200 flex items-center gap-1.5
+              ${
+m?"bg-cyan-950 border-cyan-500/50 text-cyan-300 hover:bg-cyan-900":"bg-indigo-50 border-indigo-100 hover:bg-indigo-100 text-indigo-700"}
+`,children:e.jsxDEV("span",{
+children:m?"Exit Focus":"Focus Mode 🧘"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:801,columnNumber:13}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:794,columnNumber:11}
+,this),e.jsxDEV("button",{
+className:`p-2 rounded-full transition-all duration-200 flex items-center justify-center
+              ${
+m?"hover:bg-slate-800 text-cyan-500 hover:text-cyan-300":"hover:bg-slate-100 text-slate-500 hover:text-slate-800"}
+`,title:"Search Toolkit",children:e.jsxDEV(st,{
+size:16}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:812,columnNumber:13}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:805,columnNumber:11}
+,this),e.jsxDEV("button",{
+className:`p-2 rounded-full transition-all duration-200 flex items-center justify-center
+              ${
+m?"hover:bg-slate-800 text-cyan-500 hover:text-cyan-300":"hover:bg-slate-100 text-slate-500 hover:text-slate-800"}
+`,title:"Toolkit Settings",children:e.jsxDEV(os,{
+size:16}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:823,columnNumber:13}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:816,columnNumber:11}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:778,columnNumber:9}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:733,columnNumber:7}
+,this),m?e.jsxDEV("div",{
+className:"flex-1 bg-slate-950 text-cyan-300 p-6 flex flex-col md:flex-row gap-6 overflow-y-auto",children:[e.jsxDEV("div",{
+className:"flex-1 flex flex-col justify-center items-center text-center space-y-6 border-r border-slate-900 pr-0 md:pr-6",children:[e.jsxDEV("span",{
+className:"text-sm tracking-widest font-black uppercase text-cyan-500",children:"Focusing On Your Future"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:832,columnNumber:13}
+,this),e.jsxDEV("div",{
+className:"text-6xl font-mono font-black text-cyan-400 shadow-cyan-950/50 drop-shadow-[0_0_15px_rgba(34,211,238,0.4)]",children:[Math.floor(B/60).toString().padStart(2,"0"),":",(B%60).toString().padStart(2,"0")]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:833,columnNumber:13}
+,this),e.jsxDEV("div",{
+className:"flex gap-2",children:[e.jsxDEV("button",{
+onClick:()=>ae(!P),className:"px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-slate-950 rounded-2xl text-xs font-black uppercase tracking-wider",children:P?"Pause":"Start Session"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:837,columnNumber:15}
+,this),e.jsxDEV("button",{
+onClick:()=>{
+Ue(1500),ae(!1)}
+,className:"p-3 bg-slate-900 border border-slate-800 text-cyan-400 rounded-2xl",children:e.jsxDEV(ns,{
+size:16}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:847,columnNumber:17}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:843,columnNumber:15}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:836,columnNumber:13}
+,this),e.jsxDEV("p",{
+className:"text-[10px] text-slate-500 italic max-w-sm",children:"No notifications. No alerts. Just you and your textbooks."}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:850,columnNumber:13}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:831,columnNumber:11}
+,this),e.jsxDEV("div",{
+className:"w-full md:w-80 flex flex-col gap-4",children:[e.jsxDEV("div",{
+className:"bg-slate-900 border border-slate-800/80 p-4 rounded-3xl space-y-3",children:[e.jsxDEV("h3",{
+className:"text-xs font-bold text-cyan-400 flex items-center uppercase tracking-wide gap-1.5",children:[e.jsxDEV(k,{
+size:14}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:856,columnNumber:17}
+,this)," Soundscape Mixer"]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:855,columnNumber:15}
+,this),Ge.map(t=>e.jsxDEV("div",{
+className:"flex items-center justify-between gap-2",children:[e.jsxDEV("span",{
+className:"text-xs text-slate-300 font-bold",children:[t.icon," ",t.name]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:860,columnNumber:19}
+,this),e.jsxDEV("div",{
+className:"flex items-center gap-2 flex-1 justify-end",children:[e.jsxDEV("input",{
+type:"range",min:"0",max:"100",value:t.volume,onChange:s=>Je(t.id,parseInt(s.target.value)),className:"w-16 accent-cyan-500"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:862,columnNumber:21}
+,this),e.jsxDEV("button",{
+onClick:()=>Qe(t.id),className:`p-1.5 rounded-lg text-[10px] ${
+t.playing?"bg-cyan-600 text-slate-950":"bg-slate-850 text-cyan-500"}
+`,children:t.playing?e.jsxDEV(k,{
+size:10}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:874,columnNumber:36}
+,this):e.jsxDEV(rs,{
+size:10}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:874,columnNumber:60}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:870,columnNumber:21}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:861,columnNumber:19}
+,this)]}
+,t.id,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:859,columnNumber:17}
+,this))]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:854,columnNumber:13}
+,this),e.jsxDEV("div",{
+className:"flex-1 bg-slate-900 border border-slate-800/80 p-4 rounded-3xl flex flex-col",children:[e.jsxDEV("span",{
+className:"text-[10px] font-black text-cyan-500 uppercase mb-2",children:"Scratchpad"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:882,columnNumber:15}
+,this),e.jsxDEV("textarea",{
+value:Rt,onChange:t=>Pt(t.target.value),placeholder:"Jot down formulas or quick calculation steps...",className:"flex-1 bg-slate-950/50 border border-slate-800 rounded-2xl p-2.5 text-xs text-cyan-300 outline-none resize-none font-mono"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:883,columnNumber:15}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:881,columnNumber:13}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:853,columnNumber:11}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:830,columnNumber:9}
+,this):e.jsxDEV("div",{
+className:"flex-1 flex overflow-hidden relative",children:[ve&&e.jsxDEV("div",{
+className:"fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-30 md:hidden",onClick:()=>L(!1)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:897,columnNumber:13}
+,this),e.jsxDEV("aside",{
+className:`
+            fixed inset-y-0 left-0 z-40 bg-white border-r border-slate-200/80 p-4 flex flex-col gap-2 transition-all duration-300 ease-in-out
+            md:static md:translate-x-0 shrink-0
+            ${
+ve?"translate-x-0":"-translate-x-full md:translate-x-0"}
+
+            ${
+u?"md:w-16 md:px-2 md:py-4":"md:w-56 md:px-4 md:py-4"}
+
+          `,children:[e.jsxDEV("div",{
+className:"flex justify-between items-center mb-3 border-b border-slate-100 pb-2",children:[e.jsxDEV("span",{
+className:`text-[9px] uppercase font-black text-slate-400 tracking-wider transition-opacity duration-300 ${
+u?"md:opacity-0 md:w-0":"opacity-100"}
+`,children:"Sections"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:912,columnNumber:15}
+,this),e.jsxDEV("button",{
+onClick:()=>dt(!u),className:"hidden md:flex p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-indigo-600 transition",title:u?"Expand Sidebar":"Collapse Sidebar",children:u?e.jsxDEV(it,{
+size:15}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:922,columnNumber:39}
+,this):e.jsxDEV(cs,{
+size:15}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:922,columnNumber:68}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:917,columnNumber:15}
+,this),e.jsxDEV("button",{
+onClick:()=>L(!1),className:"flex md:hidden p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-rose-600 transition",title:"Close Navigation",children:e.jsxDEV(lt,{
+size:15}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:931,columnNumber:17}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:926,columnNumber:15}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:911,columnNumber:13}
+,this),e.jsxDEV("div",{
+className:"flex flex-col gap-1.5 flex-1",children:[[{
+id:"study",label:"AI Study Center",icon:e.jsxDEV(ue,{
+size:15}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:938,columnNumber:64}
+,this)}
+,{
+id:"vocab_calc",label:"Practice Tools",icon:e.jsxDEV(pt,{
+size:15}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:939,columnNumber:68}
+,this)}
+,{
+id:"productivity",label:"Planner & Goals",icon:e.jsxDEV(ps,{
+size:15}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:940,columnNumber:71}
+,this)}
+,{
+id:"focus",label:"Social & Sounds",icon:e.jsxDEV(at,{
+size:15}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:941,columnNumber:64}
+,this)}
+,{
+id:"utilities",label:"File Backup",icon:e.jsxDEV(ot,{
+size:15}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:942,columnNumber:64}
+,this)}
+].map(t=>{
+const s=j===t.id;
+return e.jsxDEV("button",{
+onClick:()=>{
+ut(t.id),L(!1)}
+,className:`w-full py-2.5 px-3 rounded-xl transition-all duration-200 flex items-center gap-3 font-extrabold text-xs group relative
+                      ${
+s?"bg-indigo-600 text-white shadow-sm":"text-slate-650 hover:bg-slate-100 hover:text-slate-900"}
+
+                      ${
+u?"md:justify-center md:px-0":""}
+
+                    `,title:t.label,children:[e.jsxDEV("span",{
+className:`${
+s?"text-white":"text-indigo-600 group-hover:text-indigo-700"}
+`,children:t.icon}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:960,columnNumber:21}
+,this),e.jsxDEV("span",{
+className:`transition-all duration-300 ${
+u?"md:hidden":"block"}
+`,children:t.label}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:963,columnNumber:21}
+,this),u&&e.jsxDEV("div",{
+className:"absolute left-full ml-3 px-2 py-1 bg-slate-900 text-white text-[9px] font-black rounded-md opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap z-50 hidden md:block shadow-md",children:t.label}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:969,columnNumber:23}
+,this)]}
+,t.id,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:946,columnNumber:19}
+,this)}
+),e.jsxDEV("button",{
+onClick:()=>{
+Ne(),_&&_("","","Science")}
+,className:`w-full py-2.5 px-3 rounded-xl transition-all duration-200 flex items-center gap-3 font-black text-xs group relative border border-dashed text-indigo-600 border-indigo-200 hover:bg-indigo-50/50 mt-2
+                  ${
+u?"md:justify-center md:px-0":""}
+
+                `,title:"Open Diagram Lab",children:[e.jsxDEV("span",{
+className:"text-indigo-600",children:e.jsxDEV(nt,{
+size:15}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:991,columnNumber:19}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:990,columnNumber:17}
+,this),e.jsxDEV("span",{
+className:`transition-all duration-300 ${
+u?"md:hidden":"block"}
+`,children:"Open Diagram Lab 🎨"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:993,columnNumber:17}
+,this),u&&e.jsxDEV("div",{
+className:"absolute left-full ml-3 px-2 py-1 bg-slate-900 text-white text-[9px] font-black rounded-md opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap z-50 hidden md:block shadow-md",children:"Diagram Lab"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:998,columnNumber:19}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:978,columnNumber:15}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:936,columnNumber:13}
+,this),!u&&e.jsxDEV("div",{
+className:"mt-auto p-3 bg-indigo-50/60 border border-indigo-100 rounded-2xl space-y-2 select-none",children:[e.jsxDEV("div",{
+className:"flex items-center justify-between",children:[e.jsxDEV("div",{
+className:"flex items-center space-x-1.5",children:[e.jsxDEV(de,{
+className:"w-3.5 h-3.5 text-indigo-600 animate-pulse"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1010,columnNumber:21}
+,this),e.jsxDEV("span",{
+className:"font-extrabold text-[9px] text-slate-750 uppercase tracking-wider",children:r==="Hindi"?"टूलकिट उपयोग":"Toolkit Usage"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1011,columnNumber:21}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1009,columnNumber:19}
+,this),e.jsxDEV("span",{
+className:`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${
+c.count>=c.limit?"bg-rose-100 text-rose-700":"bg-emerald-100 text-emerald-700"}
+`,children:c.count>=c.limit?r==="Hindi"?"सीमा पूर्ण 🛑":"Full 🛑":r==="Hindi"?"सक्रिय ✅":"Active ✅"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1015,columnNumber:19}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1008,columnNumber:17}
+,this),e.jsxDEV("div",{
+className:"space-y-1",children:[e.jsxDEV("div",{
+className:"w-full bg-slate-100 border border-slate-200/40 rounded-full h-1.5 overflow-hidden",children:e.jsxDEV("div",{
+className:`h-full transition-all duration-300 ${
+c.count>=c.limit?"bg-rose-500":c.count>=c.limit*.8?"bg-amber-500 animate-pulse":"bg-indigo-600"}
+`,style:{
+width:`${
+Math.min(100,c.count/c.limit*100)}
+%`}
+}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1029,columnNumber:21}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1028,columnNumber:19}
+,this),e.jsxDEV("div",{
+className:"flex justify-between text-[8px] font-extrabold text-slate-500",children:[e.jsxDEV("span",{
+children:r==="Hindi"?"दैनिक सीमा (50)":"Daily Limit (50)"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1041,columnNumber:21}
+,this),e.jsxDEV("span",{
+children:[c.count," / ",c.limit]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1042,columnNumber:21}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1040,columnNumber:19}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1027,columnNumber:17}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1007,columnNumber:15}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:904,columnNumber:11}
+,this),e.jsxDEV("main",{
+className:"flex-1 p-4 sm:p-6 overflow-y-auto space-y-6",children:[j==="study"&&e.jsxDEV("div",{
+className:"space-y-4",children:[e.jsxDEV("div",{
+className:"flex gap-1.5 flex-wrap bg-slate-100 p-1 rounded-2xl",children:["notes","summarize","explain","mindmap","qpaper","ocr","pdf"].map(t=>e.jsxDEV("button",{
+onClick:()=>{
+xt(t),H(null)}
+,className:`px-3 py-1.5 text-[10px] font-black uppercase rounded-xl transition ${
+p===t?"bg-white text-indigo-600 shadow":"text-slate-500 hover:text-slate-800"}
+`,children:t}
+,t,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1058,columnNumber:23}
+,this))}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1056,columnNumber:19}
+,this),e.jsxDEV("div",{
+className:"grid grid-cols-1 md:grid-cols-3 gap-6",children:[e.jsxDEV("div",{
+className:"space-y-4 bg-slate-50/50 p-4 rounded-3xl border border-slate-100",children:[e.jsxDEV("h3",{
+className:"font-extrabold text-[11px] text-slate-800 uppercase tracking-wider",children:"AI Parameters"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1071,columnNumber:23}
+,this),p!=="ocr"&&p!=="pdf"&&e.jsxDEV("div",{
+children:[e.jsxDEV("label",{
+className:"block text-[8px] uppercase font-black text-slate-400 tracking-wider mb-1",children:"Topic / Term"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1075,columnNumber:27}
+,this),e.jsxDEV("div",{
+className:"relative",children:[e.jsxDEV("input",{
+type:"text",value:E,onChange:t=>ge(t.target.value),placeholder:"e.g. Gravity, Organic Chemistry",className:"w-full p-2.5 text-xs border border-slate-200 rounded-xl outline-none"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1077,columnNumber:29}
+,this),e.jsxDEV("button",{
+onClick:_t,className:`absolute right-2 top-2.5 p-0.5 rounded-lg text-slate-400 hover:text-indigo-600 ${
+Ot?"animate-pulse text-red-500":""}
+`,children:e.jsxDEV(ms,{
+size:14}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1088,columnNumber:31}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1084,columnNumber:29}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1076,columnNumber:27}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1074,columnNumber:25}
+,this),p!=="summarize"&&p!=="mindmap"&&p!=="ocr"&&p!=="pdf"&&e.jsxDEV("div",{
+className:"grid grid-cols-2 gap-2",children:[e.jsxDEV("div",{
+children:[e.jsxDEV("label",{
+className:"block text-[8px] uppercase font-black text-slate-400 tracking-wider mb-1",children:"Subject"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1097,columnNumber:29}
+,this),e.jsxDEV("select",{
+value:f,onChange:t=>Nt(t.target.value),className:"w-full p-2 text-xs border border-slate-200 rounded-xl bg-white outline-none",children:["Mathematics","Science","Biology","Physics","Chemistry","English"].map(t=>e.jsxDEV("option",{
+value:t,children:t}
+,t,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1104,columnNumber:33}
+,this))}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1098,columnNumber:29}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1096,columnNumber:27}
+,this),e.jsxDEV("div",{
+children:[e.jsxDEV("label",{
+className:"block text-[8px] uppercase font-black text-slate-400 tracking-wider mb-1",children:"Grade Level"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1109,columnNumber:29}
+,this),e.jsxDEV("select",{
+value:I,onChange:t=>bt(t.target.value),className:"w-full p-2 text-xs border border-slate-200 rounded-xl bg-white outline-none",children:["8","9","10","11","12"].map(t=>e.jsxDEV("option",{
+value:t,children:["Class ",t]}
+,t,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1116,columnNumber:33}
+,this))}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1110,columnNumber:29}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1108,columnNumber:27}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1095,columnNumber:25}
+,this),p==="explain"&&e.jsxDEV("div",{
+children:[e.jsxDEV("label",{
+className:"block text-[8px] uppercase font-black text-slate-400 tracking-wider mb-1",children:"Explanation Style"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1125,columnNumber:27}
+,this),e.jsxDEV("select",{
+value:ke,onChange:t=>ft(t.target.value),className:"w-full p-2 text-xs border border-slate-200 bg-white rounded-xl outline-none",children:[e.jsxDEV("option",{
+value:"Simple",children:"Simple Student English"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1131,columnNumber:29}
+,this),e.jsxDEV("option",{
+value:"Analogies",children:"Vivid Analogy & Metaphor"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1132,columnNumber:29}
+,this),e.jsxDEV("option",{
+value:"5-year-old",children:"Like I am 5 Years Old"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1133,columnNumber:29}
+,this),e.jsxDEV("option",{
+value:"Step-by-step",children:"Meticulous Step-by-Step"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1134,columnNumber:29}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1126,columnNumber:27}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1124,columnNumber:25}
+,this),p==="ocr"&&e.jsxDEV("div",{
+children:[e.jsxDEV("label",{
+className:"block text-[8px] uppercase font-black text-slate-400 tracking-wider mb-1",children:"Upload Homework / Textbook Image"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1141,columnNumber:27}
+,this),e.jsxDEV("div",{
+className:"border border-dashed border-slate-200 rounded-2xl p-4 text-center hover:bg-slate-50 transition relative",children:[e.jsxDEV("input",{
+type:"file",accept:"image/*",onChange:ts,className:"absolute inset-0 opacity-0 cursor-pointer"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1143,columnNumber:29}
+,this),e.jsxDEV(us,{
+className:"w-8 h-8 text-slate-400 mx-auto mb-1.5"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1149,columnNumber:29}
+,this),e.jsxDEV("span",{
+className:"text-[10px] text-slate-500 font-bold block",children:"Click to select image file"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1150,columnNumber:29}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1142,columnNumber:27}
+,this),Y&&e.jsxDEV("img",{
+src:Y,alt:"OCR Upload Preview",className:"mt-2 w-full h-24 object-cover rounded-xl border"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1152,columnNumber:40}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1140,columnNumber:25}
+,this),p==="pdf"&&e.jsxDEV("div",{
+children:[e.jsxDEV("label",{
+className:"block text-[8px] uppercase font-black text-slate-400 tracking-wider mb-1",children:"Paste Document / Note Content"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1158,columnNumber:27}
+,this),e.jsxDEV("textarea",{
+value:Se,onChange:t=>Tt(t.target.value),placeholder:"Paste your long notes, PDF texts, or study guides here...",className:"w-full h-32 p-2 text-xs border border-slate-200 rounded-xl outline-none resize-none font-mono"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1159,columnNumber:27}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1157,columnNumber:25}
+,this),e.jsxDEV("button",{
+onClick:()=>We(),disabled:G,className:"w-full py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-wide flex justify-center items-center gap-1.5 shadow",children:G?"Gemini Reasoning...":"Run AI Tool ⚡"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1168,columnNumber:23}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1070,columnNumber:21}
+,this),e.jsxDEV("div",{
+className:"col-span-2 bg-slate-50/20 rounded-3xl border border-slate-100 p-4 min-h-[300px] flex flex-col justify-between",children:G?e.jsxDEV("div",{
+className:"flex-1 flex flex-col items-center justify-center space-y-2",children:[e.jsxDEV("span",{
+className:"animate-spin text-2xl",children:"⏳"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1181,columnNumber:27}
+,this),e.jsxDEV("span",{
+className:"text-xs font-bold text-slate-500 animate-pulse",children:"Running Gemini analysis models..."}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1182,columnNumber:27}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1180,columnNumber:25}
+,this):a?e.jsxDEV("div",{
+className:"space-y-4 flex-1 flex flex-col justify-between",children:[e.jsxDEV("div",{
+className:"flex justify-between items-center border-b pb-2",children:[e.jsxDEV("h4",{
+className:"font-extrabold text-xs text-indigo-900",children:a.title||"Gemini Extraction Result"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1187,columnNumber:29}
+,this),e.jsxDEV("div",{
+className:"flex gap-1.5",children:[e.jsxDEV("button",{
+onClick:()=>Q(a.content||a.summary||a.explanation||a.paperText||""),className:`text-[10px] font-bold px-2 py-1 rounded-lg border flex items-center gap-1 ${
+re?"bg-indigo-600 text-white":"bg-white"}
+`,children:[e.jsxDEV(k,{
+size:12}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1193,columnNumber:33}
+,this)," ",re?"Mute":"Listen"]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1189,columnNumber:31}
+,this),e.jsxDEV("button",{
+onClick:Zt,className:"text-[10px] bg-white text-slate-700 font-bold px-2 py-1 rounded-lg border hover:bg-slate-50 transition",children:"Save Note 📝"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1195,columnNumber:31}
+,this),_&&e.jsxDEV("button",{
+onClick:()=>{
+const t=a.title||E||"Custom Concept",s=`A detailed, high-contrast textbook-grade study diagram of ${
+t}
+ with academic labeling pointers.`;
+_(s,t,f)}
+,className:"text-[10px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-250 font-black px-2 py-1 rounded-lg transition flex items-center gap-1.5",children:[e.jsxDEV(nt,{
+size:11}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1210,columnNumber:35}
+,this),e.jsxDEV("span",{
+children:"Diagram Lab 🎨"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1211,columnNumber:35}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1202,columnNumber:33}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1188,columnNumber:29}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1186,columnNumber:27}
+,this),Et&&e.jsxDEV("div",{
+className:"p-2.5 bg-amber-50 border border-amber-200/60 rounded-xl text-[10px] text-amber-850 leading-normal select-none font-sans",children:["⚠️ ",e.jsxDEV("strong",{
+children:"Offline Fallback Mode"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1219,columnNumber:34}
+,this),": Gemini daily API quota exceeded. Running internal high-quality study generator. Configure a custom key in settings for unlimited live AI."]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1218,columnNumber:29}
+,this),e.jsxDEV("div",{
+className:"flex-1 overflow-y-auto max-h-[350px] text-xs leading-relaxed text-slate-700 whitespace-pre-line font-medium p-1",children:[p==="mindmap"?e.jsxDEV("div",{
+className:"space-y-4 font-sans",children:[e.jsxDEV("div",{
+className:"flex items-center justify-between border-b border-indigo-100 pb-2",children:[e.jsxDEV("div",{
+className:"flex items-center space-x-1.5",children:[e.jsxDEV("span",{
+className:"text-sm",children:"🌳"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1228,columnNumber:37}
+,this),e.jsxDEV("span",{
+className:"font-extrabold text-[11px] text-slate-800 uppercase tracking-wider",children:r==="Hindi"?"माइंड मैप विज़ुअलाइज़र":"Mind Map Visualizer"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1229,columnNumber:37}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1227,columnNumber:35}
+,this),e.jsxDEV("div",{
+className:"flex bg-slate-100 p-0.5 rounded-xl text-[9px] font-bold",children:[e.jsxDEV("button",{
+onClick:()=>Ie("visual"),className:`px-2.5 py-1 rounded-lg transition-all ${
+W==="visual"?"bg-white text-indigo-600 shadow-sm":"text-slate-500 hover:text-slate-800"}
+`,children:["🎨 ",r==="Hindi"?"विज़ुअल मैप":"Visual Map"]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1234,columnNumber:37}
+,this),e.jsxDEV("button",{
+onClick:()=>Ie("tree"),className:`px-2.5 py-1 rounded-lg transition-all ${
+W==="tree"?"bg-white text-indigo-600 shadow-sm":"text-slate-500 hover:text-slate-800"}
+`,children:["🌳 ",r==="Hindi"?"ट्री व्यू":"Tree View"]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1240,columnNumber:37}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1233,columnNumber:35}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1226,columnNumber:33}
+,this),W==="visual"?e.jsxDEV("div",{
+className:"space-y-4",children:[e.jsxDEV("div",{
+className:"flex justify-center my-2",children:e.jsxDEV("div",{
+className:"bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-black text-xs px-5 py-3 rounded-2xl shadow-md border-2 border-indigo-200 text-center relative max-w-xs transform hover:scale-105 transition duration-300",children:[e.jsxDEV("div",{
+className:"absolute -top-2.5 left-1/2 -translate-x-1/2 bg-yellow-400 text-[8px] font-black uppercase text-indigo-950 px-2 py-0.5 rounded-full shadow-sm tracking-wider whitespace-nowrap",children:r==="Hindi"?"मुख्य विषय":"Main Topic"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1254,columnNumber:41}
+,this),e.jsxDEV("span",{
+className:"block mt-0.5 tracking-wide",children:a.name}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1257,columnNumber:41}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1253,columnNumber:39}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1252,columnNumber:37}
+,this),e.jsxDEV("div",{
+className:"space-y-3",children:(Xe=a.children)==null?void 0:Xe.map((t,s)=>{
+const i=!!gt[`child-${
+s}
+`],o=t.children&&t.children.length>0;
+return e.jsxDEV("div",{
+className:"bg-white rounded-2xl border border-indigo-50 shadow-xs overflow-hidden transition-all duration-300",children:[e.jsxDEV("div",{
+className:"flex items-center justify-between p-3 bg-gradient-to-r from-indigo-50/20 to-slate-50/35 border-b border-indigo-50/40",children:[e.jsxDEV("div",{
+className:"flex items-center space-x-2 flex-1 min-w-0 pr-1",children:[e.jsxDEV("span",{
+className:"flex items-center justify-center w-5 h-5 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-lg shrink-0",children:s+1}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1271,columnNumber:49}
+,this),e.jsxDEV("span",{
+className:"font-extrabold text-xs text-slate-800 leading-tight truncate",children:t.name}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1274,columnNumber:49}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1270,columnNumber:47}
+,this),e.jsxDEV("div",{
+className:"flex items-center space-x-1.5 shrink-0",children:[o&&e.jsxDEV("button",{
+onClick:()=>ye(n=>({
+...n,[`child-${
+s}
+`]:!i}
+)),className:"p-1 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-55 transition-all text-[9px] font-bold flex items-center gap-0.5",title:i?"Collapse":"Expand",children:[e.jsxDEV("span",{
+className:"uppercase text-[8px]",children:i?r==="Hindi"?"छिपाएं":"Hide":`${
+r==="Hindi"?"देखें":"Show"}
+ (${
+t.children.length}
+)`}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1286,columnNumber:53}
+,this),e.jsxDEV(it,{
+size:11,className:`transform transition-transform ${
+i?"rotate-90":""}
+`}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1292,columnNumber:53}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1281,columnNumber:51}
+,this),e.jsxDEV("button",{
+onClick:()=>we(t.name),className:"px-2 py-0.5 text-indigo-600 hover:bg-indigo-50 border border-indigo-100 bg-indigo-50/20 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all",children:["💡 ",r==="Hindi"?"समझें":"Explain"]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1296,columnNumber:49}
+,this),e.jsxDEV("button",{
+onClick:()=>Q(t.name),className:"p-1 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-50 transition-all",title:"Speak text",children:e.jsxDEV(k,{
+size:12}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1308,columnNumber:51}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1303,columnNumber:49}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1279,columnNumber:47}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1269,columnNumber:45}
+,this),i&&o&&e.jsxDEV("div",{
+className:"p-2.5 bg-slate-50/40 space-y-2 border-t border-slate-100/40",children:e.jsxDEV("div",{
+className:"grid grid-cols-1 sm:grid-cols-2 gap-2",children:t.children.map((n,S)=>e.jsxDEV("div",{
+className:"bg-white border border-slate-150 p-2 rounded-xl shadow-2xs hover:border-indigo-100 transition-all flex items-center justify-between",children:[e.jsxDEV("div",{
+className:"flex items-center space-x-1.5 flex-1 min-w-0 pr-1.5",children:[e.jsxDEV("span",{
+className:"w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0 animate-pulse"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1322,columnNumber:57}
+,this),e.jsxDEV("span",{
+className:"text-[10px] font-bold text-slate-700 truncate leading-tight",children:n.name}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1323,columnNumber:57}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1321,columnNumber:55}
+,this),e.jsxDEV("div",{
+className:"flex items-center space-x-1 shrink-0",children:[e.jsxDEV("button",{
+onClick:()=>we(n.name),className:"px-1.5 py-0.5 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 text-slate-500 rounded-lg text-[7px] font-black uppercase transition-all",title:"Explain this detail",children:"AI"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1329,columnNumber:57}
+,this),e.jsxDEV("button",{
+onClick:()=>Q(n.name),className:"p-0.5 text-slate-300 hover:text-indigo-600 transition-all",children:e.jsxDEV(k,{
+size:10}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1341,columnNumber:59}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1337,columnNumber:57}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1328,columnNumber:55}
+,this)]}
+,S,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1317,columnNumber:53}
+,this))}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1315,columnNumber:49}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1314,columnNumber:47}
+,this)]}
+,s,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1268,columnNumber:43}
+,this)}
+)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1262,columnNumber:37}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1250,columnNumber:35}
+,this):e.jsxDEV("div",{
+className:"space-y-3 font-mono text-[10px] bg-indigo-950 text-indigo-200 p-4 rounded-2xl shadow-inner",children:[e.jsxDEV("span",{
+className:"font-black text-xs text-white",children:"🌳 Mind Map Tree Structure"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1356,columnNumber:37}
+,this),e.jsxDEV("div",{
+className:"space-y-1",children:[e.jsxDEV("strong",{
+children:a.name}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1358,columnNumber:39}
+,this),(Ke=a.children)==null?void 0:Ke.map((t,s)=>{
+var i;
+return e.jsxDEV("div",{
+className:"pl-4 border-l border-indigo-700/50 mt-1",children:[e.jsxDEV("span",{
+children:["├── ",t.name]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1361,columnNumber:43}
+,this),(i=t.children)==null?void 0:i.map((o,n)=>e.jsxDEV("div",{
+className:"pl-6 text-indigo-400",children:["├── ",o.name]}
+,n,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1363,columnNumber:45}
+,this))]}
+,s,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1360,columnNumber:41}
+,this)}
+)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1357,columnNumber:37}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1355,columnNumber:35}
+,this),h&&e.jsxDEV("div",{
+className:"mt-4 p-4 bg-gradient-to-br from-indigo-950 to-indigo-900 text-white rounded-3xl shadow-xl space-y-3 border border-indigo-800 animate-fadeIn relative overflow-hidden",children:[e.jsxDEV("div",{
+className:"absolute -right-6 -bottom-6 w-24 h-24 bg-indigo-500/10 rounded-full blur-xl pointer-events-none"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1374,columnNumber:37}
+,this),e.jsxDEV("div",{
+className:"flex justify-between items-center pb-2 border-b border-indigo-800/60",children:[e.jsxDEV("div",{
+className:"flex items-center space-x-1.5",children:[e.jsxDEV(ue,{
+className:"w-4 h-4 text-yellow-300 stroke-[2] animate-bounce"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1378,columnNumber:41}
+,this),e.jsxDEV("span",{
+className:"text-[9px] font-black uppercase tracking-wider text-indigo-300",children:r==="Hindi"?"एआई ट्यूटर स्पष्टीकरण":"AI Tutor Explanation"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1379,columnNumber:41}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1377,columnNumber:39}
+,this),e.jsxDEV("button",{
+onClick:()=>$(null),className:"text-indigo-400 hover:text-white p-1 rounded-lg transition-all",children:e.jsxDEV(lt,{
+size:14}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1387,columnNumber:41}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1383,columnNumber:39}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1376,columnNumber:37}
+,this),e.jsxDEV("div",{
+className:"space-y-2",children:[e.jsxDEV("h4",{
+className:"text-xs font-black text-white flex items-center gap-1.5",children:["💡 ",h.nodeName]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1392,columnNumber:39}
+,this),De?e.jsxDEV("div",{
+className:"flex items-center space-x-2 py-3 text-indigo-300 text-[11px] font-bold",children:[e.jsxDEV("span",{
+className:"w-2 h-2 rounded-full bg-yellow-400 animate-ping"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1398,columnNumber:43}
+,this),e.jsxDEV("span",{
+children:r==="Hindi"?"एआई ट्यूटर विचार कर रहा है...":"AI Tutor is thinking..."}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1399,columnNumber:43}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1397,columnNumber:41}
+,this):e.jsxDEV("p",{
+className:"text-[11px] leading-relaxed text-indigo-100 font-medium",children:h.explanation}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1402,columnNumber:41}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1391,columnNumber:37}
+,this),!De&&h.explanation&&e.jsxDEV("div",{
+className:"flex justify-between items-center pt-2 border-t border-indigo-800/40",children:[e.jsxDEV("button",{
+onClick:()=>Q(h.explanation),className:"px-3 py-1.5 bg-indigo-800 hover:bg-indigo-700 text-indigo-200 hover:text-white rounded-xl text-[10px] font-extrabold uppercase flex items-center gap-1.5 transition-all",children:[e.jsxDEV(k,{
+size:12}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1414,columnNumber:43}
+,this)," ",r==="Hindi"?"सुनें":"Listen"]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1410,columnNumber:41}
+,this),e.jsxDEV("button",{
+onClick:()=>kt(h.nodeName,h.explanation),className:"px-4 py-1.5 bg-yellow-400 hover:bg-yellow-300 text-indigo-950 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md shadow-yellow-500/10 active:scale-95",children:[e.jsxDEV(ds,{
+size:12,strokeWidth:2.5}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1421,columnNumber:43}
+,this)," ",r==="Hindi"?"नोटबुक":"Add to Note"]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1417,columnNumber:41}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1409,columnNumber:39}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1373,columnNumber:35}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1225,columnNumber:31}
+,this):a.content||a.summary||a.explanation||a.paperText||a.text||(a.summary?"See structured summary cards.":JSON.stringify(a,null,2)),a.keyTerms&&a.keyTerms.length>0&&e.jsxDEV("div",{
+className:"mt-4 space-y-2 border-t pt-3",children:[e.jsxDEV("span",{
+className:"font-extrabold text-[11px] text-slate-800 block",children:"📌 Key Term Cards Generated"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1434,columnNumber:33}
+,this),e.jsxDEV("div",{
+className:"grid grid-cols-2 gap-2",children:a.keyTerms.map((t,s)=>e.jsxDEV("div",{
+className:"p-2.5 bg-amber-50 border border-amber-100 rounded-xl",children:[e.jsxDEV("strong",{
+className:"text-amber-800 font-black block text-[10px]",children:t.term}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1438,columnNumber:39}
+,this),e.jsxDEV("p",{
+className:"text-[9px] text-amber-700 mt-0.5 leading-tight",children:t.definition}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1439,columnNumber:39}
+,this)]}
+,s,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1437,columnNumber:37}
+,this))}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1435,columnNumber:33}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1433,columnNumber:31}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1223,columnNumber:27}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1185,columnNumber:25}
+,this):e.jsxDEV("div",{
+className:"flex-1 flex flex-col items-center justify-center text-center space-y-1 p-4",children:[e.jsxDEV(de,{
+className:"w-10 h-10 text-slate-300 stroke-[1.5]"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1449,columnNumber:27}
+,this),e.jsxDEV("span",{
+className:"text-xs font-extrabold text-slate-600 block",children:"Awaiting AI Task Execution"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1450,columnNumber:27}
+,this),e.jsxDEV("p",{
+className:"text-[9px] text-slate-400 max-w-xs",children:"Run any parameters above to query Gemini models on physics, math, science, or biology details."}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1451,columnNumber:27}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1448,columnNumber:25}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1178,columnNumber:21}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1068,columnNumber:19}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1054,columnNumber:17}
+,this),j==="vocab_calc"&&e.jsxDEV("div",{
+className:"space-y-6",children:[e.jsxDEV("div",{
+className:"grid grid-cols-1 md:grid-cols-2 gap-6",children:[e.jsxDEV("div",{
+className:"bg-slate-50/50 p-4 rounded-3xl border border-slate-100 flex flex-col justify-between",children:[e.jsxDEV("div",{
+className:"space-y-4",children:[e.jsxDEV("div",{
+className:"flex justify-between items-center",children:[e.jsxDEV("h3",{
+className:"font-extrabold text-[11px] text-slate-800 uppercase tracking-wider flex items-center gap-1.5",children:[e.jsxDEV(at,{
+size:14,className:"text-indigo-600"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1469,columnNumber:29}
+,this)," AI Vocabulary Builder"]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1468,columnNumber:27}
+,this),e.jsxDEV("span",{
+className:"text-[9px] font-mono bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg font-black uppercase",children:[g.length," WORDS"]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1471,columnNumber:27}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1467,columnNumber:25}
+,this),e.jsxDEV("div",{
+className:"flex gap-1.5",children:[e.jsxDEV("input",{
+type:"text",value:y,onChange:t=>$t(t.target.value),placeholder:"Type vocabulary word...",className:"flex-1 p-2 border border-slate-200 bg-white rounded-xl text-xs outline-none"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1476,columnNumber:27}
+,this),e.jsxDEV("button",{
+onClick:Gt,disabled:ze,className:"px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold",children:ze?"Looking...":"Search"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1483,columnNumber:27}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1475,columnNumber:25}
+,this),d&&e.jsxDEV("div",{
+className:"p-3 bg-white border border-indigo-100 rounded-2xl space-y-2 relative shadow-sm",children:[e.jsxDEV("div",{
+className:"flex justify-between items-center",children:[e.jsxDEV("strong",{
+className:"text-xs font-black text-indigo-900 uppercase tracking-tight",children:d.word}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1495,columnNumber:31}
+,this),e.jsxDEV("span",{
+className:"text-[9px] font-bold text-slate-400 italic",children:["(",d.partOfSpeech,")"]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1496,columnNumber:31}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1494,columnNumber:29}
+,this),e.jsxDEV("p",{
+className:"text-[10px] text-slate-600 leading-relaxed font-medium",children:[e.jsxDEV("strong",{
+children:"Def:"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1498,columnNumber:99}
+,this)," ",d.definition]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1498,columnNumber:29}
+,this),e.jsxDEV("p",{
+className:"text-[10px] text-slate-500 italic leading-none",children:[e.jsxDEV("strong",{
+children:"Ex:"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1499,columnNumber:91}
+,this),' "',d.example,'"']}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1499,columnNumber:29}
+,this),e.jsxDEV("div",{
+className:"flex justify-between items-center pt-1.5 border-t",children:[e.jsxDEV("span",{
+className:"text-[9px] font-bold text-slate-400",children:["Synonyms: ",(Ze=d.synonyms)==null?void 0:Ze.join(", ")]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1501,columnNumber:31}
+,this),e.jsxDEV("button",{
+onClick:Ht,className:"text-[9px] font-black text-emerald-600 border border-emerald-200 bg-emerald-50 px-2 py-1 rounded-lg hover:bg-emerald-100",children:"+ Save to Deck"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1502,columnNumber:31}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1500,columnNumber:29}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1493,columnNumber:27}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1466,columnNumber:23}
+,this),g.length>0&&e.jsxDEV("div",{
+className:"mt-4 border-t pt-3 space-y-2",children:[e.jsxDEV("span",{
+className:"text-[9px] font-black uppercase text-slate-400 block",children:"My Saved Deck"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1515,columnNumber:27}
+,this),e.jsxDEV("div",{
+className:"flex gap-1.5 flex-wrap max-h-[100px] overflow-y-auto",children:g.map((t,s)=>e.jsxDEV("span",{
+className:"text-[10px] font-bold bg-indigo-50 border border-indigo-100 text-indigo-700 px-2 py-1 rounded-lg",children:t.word}
+,s,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1518,columnNumber:31}
+,this))}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1516,columnNumber:27}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1514,columnNumber:25}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1465,columnNumber:21}
+,this),e.jsxDEV("div",{
+className:"bg-slate-50/50 p-4 rounded-3xl border border-slate-100 space-y-3",children:[e.jsxDEV("h3",{
+className:"font-extrabold text-[11px] text-slate-800 uppercase tracking-wider flex items-center gap-1.5",children:[e.jsxDEV(pt,{
+size:14,className:"text-cyan-600"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1530,columnNumber:25}
+,this)," Scientific Calculator"]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1529,columnNumber:23}
+,this),e.jsxDEV("div",{
+className:"bg-slate-900 p-3 rounded-2xl text-right text-white font-mono font-black text-lg select-none min-h-[48px] shadow-inner",children:Oe}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1532,columnNumber:23}
+,this),e.jsxDEV("div",{
+className:"grid grid-cols-4 gap-1 text-[10px] font-mono",children:["sin(","cos(","tan(","DEL","log(","ln(","pi","C","(",")","^","/","7","8","9","*","4","5","6","-","1","2","3","+","0",".","e","="].map(t=>e.jsxDEV("button",{
+onClick:()=>Ut(t),className:`py-2 rounded-lg font-black transition cursor-pointer ${
+t==="="?"bg-cyan-600 text-white hover:bg-cyan-700 col-span-2":["C","DEL"].includes(t)?"bg-rose-50 text-rose-600 hover:bg-rose-100":"bg-white border border-slate-100 hover:bg-slate-100 text-slate-700"}
+`,children:t}
+,t,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1537,columnNumber:27}
+,this))}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1535,columnNumber:23}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1528,columnNumber:21}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1462,columnNumber:19}
+,this),e.jsxDEV("div",{
+className:"bg-slate-50/50 p-4 rounded-3xl border border-slate-100 space-y-4",children:[e.jsxDEV("div",{
+className:"flex justify-between items-center",children:[e.jsxDEV("h3",{
+className:"font-extrabold text-[11px] text-slate-800 uppercase tracking-wider",children:"📐 Math & Physics Formula Library"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1552,columnNumber:23}
+,this),e.jsxDEV("div",{
+className:"relative w-48",children:[e.jsxDEV(st,{
+className:"w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1554,columnNumber:25}
+,this),e.jsxDEV("input",{
+type:"text",value:_e,onChange:t=>At(t.target.value),placeholder:"Search formula...",className:"w-full pl-8 pr-2 py-1.5 border border-slate-200 bg-white rounded-xl text-[10px] outline-none"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1555,columnNumber:25}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1553,columnNumber:23}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1551,columnNumber:21}
+,this),e.jsxDEV("div",{
+className:"grid grid-cols-1 md:grid-cols-3 gap-3",children:Mt.filter(t=>t.title.toLowerCase().includes(_e.toLowerCase())).map((t,s)=>e.jsxDEV("div",{
+className:"bg-white p-3 rounded-2xl border border-slate-100 space-y-1.5 shadow-xs hover:border-indigo-300 transition",children:[e.jsxDEV("span",{
+className:"text-[8px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded",children:t.subject}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1568,columnNumber:27}
+,this),e.jsxDEV("strong",{
+className:"text-[10px] font-black text-slate-800 block",children:t.title}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1569,columnNumber:27}
+,this),e.jsxDEV("div",{
+className:"bg-slate-50 p-2 rounded-lg font-mono text-[10px] font-black text-indigo-900 border text-center",children:t.expr}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1570,columnNumber:27}
+,this),e.jsxDEV("p",{
+className:"text-[9px] text-slate-400 font-bold leading-tight mt-1",children:t.desc}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1571,columnNumber:27}
+,this)]}
+,s,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1567,columnNumber:25}
+,this))}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1565,columnNumber:21}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1550,columnNumber:19}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1461,columnNumber:17}
+,this),j==="productivity"&&e.jsxDEV("div",{
+className:"space-y-6",children:[e.jsxDEV("div",{
+className:"grid grid-cols-1 md:grid-cols-2 gap-6",children:[e.jsxDEV("div",{
+className:"bg-slate-50/50 p-4 rounded-3xl border border-slate-100 flex flex-col justify-between space-y-4",children:[e.jsxDEV("div",{
+className:"space-y-3",children:[e.jsxDEV("h3",{
+className:"font-extrabold text-[11px] text-slate-800 uppercase tracking-wider",children:"🎯 Daily Study Goals"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1589,columnNumber:25}
+,this),e.jsxDEV("div",{
+className:"flex gap-1.5",children:[e.jsxDEV("input",{
+type:"text",value:se,onChange:t=>Le(t.target.value),placeholder:"Add study target (e.g. solve trigonometry quiz)...",className:"flex-1 p-2 border border-slate-200 bg-white rounded-xl text-xs outline-none"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1592,columnNumber:27}
+,this),e.jsxDEV("button",{
+onClick:qt,className:"px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold",children:"+"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1599,columnNumber:27}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1591,columnNumber:25}
+,this),e.jsxDEV("div",{
+className:"space-y-2",children:D.map(t=>e.jsxDEV("div",{
+className:"flex items-center justify-between p-2 bg-white rounded-xl border border-slate-100 shadow-xs",children:[e.jsxDEV("button",{
+onClick:()=>Bt(t.id),className:"flex items-center gap-2 text-left",children:[t.completed?e.jsxDEV(xs,{
+size:14,className:"text-indigo-600"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1606,columnNumber:48}
+,this):e.jsxDEV(Ns,{
+size:14,className:"text-slate-400"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1606,columnNumber:105}
+,this),e.jsxDEV("span",{
+className:`text-[11px] font-bold ${
+t.completed?"line-through text-slate-400":"text-slate-700"}
+`,children:t.text}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1607,columnNumber:33}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1605,columnNumber:31}
+,this),e.jsxDEV("button",{
+onClick:()=>q(s=>s.filter(i=>i.id!==t.id)),className:"text-slate-300 hover:text-rose-600 p-0.5",children:e.jsxDEV(rt,{
+size:12}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1609,columnNumber:158}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1609,columnNumber:31}
+,this)]}
+,t.id,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1604,columnNumber:29}
+,this))}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1602,columnNumber:25}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1588,columnNumber:23}
+,this),e.jsxDEV("div",{
+className:"bg-indigo-50 border border-indigo-100/50 p-3 rounded-2xl flex items-center justify-between",children:[e.jsxDEV("span",{
+className:"text-[10px] text-indigo-900 font-bold",children:["Completion: ",D.filter(t=>t.completed).length,"/",D.length]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1616,columnNumber:25}
+,this),e.jsxDEV("span",{
+className:"text-[9px] font-black uppercase text-indigo-700 bg-white border border-indigo-100 px-2 py-0.5 rounded-lg",children:"+15 XP local reward per goal"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1617,columnNumber:25}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1615,columnNumber:23}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1587,columnNumber:21}
+,this),e.jsxDEV("div",{
+className:"bg-slate-50/50 p-4 rounded-3xl border border-slate-100 space-y-4",children:[e.jsxDEV("h3",{
+className:"font-extrabold text-[11px] text-slate-800 uppercase tracking-wider",children:"⏳ Exam Countdown Timers"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1623,columnNumber:23}
+,this),e.jsxDEV("div",{
+className:"grid grid-cols-3 gap-1.5 items-end",children:[e.jsxDEV("div",{
+className:"col-span-2",children:[e.jsxDEV("label",{
+className:"block text-[8px] uppercase font-black text-slate-400 mb-1",children:"Exam Title"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1627,columnNumber:27}
+,this),e.jsxDEV("input",{
+type:"text",value:R.title,onChange:t=>le(s=>({
+...s,title:t.target.value}
+)),placeholder:"e.g. Science Finals",className:"w-full p-2 border border-slate-200 bg-white rounded-xl text-[10px] outline-none"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1628,columnNumber:27}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1626,columnNumber:25}
+,this),e.jsxDEV("div",{
+children:[e.jsxDEV("label",{
+className:"block text-[8px] uppercase font-black text-slate-400 mb-1",children:"Date"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1637,columnNumber:27}
+,this),e.jsxDEV("input",{
+type:"date",value:R.date,onChange:t=>le(s=>({
+...s,date:t.target.value}
+)),className:"w-full p-2 border border-slate-200 bg-white rounded-xl text-[10px] outline-none"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1638,columnNumber:27}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1636,columnNumber:25}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1625,columnNumber:23}
+,this),e.jsxDEV("button",{
+onClick:Jt,className:"w-full py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase",children:"Add Exam Date"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1646,columnNumber:23}
+,this),e.jsxDEV("div",{
+className:"space-y-2 max-h-[120px] overflow-y-auto",children:z.length===0?e.jsxDEV("p",{
+className:"text-[10px] text-slate-400 italic",children:"No exams added yet."}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1650,columnNumber:27}
+,this):z.map(t=>e.jsxDEV("div",{
+className:"flex items-center justify-between p-2 bg-white rounded-xl border border-slate-100 shadow-xs",children:[e.jsxDEV("div",{
+children:[e.jsxDEV("span",{
+className:"text-[8px] font-black uppercase bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded mr-1.5",children:t.subject}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1655,columnNumber:33}
+,this),e.jsxDEV("strong",{
+className:"text-[10px] font-black text-slate-800",children:t.title}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1656,columnNumber:33}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1654,columnNumber:31}
+,this),e.jsxDEV("div",{
+className:"flex items-center gap-2",children:[e.jsxDEV("span",{
+className:"text-[10px] font-mono font-black text-indigo-600",children:Wt(t.date)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1659,columnNumber:33}
+,this),e.jsxDEV("button",{
+onClick:()=>Qt(t.id),className:"text-slate-300 hover:text-rose-600 p-0.5",children:e.jsxDEV(rt,{
+size:12}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1660,columnNumber:133}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1660,columnNumber:33}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1658,columnNumber:31}
+,this)]}
+,t.id,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1653,columnNumber:29}
+,this))}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1648,columnNumber:23}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1622,columnNumber:21}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1584,columnNumber:19}
+,this),e.jsxDEV("div",{
+className:"bg-slate-50/50 p-4 rounded-3xl border border-slate-100 space-y-3",children:[e.jsxDEV("h3",{
+className:"font-extrabold text-[11px] text-slate-800 uppercase tracking-wider",children:"📅 Spaced Revision Planner"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1671,columnNumber:21}
+,this),e.jsxDEV("p",{
+className:"text-[9px] text-slate-400 font-bold leading-none mb-2",children:"Active recall intervals automatically logged on note creation."}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1672,columnNumber:21}
+,this),e.jsxDEV("div",{
+className:"grid grid-cols-1 md:grid-cols-2 gap-3",children:be.length===0?e.jsxDEV("p",{
+className:"text-[10px] text-slate-400 italic",children:"No notes logged in your Notebook tab yet."}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1676,columnNumber:25}
+,this):be.map(t=>{
+const s=F.find(i=>i.noteId===t.id);
+return e.jsxDEV("div",{
+className:"bg-white p-3 rounded-2xl border border-slate-100 flex items-center justify-between shadow-xs",children:[e.jsxDEV("div",{
+children:[e.jsxDEV("span",{
+className:"text-[8px] font-black uppercase bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded mr-2",children:t.subject}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1683,columnNumber:33}
+,this),e.jsxDEV("strong",{
+className:"text-[10px] font-black text-slate-800",children:t.title}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1684,columnNumber:33}
+,this),e.jsxDEV("span",{
+className:"block text-[8px] text-slate-400 mt-1",children:["Stage: ",s?s.stage+1:"Not Scheduled"," | Next review: ",s?s.nextDate:"Pending study"]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1685,columnNumber:33}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1682,columnNumber:31}
+,this),e.jsxDEV("button",{
+onClick:()=>es(t.id,t.title),className:"text-[9px] font-black uppercase text-indigo-600 border border-indigo-200 bg-indigo-50/55 px-2.5 py-1.5 rounded-xl hover:bg-indigo-100",children:"Log Study Session"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1687,columnNumber:31}
+,this)]}
+,t.id,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1681,columnNumber:29}
+,this)}
+)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1674,columnNumber:21}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1670,columnNumber:19}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1581,columnNumber:17}
+,this),j==="focus"&&e.jsxDEV("div",{
+className:"space-y-6",children:[e.jsxDEV("div",{
+className:"grid grid-cols-1 md:grid-cols-2 gap-6",children:[e.jsxDEV("div",{
+className:"bg-slate-50/50 p-4 rounded-3xl border border-slate-100 flex flex-col justify-between",children:[e.jsxDEV("div",{
+className:"space-y-3",children:[e.jsxDEV("h3",{
+className:"font-extrabold text-[11px] text-slate-800 uppercase tracking-wider flex items-center gap-1.5",children:[e.jsxDEV(bs,{
+size:14,className:"text-indigo-600"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1711,columnNumber:27}
+,this)," Buddy Study Circles"]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1710,columnNumber:25}
+,this),e.jsxDEV("div",{
+className:"space-y-2",children:V.map(t=>e.jsxDEV("button",{
+onClick:()=>Ft(t.id),className:`w-full p-2.5 bg-white rounded-2xl border flex items-center justify-between hover:border-indigo-200 transition text-left ${
+w===t.id?"border-indigo-600":"border-slate-100"}
+`,children:[e.jsxDEV("div",{
+className:"flex items-center gap-2",children:[e.jsxDEV("span",{
+className:"text-lg",children:"🧑‍🎓"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1722,columnNumber:33}
+,this),e.jsxDEV("div",{
+children:[e.jsxDEV("strong",{
+className:"text-[11px] font-black text-slate-800 block",children:t.name}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1724,columnNumber:35}
+,this),e.jsxDEV("span",{
+className:"text-[8px] text-slate-400 font-bold",children:["Level ",Math.floor(t.xp/100)+1," | ",t.xp," XP"]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1725,columnNumber:35}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1723,columnNumber:33}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1721,columnNumber:31}
+,this),e.jsxDEV("span",{
+className:`text-[8px] font-black uppercase px-2 py-0.5 rounded-lg ${
+t.online?"bg-emerald-50 text-emerald-700 border border-emerald-200":"bg-slate-100 text-slate-400"}
+`,children:t.online?"ONLINE":"OFFLINE"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1728,columnNumber:31}
+,this)]}
+,t.id,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1716,columnNumber:29}
+,this))}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1714,columnNumber:25}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1709,columnNumber:23}
+,this),w&&e.jsxDEV("div",{
+className:"mt-4 border-t pt-3 space-y-2",children:[e.jsxDEV("span",{
+className:"text-[9px] font-black uppercase text-slate-400 block",children:["Direct message with ",(et=V.find(t=>t.id===w))==null?void 0:et.name]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1738,columnNumber:27}
+,this),e.jsxDEV("div",{
+className:"bg-white p-2.5 rounded-2xl border max-h-[80px] overflow-y-auto space-y-1 text-[9px] font-medium leading-none text-slate-600 font-sans",children:((tt=V.find(t=>t.id===w))==null?void 0:tt.chat.map((t,s)=>e.jsxDEV("div",{
+className:`p-1 rounded ${
+t.startsWith("Me")?"bg-indigo-50/60":"bg-slate-50"}
+`,children:t}
+,s,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1741,columnNumber:31}
+,this)))||e.jsxDEV("span",{
+className:"italic text-slate-400",children:"Start a chat..."}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1742,columnNumber:35}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1739,columnNumber:27}
+,this),e.jsxDEV("div",{
+className:"flex gap-1.5",children:[e.jsxDEV("input",{
+type:"text",value:oe,onChange:t=>Be(t.target.value),placeholder:"Send materials...",className:"flex-1 p-2 border border-slate-200 rounded-xl text-[10px] bg-white outline-none"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1745,columnNumber:29}
+,this),e.jsxDEV("button",{
+onClick:Kt,className:"px-3 bg-indigo-600 text-white rounded-xl text-[10px] font-bold",children:"Send"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1752,columnNumber:29}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1744,columnNumber:27}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1737,columnNumber:25}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1708,columnNumber:21}
+,this),e.jsxDEV("div",{
+className:"bg-slate-50/50 p-4 rounded-3xl border border-slate-100 space-y-4",children:[e.jsxDEV("h3",{
+className:"font-extrabold text-[11px] text-slate-800 uppercase tracking-wider flex items-center gap-1.5",children:[e.jsxDEV(k,{
+size:14,className:"text-indigo-600"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1761,columnNumber:25}
+,this)," Focus Soundscapes & White Noise"]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1760,columnNumber:23}
+,this),Ge.map(t=>e.jsxDEV("div",{
+className:"flex items-center justify-between p-2.5 bg-white border border-slate-100 rounded-2xl shadow-xs",children:[e.jsxDEV("span",{
+className:"text-xs text-slate-700 font-extrabold",children:[t.icon," ",t.name]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1765,columnNumber:27}
+,this),e.jsxDEV("div",{
+className:"flex items-center gap-3",children:[e.jsxDEV("input",{
+type:"range",min:"0",max:"100",value:t.volume,onChange:s=>Je(t.id,parseInt(s.target.value)),className:"w-20 accent-indigo-600 cursor-pointer"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1767,columnNumber:29}
+,this),e.jsxDEV("button",{
+onClick:()=>Qe(t.id),className:`p-2 rounded-xl text-[10px] ${
+t.playing?"bg-indigo-600 text-white":"bg-indigo-50 text-indigo-600"}
+`,children:t.playing?"PAUSE":"PLAY"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1775,columnNumber:29}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1766,columnNumber:27}
+,this)]}
+,t.id,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1764,columnNumber:25}
+,this))]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1759,columnNumber:21}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1705,columnNumber:19}
+,this),e.jsxDEV("div",{
+className:"bg-slate-50/50 p-4 rounded-3xl border border-slate-100 space-y-4",children:[e.jsxDEV("div",{
+className:"flex justify-between items-center border-b pb-2",children:[e.jsxDEV("h3",{
+className:"font-extrabold text-[11px] text-slate-800 uppercase tracking-wider",children:"📝 AI Mock Test System"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1790,columnNumber:23}
+,this),A&&e.jsxDEV("span",{
+className:"text-[10px] font-mono bg-rose-50 text-rose-700 border border-rose-200 px-3 py-1 rounded-xl font-black",children:["Time Left: ",Math.floor(U/60),":",(U%60).toString().padStart(2,"0")]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1792,columnNumber:25}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1789,columnNumber:21}
+,this),!A&&!St?e.jsxDEV("div",{
+className:"grid grid-cols-1 md:grid-cols-3 gap-3 items-end",children:[e.jsxDEV("div",{
+children:[e.jsxDEV("label",{
+className:"block text-[8px] uppercase font-black text-slate-400 mb-1",children:"Subject"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1801,columnNumber:27}
+,this),e.jsxDEV("select",{
+value:X,onChange:t=>Dt(t.target.value),className:"w-full p-2 border border-slate-200 bg-white rounded-xl text-xs outline-none",children:["Mathematics","Science","Biology","Physics","Chemistry","English"].map(t=>e.jsxDEV("option",{
+value:t,children:t}
+,t,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1808,columnNumber:31}
+,this))}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1802,columnNumber:27}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1800,columnNumber:25}
+,this),e.jsxDEV("div",{
+children:[e.jsxDEV("label",{
+className:"block text-[8px] uppercase font-black text-slate-400 mb-1",children:"Grade"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1813,columnNumber:27}
+,this),e.jsxDEV("select",{
+value:Ce,onChange:t=>Vt(t.target.value),className:"w-full p-2 border border-slate-200 bg-white rounded-xl text-xs outline-none",children:["8","9","10","11","12"].map(t=>e.jsxDEV("option",{
+value:t,children:["Class ",t]}
+,t,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1820,columnNumber:31}
+,this))}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1814,columnNumber:27}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1812,columnNumber:25}
+,this),e.jsxDEV("button",{
+onClick:Lt,disabled:Z,className:"py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-wide cursor-pointer",children:Z?"Generating questions...":"Generate Hard Exam Test"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1824,columnNumber:25}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1799,columnNumber:23}
+,this):A?e.jsxDEV("div",{
+className:"space-y-4",children:[v.map((t,s)=>e.jsxDEV("div",{
+className:"p-3 bg-white border rounded-2xl space-y-2 shadow-xs",children:[e.jsxDEV("span",{
+className:"text-[9px] font-black uppercase text-indigo-600",children:["Question ",s+1]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1836,columnNumber:29}
+,this),e.jsxDEV("p",{
+className:"text-xs font-bold text-slate-800",children:t.question}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1837,columnNumber:29}
+,this),e.jsxDEV("div",{
+className:"grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs",children:t.options.map((i,o)=>e.jsxDEV("button",{
+onClick:()=>Ae(n=>n.map((S,C)=>C===s?o:S)),className:`p-2 rounded-xl text-left font-semibold border transition ${
+ee[s]===o?"bg-indigo-50 border-indigo-500 text-indigo-700":"bg-slate-50 border-slate-100 hover:bg-slate-100"}
+`,children:i}
+,o,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1840,columnNumber:33}
+,this))}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1838,columnNumber:29}
+,this)]}
+,s,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1835,columnNumber:27}
+,this)),e.jsxDEV("button",{
+onClick:Ye,className:"w-full py-3 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase",children:"Submit Test & Log Score"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1851,columnNumber:25}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1833,columnNumber:23}
+,this):e.jsxDEV("div",{
+className:"p-4 bg-white border rounded-2xl text-center space-y-3",children:[e.jsxDEV("strong",{
+className:"text-xs font-black text-indigo-900 uppercase",children:"Grade report successfully processed!"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1860,columnNumber:25}
+,this),e.jsxDEV("div",{
+className:"flex justify-center gap-6 text-xs text-slate-600",children:[e.jsxDEV("span",{
+children:["Total Questions: ",v.length]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1862,columnNumber:27}
+,this),e.jsxDEV("span",{
+children:["Score: ",v.filter((t,s)=>ee[s]===t.answer).length,"/",v.length]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1863,columnNumber:27}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1861,columnNumber:25}
+,this),e.jsxDEV("button",{
+onClick:()=>te(!1),className:"px-6 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-xs font-bold uppercase",children:"Start New Test"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1865,columnNumber:25}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1859,columnNumber:23}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1788,columnNumber:19}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1704,columnNumber:17}
+,this),j==="utilities"&&e.jsxDEV("div",{
+className:"space-y-4",children:e.jsxDEV("div",{
+className:"bg-slate-50/50 p-4 rounded-3xl border border-slate-100 space-y-4 text-center",children:[e.jsxDEV("span",{
+className:"text-3xl",children:"📂"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1881,columnNumber:21}
+,this),e.jsxDEV("h3",{
+className:"font-extrabold text-[12px] text-slate-800 uppercase tracking-wider",children:"Cloud Backup & Restore Manager"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1882,columnNumber:21}
+,this),e.jsxDEV("p",{
+className:"text-[10px] text-slate-500 max-w-md mx-auto leading-relaxed",children:"Download complete client application databases - notes, schedule timers, goals, achievements, and buddy lists in an encrypted local backup file, or upload past configuration files to retrieve previous configurations."}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1883,columnNumber:21}
+,this),e.jsxDEV("div",{
+className:"flex gap-4 justify-center pt-2",children:[e.jsxDEV("button",{
+onClick:Yt,className:"px-6 py-2.5 bg-indigo-600 text-white font-black text-xs uppercase rounded-xl shadow hover:bg-indigo-700 transition flex items-center gap-2",children:[e.jsxDEV(ot,{
+size:14}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1892,columnNumber:25}
+,this)," Export Backup File"]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1888,columnNumber:23}
+,this),e.jsxDEV("div",{
+className:"relative",children:[e.jsxDEV("button",{
+className:"px-6 py-2.5 bg-white border border-slate-200 text-slate-700 font-black text-xs uppercase rounded-xl hover:bg-slate-50 transition flex items-center gap-2",children:[e.jsxDEV(Ds,{
+size:14}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1896,columnNumber:27}
+,this)," Import Backup File"]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1895,columnNumber:25}
+,this),e.jsxDEV("input",{
+type:"file",accept:".json",onChange:Xt,className:"absolute inset-0 opacity-0 cursor-pointer"}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1898,columnNumber:25}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1894,columnNumber:23}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1887,columnNumber:21}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1880,columnNumber:19}
+,this)}
+,void 0,!1,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1879,columnNumber:17}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:1050,columnNumber:11}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:894,columnNumber:9}
+,this)]}
+,void 0,!0,{
+fileName:"/app/applet/src/components/InteractiveToolkit.tsx",lineNumber:728,columnNumber:5}
+,this)}
+);
+export{
+Rs as default}
+;
+

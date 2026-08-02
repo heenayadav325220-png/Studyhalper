@@ -2,19 +2,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
     match /rooms/{roomId}/chats/{chatId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
     match /rooms/{roomId}/whiteboard/{elementId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
     match /exams/{examId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
     match /documents/{docId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
   }
 }

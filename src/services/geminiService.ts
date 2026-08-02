@@ -367,6 +367,11 @@ export async function getStudyAnswer(
   persona: 'default' | 'socratic' | 'debugger' | 'translator' | 'math' = 'default',
   history?: { role: 'user' | 'model', text: string }[]
 ): Promise<string> {
+  const cleanPrompt = typeof prompt === 'string' ? prompt : String(prompt || '');
+  const cleanHistory = Array.isArray(history) 
+    ? history.map(h => ({ role: h.role === 'user' ? ('user' as const) : ('model' as const), text: typeof h.text === 'string' ? h.text : String(h.text || '') }))
+    : undefined;
+
   // 1. Try secure backend server route (Primary route)
   try {
     const response = await safeFetch("/api/gemini/answer", {
@@ -374,7 +379,7 @@ export async function getStudyAnswer(
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ prompt, imageBase64, studentContext, language, persona, history }),
+      body: JSON.stringify({ prompt: cleanPrompt, imageBase64, studentContext, language, persona, history: cleanHistory }),
     });
 
     if (response.ok) {

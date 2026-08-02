@@ -20,6 +20,7 @@ export class MockDatabase {
 
   exec(sql: string) {
     // Simply mock table execution
+    console.log("Mock executing SQL:", sql);
     return { success: true };
   }
 
