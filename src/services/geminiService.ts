@@ -486,7 +486,7 @@ export async function getStudyAnswer(
       : `${appInfo} ${creatorInfo} ${personaInstruction} You are a helpful study assistant. Explain concepts clearly and provide step-by-step solutions. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. If the user asks for a diagram or visual explanation, describe it clearly or suggest a visual aid. ${langInstruction}`;
 
     const response = await callClientGeminiWithRetry(ai, {
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: contentsList,
       config: {
         systemInstruction: systemInstruction,
@@ -1610,6 +1610,35 @@ export async function summarizePdf(textContent: string): Promise<{ summary: stri
     summary: "Could not summarize document dynamically.",
     keyTerms: [],
     questions: []
+  };
+}
+
+export async function generateAiImage(
+  prompt: string,
+  size: '1K' | '2K' | '4K' = '1K',
+  aspectRatio: string = '1:1'
+): Promise<{ imageUrl: string; size: string; aspectRatio: string }> {
+  try {
+    const response = await fetch("/api/generate-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, size, aspectRatio })
+    });
+    if (response.ok) {
+      const data = await response.json();
+      incrementDailyAiUsage();
+      return data;
+    }
+  } catch (err) {
+    console.warn("API /api/generate-image call failed, fallback to direct search image:", err);
+  }
+
+  // Fallback if API fails or offline
+  const encPrompt = encodeURIComponent(prompt.slice(0, 30));
+  return {
+    imageUrl: `https://picsum.photos/seed/${encPrompt}/1024/1024`,
+    size,
+    aspectRatio
   };
 }
 

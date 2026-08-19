@@ -21,10 +21,16 @@ import {
   Calendar,
   ChevronRight,
   BrainCircuit,
-  Award
+  Award,
+  LayoutGrid,
+  Mail,
+  X,
+  Image as ImageIcon
 } from 'lucide-react';
 import InteractiveToolkit from './components/InteractiveToolkit';
 import AiTutorApp from './components/AiTutorApp';
+import ImageGenerator from './components/ImageGenerator';
+import OnboardingModal from './components/OnboardingModal';
 import { TRANSLATIONS, Language } from './services/translations';
 import { 
   subscribeUserProfile, 
@@ -54,7 +60,8 @@ const SUBJECTS: Subject[] = ['Mathematics', 'Science', 'Biology', 'Physics', 'Ch
 
 const DEFAULT_USER: UserProfile = {
   uid: 'user_rohit_101',
-  name: 'Chat gpt',
+  name: 'Rohit Yadav',
+  email: 'yadavrohityadav331@gmail.com',
   xp: 100,
   level: 1,
   streak: 5,
@@ -62,24 +69,140 @@ const DEFAULT_USER: UserProfile = {
   petXp: 80,
   petName: 'Chimpu',
   language: 'en',
-  lastActive: new Date().toISOString()
+  lastActive: new Date().toISOString(),
+  schoolName: '',
+  className: 'Class 12th (Science/PCM)',
+  targetGoal: 'JEE Main / Board Exams',
+  isOnboarded: true
 };
 
 export default function App() {
   const [appLanguage, setAppLanguage] = useState<Language>('en');
-  const [activeTab, setActiveTab] = useState<'home' | 'toolkit' | 'groupChat' | 'whiteboard' | 'mockExam' | 'studyDocs' | 'petCompanion' | 'aiTutor' | 'quiz' | 'notebook' | 'planner'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'toolkit' | 'groupChat' | 'whiteboard' | 'mockExam' | 'studyDocs' | 'petCompanion' | 'aiTutor' | 'quiz' | 'notebook' | 'planner' | 'imageGen'>('home');
   const [initialTool, setInitialTool] = useState<string | undefined>(undefined);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
 
-  // User State
-  const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_USER);
-  const [userClass, _setUserClass] = useState<string>('Class 12');
-  const [userOrg, _setUserOrg] = useState<string>('Open ai');
+  // User & Onboarding State
+  const [userProfile, setUserProfile] = useState<UserProfile>(() => {
+    try {
+      const saved = localStorage.getItem('user_profile_user_rohit_101');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed) {
+          if (parsed.name === 'Chat gpt' || parsed.name === 'Student' || !parsed.name) parsed.name = 'Rohit Yadav';
+          if (!parsed.email) parsed.email = 'yadavrohityadav331@gmail.com';
+          if (parsed.schoolName === 'Delhi Public School' || parsed.schoolName === 'My School') parsed.schoolName = '';
+          return { ...DEFAULT_USER, ...parsed };
+        }
+      }
+    } catch (e) {
+      console.error("Error reading saved user profile", e);
+    }
+    return DEFAULT_USER;
+  });
+
+  const [showOnboardingModal, setShowOnboardingModal] = useState<boolean>(false);
+  const [isEditingProfile, setIsEditingProfile] = useState<boolean>(false);
+  const [realtimeGreeting, setRealtimeGreeting] = useState<string>('');
+
+  // Onboarding Check - Trigger if profile is not onboarded and missing
+  useEffect(() => {
+    const isDone = localStorage.getItem(`ascend_onboarded_${userProfile.uid}`) === 'true';
+    if (!isDone && (!userProfile.name || !userProfile.isOnboarded)) {
+      setShowOnboardingModal(true);
+    }
+  }, [userProfile.uid, userProfile.isOnboarded, userProfile.name]);
+
+  // Real-time time greeting timer (using local browser or IST calculation for India)
+  useEffect(() => {
+    const updateTimeGreeting = () => {
+      const now = new Date();
+      let hour = now.getHours();
+      try {
+        const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        // Default to Asia/Kolkata (IST) if browser/container reports UTC or Pacific Cloud Run clock
+        const targetTz = (!userTz || userTz === 'UTC' || userTz.includes('America')) ? 'Asia/Kolkata' : userTz;
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          hour: 'numeric',
+          hour12: false,
+          timeZone: targetTz
+        });
+        const parts = formatter.formatToParts(now);
+        const hourPart = parts.find(p => p.type === 'hour');
+        if (hourPart) {
+          hour = parseInt(hourPart.value, 10);
+        }
+      } catch (e) {
+        console.warn("Error resolving timezone:", e);
+      }
+
+      if (hour >= 5 && hour < 12) {
+        setRealtimeGreeting('GOOD MORNING 🌅');
+      } else if (hour >= 12 && hour < 17) {
+        setRealtimeGreeting('GOOD AFTERNOON ☀️');
+      } else if (hour >= 17 && hour < 22) {
+        setRealtimeGreeting('GOOD EVENING 🌇');
+      } else {
+        setRealtimeGreeting('GOOD NIGHT 🌙');
+      }
+    };
+
+    updateTimeGreeting();
+    const interval = setInterval(updateTimeGreeting, 10000); // Live ticker
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleSaveProfile = (data: { name: string; email?: string; schoolName: string; className: string; targetGoal: string }) => {
+    const updated: UserProfile = {
+      ...userProfile,
+      name: data.name,
+      email: data.email || userProfile.email || 'yadavrohityadav331@gmail.com',
+      schoolName: data.schoolName,
+      className: data.className,
+      targetGoal: data.targetGoal,
+      isOnboarded: true
+    };
+    setUserProfile(updated);
+    localStorage.setItem(`ascend_onboarded_${userProfile.uid}`, 'true');
+    localStorage.setItem(`user_profile_${userProfile.uid}`, JSON.stringify(updated));
+    updateUserProfile(userProfile.uid, updated);
+    setShowOnboardingModal(false);
+    setIsEditingProfile(false);
+    addXp(50);
+  };
 
   // Subscribe to User Profile
   useEffect(() => {
     const unsubscribe = subscribeUserProfile(userProfile.uid, (profile) => {
       if (profile) {
-        setUserProfile(profile);
+        setUserProfile(prev => {
+          let localSaved: Partial<UserProfile> = {};
+          try {
+            const saved = localStorage.getItem(`user_profile_${userProfile.uid}`);
+            if (saved) localSaved = JSON.parse(saved);
+          } catch (e) {}
+
+          const isDoneLocal = localStorage.getItem(`ascend_onboarded_${userProfile.uid}`) === 'true';
+
+          const name = localSaved.name || prev.name || (profile.name && profile.name !== 'Chat gpt' && profile.name !== 'Student' ? profile.name : 'Rohit Yadav');
+          const email = localSaved.email || prev.email || profile.email || 'yadavrohityadav331@gmail.com';
+          const schoolName = localSaved.schoolName !== undefined ? localSaved.schoolName : (prev.schoolName || (profile.schoolName && profile.schoolName !== 'Delhi Public School' && profile.schoolName !== 'My School' && profile.schoolName !== 'Open ai' ? profile.schoolName : ''));
+          const className = localSaved.className || prev.className || (profile.className && profile.className !== 'Class 10' ? profile.className : 'Class 12th (Science/PCM)');
+          const targetGoal = localSaved.targetGoal !== undefined ? localSaved.targetGoal : (prev.targetGoal || profile.targetGoal || 'JEE Main / Board Exams');
+          const onboardedState = isDoneLocal || localSaved.isOnboarded || prev.isOnboarded || profile.isOnboarded || false;
+
+          return {
+            ...profile,
+            ...prev,
+            ...localSaved,
+            name,
+            email,
+            schoolName,
+            className,
+            targetGoal,
+            isOnboarded: onboardedState
+          };
+        });
         if (profile.language) setAppLanguage(profile.language);
       }
     });
@@ -457,13 +580,6 @@ export default function App() {
     setActiveTab('toolkit');
   };
 
-  const getTimeGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'GOOD MORNING 🌅';
-    if (hour < 18) return 'GOOD AFTERNOON ☀️';
-    return 'GOOD EVENING 🌇';
-  };
-
   return (
     <div className="bg-[#f8fafc] text-slate-800 min-h-screen font-sans flex flex-col selection:bg-indigo-500 selection:text-white">
       {/* COMPACT TOP HEADER - NO "STUDYHALPER" TEXT */}
@@ -509,70 +625,105 @@ export default function App() {
         {activeTab === 'home' && (
           <div className="space-y-4">
             
-            {/* 1. TOP USER CARD (COMPACT REFINED DESIGN) */}
-            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs space-y-3">
+            {/* 1. TOP USER CARD (REALTIME GREETING + STUDENT INFO) */}
+            <div className="bg-gradient-to-br from-white via-indigo-50/30 to-purple-50/20 rounded-2xl p-4 sm:p-5 border border-indigo-100 shadow-xs space-y-3 relative overflow-hidden">
               <div className="flex items-start justify-between">
-                <div className="space-y-1.5">
-                  <span className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider bg-indigo-50 px-2 py-0.5 rounded-full">
-                    {getTimeGreeting()} 🏙️
-                  </span>
-                  <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                    Hello, {userProfile.name}! 🚀
+                <div className="space-y-2 flex-1 pr-3">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[10px] font-extrabold text-indigo-700 uppercase tracking-wider bg-indigo-100/80 px-2.5 py-0.5 rounded-full inline-flex items-center space-x-1 border border-indigo-200/80">
+                      <span>{realtimeGreeting || 'WELCOME 🎓'}</span>
+                    </span>
+                  </div>
+
+                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center flex-wrap gap-2">
+                    <span>{userProfile.name ? `Hello, ${userProfile.name}!` : 'Welcome Student!'}</span>
+                    <span className="animate-bounce inline-block text-xl">🚀</span>
                   </h2>
-                  <div className="flex items-center space-x-1.5 pt-0.5">
-                    <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 text-[10px] font-bold rounded-full border border-slate-200">
-                      🏫 {userOrg}
-                    </span>
-                    <span className="px-2.5 py-0.5 bg-indigo-600 text-white text-[10px] font-bold rounded-full">
-                      📚 {userClass}
-                    </span>
+
+                  {/* USER SET INFORMATION BADGES */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    {userProfile.className ? (
+                      <span className="px-2.5 py-1 bg-indigo-600 text-white text-[11px] font-bold rounded-xl shadow-2xs flex items-center space-x-1">
+                        <span>📚 Class:</span>
+                        <span className="font-extrabold">{userProfile.className}</span>
+                      </span>
+                    ) : null}
+
+                    {userProfile.schoolName ? (
+                      <span className="px-2.5 py-1 bg-slate-100 text-slate-800 text-[11px] font-bold rounded-xl border border-slate-200/80 shadow-2xs flex items-center space-x-1">
+                        <span>🏫 School:</span>
+                        <span className="font-semibold">{userProfile.schoolName}</span>
+                      </span>
+                    ) : null}
+
+                    {userProfile.targetGoal ? (
+                      <span className="px-2.5 py-1 bg-amber-500/15 text-amber-800 border border-amber-500/30 text-[11px] font-bold rounded-xl shadow-2xs flex items-center space-x-1">
+                        <span>🎯 Goal:</span>
+                        <span className="font-extrabold">{userProfile.targetGoal}</span>
+                      </span>
+                    ) : null}
+
+                    {userProfile.email && (
+                      <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200/80 text-[11px] font-bold rounded-xl shadow-2xs flex items-center space-x-1">
+                        <Mail className="w-3 h-3 text-indigo-600" />
+                        <span>{userProfile.email}</span>
+                      </span>
+                    )}
+
+                    {(!userProfile.className && !userProfile.schoolName && !userProfile.targetGoal) && (
+                      <button
+                        onClick={() => {
+                          setIsEditingProfile(true);
+                          setShowOnboardingModal(true);
+                        }}
+                        className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold rounded-xl border border-indigo-200 transition flex items-center space-x-1 cursor-pointer"
+                      >
+                        <span>✏️ Click here to set your Class, School & Goal</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {/* AVATAR BOX & SWITCH PROFILE */}
-                <div className="flex flex-col items-end space-y-1.5">
-                  <div className="relative w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-500 to-indigo-600 p-0.5 shadow-xs">
-                    <div className="w-full h-full bg-indigo-50 rounded-lg flex items-center justify-center text-2xl">
-                      🐼
+                {/* AVATAR BOX & EDIT PROFILE */}
+                <div className="flex flex-col items-end space-y-2 shrink-0">
+                  <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 p-0.5 shadow-md">
+                    <div className="w-full h-full bg-white rounded-[14px] flex items-center justify-center text-2xl shadow-inner">
+                      🧑‍🎓
                     </div>
                     {equippedAccessory && (
                       <span className="absolute -top-2 -right-2 text-base">{equippedAccessory}</span>
                     )}
-                    <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-amber-400 rounded-full flex items-center justify-center text-[9px] font-bold text-slate-900 shadow-xs">
+                    <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-amber-400 rounded-full flex items-center justify-center text-[9px] font-bold text-slate-900 shadow-xs border border-white">
                       ⭐
                     </span>
                   </div>
                   <button 
                     onClick={() => {
-                      const newName = prompt('Enter your name:', userProfile.name);
-                      if (newName) {
-                        setUserProfile(prev => ({ ...prev, name: newName }));
-                        updateUserProfile(userProfile.uid, { name: newName });
-                      }
+                      setIsEditingProfile(true);
+                      setShowOnboardingModal(true);
                     }}
-                    className="text-[10px] font-bold text-indigo-600 hover:underline flex items-center space-x-1"
+                    className="text-[11px] font-extrabold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-50 px-2.5 py-1 rounded-xl border border-indigo-200 shadow-2xs transition flex items-center space-x-1 cursor-pointer active:scale-95"
                   >
-                    <span>Switch Profile</span>
-                    <Globe className="w-2.5 h-2.5" />
+                    <span>Edit Profile ✏️</span>
                   </button>
                 </div>
               </div>
 
               {/* LEVEL & XP PROGRESS BAR */}
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-slate-600">
-                <span className="text-indigo-600">Level {userProfile.level}</span>
+              <div className="pt-2 border-t border-indigo-100/60 flex items-center justify-between text-[11px] font-bold text-slate-600">
+                <span className="text-indigo-600 font-extrabold">Level {userProfile.level}</span>
                 <span>{userProfile.xp % 100}/100 XP</span>
                 <button 
                   onClick={() => addXp(10)}
-                  className="text-[10px] text-indigo-600 hover:underline flex items-center space-x-1"
+                  className="text-[10px] text-indigo-600 hover:underline flex items-center space-x-1 cursor-pointer font-bold"
                 >
-                  <Sparkles className="w-3 h-3" />
+                  <Sparkles className="w-3 h-3 text-indigo-500" />
                   <span>Earn XP</span>
                 </button>
               </div>
               <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-indigo-600 transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 transition-all duration-500"
                   style={{ width: `${userProfile.xp % 100}%` }}
                 />
               </div>
@@ -1034,6 +1185,39 @@ export default function App() {
               </div>
             </div>
 
+            {/* OFFICIAL CREATOR & DEVELOPER RECOGNITION CARD */}
+            <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-4 text-white border border-indigo-900/50 shadow-md flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left mt-2">
+              <div className="flex items-center space-x-3">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-xl shadow-inner font-bold text-white shrink-0">
+                  🚀
+                </div>
+                <div>
+                  <div className="flex items-center space-x-1.5 justify-center sm:justify-start">
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-400 bg-indigo-950 px-2 py-0.5 rounded-full border border-indigo-800">
+                      Developer & Creator
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-black text-white mt-0.5">
+                    Rohit Yadav
+                  </h4>
+                  <p className="text-[11px] text-slate-300 flex items-center justify-center sm:justify-start space-x-1 mt-0.5">
+                    <Mail className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    <a href="mailto:yadavrohityadav331@gmail.com" className="hover:text-white underline decoration-indigo-400">
+                      yadavrohityadav331@gmail.com
+                    </a>
+                  </p>
+                </div>
+              </div>
+
+              <a
+                href="mailto:yadavrohityadav331@gmail.com"
+                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5 shrink-0 active:scale-95"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                <span>Contact Rohit</span>
+              </a>
+            </div>
+
           </div>
         )}
 
@@ -1453,18 +1637,102 @@ export default function App() {
           />
         )}
 
+        {/* AI IMAGE GENERATOR (gemini-3-pro-image-preview) */}
+        {activeTab === 'imageGen' && (
+          <ImageGenerator
+            onSaveToNotebook={async (title, content) => {
+              await saveStudyDocument({
+                id: 'doc_' + Date.now(),
+                ownerId: userProfile.uid,
+                title,
+                content,
+                summary: content.slice(0, 150) + '...',
+                tagsJson: JSON.stringify(['AiImage']),
+                isShared: false,
+                timestamp: new Date().toISOString()
+              });
+            }}
+            onAddXp={addXp}
+          />
+        )}
+
       </main>
 
-      {/* BOTTOM STICKY NAVIGATION BAR */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-2 py-1.5 flex items-center justify-around shadow-lg shadow-slate-200/50">
+      {/* FLOATING MORE MENU OVERLAY */}
+      {showMoreMenu && (
+        <>
+          <div 
+            className="fixed inset-0 bg-slate-900/30 backdrop-blur-xs z-40 transition-opacity"
+            onClick={() => setShowMoreMenu(false)}
+          />
+          <div className="fixed bottom-14 right-2 sm:right-6 z-50 w-72 bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-2xl shadow-2xl p-3.5 space-y-2.5 animate-in slide-in-from-bottom-3 duration-200">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <span className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+                <LayoutGrid className="w-3.5 h-3.5 text-indigo-600" />
+                <span>More Features</span>
+              </span>
+              <button 
+                onClick={() => setShowMoreMenu(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: 'imageGen', label: 'Image Gen', icon: ImageIcon, color: 'text-indigo-600 bg-indigo-50' },
+                { id: 'whiteboard', label: 'Whiteboard', icon: PenTool, color: 'text-purple-600 bg-purple-50' },
+                { id: 'mockExam', label: 'Mock Exams', icon: GraduationCap, color: 'text-amber-600 bg-amber-50' },
+                { id: 'studyDocs', label: 'Notebook', icon: FileText, color: 'text-teal-600 bg-teal-50' },
+                { id: 'petCompanion', label: 'Sanctuary', icon: Heart, color: 'text-rose-600 bg-rose-50' },
+              ].map((item) => {
+                const Icon = item.icon;
+                const isItemActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveTab(item.id as any);
+                      setShowMoreMenu(false);
+                    }}
+                    className={`flex items-center space-x-2 p-2 rounded-xl transition text-left border ${
+                      isItemActive
+                        ? 'bg-indigo-50/80 border-indigo-200 text-indigo-700 font-bold shadow-xs'
+                        : 'bg-slate-50/60 border-slate-100 hover:bg-slate-100/80 text-slate-700 font-medium'
+                    }`}
+                  >
+                    <div className={`p-1.5 rounded-lg ${item.color}`}>
+                      <Icon className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[11px] font-semibold tracking-tight">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+              <button
+                onClick={() => {
+                  toggleLanguage();
+                }}
+                className="w-full py-1.5 px-2 bg-slate-100 hover:bg-slate-200/80 text-slate-700 rounded-xl font-bold flex items-center justify-center space-x-1.5 transition"
+              >
+                <Globe className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Lang: {appLanguage.toUpperCase()}</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* COMPACT & SLIM BOTTOM STICKY NAVIGATION BAR */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-md border-t border-slate-200/80 px-4 py-1 flex items-center justify-around shadow-xs h-12">
         {[
-          { id: 'home', label: 'Dashboard', icon: BookOpen },
-          { id: 'toolkit', label: '19+ Tools', icon: Sparkles },
+          { id: 'home', label: 'Home', icon: BookOpen },
+          { id: 'aiTutor', label: 'AI Tutor', icon: BrainCircuit, badge: 'PRO' },
+          { id: 'toolkit', label: 'Tools', icon: Sparkles },
           { id: 'groupChat', label: 'Rooms', icon: MessageSquare },
-          { id: 'whiteboard', label: 'Board', icon: PenTool },
-          { id: 'mockExam', label: 'Exams', icon: GraduationCap },
-          { id: 'studyDocs', label: 'Notebook', icon: FileText },
-          { id: 'petCompanion', label: 'Sanctuary', icon: Heart },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -1472,23 +1740,62 @@ export default function App() {
             <button
               key={tab.id}
               onClick={() => {
+                setShowMoreMenu(false);
                 if (tab.id === 'toolkit') setInitialTool(undefined);
                 setActiveTab(tab.id as any);
               }}
-              className={`flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all ${
+              className={`relative flex flex-col items-center justify-center py-0.5 px-3 rounded-lg transition-all ${
                 isActive
-                  ? 'text-indigo-600 font-extrabold'
+                  ? 'text-indigo-600 font-bold'
                   : 'text-slate-500 hover:text-slate-800 font-medium'
               }`}
             >
-              <div className={`p-1.5 rounded-xl transition-colors ${isActive ? 'bg-indigo-50/90' : ''}`}>
-                <Icon className="w-4 h-4" />
+              <div className="relative">
+                <Icon className={`w-4 h-4 transition-transform ${isActive ? 'scale-110 text-indigo-600' : 'text-slate-500'}`} />
+                {tab.badge && (
+                  <span className="absolute -top-1 -right-2 px-1 py-0.2 bg-indigo-600 text-white text-[7px] font-black rounded-full leading-none">
+                    {tab.badge}
+                  </span>
+                )}
               </div>
-              <span className="text-[9px] tracking-tight mt-0.5">{tab.label}</span>
+              <span className="text-[9.5px] tracking-tight mt-0.5">{tab.label}</span>
             </button>
           );
         })}
+
+        {/* MORE BUTTON */}
+        <button
+          onClick={() => setShowMoreMenu(!showMoreMenu)}
+          className={`relative flex flex-col items-center justify-center py-0.5 px-3 rounded-lg transition-all ${
+            showMoreMenu || ['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab)
+              ? 'text-indigo-600 font-bold'
+              : 'text-slate-500 hover:text-slate-800 font-medium'
+          }`}
+        >
+          <div className="relative">
+            <LayoutGrid className={`w-4 h-4 transition-transform ${showMoreMenu ? 'scale-110 text-indigo-600' : 'text-slate-500'}`} />
+            {['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab) && (
+              <span className="absolute -top-0.5 -right-1 w-2 h-2 bg-indigo-600 rounded-full ring-2 ring-white" />
+            )}
+          </div>
+          <span className="text-[9.5px] tracking-tight mt-0.5">More</span>
+        </button>
       </nav>
+
+      {/* ONBOARDING & PROFILE EDIT MODAL */}
+      <OnboardingModal
+        isOpen={showOnboardingModal}
+        initialData={{
+          name: userProfile.name || 'Rohit Yadav',
+          email: userProfile.email || 'yadavrohityadav331@gmail.com',
+          schoolName: userProfile.schoolName,
+          className: userProfile.className,
+          targetGoal: userProfile.targetGoal
+        }}
+        onSave={handleSaveProfile}
+        onClose={() => setShowOnboardingModal(false)}
+        isEditing={isEditingProfile}
+      />
     </div>
   );
 }

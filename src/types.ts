@@ -81,6 +81,7 @@ export interface GroupNote {
 export interface UserProfile {
   uid: string;
   name: string;
+  email?: string;
   xp: number;
   level: number;
   streak: number;
@@ -89,6 +90,10 @@ export interface UserProfile {
   petName: string;
   language: 'en' | 'hi';
   lastActive: string;
+  schoolName?: string;
+  className?: string;
+  targetGoal?: string;
+  isOnboarded?: boolean;
 }
 
 export interface RoomChatMessage {

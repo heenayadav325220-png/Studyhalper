@@ -44,6 +44,10 @@ import {
   Activity
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 import {
   generateNotes,
@@ -1486,8 +1490,61 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                               )}
                             </div>
                           ) : (
-                            <div className="markdown-body text-xs font-sans leading-relaxed">
-                              <ReactMarkdown>{a.content || a.summary || a.explanation || a.paperText || a.text || safeJsonStringify(a)}</ReactMarkdown>
+                            <div className="markdown-body text-xs font-sans leading-relaxed overflow-x-auto">
+                              <ReactMarkdown 
+                                remarkPlugins={[remarkMath]} 
+                                rehypePlugins={[rehypeKatex]}
+                                components={{
+                                  code({ node, className, children, ...props }: any) {
+                                    const match = /language-(\w+)/.exec(className || '');
+                                    const codeString = String(children).replace(/\n$/, '');
+                                    const isMultiLine = String(children).includes('\n') || !!match;
+
+                                    if (isMultiLine) {
+                                      const lang = match ? match[1] : 'code';
+                                      return (
+                                        <div className="relative my-2.5 rounded-xl overflow-hidden border border-slate-700/80 bg-slate-950 text-left">
+                                          <div className="bg-slate-900/90 px-3 py-1.5 flex items-center justify-between text-[10px] text-slate-400 font-mono border-b border-slate-800">
+                                            <span className="uppercase font-bold text-indigo-400">{lang}</span>
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigator.clipboard.writeText(codeString);
+                                              }}
+                                              className="hover:text-slate-100 transition font-sans text-[10px] bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded-md text-slate-300"
+                                            >
+                                              Copy Code
+                                            </button>
+                                          </div>
+                                          <SyntaxHighlighter
+                                            style={oneDark}
+                                            language={lang === 'code' ? 'text' : lang}
+                                            PreTag="div"
+                                            customStyle={{ margin: 0, padding: '0.75rem', fontSize: '0.75rem', background: '#090d16' }}
+                                            {...props}
+                                          >
+                                            {codeString}
+                                          </SyntaxHighlighter>
+                                        </div>
+                                      );
+                                    }
+
+                                    return (
+                                      <code className="bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-300 px-1.5 py-0.5 rounded text-[11px] font-mono border border-slate-200 dark:border-slate-700/50" {...props}>
+                                        {children}
+                                      </code>
+                                    );
+                                  }
+                                }}
+                              >
+                                {(() => {
+                                  const raw = a.content || a.summary || a.explanation || a.paperText || a.text || safeJsonStringify(a);
+                                  return typeof raw === 'string'
+                                    ? raw.replace(/\\\[([\s\S]*?)\\\]/g, (_m, math) => `\n$$\n${math.trim()}\n$$\n`).replace(/\\\(([\s\S]*?)\\\)/g, (_m, math) => `$${math.trim()}$`)
+                                    : String(raw || '');
+                                })()}
+                              </ReactMarkdown>
                             </div>
                           )}
 
