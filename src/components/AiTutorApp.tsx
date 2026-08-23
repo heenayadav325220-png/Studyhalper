@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, memo } from 'react';
+import { motion } from 'motion/react';
 import { 
   ArrowLeft, 
   Send, 
@@ -855,32 +856,55 @@ export const AiTutorApp = memo(function AiTutorApp({
                     </div>
 
                     {/* QUICK FOLLOW-UP ACTION CHIPS */}
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      <button
+                    <motion.div 
+                      className="flex flex-wrap gap-1.5 pt-1"
+                      initial="hidden"
+                      animate="visible"
+                      variants={{
+                        visible: { transition: { staggerChildren: 0.05 } }
+                      }}
+                    >
+                      <motion.button
+                        variants={{
+                          hidden: { opacity: 0, scale: 0.8 },
+                          visible: { opacity: 1, scale: 1 }
+                        }}
                         onClick={() => handleSendMessage("Can you explain this concept in even simpler terms with a super easy real-world analogy?")}
                         className="px-2 py-0.5 bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-800/50 rounded-lg text-[10px] font-semibold transition flex items-center space-x-1"
                       >
                         <span>💡 Explain Simpler</span>
-                      </button>
-                      <button
+                      </motion.button>
+                      <motion.button
+                        variants={{
+                          hidden: { opacity: 0, scale: 0.8 },
+                          visible: { opacity: 1, scale: 1 }
+                        }}
                         onClick={() => handleSendMessage("Give me 1 practice question based on this topic so I can test my understanding.")}
                         className="px-2 py-0.5 bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-800/50 rounded-lg text-[10px] font-semibold transition flex items-center space-x-1"
                       >
                         <span>📝 Practice Question</span>
-                      </button>
-                      <button
+                      </motion.button>
+                      <motion.button
+                        variants={{
+                          hidden: { opacity: 0, scale: 0.8 },
+                          visible: { opacity: 1, scale: 1 }
+                        }}
                         onClick={() => handleSendMessage("Explain this exact concept in simple, friendly Hinglish (Hindi + English mix).")}
                         className="px-2 py-0.5 bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-800/50 rounded-lg text-[10px] font-semibold transition flex items-center space-x-1"
                       >
                         <span>🌐 Explain in Hinglish</span>
-                      </button>
-                      <button
+                      </motion.button>
+                      <motion.button
+                        variants={{
+                          hidden: { opacity: 0, scale: 0.8 },
+                          visible: { opacity: 1, scale: 1 }
+                        }}
                         onClick={() => handleSendMessage("Summarize the key formulas and core takeaways from this in a clean table.")}
                         className="px-2 py-0.5 bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-800/50 rounded-lg text-[10px] font-semibold transition flex items-center space-x-1"
                       >
                         <span>📌 Summary Table</span>
-                      </button>
-                    </div>
+                      </motion.button>
+                    </motion.div>
                   </div>
                 )}
               </div>

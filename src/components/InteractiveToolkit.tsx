@@ -552,8 +552,8 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
     te(false);
     try {
       const res = await generateQuiz(quizSubject, {
-        name: user?.name || "Rohit",
-        school: user?.school || "Core School",
+        name: user?.name || "Student",
+        school: user?.school || "School",
         className: Ce
       }, appLanguage, "Hard");
 

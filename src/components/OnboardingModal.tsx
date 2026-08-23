@@ -28,8 +28,8 @@ export default function OnboardingModal({
   onClose,
   isEditing = false
 }: OnboardingModalProps) {
-  const [name, setName] = useState(initialData?.name || 'Rohit Yadav');
-  const [email, setEmail] = useState(initialData?.email || 'yadavrohityadav331@gmail.com');
+  const [name, setName] = useState(initialData?.name || '');
+  const [email, setEmail] = useState(initialData?.email || '');
   const [schoolName, setSchoolName] = useState(initialData?.schoolName || '');
   const [className, setClassName] = useState(initialData?.className || 'Class 12th (Science/PCM)');
   const [targetGoal, setTargetGoal] = useState(initialData?.targetGoal || 'JEE Main / Board Exams');
@@ -37,8 +37,8 @@ export default function OnboardingModal({
 
   useEffect(() => {
     if (initialData) {
-      setName(initialData.name || 'Rohit Yadav');
-      setEmail(initialData.email || 'yadavrohityadav331@gmail.com');
+      setName(initialData.name || '');
+      setEmail(initialData.email || '');
       setSchoolName(initialData.schoolName || '');
       setClassName(initialData.className || 'Class 12th (Science/PCM)');
       setTargetGoal(initialData.targetGoal || 'JEE Main / Board Exams');
@@ -57,7 +57,7 @@ export default function OnboardingModal({
     setError('');
     onSave({
       name: name.trim(),
-      email: email.trim() || 'yadavrohityadav331@gmail.com',
+      email: email.trim(),
       schoolName: schoolName.trim(),
       className: className.trim() || 'Class 12th (Science/PCM)',
       targetGoal: targetGoal.trim()
@@ -132,7 +132,7 @@ export default function OnboardingModal({
                 setName(e.target.value);
                 if (error) setError('');
               }}
-              placeholder="e.g. Rohit Yadav"
+              placeholder="e.g. Rahul Sharma"
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-slate-900 transition"
             />
           </div>
@@ -147,7 +147,7 @@ export default function OnboardingModal({
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. yadavrohityadav331@gmail.com"
+              placeholder="e.g. student@gmail.com"
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-slate-900 transition"
             />
           </div>

@@ -226,7 +226,7 @@ export function subscribeToMockExams(userId: string, callback: (exams: MockExam[
 export async function saveMockExam(exam: MockExam): Promise<void> {
   const cleanExam: MockExam = {
     id: exam.id || 'exam_' + Date.now(),
-    userId: exam.userId || 'user_rohit_101',
+    userId: exam.userId || 'user_local_student',
     subject: exam.subject || 'General',
     topic: exam.topic || 'General Topic',
     questionsJson: exam.questionsJson || '[]',
@@ -286,7 +286,7 @@ export function subscribeToStudyDocuments(ownerId: string, callback: (docs: Stud
 export async function saveStudyDocument(document: StudyDocument): Promise<void> {
   const cleanDoc: StudyDocument = {
     id: document.id || 'doc_' + Date.now(),
-    ownerId: document.ownerId || 'user_rohit_101',
+    ownerId: document.ownerId || 'user_local_student',
     title: document.title || 'Untitled Note',
     content: document.content || '',
     summary: document.summary || '',
