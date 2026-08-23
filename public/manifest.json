@@ -1,8 +1,73 @@
 {
-  "name": "Ascend Study",
-  "short_name": "Ascend",
+  "id": "/",
+  "name": "ASCEND STUDY - AI Study Companion",
+  "short_name": "Ascend Study",
+  "description": "Ultra-modern AI study companion with AI Tutor, Mock Exams, Interactive Toolkit, and Real-time Study Rooms.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a"
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
+  "orientation": "portrait-primary",
+  "background_color": "#090d16",
+  "theme_color": "#4338ca",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["education", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "AI Tutor Chat",
+      "short_name": "AI Tutor",
+      "description": "Ask doubts and get instant homework help from AI Tutor",
+      "url": "/?tab=tutor",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "AI Mock Exams",
+      "short_name": "Mock Exams",
+      "description": "Practice mock tests and timed quizzes with instant grading",
+      "url": "/?tab=mockExam",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Interactive Toolkit",
+      "short_name": "19+ Tools",
+      "description": "Scientific calculator, periodic table, flashcards, and study timers",
+      "url": "/?tab=tools",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Study Rooms",
+      "short_name": "Study Rooms",
+      "description": "Join live peer study rooms and collaborative whiteboards",
+      "url": "/?tab=groups",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false
 }

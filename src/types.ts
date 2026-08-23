@@ -82,6 +82,9 @@ export interface UserProfile {
   uid: string;
   name: string;
   email?: string;
+  avatar?: string;
+  avatarType?: 'personal' | 'cloud' | 'emoji' | 'initials';
+  avatarBg?: string;
   xp: number;
   level: number;
   streak: number;

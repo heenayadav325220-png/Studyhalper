@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 
 // Safe JSON stringify helper to catch circular structures
 function safeJsonStringify(obj: any): string {
@@ -1958,103 +1959,151 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
 
                 <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100 space-y-4">
                   <div className="flex justify-between items-center border-b pb-2">
-                    <h3 className="font-extrabold text-[11px] text-slate-800 uppercase tracking-wider">
-                      📝 AI Mock Test System
+                    <h3 className="font-extrabold text-[11px] text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>AI Mock Test System</span>
                     </h3>
                     {A && (
-                      <span className="text-[10px] font-mono bg-rose-50 text-rose-700 border border-rose-200 px-3 py-1 rounded-xl font-black">
+                      <span className="text-[10px] font-mono bg-rose-50 text-rose-700 border border-rose-200 px-3 py-1 rounded-xl font-black flex items-center gap-1">
+                        <Activity className="w-3 h-3 animate-pulse" />
                         Time Left: {Math.floor(U / 60)}:{(U % 60).toString().padStart(2, "0")}
                       </span>
                     )}
                   </div>
 
-                  {!A && !St ? (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-                      <div>
-                        <label className="block text-[8px] uppercase font-black text-slate-400 mb-1">Subject</label>
-                        <select
-                          value={quizSubject}
-                          onChange={(t) => setQuizSubject(t.target.value)}
-                          className="w-full p-2 border border-slate-200 bg-white rounded-xl text-xs outline-none"
-                        >
-                          {["Mathematics", "Science", "Biology", "Physics", "Chemistry", "English"].map((t) => (
-                            <option key={t} value={t}>
-                              {t}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[8px] uppercase font-black text-slate-400 mb-1">Grade</label>
-                        <select
-                          value={Ce}
-                          onChange={(t) => Vt(t.target.value)}
-                          className="w-full p-2 border border-slate-200 bg-white rounded-xl text-xs outline-none"
-                        >
-                          {["8", "9", "10", "11", "12"].map((t) => (
-                            <option key={t} value={t}>
-                              Class {t}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <button
-                        onClick={Lt}
-                        disabled={Z}
-                        className="py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-wide cursor-pointer"
+                  <AnimatePresence mode="wait">
+                    {!A && !St ? (
+                      <motion.div
+                        key="config"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end"
                       >
-                        {Z ? "Generating questions..." : "Generate Hard Exam Test"}
-                      </button>
-                    </div>
-                  ) : A ? (
-                    <div className="space-y-4">
-                      {v.map((qItem: any, idx: number) => (
-                        <div key={idx} className="p-3 bg-white border rounded-2xl space-y-2 shadow-xs">
-                          <span className="text-[9px] font-black uppercase text-indigo-600">Question {idx + 1}</span>
-                          <p className="text-xs font-bold text-slate-800">{qItem.question}</p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                            {qItem.options.map((optionText: string, oIdx: number) => (
-                              <button
-                                key={oIdx}
-                                onClick={() =>
-                                  Ae((n) =>
-                                    n.map((curr, cIdx) => (cIdx === idx ? oIdx : curr))
-                                  )
-                                }
-                                className={`p-2 rounded-xl text-left font-semibold border transition ${
-                                  ee[idx] === oIdx
-                                    ? "bg-indigo-50 border-indigo-500 text-indigo-700"
-                                    : "bg-slate-50 border-slate-100 hover:bg-slate-100"
-                                }`}
-                              >
-                                {optionText}
-                              </button>
+                        <div>
+                          <label className="block text-[8px] uppercase font-black text-slate-400 mb-1">Subject</label>
+                          <select
+                            value={quizSubject}
+                            onChange={(t) => setQuizSubject(t.target.value)}
+                            className="w-full p-2 border border-slate-200 bg-white rounded-xl text-xs outline-none"
+                          >
+                            {["Mathematics", "Science", "Biology", "Physics", "Chemistry", "English"].map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
                             ))}
-                          </div>
+                          </select>
                         </div>
-                      ))}
-                      <button
-                        onClick={Ye}
-                        className="w-full py-3 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase"
+                        <div>
+                          <label className="block text-[8px] uppercase font-black text-slate-400 mb-1">Grade</label>
+                          <select
+                            value={Ce}
+                            onChange={(t) => Vt(t.target.value)}
+                            className="w-full p-2 border border-slate-200 bg-white rounded-xl text-xs outline-none"
+                          >
+                            {["8", "9", "10", "11", "12"].map((t) => (
+                              <option key={t} value={t}>
+                                Class {t}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <motion.button
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={Lt}
+                          disabled={Z}
+                          className="py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wide cursor-pointer transition shadow-xs flex items-center justify-center gap-1.5"
+                        >
+                          {Z ? (
+                            <>
+                              <Activity className="w-3.5 h-3.5 animate-spin" />
+                              <span>Generating questions...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>Generate Exam Test</span>
+                            </>
+                          )}
+                        </motion.button>
+                      </motion.div>
+                    ) : A ? (
+                      <motion.div
+                        key="running"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="space-y-4"
                       >
-                        Submit Test & Log Score
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="p-4 bg-white border rounded-2xl text-center space-y-3">
-                      <strong className="text-xs font-black text-indigo-900 uppercase">Grade report successfully processed!</strong>
-                      <div className="flex justify-center gap-6 text-xs text-slate-600">
-                        <span>Total Questions: {v.length}</span>
-                        <span>Score: {v.filter((t: any, s: number) => ee[s] === t.answer).length} / {v.length}</span>
-                      </div>
-                      <button
-                        onClick={() => te(false)}
-                        className="px-6 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-xs font-bold uppercase"
+                        {v.map((qItem: any, idx: number) => (
+                          <motion.div
+                            key={idx}
+                            initial={{ opacity: 0, y: 6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: idx * 0.05 }}
+                            className="p-4 bg-white border border-slate-200/90 rounded-2xl space-y-2.5 shadow-xs"
+                          >
+                            <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                              Question {idx + 1}
+                            </span>
+                            <p className="text-xs font-bold text-slate-800">{qItem.question}</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                              {qItem.options.map((optionText: string, oIdx: number) => (
+                                <motion.button
+                                  key={oIdx}
+                                  whileHover={{ scale: 1.01 }}
+                                  whileTap={{ scale: 0.99 }}
+                                  onClick={() =>
+                                    Ae((n) =>
+                                      n.map((curr, cIdx) => (cIdx === idx ? oIdx : curr))
+                                    )
+                                  }
+                                  className={`p-2.5 rounded-xl text-left font-semibold border transition cursor-pointer ${
+                                    ee[idx] === oIdx
+                                      ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                                      : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                                  }`}
+                                >
+                                  {optionText}
+                                </motion.button>
+                              ))}
+                            </div>
+                          </motion.div>
+                        ))}
+                        <motion.button
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={Ye}
+                          className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase shadow-xs transition cursor-pointer"
+                        >
+                          Submit Test & Log Score
+                        </motion.button>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="report"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="p-5 bg-white border border-slate-200/90 rounded-2xl text-center space-y-3 shadow-xs"
                       >
-                        Start New Test
-                      </button>
-                    </div>
-                  )}
+                        <strong className="text-xs font-black text-indigo-900 uppercase">
+                          Grade Report Processed Successfully!
+                        </strong>
+                        <div className="flex justify-center gap-6 text-xs text-slate-600 font-semibold">
+                          <span>Total Questions: {v.length}</span>
+                          <span>Score: {v.filter((t: any, s: number) => ee[s] === t.answer).length} / {v.length}</span>
+                        </div>
+                        <button
+                          onClick={() => te(false)}
+                          className="px-6 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl text-xs font-bold uppercase transition cursor-pointer shadow-xs"
+                        >
+                          Start New Test
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
             )}

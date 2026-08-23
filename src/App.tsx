@@ -11,8 +11,6 @@ import {
   Send, 
   Plus, 
   Trash2, 
-  CheckCircle2, 
-  Loader2,
   Play,
   Pause,
   RotateCcw,
@@ -46,7 +44,10 @@ import {
   saveStudyDocument, 
   deleteStudyDocument 
 } from './services/firebaseDb';
-import { generateQuiz } from './services/geminiService';
+import UserAvatar from './components/UserAvatar';
+import AvatarSelectorModal, { AvatarSelectionData } from './components/AvatarSelectorModal';
+import QuizSection from './components/QuizSection';
+import PWAInstallBanner, { PWAHeaderButton } from './components/PWAInstallBanner';
 import type { 
   UserProfile, 
   RoomChatMessage, 
@@ -62,6 +63,9 @@ const DEFAULT_USER: UserProfile = {
   uid: 'user_local_student',
   name: '',
   email: '',
+  avatar: '🧑‍🎓',
+  avatarType: 'emoji',
+  avatarBg: 'bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600',
   xp: 100,
   level: 1,
   streak: 5,
@@ -81,6 +85,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'home' | 'toolkit' | 'groupChat' | 'whiteboard' | 'mockExam' | 'studyDocs' | 'petCompanion' | 'aiTutor' | 'quiz' | 'notebook' | 'planner' | 'imageGen'>('home');
   const [initialTool, setInitialTool] = useState<string | undefined>(undefined);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
 
   // User & Onboarding State - Sourced from localStorage
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
@@ -167,11 +172,38 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleSaveProfile = (data: { name: string; email?: string; schoolName: string; className: string; targetGoal: string }) => {
+  const handleSaveAvatar = (data: AvatarSelectionData) => {
+    const updated: UserProfile = {
+      ...userProfile,
+      avatar: data.avatar,
+      avatarType: data.avatarType,
+      avatarBg: data.avatarBg || userProfile.avatarBg
+    };
+    setUserProfile(updated);
+    localStorage.setItem('ascend_user_profile', JSON.stringify(updated));
+    localStorage.setItem('user_profile_data', JSON.stringify(updated));
+    localStorage.setItem(`user_profile_${userProfile.uid}`, JSON.stringify(updated));
+    updateUserProfile(userProfile.uid, updated);
+    addXp(20);
+  };
+
+  const handleSaveProfile = (data: { 
+    name: string; 
+    email?: string; 
+    avatar?: string;
+    avatarType?: 'personal' | 'cloud' | 'emoji' | 'initials';
+    avatarBg?: string;
+    schoolName: string; 
+    className: string; 
+    targetGoal: string;
+  }) => {
     const updated: UserProfile = {
       ...userProfile,
       name: data.name,
       email: data.email || '',
+      avatar: data.avatar || userProfile.avatar,
+      avatarType: data.avatarType || userProfile.avatarType,
+      avatarBg: data.avatarBg || userProfile.avatarBg,
       schoolName: data.schoolName,
       className: data.className,
       targetGoal: data.targetGoal,
@@ -484,13 +516,7 @@ export default function App() {
   };
 
   // --- MOCK EXAMS STATE ---
-  const [_mockExams, setMockExams] = useState<MockExam[]>([]);
-  const [examSubject, setExamSubject] = useState<Subject>('Science');
-  const [examTopic, setExamTopic] = useState<string>('Laws of Motion');
-  const [isGeneratingExam, setIsGeneratingExam] = useState(false);
-  const [activeExam, setActiveExam] = useState<MockExam | null>(null);
-  const [userExamAnswers, setUserExamAnswers] = useState<Record<number, number>>({});
-  const [examSubmitted, setExamSubmitted] = useState(false);
+  const [mockExams, setMockExams] = useState<MockExam[]>([]);
 
   useEffect(() => {
     const unsubscribe = subscribeToMockExams(userProfile.uid, (exams) => {
@@ -498,64 +524,6 @@ export default function App() {
     });
     return () => unsubscribe();
   }, [userProfile.uid]);
-
-  const handleGenerateExam = async () => {
-    if (!examTopic.trim()) return;
-    setIsGeneratingExam(true);
-    setExamSubmitted(false);
-    setUserExamAnswers({});
-
-    try {
-      const questions = await generateQuiz(examSubject);
-      const newExam: MockExam = {
-        id: 'exam_' + Date.now(),
-        userId: userProfile.uid,
-        subject: examSubject,
-        topic: examTopic,
-        questionsJson: JSON.stringify(questions),
-        submittedAnswersJson: '{}',
-        score: 0,
-        completed: false,
-        feedback: '',
-        timestamp: new Date().toISOString()
-      };
-
-      await saveMockExam(newExam);
-      setActiveExam(newExam);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsGeneratingExam(false);
-    }
-  };
-
-  const handleSubmitExam = async () => {
-    if (!activeExam) return;
-    try {
-      const questions = JSON.parse(activeExam.questionsJson);
-      let correct = 0;
-      questions.forEach((q: any, idx: number) => {
-        if (userExamAnswers[idx] === q.answer) {
-          correct++;
-        }
-      });
-
-      const updatedExam: MockExam = {
-        ...activeExam,
-        submittedAnswersJson: JSON.stringify(userExamAnswers),
-        score: correct,
-        completed: true,
-        feedback: `Great effort! You answered ${correct} out of ${questions.length} questions correctly.`
-      };
-
-      await saveMockExam(updatedExam);
-      setActiveExam(updatedExam);
-      setExamSubmitted(true);
-      addXp(correct * 20);
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   // --- STUDY DOCS STATE ---
   const [studyDocs, setStudyDocs] = useState<StudyDocument[]>([]);
@@ -618,19 +586,40 @@ export default function App() {
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* USER AVATAR BUTTON (DIRECT ACCESS) */}
+          <button
+            onClick={() => setShowAvatarModal(true)}
+            title="Customize Study Avatar"
+            className="flex items-center space-x-1.5 p-1 pl-1.5 pr-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer border border-slate-200/80 active:scale-95"
+          >
+            <UserAvatar
+              avatar={userProfile.avatar}
+              name={userProfile.name || 'Student'}
+              avatarType={userProfile.avatarType}
+              avatarBg={userProfile.avatarBg}
+              size="xs"
+            />
+            <span className="text-[10px] font-extrabold text-indigo-700 max-w-[60px] truncate hidden sm:inline">
+              Avatar 🎨
+            </span>
+          </button>
+
           {/* LANGUAGE TOGGLE */}
           <button 
             onClick={toggleLanguage}
-            className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold transition"
+            className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold transition cursor-pointer"
           >
             <Globe className="w-3 h-3 text-indigo-600" />
             <span>{t('languageToggle')}</span>
           </button>
 
+          {/* PWA INSTALL BUTTON */}
+          <PWAHeaderButton />
+
           {/* ADVANCED TOOLKIT TRIGGER */}
           <button
             onClick={() => openToolkitWithTool()}
-            className="flex items-center space-x-1 px-3 py-1.5 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 text-[11px] font-bold shadow-xs transition"
+            className="flex items-center space-x-1 px-3 py-1.5 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 text-[11px] font-bold shadow-xs transition cursor-pointer active:scale-95"
           >
             <Sparkles className="w-3 h-3" />
             <span>19+ Tools</span>
@@ -703,28 +692,37 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* AVATAR BOX & EDIT PROFILE */}
-                <div className="flex flex-col items-end space-y-2 shrink-0">
-                  <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 p-0.5 shadow-md">
-                    <div className="w-full h-full bg-white rounded-[14px] flex items-center justify-center text-2xl shadow-inner">
-                      🧑‍🎓
-                    </div>
-                    {equippedAccessory && (
-                      <span className="absolute -top-2 -right-2 text-base">{equippedAccessory}</span>
-                    )}
-                    <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-amber-400 rounded-full flex items-center justify-center text-[9px] font-bold text-slate-900 shadow-xs border border-white">
-                      ⭐
-                    </span>
+                {/* AVATAR BOX & PROFILE ACTIONS */}
+                <div className="flex flex-col items-end space-y-1.5 shrink-0">
+                  <UserAvatar
+                    avatar={userProfile.avatar}
+                    name={userProfile.name || 'Student'}
+                    avatarType={userProfile.avatarType}
+                    avatarBg={userProfile.avatarBg}
+                    size="lg"
+                    accessory={equippedAccessory}
+                    showBadge={true}
+                    badgeIcon="⭐"
+                    isEditable={true}
+                    onClick={() => setShowAvatarModal(true)}
+                  />
+                  <div className="flex flex-col space-y-1 items-end">
+                    <button 
+                      onClick={() => setShowAvatarModal(true)}
+                      className="text-[10px] font-extrabold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-200 shadow-2xs transition flex items-center space-x-1 cursor-pointer active:scale-95 whitespace-nowrap"
+                    >
+                      <span>Change Avatar 🎨</span>
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setIsEditingProfile(true);
+                        setShowOnboardingModal(true);
+                      }}
+                      className="text-[10px] font-bold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200 shadow-2xs transition flex items-center space-x-1 cursor-pointer active:scale-95 whitespace-nowrap"
+                    >
+                      <span>Edit Details ✏️</span>
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => {
-                      setIsEditingProfile(true);
-                      setShowOnboardingModal(true);
-                    }}
-                    className="text-[11px] font-extrabold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-50 px-2.5 py-1 rounded-xl border border-indigo-200 shadow-2xs transition flex items-center space-x-1 cursor-pointer active:scale-95"
-                  >
-                    <span>Edit Profile ✏️</span>
-                  </button>
                 </div>
               </div>
 
@@ -1077,12 +1075,26 @@ export default function App() {
                           >
                             <div className="flex items-center space-x-2.5">
                               <span className="w-5 text-center font-bold text-xs text-slate-600">{medalIcon}</span>
-                              <div>
-                                <h4 className="font-bold text-xs text-slate-900 flex items-center space-x-1">
-                                  <span>{item.name}</span>
-                                  <span>{item.icon}</span>
-                                </h4>
-                                <p className="text-[8px] font-bold text-slate-400">{item.level}</p>
+                              <div className="flex items-center space-x-2">
+                                {item.isUser ? (
+                                  <UserAvatar
+                                    avatar={userProfile.avatar}
+                                    name={userProfile.name || 'Student'}
+                                    avatarType={userProfile.avatarType}
+                                    avatarBg={userProfile.avatarBg}
+                                    size="xs"
+                                  />
+                                ) : (
+                                  <div className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-xs shadow-2xs">
+                                    {item.icon}
+                                  </div>
+                                )}
+                                <div>
+                                  <h4 className="font-bold text-xs text-slate-900 flex items-center space-x-1">
+                                    <span>{item.name}</span>
+                                  </h4>
+                                  <p className="text-[8px] font-bold text-slate-400">{item.level}</p>
+                                </div>
                               </div>
                             </div>
                             <span className="font-extrabold text-xs text-indigo-600">{item.xp} XP</span>
@@ -1220,14 +1232,25 @@ export default function App() {
 
             {/* STUDENT PROFILE & QUICK ACTIONS CARD */}
             <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-4 text-white border border-indigo-900/50 shadow-md flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left mt-2">
-              <div className="flex items-center space-x-3">
-                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-xl shadow-inner font-bold text-white shrink-0">
-                  🎓
-                </div>
+              <div className="flex items-center space-x-3.5">
+                <UserAvatar
+                  avatar={userProfile.avatar}
+                  name={userProfile.name || 'Student'}
+                  avatarType={userProfile.avatarType}
+                  avatarBg={userProfile.avatarBg}
+                  size="lg"
+                  accessory={equippedAccessory}
+                  showBadge={true}
+                  isEditable={true}
+                  onClick={() => setShowAvatarModal(true)}
+                />
                 <div>
                   <div className="flex items-center space-x-1.5 justify-center sm:justify-start">
                     <span className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-400 bg-indigo-950 px-2 py-0.5 rounded-full border border-indigo-800">
-                      Your Profile
+                      Your Student Profile
+                    </span>
+                    <span className="text-[10px] text-amber-400 font-bold bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-800/60">
+                      Lv {userProfile.level}
                     </span>
                   </div>
                   <h4 className="text-sm font-black text-white mt-0.5">
@@ -1246,15 +1269,23 @@ export default function App() {
                 </div>
               </div>
 
-              <button
-                onClick={() => {
-                  setIsEditingProfile(true);
-                  setShowOnboardingModal(true);
-                }}
-                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5 shrink-0 active:scale-95 cursor-pointer"
-              >
-                <span>Edit Profile ✏️</span>
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setShowAvatarModal(true)}
+                  className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition border border-white/20 flex items-center space-x-1 shrink-0 active:scale-95 cursor-pointer"
+                >
+                  <span>Avatar 🎨</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setIsEditingProfile(true);
+                    setShowOnboardingModal(true);
+                  }}
+                  className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5 shrink-0 active:scale-95 cursor-pointer"
+                >
+                  <span>Edit Details ✏️</span>
+                </button>
+              </div>
             </div>
 
           </div>
@@ -1414,121 +1445,16 @@ export default function App() {
           </div>
         )}
 
-        {/* AI MOCK EXAMS TAB */}
-        {activeTab === 'mockExam' && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4">
-            {!activeExam ? (
-              <div className="max-w-xl mx-auto space-y-3">
-                <div className="text-center space-y-1">
-                  <GraduationCap className="w-10 h-10 text-indigo-600 mx-auto" />
-                  <h3 className="text-xl font-black text-slate-900">{t('generateExam')}</h3>
-                  <p className="text-xs text-slate-500">AI will generate custom multiple-choice questions for your chosen topic.</p>
-                </div>
-
-                <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 block mb-1">{t('subject')}</label>
-                    <select
-                      value={examSubject}
-                      onChange={(e) => setExamSubject(e.target.value as Subject)}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800"
-                    >
-                      {SUBJECTS.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 block mb-1">{t('topic')}</label>
-                    <input
-                      type="text"
-                      value={examTopic}
-                      onChange={(e) => setExamTopic(e.target.value)}
-                      placeholder="e.g. Newton's Laws of Motion, Cell Biology"
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800"
-                    />
-                  </div>
-
-                  <button
-                    onClick={handleGenerateExam}
-                    disabled={isGeneratingExam}
-                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition shadow-xs flex items-center justify-center space-x-2"
-                  >
-                    {isGeneratingExam ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>{t('generating')}</span>
-                      </>
-                    ) : (
-                      <span>{t('startExam')}</span>
-                    )}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                  <div>
-                    <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">{activeExam.subject}</span>
-                    <h3 className="text-base font-bold text-slate-900">{activeExam.topic}</h3>
-                  </div>
-                  <button
-                    onClick={() => setActiveExam(null)}
-                    className="text-xs text-slate-500 hover:text-slate-900"
-                  >
-                    Close Exam
-                  </button>
-                </div>
-
-                {!examSubmitted ? (
-                  <div className="space-y-4">
-                    {JSON.parse(activeExam.questionsJson || '[]').map((q: any, idx: number) => (
-                      <div key={idx} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-                        <h4 className="font-bold text-slate-900 text-xs">
-                          {idx + 1}. {q.question}
-                        </h4>
-                        <div className="grid gap-1.5">
-                          {q.options.map((opt: string, optIdx: number) => (
-                            <button
-                              key={optIdx}
-                              onClick={() => setUserExamAnswers((prev) => ({ ...prev, [idx]: optIdx }))}
-                              className={`p-2.5 text-left rounded-xl border text-xs font-medium transition ${
-                                userExamAnswers[idx] === optIdx
-                                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-                              }`}
-                            >
-                              {opt}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-
-                    <button
-                      onClick={handleSubmitExam}
-                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition"
-                    >
-                      Submit Exam & View Grade
-                    </button>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 space-y-3 bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                    <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
-                    <h3 className="text-xl font-bold text-slate-900">Exam Completed!</h3>
-                    <p className="text-slate-600 text-xs">{activeExam.feedback}</p>
-                    <button
-                      onClick={() => setActiveExam(null)}
-                      className="px-5 py-2.5 bg-indigo-600 text-white text-xs font-bold rounded-xl shadow-xs"
-                    >
-                      Take Another Exam
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+        {/* AI MOCK EXAMS & PRACTICE QUIZZES TAB */}
+        {(activeTab === 'mockExam' || activeTab === 'quiz') && (
+          <QuizSection
+            user={userProfile}
+            onAddXp={addXp}
+            onSaveMockExam={saveMockExam}
+            savedExams={mockExams}
+            onClose={() => setActiveTab('home')}
+            language={appLanguage}
+          />
         )}
 
         {/* STUDY DOCS / NOTEBOOK TAB */}
@@ -1827,6 +1753,9 @@ export default function App() {
         initialData={{
           name: userProfile.name || '',
           email: userProfile.email || '',
+          avatar: userProfile.avatar || '🧑‍🎓',
+          avatarType: userProfile.avatarType || 'emoji',
+          avatarBg: userProfile.avatarBg || 'bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600',
           schoolName: userProfile.schoolName || '',
           className: userProfile.className || '',
           targetGoal: userProfile.targetGoal || ''
@@ -1835,6 +1764,21 @@ export default function App() {
         onClose={() => setShowOnboardingModal(false)}
         isEditing={isEditingProfile}
       />
+
+      {/* AVATAR STUDIO MODAL */}
+      <AvatarSelectorModal
+        isOpen={showAvatarModal}
+        currentAvatar={userProfile.avatar || '🧑‍🎓'}
+        currentAvatarType={userProfile.avatarType || 'emoji'}
+        currentAvatarBg={userProfile.avatarBg}
+        userName={userProfile.name || 'Student'}
+        equippedAccessory={equippedAccessory}
+        onSave={handleSaveAvatar}
+        onClose={() => setShowAvatarModal(false)}
+      />
+
+      {/* PWA INSTALL & OFFLINE PROMPT BANNER */}
+      <PWAInstallBanner />
     </div>
   );
 }
