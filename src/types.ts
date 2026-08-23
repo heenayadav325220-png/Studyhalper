@@ -97,6 +97,8 @@ export interface UserProfile {
   className?: string;
   targetGoal?: string;
   isOnboarded?: boolean;
+  authProvider?: 'google' | 'password' | 'guest' | 'anonymous';
+  photoURL?: string;
 }
 
 export interface RoomChatMessage {

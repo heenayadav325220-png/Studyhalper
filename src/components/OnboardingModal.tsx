@@ -27,6 +27,7 @@ interface OnboardingModalProps {
   }) => void;
   onClose?: () => void;
   isEditing?: boolean;
+  onOpenAuth?: () => void;
 }
 
 export default function OnboardingModal({
@@ -34,7 +35,8 @@ export default function OnboardingModal({
   initialData,
   onSave,
   onClose,
-  isEditing = false
+  isEditing = false,
+  onOpenAuth
 }: OnboardingModalProps) {
   const [name, setName] = useState(initialData?.name || '');
   const [email, setEmail] = useState(initialData?.email || '');
@@ -129,6 +131,25 @@ export default function OnboardingModal({
               </button>
             )}
           </div>
+
+          {/* QUICK SIGN IN SHORTCUT FOR RETURNING STUDENTS */}
+          {!isEditing && onOpenAuth && (
+            <div className="px-6 py-2.5 bg-indigo-50/80 border-b border-indigo-100 flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-indigo-900">
+                Already have an account?
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onClose) onClose();
+                  onOpenAuth();
+                }}
+                className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 underline cursor-pointer"
+              >
+                Sign In with Email / Google →
+              </button>
+            </div>
+          )}
 
           {/* FORM BODY */}
           <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">

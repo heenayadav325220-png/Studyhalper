@@ -1613,16 +1613,45 @@ export async function summarizePdf(textContent: string): Promise<{ summary: stri
   };
 }
 
+export async function enhanceImagePrompt(prompt: string, style?: string): Promise<string> {
+  try {
+    const response = await fetch("/api/enhance-image-prompt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, style })
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return data.enhancedPrompt || prompt;
+    }
+  } catch (err) {
+    console.warn("Failed to enhance prompt:", err);
+  }
+  return prompt;
+}
+
 export async function generateAiImage(
   prompt: string,
-  size: '1K' | '2K' | '4K' = '1K',
-  aspectRatio: string = '1:1'
-): Promise<{ imageUrl: string; size: string; aspectRatio: string }> {
+  size: '1K' | '2K' | '4K' | '512px' = '1K',
+  aspectRatio: string = '1:1',
+  options?: {
+    style?: string;
+    negativePrompt?: string;
+    seed?: number;
+  }
+): Promise<{ imageUrl: string; size: string; aspectRatio: string; modelUsed?: string; width?: number; height?: number; prompt?: string }> {
   try {
     const response = await fetch("/api/generate-image", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, size, aspectRatio })
+      body: JSON.stringify({
+        prompt,
+        size,
+        aspectRatio,
+        style: options?.style || 'none',
+        negativePrompt: options?.negativePrompt,
+        seed: options?.seed
+      })
     });
     if (response.ok) {
       const data = await response.json();
@@ -1630,15 +1659,17 @@ export async function generateAiImage(
       return data;
     }
   } catch (err) {
-    console.warn("API /api/generate-image call failed, fallback to direct search image:", err);
+    console.warn("API /api/generate-image call failed, fallback:", err);
   }
 
-  // Fallback if API fails or offline
-  const encPrompt = encodeURIComponent(prompt.slice(0, 30));
+  // Fallback if network fails
+  const randomSeed = options?.seed || Math.floor(Math.random() * 900000) + 100000;
+  const encPrompt = encodeURIComponent(prompt.slice(0, 100));
   return {
-    imageUrl: `https://picsum.photos/seed/${encPrompt}/1024/1024`,
+    imageUrl: `https://image.pollinations.ai/prompt/${encPrompt}?width=1024&height=1024&seed=${randomSeed}&nologo=true&enhance=true`,
     size,
-    aspectRatio
+    aspectRatio,
+    modelUsed: 'Flux-RealAI-Engine'
   };
 }
 

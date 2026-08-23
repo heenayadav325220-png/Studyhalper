@@ -22,7 +22,8 @@ import {
   Plus,
   Camera,
   Upload,
-  RefreshCw
+  RefreshCw,
+  FileDown
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -31,6 +32,7 @@ import 'katex/dist/katex.min.css';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { getStudyAnswer } from '../services/geminiService';
+import { exportConversationToPdf } from '../utils/pdfExport';
 import type { Subject } from '../types';
 
 interface AiTutorAppProps {
@@ -260,6 +262,10 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [newFormulaLatex, setNewFormulaLatex] = useState('');
   const [showAddFormulaForm, setShowAddFormulaForm] = useState(false);
   const [copiedFormulaId, setCopiedFormulaId] = useState<string | null>(null);
+
+  // PDF Export State
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [pdfExportSuccess, setPdfExportSuccess] = useState(false);
 
   // Camera & Image Attachment State
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -524,6 +530,33 @@ export const AiTutorApp = memo(function AiTutorApp({
     }
   };
 
+  const handleExportPdf = async () => {
+    if (messages.length === 0 || isExportingPdf) return;
+    setIsExportingPdf(true);
+    try {
+      await exportConversationToPdf({
+        messages,
+        user,
+        subject: selectedSubject,
+        tutorMode: tutorMode === 'homework' 
+          ? 'Homework Solver' 
+          : tutorMode === 'step' 
+          ? 'Step-by-Step Math' 
+          : tutorMode === 'explain' 
+          ? 'Concept Explainer' 
+          : 'Practice Quiz'
+      });
+      setPdfExportSuccess(true);
+      if (onAddXp) onAddXp(15);
+      setTimeout(() => setPdfExportSuccess(false), 3500);
+    } catch (error) {
+      console.error("PDF Export error:", error);
+      alert("Failed to export PDF study guide. Please ensure there are conversation messages.");
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   const handleClearChat = () => {
     if (window.confirm("Clear all AI Tutor conversation history?")) {
       setMessages([]);
@@ -646,6 +679,29 @@ export const AiTutorApp = memo(function AiTutorApp({
             ))}
           </select>
 
+          {/* EXPORT PDF BUTTON */}
+          <button
+            onClick={handleExportPdf}
+            disabled={messages.length === 0 || isExportingPdf}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border shadow-sm ${
+              messages.length === 0
+                ? 'bg-slate-800/60 text-slate-500 border-slate-700/40 cursor-not-allowed'
+                : isExportingPdf
+                ? 'bg-indigo-700 text-indigo-200 border-indigo-500/60 cursor-wait'
+                : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-500 shadow-indigo-600/20 active:scale-95 cursor-pointer'
+            }`}
+            title="Export conversation thread as formatted PDF for offline studying"
+          >
+            {isExportingPdf ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+            ) : (
+              <FileDown className="w-3.5 h-3.5 text-white" />
+            )}
+            <span className="hidden sm:inline">
+              {isExportingPdf ? 'Exporting...' : 'Export PDF'}
+            </span>
+          </button>
+
           {messages.length > 0 && (
             <button
               onClick={handleClearChat}
@@ -657,6 +713,24 @@ export const AiTutorApp = memo(function AiTutorApp({
           )}
         </div>
       </header>
+
+      {/* TOAST SUCCESS BANNER FOR PDF EXPORT */}
+      {pdfExportSuccess && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className="bg-emerald-600/90 text-white px-4 py-2 text-xs font-bold flex items-center justify-between shadow-xl z-20"
+        >
+          <div className="flex items-center space-x-2">
+            <Check className="w-4 h-4 text-white" />
+            <span>Formatted PDF study guide successfully downloaded! Saved for offline study.</span>
+          </div>
+          <span className="bg-emerald-800 text-emerald-100 text-[10px] px-2 py-0.5 rounded-full font-mono">
+            +15 XP Earned
+          </span>
+        </motion.div>
+      )}
 
       {/* STUDENT PROFILE CONTEXT BANNER */}
       <div className="bg-slate-900/90 border-b border-indigo-900/40 px-4 py-1.5 flex items-center justify-between text-[11px] text-indigo-200 shrink-0">
@@ -685,25 +759,42 @@ export const AiTutorApp = memo(function AiTutorApp({
       </div>
 
       {/* MODE TABS BAR */}
-      <div className="bg-slate-900/60 border-b border-slate-800/80 px-4 py-2 flex items-center space-x-2 overflow-x-auto no-scrollbar shrink-0">
-        {[
-          { id: 'homework', label: '⚡ Homework Solver' },
-          { id: 'step', label: '📐 Step-by-Step Math' },
-          { id: 'explain', label: '💡 Concept Explainer' },
-          { id: 'quiz', label: '📝 Practice Quiz' }
-        ].map((mode) => (
-          <button
-            key={mode.id}
-            onClick={() => setTutorMode(mode.id as any)}
-            className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all border ${
-              tutorMode === mode.id
-                ? 'bg-indigo-600 text-white border-indigo-500 shadow-xs'
-                : 'bg-slate-800/80 text-slate-400 border-slate-700/60 hover:text-slate-200'
-            }`}
-          >
-            {mode.label}
-          </button>
-        ))}
+      <div className="bg-slate-900/60 border-b border-slate-800/80 px-4 py-2 flex items-center justify-between overflow-x-auto no-scrollbar shrink-0">
+        <div className="flex items-center space-x-2">
+          {[
+            { id: 'homework', label: '⚡ Homework Solver' },
+            { id: 'step', label: '📐 Step-by-Step Math' },
+            { id: 'explain', label: '💡 Concept Explainer' },
+            { id: 'quiz', label: '📝 Practice Quiz' }
+          ].map((mode) => (
+            <button
+              key={mode.id}
+              onClick={() => setTutorMode(mode.id as any)}
+              className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all border ${
+                tutorMode === mode.id
+                  ? 'bg-indigo-600 text-white border-indigo-500 shadow-xs'
+                  : 'bg-slate-800/80 text-slate-400 border-slate-700/60 hover:text-slate-200'
+              }`}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
+
+        {/* COMPACT EXPORT PDF BUTTON IN MODE BAR */}
+        <button
+          onClick={handleExportPdf}
+          disabled={messages.length === 0 || isExportingPdf}
+          className={`ml-2 px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition-all border flex items-center space-x-1 shrink-0 ${
+            messages.length === 0
+              ? 'opacity-40 border-slate-700 text-slate-500 cursor-not-allowed'
+              : 'bg-slate-800/90 hover:bg-indigo-600/90 text-indigo-300 hover:text-white border-indigo-500/40 cursor-pointer shadow-xs active:scale-95'
+          }`}
+          title="Export conversation as PDF"
+        >
+          <FileDown className="w-3.5 h-3.5" />
+          <span className="hidden md:inline">Download PDF</span>
+        </button>
       </div>
 
       {/* CHAT MESSAGES BODY */}

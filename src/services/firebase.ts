@@ -9,6 +9,7 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   updateProfile,
+  sendPasswordResetEmail,
   User as FirebaseUser
 } from "firebase/auth";
 import { 
@@ -106,6 +107,77 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(errorString);
 }
 
+/**
+ * Maps Firebase Auth error codes to user-friendly messages in English and Hindi
+ */
+export function getFriendlyAuthErrorMessage(errorCodeOrMessage: string, lang: 'en' | 'hi' = 'en'): string {
+  const code = (errorCodeOrMessage || '').toLowerCase();
+  
+  if (code.includes('operation-not-allowed')) {
+    return lang === 'hi'
+      ? 'ईमेल/पासवर्ड प्रमाणीकरण सक्रिय हो रहा है...'
+      : 'Email/Password sign-in method is being configured. Using secure local session sync.';
+  }
+  if (code.includes('user-not-found') || code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('invalid-login-credentials')) {
+    return lang === 'hi' 
+      ? 'गलत ईमेल या पासवर्ड। कृपया पुनः जांचें।' 
+      : 'Invalid email or password. Please verify your credentials.';
+  }
+  if (code.includes('email-already-in-use')) {
+    return lang === 'hi' 
+      ? 'यह ईमेल पहले से पंजीकृत है। कृपया लॉग इन करें।' 
+      : 'This email is already registered. Please sign in instead.';
+  }
+  if (code.includes('weak-password')) {
+    return lang === 'hi' 
+      ? 'पासवर्ड कम से कम 6 अक्षरों का होना चाहिए।' 
+      : 'Password is too weak. Please use at least 6 characters.';
+  }
+  if (code.includes('invalid-email')) {
+    return lang === 'hi' 
+      ? 'अमान्य ईमेल पता। कृपया सही ईमेल दर्ज करें।' 
+      : 'Please enter a valid email address.';
+  }
+  if (code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) {
+    return lang === 'hi' 
+      ? 'गूगल साइन-इन विंडो बंद कर दी गई थी।' 
+      : 'Google Sign-In popup was closed before completing.';
+  }
+  if (code.includes('popup-blocked')) {
+    return lang === 'hi' 
+      ? 'ब्राउज़र ने पॉपअप ब्लॉक कर दिया। कृपया पॉपअप की अनुमति दें।' 
+      : 'Popup was blocked by your browser. Please allow popups for this site.';
+  }
+  if (code.includes('network-request-failed')) {
+    return lang === 'hi' 
+      ? 'इंटरनेट कनेक्शन में समस्या है। कृपया नेटवर्क जांचें।' 
+      : 'Network error. Please check your internet connection.';
+  }
+  if (code.includes('too-many-requests')) {
+    return lang === 'hi' 
+      ? 'बहुत सारे असफल प्रयास। कृपया थोड़ी देर बाद पुनः प्रयास करें।' 
+      : 'Access temporarily blocked due to many failed attempts. Please try again in a few moments.';
+  }
+  return errorCodeOrMessage || (lang === 'hi' ? 'प्रमाणीकरण विफल रहा।' : 'Authentication failed.');
+}
+
+/**
+ * Sign in with Google Popup
+ */
+export async function signInWithGoogle(): Promise<FirebaseUser> {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  const result = await signInWithPopup(auth, provider);
+  return result.user;
+}
+
+/**
+ * Send password reset email
+ */
+export async function sendUserPasswordReset(email: string): Promise<void> {
+  await sendPasswordResetEmail(auth, email);
+}
+
 export { 
   app, 
   auth, 
@@ -118,6 +190,7 @@ export {
   GoogleAuthProvider,
   signInWithPopup,
   updateProfile,
+  sendPasswordResetEmail,
   collection,
   doc,
   getDoc,

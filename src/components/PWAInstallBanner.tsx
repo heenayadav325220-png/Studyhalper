@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Download, Smartphone, X, WifiOff, CheckCircle, Share, PlusSquare } from 'lucide-react';
+import { Download, Smartphone, X, WifiOff, CheckCircle, Share, PlusSquare, MoreVertical, Compass, Globe } from 'lucide-react';
 import { isStandaloneMode, isIosDevice } from '../services/pwaService';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -12,7 +12,7 @@ export default function PWAInstallBanner() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState<boolean>(false);
   const [isDismissed, setIsDismissed] = useState<boolean>(false);
-  const [showIosGuide, setShowIosGuide] = useState<boolean>(false);
+  const [showGuide, setShowGuide] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [justInstalled, setJustInstalled] = useState<boolean>(false);
 
@@ -61,14 +61,18 @@ export default function PWAInstallBanner() {
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const choiceResult = await deferredPrompt.userChoice;
-      if (choiceResult.outcome === 'accepted') {
-        setIsInstalled(true);
+      try {
+        await deferredPrompt.prompt();
+        const choiceResult = await deferredPrompt.userChoice;
+        if (choiceResult.outcome === 'accepted') {
+          setIsInstalled(true);
+        }
+        setDeferredPrompt(null);
+      } catch (_e) {
+        setShowGuide(true);
       }
-      setDeferredPrompt(null);
-    } else if (isIosDevice()) {
-      setShowIosGuide(true);
+    } else {
+      setShowGuide(true);
     }
   };
 
@@ -78,7 +82,7 @@ export default function PWAInstallBanner() {
   };
 
   const isIos = isIosDevice();
-  const canShowBanner = (!isInstalled && !isDismissed && (deferredPrompt || isIos));
+  const canShowBanner = !isInstalled && !isDismissed;
 
   return (
     <>
@@ -130,11 +134,11 @@ export default function PWAInstallBanner() {
                   <h4 className="text-xs font-black text-white tracking-wide flex items-center gap-1.5">
                     <span>Install Ascend Study</span>
                     <span className="text-[9px] bg-indigo-500/30 text-indigo-300 font-extrabold px-1.5 py-0.5 rounded uppercase">
-                      PWA
+                      App
                     </span>
                   </h4>
                   <p className="text-[11px] text-slate-300 line-clamp-1">
-                    Fast offline access & native app experience
+                    Direct installation for Android, iOS & PC
                   </p>
                 </div>
               </div>
@@ -153,7 +157,7 @@ export default function PWAInstallBanner() {
                 className="flex-1 py-2 px-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-600 text-white text-xs font-black rounded-xl shadow-md transition flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>{isIos ? 'How to Add to Home Screen' : 'Install App (Free)'}</span>
+                <span>{deferredPrompt ? 'Install App (1-Click)' : 'Download / Install App'}</span>
               </button>
               <button
                 onClick={handleDismiss}
@@ -166,81 +170,170 @@ export default function PWAInstallBanner() {
         )}
       </AnimatePresence>
 
-      {/* IOS SAFARI INSTALL INSTRUCTIONS MODAL */}
+      {/* COMPREHENSIVE ALL-DEVICE INSTALL INSTRUCTIONS MODAL */}
       <AnimatePresence>
-        {showIosGuide && (
-          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-4">
+        {showGuide && (
+          <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              initial={{ opacity: 0, scale: 0.92, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-slate-900 border border-slate-800 rounded-3xl p-5 max-w-sm w-full space-y-4 text-slate-100 shadow-2xl"
+              exit={{ opacity: 0, scale: 0.92, y: 15 }}
+              className="bg-slate-900 border border-slate-700/80 rounded-3xl p-5 max-w-md w-full space-y-4 text-slate-100 shadow-2xl my-auto"
             >
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-xs">
                     📱
                   </div>
-                  <h3 className="font-extrabold text-sm text-white">Install on iPhone / iPad</h3>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-white">Download & Install on Mobile</h3>
+                    <p className="text-[10px] text-slate-400">Works on Android, iPhone, iPad, Tablet & PC</p>
+                  </div>
                 </div>
                 <button
-                  onClick={() => setShowIosGuide(false)}
-                  className="text-slate-400 hover:text-white p-1 rounded-lg"
+                  onClick={() => setShowGuide(false)}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="space-y-3 text-xs text-slate-300">
-                <div className="flex items-start space-x-3 bg-slate-800/60 p-3 rounded-2xl border border-slate-700/50">
-                  <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                    1
-                  </div>
-                  <div>
-                    <p className="font-bold text-white flex items-center gap-1.5">
-                      <span>Tap the Share Button</span>
-                      <Share className="w-3.5 h-3.5 text-indigo-400 inline" />
-                    </p>
-                    <p className="text-[11px] text-slate-400">
-                      In Safari browser at the bottom or top of your screen.
-                    </p>
-                  </div>
-                </div>
+              {/* TABS FOR ANDROID / IOS / DESKTOP */}
+              <div className="space-y-3">
+                {isIos ? (
+                  /* IPHONE / IPAD SAFARI GUIDE */
+                  <div className="space-y-2.5 text-xs text-slate-300">
+                    <div className="p-2.5 rounded-xl bg-indigo-950/50 border border-indigo-500/30 text-indigo-200 text-[11px] font-semibold flex items-center gap-2">
+                      <Compass className="w-4 h-4 text-indigo-400 shrink-0" />
+                      <span>Follow these 3 easy steps in Safari on iPhone / iPad:</span>
+                    </div>
 
-                <div className="flex items-start space-x-3 bg-slate-800/60 p-3 rounded-2xl border border-slate-700/50">
-                  <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                    2
-                  </div>
-                  <div>
-                    <p className="font-bold text-white flex items-center gap-1.5">
-                      <span>Scroll & Tap 'Add to Home Screen'</span>
-                      <PlusSquare className="w-3.5 h-3.5 text-indigo-400 inline" />
-                    </p>
-                    <p className="text-[11px] text-slate-400">
-                      Look for the plus icon in the share menu options.
-                    </p>
-                  </div>
-                </div>
+                    <div className="flex items-start space-x-3 bg-slate-800/70 p-3 rounded-2xl border border-slate-700/50">
+                      <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                        1
+                      </div>
+                      <div>
+                        <p className="font-bold text-white flex items-center gap-1.5">
+                          <span>Tap the Share button in Safari</span>
+                          <Share className="w-3.5 h-3.5 text-indigo-400 inline" />
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          (Located at the bottom of the screen on iPhone, or top on iPad)
+                        </p>
+                      </div>
+                    </div>
 
-                <div className="flex items-start space-x-3 bg-slate-800/60 p-3 rounded-2xl border border-slate-700/50">
-                  <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                    3
+                    <div className="flex items-start space-x-3 bg-slate-800/70 p-3 rounded-2xl border border-slate-700/50">
+                      <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                        2
+                      </div>
+                      <div>
+                        <p className="font-bold text-white flex items-center gap-1.5">
+                          <span>Select 'Add to Home Screen'</span>
+                          <PlusSquare className="w-3.5 h-3.5 text-indigo-400 inline" />
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          Scroll down the share sheet and tap the <strong>Add to Home Screen</strong> option.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start space-x-3 bg-slate-800/70 p-3 rounded-2xl border border-slate-700/50">
+                      <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                        3
+                      </div>
+                      <div>
+                        <p className="font-bold text-white">Tap 'Add' in Top Right</p>
+                        <p className="text-[11px] text-slate-400">
+                          Ascend Study will be added as a native app icon on your home screen!
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-bold text-white">Tap 'Add' in Top Right</p>
-                    <p className="text-[11px] text-slate-400">
-                      Ascend Study will appear directly on your home screen!
-                    </p>
+                ) : (
+                  /* ANDROID & UNIVERSAL MOBILE GUIDE */
+                  <div className="space-y-2.5 text-xs text-slate-300">
+                    <div className="p-2.5 rounded-xl bg-indigo-950/50 border border-indigo-500/30 text-indigo-200 text-[11px] font-semibold flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-indigo-400 shrink-0" />
+                      <span>Android / Chrome / Samsung Internet Installation:</span>
+                    </div>
+
+                    <div className="flex items-start space-x-3 bg-slate-800/70 p-3 rounded-2xl border border-slate-700/50">
+                      <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                        1
+                      </div>
+                      <div>
+                        <p className="font-bold text-white flex items-center gap-1.5">
+                          <span>Tap Browser Menu (3 Dots)</span>
+                          <MoreVertical className="w-3.5 h-3.5 text-indigo-400 inline" />
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          Tap the three vertical dots (⋮) in the top-right corner of Chrome or your browser.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start space-x-3 bg-slate-800/70 p-3 rounded-2xl border border-slate-700/50">
+                      <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                        2
+                      </div>
+                      <div>
+                        <p className="font-bold text-white flex items-center gap-1.5">
+                          <span>Tap 'Install App' or 'Add to Home Screen'</span>
+                          <Download className="w-3.5 h-3.5 text-indigo-400 inline" />
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          Select <strong>Install App</strong> (or <em>Add to Home Screen</em>).
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start space-x-3 bg-slate-800/70 p-3 rounded-2xl border border-slate-700/50">
+                      <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                        3
+                      </div>
+                      <div>
+                        <p className="font-bold text-white">Tap 'Install' to Confirm</p>
+                        <p className="text-[11px] text-slate-400">
+                          The app will download immediately and open in full-screen offline mode!
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
-              <button
-                onClick={() => setShowIosGuide(false)}
-                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition shadow-xs"
-              >
-                Got It!
-              </button>
+              {/* ACTION BUTTON */}
+              <div className="pt-2 flex gap-2">
+                {deferredPrompt && (
+                  <button
+                    onClick={async () => {
+                      if (deferredPrompt) {
+                        try {
+                          await deferredPrompt.prompt();
+                          const choice = await deferredPrompt.userChoice;
+                          if (choice.outcome === 'accepted') {
+                            setIsInstalled(true);
+                            setShowGuide(false);
+                          }
+                        } catch (_e) {
+                          // proceed
+                        }
+                      }
+                    }}
+                    className="flex-1 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Click Here to Direct Install</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowGuide(false)}
+                  className={`py-2.5 ${deferredPrompt ? 'px-4 bg-slate-800 hover:bg-slate-700 text-slate-300' : 'w-full bg-indigo-600 hover:bg-indigo-700 text-white'} font-bold text-xs rounded-xl transition shadow-xs cursor-pointer`}
+                >
+                  Got It, Thanks!
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
@@ -250,12 +343,12 @@ export default function PWAInstallBanner() {
 }
 
 /**
- * Compact Install Button for Header / Settings Bar
+ * Compact Install Button for Header / Navigation Bar
  */
 export function PWAHeaderButton() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState<boolean>(false);
-  const [showIosGuide, setShowIosGuide] = useState<boolean>(false);
+  const [showGuide, setShowGuide] = useState<boolean>(false);
 
   useEffect(() => {
     if (isStandaloneMode()) {
@@ -283,18 +376,22 @@ export function PWAHeaderButton() {
 
   const handleClick = async () => {
     if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const choiceResult = await deferredPrompt.userChoice;
-      if (choiceResult.outcome === 'accepted') {
-        setIsInstalled(true);
+      try {
+        await deferredPrompt.prompt();
+        const choiceResult = await deferredPrompt.userChoice;
+        if (choiceResult.outcome === 'accepted') {
+          setIsInstalled(true);
+        }
+        setDeferredPrompt(null);
+      } catch (_e) {
+        setShowGuide(true);
       }
-      setDeferredPrompt(null);
-    } else if (isIosDevice()) {
-      setShowIosGuide(true);
     } else {
-      alert('To install Ascend Study, click the Install App icon in your browser address bar.');
+      setShowGuide(true);
     }
   };
+
+  const isIos = isIosDevice();
 
   if (isInstalled) {
     return (
@@ -309,44 +406,106 @@ export function PWAHeaderButton() {
     <>
       <button
         onClick={handleClick}
-        className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[11px] font-bold transition cursor-pointer active:scale-95"
-        title="Install App as PWA"
+        className="flex items-center space-x-1 px-2 sm:px-2.5 py-1 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10.5px] sm:text-[11px] font-bold transition cursor-pointer active:scale-95 shrink-0"
+        title="Download & Install App on this device"
       >
         <Download className="w-3 h-3 text-indigo-600" />
         <span className="hidden sm:inline">Install App</span>
         <span className="sm:hidden">Install</span>
       </button>
 
-      {/* IOS SAFARI GUIDE MODAL */}
+      {/* ALL-DEVICE INSTALL GUIDE MODAL */}
       <AnimatePresence>
-        {showIosGuide && (
-          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-4">
+        {showGuide && (
+          <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              initial={{ opacity: 0, scale: 0.92, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-slate-900 border border-slate-800 rounded-3xl p-5 max-w-sm w-full space-y-4 text-slate-100 shadow-2xl"
+              exit={{ opacity: 0, scale: 0.92, y: 15 }}
+              className="bg-slate-900 border border-slate-700/80 rounded-3xl p-5 max-w-md w-full space-y-4 text-slate-100 shadow-2xl my-auto"
             >
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="font-extrabold text-sm text-white">Add to Home Screen (iOS)</h3>
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-xs">
+                    📥
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-white">Install Ascend Study</h3>
+                    <p className="text-[10px] text-slate-400">Universal Mobile & Desktop Support</p>
+                  </div>
+                </div>
                 <button
-                  onClick={() => setShowIosGuide(false)}
-                  className="text-slate-400 hover:text-white p-1 rounded-lg"
+                  onClick={() => setShowGuide(false)}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <p className="text-xs text-slate-300">
-                1. Tap the <strong>Share</strong> button in Safari.<br />
-                2. Tap <strong>'Add to Home Screen'</strong> ➕.<br />
-                3. Tap <strong>Add</strong> in the top-right corner.
-              </p>
-              <button
-                onClick={() => setShowIosGuide(false)}
-                className="w-full py-2.5 bg-indigo-600 text-white font-bold text-xs rounded-xl"
-              >
-                Close
-              </button>
+
+              {isIos ? (
+                /* IOS SAFARI GUIDE */
+                <div className="space-y-2.5 text-xs text-slate-300">
+                  <p className="text-indigo-300 font-bold text-xs">Steps for iPhone / iPad (Safari):</p>
+                  <div className="p-3 bg-slate-800/80 rounded-xl space-y-2">
+                    <p className="flex items-center gap-1.5 font-bold text-white">
+                      1. Tap the Share button <Share className="w-3.5 h-3.5 text-indigo-400 inline" /> at bottom of Safari.
+                    </p>
+                    <p className="flex items-center gap-1.5 font-bold text-white">
+                      2. Select <strong>'Add to Home Screen'</strong> <PlusSquare className="w-3.5 h-3.5 text-indigo-400 inline" />.
+                    </p>
+                    <p className="font-bold text-white">
+                      3. Tap <strong>'Add'</strong> in top right corner.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                /* ANDROID / CHROME / ALL MOBILE */
+                <div className="space-y-2.5 text-xs text-slate-300">
+                  <p className="text-indigo-300 font-bold text-xs">Steps for Android / Chrome / Mobile:</p>
+                  <div className="p-3 bg-slate-800/80 rounded-xl space-y-2">
+                    <p className="flex items-center gap-1.5 font-bold text-white">
+                      1. Tap browser menu <MoreVertical className="w-3.5 h-3.5 text-indigo-400 inline" /> (3 dots in top right).
+                    </p>
+                    <p className="flex items-center gap-1.5 font-bold text-white">
+                      2. Tap <strong>'Install App'</strong> or <strong>'Add to Home Screen'</strong> <Download className="w-3.5 h-3.5 text-indigo-400 inline" />.
+                    </p>
+                    <p className="font-bold text-white">
+                      3. Tap <strong>'Install'</strong> to download to your phone.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-2 flex gap-2">
+                {deferredPrompt && (
+                  <button
+                    onClick={async () => {
+                      if (deferredPrompt) {
+                        try {
+                          await deferredPrompt.prompt();
+                          const choice = await deferredPrompt.userChoice;
+                          if (choice.outcome === 'accepted') {
+                            setIsInstalled(true);
+                            setShowGuide(false);
+                          }
+                        } catch (_e) {
+                          // continue
+                        }
+                      }
+                    }}
+                    className="flex-1 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>1-Click Install Now</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowGuide(false)}
+                  className={`py-2.5 ${deferredPrompt ? 'px-4 bg-slate-800 hover:bg-slate-700 text-slate-300' : 'w-full bg-indigo-600 hover:bg-indigo-700 text-white'} font-bold text-xs rounded-xl transition cursor-pointer`}
+                >
+                  Close
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
@@ -354,3 +513,4 @@ export function PWAHeaderButton() {
     </>
   );
 }
+

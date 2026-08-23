@@ -168,6 +168,26 @@ export const TRANSLATIONS = {
   quest3: {
     en: 'Draw on Whiteboard (+50 XP)',
     hi: 'व्हाइटबोर्ड पर चित्र बनाएं (+50 एक्सपी)'
+  },
+  signIn: {
+    en: 'Sign In',
+    hi: 'साइन इन करें'
+  },
+  signUp: {
+    en: 'Create Account',
+    hi: 'नया खाता बनाएं'
+  },
+  continueWithGoogle: {
+    en: 'Continue with Google',
+    hi: 'गूगल के साथ जारी रखें'
+  },
+  signOut: {
+    en: 'Sign Out',
+    hi: 'लॉग आउट करें'
+  },
+  account: {
+    en: 'Account',
+    hi: 'खाता'
   }
 };
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { motion } from 'motion/react';
 import { 
   Sparkles, 
   MessageSquare, 
@@ -23,13 +24,24 @@ import {
   LayoutGrid,
   Mail,
   X,
-  Image as ImageIcon
+  Image as ImageIcon,
+  LogIn,
+  UserCheck,
+  Edit3,
+  Target,
+  School
 } from 'lucide-react';
 import InteractiveToolkit from './components/InteractiveToolkit';
 import AiTutorApp from './components/AiTutorApp';
 import ImageGenerator from './components/ImageGenerator';
 import OnboardingModal from './components/OnboardingModal';
+import AuthModal from './components/AuthModal';
 import { TRANSLATIONS, Language } from './services/translations';
+import { 
+  auth, 
+  onAuthStateChanged,
+  FirebaseUser 
+} from './services/firebase';
 import { 
   subscribeUserProfile, 
   updateUserProfile, 
@@ -86,6 +98,8 @@ export default function App() {
   const [initialTool, setInitialTool] = useState<string | undefined>(undefined);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
 
   // User & Onboarding State - Sourced from localStorage
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
@@ -105,6 +119,31 @@ export default function App() {
     }
     return DEFAULT_USER;
   });
+
+  // Listen to Firebase Auth State changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      if (user && !user.isAnonymous) {
+        // Authenticated user detected
+        setUserProfile(prev => {
+          const updated: UserProfile = {
+            ...prev,
+            uid: user.uid,
+            email: user.email || prev.email || '',
+            name: user.displayName || prev.name || (user.email ? user.email.split('@')[0] : 'Student'),
+            photoURL: user.photoURL || prev.photoURL,
+            avatar: user.photoURL || prev.avatar || '🧑‍🎓',
+            avatarType: user.photoURL ? 'personal' : prev.avatarType,
+            authProvider: user.providerData?.[0]?.providerId?.includes('google') ? 'google' : 'password'
+          };
+          localStorage.setItem('ascend_user_profile', JSON.stringify(updated));
+          return updated;
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Real-time dynamic greeting helper based on current real-time hour (IST / Local timezone)
   const getDynamicGreeting = () => {
@@ -568,29 +607,29 @@ export default function App() {
   };
 
   return (
-    <div className="bg-[#f8fafc] text-slate-800 min-h-screen font-sans flex flex-col selection:bg-indigo-500 selection:text-white">
+    <div className="bg-[#f8fafc] text-slate-800 min-h-screen font-sans flex flex-col selection:bg-indigo-500 selection:text-white w-full max-w-full overflow-x-hidden">
       {/* COMPACT TOP HEADER */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-xs">
-        <div className="flex items-center space-x-2.5">
-          <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-xs font-black text-lg">
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-3 sm:px-4 py-2 flex items-center justify-between shadow-xs w-full max-w-full overflow-hidden">
+        <div className="flex items-center space-x-2 shrink min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-xs font-black text-lg shrink-0">
             🎓
           </div>
-          <div>
-            <h1 className="text-xs font-black tracking-tight text-slate-900">
+          <div className="min-w-0">
+            <h1 className="text-xs font-black tracking-tight text-slate-900 truncate">
               ASCEND STUDY
             </h1>
-            <p className="text-[9px] font-bold text-indigo-600 uppercase tracking-wider truncate max-w-[150px] sm:max-w-[220px]">
+            <p className="text-[9px] font-bold text-indigo-600 uppercase tracking-wider truncate max-w-[120px] sm:max-w-[220px]">
               {userProfile.name ? `${userProfile.name}'s Companion` : 'Student Companion'}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1.5 shrink-0">
           {/* USER AVATAR BUTTON (DIRECT ACCESS) */}
           <button
             onClick={() => setShowAvatarModal(true)}
             title="Customize Study Avatar"
-            className="flex items-center space-x-1.5 p-1 pl-1.5 pr-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer border border-slate-200/80 active:scale-95"
+            className="flex items-center space-x-1.5 p-1 pl-1.5 pr-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer border border-slate-200/80 active:scale-95 shrink-0"
           >
             <UserAvatar
               avatar={userProfile.avatar}
@@ -607,93 +646,125 @@ export default function App() {
           {/* LANGUAGE TOGGLE */}
           <button 
             onClick={toggleLanguage}
-            className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold transition cursor-pointer"
+            className="flex items-center space-x-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10.5px] sm:text-[11px] font-bold transition cursor-pointer shrink-0"
           >
             <Globe className="w-3 h-3 text-indigo-600" />
-            <span>{t('languageToggle')}</span>
+            <span className="hidden xs:inline sm:inline">{t('languageToggle')}</span>
+            <span className="xs:hidden sm:hidden">{appLanguage.toUpperCase()}</span>
           </button>
 
           {/* PWA INSTALL BUTTON */}
           <PWAHeaderButton />
 
-          {/* ADVANCED TOOLKIT TRIGGER */}
+          {/* AUTH / ACCOUNT BUTTON */}
           <button
-            onClick={() => openToolkitWithTool()}
-            className="flex items-center space-x-1 px-3 py-1.5 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 text-[11px] font-bold shadow-xs transition cursor-pointer active:scale-95"
+            onClick={() => setShowAuthModal(true)}
+            className={`flex items-center space-x-1 px-2 sm:px-2.5 py-1 rounded-full text-[10.5px] sm:text-[11px] font-bold transition cursor-pointer border active:scale-95 shrink-0 ${
+              currentUser && !currentUser.isAnonymous
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-300/80 hover:bg-emerald-100'
+                : 'bg-indigo-50 text-indigo-700 border-indigo-200/80 hover:bg-indigo-100'
+            }`}
+            title={currentUser && !currentUser.isAnonymous ? 'Manage Account' : 'Sign In / Register'}
           >
-            <Sparkles className="w-3 h-3" />
-            <span>19+ Tools</span>
+            {currentUser && !currentUser.isAnonymous ? (
+              <>
+                <UserCheck className="w-3 h-3 text-emerald-600" />
+                <span className="hidden xs:inline">{userProfile.name ? userProfile.name.split(' ')[0] : 'Account'}</span>
+                <span className="xs:hidden">Me</span>
+              </>
+            ) : (
+              <>
+                <LogIn className="w-3 h-3 text-indigo-600" />
+                <span>{appLanguage === 'hi' ? 'लॉग इन' : 'Sign In'}</span>
+              </>
+            )}
           </button>
         </div>
       </header>
 
       {/* MAIN CONTENT AREA - WITH pb-24 TO AVOID BOTTOM NAV OVERLAP */}
-      <main className="flex-1 p-3 sm:p-4 md:p-5 max-w-xl mx-auto w-full space-y-4 pb-24">
+      <main className="flex-1 p-3 sm:p-4 md:p-5 max-w-xl mx-auto w-full space-y-4 pb-24 overflow-x-hidden">
         {/* DASHBOARD TAB */}
         {activeTab === 'home' && (
           <div className="space-y-4">
             
-            {/* 1. TOP USER CARD (REALTIME GREETING + STUDENT INFO) */}
-            <div className="bg-gradient-to-br from-white via-indigo-50/30 to-purple-50/20 rounded-2xl p-4 sm:p-5 border border-indigo-100 shadow-xs space-y-3 relative overflow-hidden">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-2 flex-1 min-w-0">
-                  <div className="flex items-center space-x-2 flex-wrap gap-1">
-                    <span className="text-[10px] font-extrabold text-indigo-700 uppercase tracking-wider bg-indigo-100/90 px-2.5 py-0.5 rounded-full inline-flex items-center space-x-1 border border-indigo-200/80 shrink-0 whitespace-nowrap shadow-2xs">
-                      <span>{realtimeGreeting || getDynamicGreeting()}</span>
+            {/* 1. TOP USER CARD (ORGANIZED REALTIME GREETING + STUDENT INFO + XP PROGRESS) */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-sm space-y-4 relative overflow-hidden">
+              {/* Top Row: Greeting Tag, Target Goal & Edit Action */}
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div className="flex items-center flex-wrap gap-2">
+                  <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full inline-flex items-center space-x-1.5 border border-indigo-100/80">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse"></span>
+                    <span>{realtimeGreeting || getDynamicGreeting()}</span>
+                  </span>
+                  {userProfile.targetGoal ? (
+                    <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200/70 inline-flex items-center space-x-1">
+                      <Target className="w-3 h-3 text-amber-600 shrink-0" />
+                      <span className="truncate max-w-[130px] sm:max-w-[200px]">{userProfile.targetGoal}</span>
                     </span>
+                  ) : null}
+                </div>
+
+                <button
+                  onClick={() => {
+                    setIsEditingProfile(true);
+                    setShowOnboardingModal(true);
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/70 rounded-lg transition border border-transparent hover:border-indigo-100 cursor-pointer flex items-center space-x-1 text-xs font-semibold"
+                  title="Edit Profile"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline text-[11px]">Edit</span>
+                </button>
+              </div>
+
+              {/* Main Student Profile & Avatar Section */}
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-2 flex-1 min-w-0">
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                      <span className="truncate">{userProfile.name ? `Hello, ${userProfile.name}` : 'Welcome, Student'}</span>
+                      <span className="text-lg shrink-0">🚀</span>
+                    </h2>
+                    <p className="text-xs text-slate-500 font-medium flex items-center space-x-1 mt-0.5">
+                      <School className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate">{userProfile.schoolName || 'Ascend AI Study Buddy'}</span>
+                    </p>
                   </div>
 
-                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center flex-wrap gap-2 pt-0.5">
-                    <span>{userProfile.name ? `Hello, ${userProfile.name}!` : 'Welcome Student!'}</span>
-                    <span className="animate-bounce inline-block text-xl shrink-0">🚀</span>
-                  </h2>
-
-                  {/* USER SET INFORMATION BADGES */}
-                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                    {userProfile.className ? (
-                      <span className="px-2.5 py-1 bg-indigo-600 text-white text-[11px] font-bold rounded-xl shadow-2xs flex items-center space-x-1">
-                        <span>📚 Class:</span>
-                        <span className="font-extrabold">{userProfile.className}</span>
-                      </span>
-                    ) : null}
-
-                    {userProfile.schoolName ? (
-                      <span className="px-2.5 py-1 bg-slate-100 text-slate-800 text-[11px] font-bold rounded-xl border border-slate-200/80 shadow-2xs flex items-center space-x-1">
-                        <span>🏫 School:</span>
-                        <span className="font-semibold">{userProfile.schoolName}</span>
-                      </span>
-                    ) : null}
-
-                    {userProfile.targetGoal ? (
-                      <span className="px-2.5 py-1 bg-amber-500/15 text-amber-800 border border-amber-500/30 text-[11px] font-bold rounded-xl shadow-2xs flex items-center space-x-1">
-                        <span>🎯 Goal:</span>
-                        <span className="font-extrabold">{userProfile.targetGoal}</span>
-                      </span>
-                    ) : null}
-
-                    {userProfile.email && (
-                      <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200/80 text-[11px] font-bold rounded-xl shadow-2xs flex items-center space-x-1">
-                        <Mail className="w-3 h-3 text-indigo-600" />
-                        <span>{userProfile.email}</span>
+                  {/* Organized Student Info Badges */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    {userProfile.className && (
+                      <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 text-[11px] font-bold rounded-md border border-slate-200/70 flex items-center space-x-1">
+                        <GraduationCap className="w-3 h-3 text-slate-500 shrink-0" />
+                        <span>Class {userProfile.className}</span>
                       </span>
                     )}
 
-                    {(!userProfile.className && !userProfile.schoolName && !userProfile.targetGoal) && (
+                    {userProfile.email && (
+                      <span className="px-2.5 py-0.5 bg-slate-100 text-slate-600 text-[11px] font-medium rounded-md border border-slate-200/70 flex items-center space-x-1 truncate max-w-[200px]">
+                        <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="truncate">{userProfile.email}</span>
+                      </span>
+                    )}
+
+                    {!userProfile.className && !userProfile.schoolName && !userProfile.targetGoal && (
                       <button
                         onClick={() => {
                           setIsEditingProfile(true);
                           setShowOnboardingModal(true);
                         }}
-                        className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold rounded-xl border border-indigo-200 transition flex items-center space-x-1 cursor-pointer"
+                        className="px-2.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold rounded-md border border-indigo-200/80 transition flex items-center space-x-1 cursor-pointer"
                       >
-                        <span>✏️ Click here to set your Class, School & Goal</span>
+                        <Plus className="w-3 h-3" />
+                        <span>Add Class & Goal</span>
                       </button>
                     )}
                   </div>
                 </div>
 
-                {/* AVATAR BOX & PROFILE ACTIONS */}
-                <div className="flex flex-col items-end space-y-1.5 shrink-0">
+                {/* Avatar with click action */}
+                <div className="shrink-0 flex flex-col items-center">
                   <UserAvatar
                     avatar={userProfile.avatar}
                     name={userProfile.name || 'Student'}
@@ -706,45 +777,94 @@ export default function App() {
                     isEditable={true}
                     onClick={() => setShowAvatarModal(true)}
                   />
-                  <div className="flex flex-col space-y-1 items-end">
-                    <button 
-                      onClick={() => setShowAvatarModal(true)}
-                      className="text-[10px] font-extrabold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-200 shadow-2xs transition flex items-center space-x-1 cursor-pointer active:scale-95 whitespace-nowrap"
-                    >
-                      <span>Change Avatar 🎨</span>
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setIsEditingProfile(true);
-                        setShowOnboardingModal(true);
-                      }}
-                      className="text-[10px] font-bold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200 shadow-2xs transition flex items-center space-x-1 cursor-pointer active:scale-95 whitespace-nowrap"
-                    >
-                      <span>Edit Details ✏️</span>
-                    </button>
+                  <span className="text-[10px] text-slate-400 hover:text-indigo-600 font-semibold cursor-pointer mt-1">
+                    Change
+                  </span>
+                </div>
+              </div>
+
+              {/* 3-Column Gamified Quick Stats Strip */}
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                <div className="bg-slate-50 rounded-xl p-2 text-center border border-slate-100/90">
+                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider flex items-center justify-center space-x-1">
+                    <Flame className="w-3 h-3 text-amber-500" />
+                    <span>Streak</span>
+                  </div>
+                  <div className="text-sm font-black text-slate-800 mt-0.5">
+                    {userProfile.streak || 1} <span className="text-[10px] font-semibold text-slate-400">days</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 rounded-xl p-2 text-center border border-slate-100/90">
+                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider flex items-center justify-center space-x-1">
+                    <Award className="w-3 h-3 text-indigo-500" />
+                    <span>Level</span>
+                  </div>
+                  <div className="text-sm font-black text-indigo-600 mt-0.5">
+                    Lvl {userProfile.level || 1}
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 rounded-xl p-2 text-center border border-slate-100/90">
+                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider flex items-center justify-center space-x-1">
+                    <Sparkles className="w-3 h-3 text-emerald-500" />
+                    <span>Total XP</span>
+                  </div>
+                  <div className="text-sm font-black text-slate-800 mt-0.5">
+                    {userProfile.xp} <span className="text-[10px] font-semibold text-slate-400">XP</span>
                   </div>
                 </div>
               </div>
 
-              {/* LEVEL & XP PROGRESS BAR */}
-              <div className="pt-2 border-t border-indigo-100/60 flex items-center justify-between text-[11px] font-bold text-slate-600">
-                <span className="text-indigo-600 font-extrabold">Level {userProfile.level}</span>
-                <span>{userProfile.xp % 100}/100 XP</span>
-                <button 
-                  onClick={() => addXp(10)}
-                  className="text-[10px] text-indigo-600 hover:underline flex items-center space-x-1 cursor-pointer font-bold"
-                >
-                  <Sparkles className="w-3 h-3 text-indigo-500" />
-                  <span>Earn XP</span>
-                </button>
-              </div>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 transition-all duration-500"
-                  style={{ width: `${userProfile.xp % 100}%` }}
-                />
+              {/* Level & XP Progress Section */}
+              <div className="bg-slate-50/90 rounded-xl p-2.5 sm:p-3 border border-slate-100 space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <div className="flex items-center space-x-1.5">
+                    <span className="text-slate-500 text-[11px] font-medium">Level {userProfile.level} Progress:</span>
+                    <span className="text-slate-800 text-[11px] font-bold">
+                      {userProfile.xp % 100} / 100 <span className="text-slate-400 font-normal">XP</span>
+                    </span>
+                  </div>
+                  <button 
+                    onClick={() => addXp(10)}
+                    className="text-[11px] text-indigo-600 hover:text-indigo-700 flex items-center space-x-1 cursor-pointer font-bold transition hover:bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100/70"
+                  >
+                    <Sparkles className="w-3 h-3 text-indigo-500" />
+                    <span>+10 XP Booster</span>
+                  </button>
+                </div>
+                <div className="w-full h-2 bg-slate-200/80 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full transition-all duration-500"
+                    style={{ width: `${userProfile.xp % 100}%` }}
+                  />
+                </div>
               </div>
             </div>
+
+            {/* CLOUD AUTH & SYNC BANNER (WHEN NOT FULLY AUTHENTICATED) */}
+            {(!currentUser || currentUser.isAnonymous) && (
+              <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 rounded-2xl p-3.5 sm:p-4 text-white flex items-center justify-between gap-3 shadow-md border border-indigo-800/60">
+                <div className="space-y-0.5 min-w-0">
+                  <p className="text-xs font-black flex items-center gap-1.5 text-indigo-200">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                    <span>{appLanguage === 'hi' ? 'क्लाउड सिंक और +150 XP बोनस' : 'Sync Progress & Get +150 XP Bonus'}</span>
+                  </p>
+                  <p className="text-[11px] text-slate-300 line-clamp-1">
+                    {appLanguage === 'hi' 
+                      ? 'गूगल या ईमेल से साइन इन करें ताकि नोट्स और परीक्षाएं सुरक्षित रहें।'
+                      : 'Sign in with Google or Email to backup your study progress across devices.'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="px-3 py-1.5 bg-white hover:bg-slate-100 text-indigo-950 font-black text-xs rounded-xl transition cursor-pointer shrink-0 shadow-xs active:scale-95 flex items-center space-x-1"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>{appLanguage === 'hi' ? 'लॉग इन' : 'Sign In'}</span>
+                </button>
+              </div>
+            )}
 
             {/* 2. ACADEMY PLAYGROUND */}
             <div className="space-y-2.5">
@@ -757,7 +877,7 @@ export default function App() {
                 {/* CARD 1: AI TUTOR QUICK LINK - OPENS DEDICATED FULL AI APP INTERFACE */}
                 <button
                   onClick={() => setActiveTab('aiTutor')}
-                  className="p-3.5 rounded-2xl bg-indigo-600 text-white text-left shadow-xs hover:bg-indigo-700 transition flex flex-col justify-between h-32 group"
+                  className="p-3.5 rounded-2xl bg-indigo-600 text-white text-left shadow-xs hover:bg-indigo-700 transition flex flex-col justify-between h-32 group cursor-pointer"
                 >
                   <div className="flex justify-between items-start">
                     <BrainCircuit className="w-6 h-6 group-hover:scale-110 transition-transform" />
@@ -769,10 +889,25 @@ export default function App() {
                   </div>
                 </button>
 
-                {/* CARD 2: QUIZ */}
+                {/* CARD 2: REAL AI IMAGE GENERATOR ENGINE */}
+                <button
+                  onClick={() => setActiveTab('imageGen')}
+                  className="p-3.5 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 text-white text-left shadow-xs hover:opacity-95 transition flex flex-col justify-between h-32 group cursor-pointer"
+                >
+                  <div className="flex justify-between items-start">
+                    <ImageIcon className="w-6 h-6 group-hover:scale-110 transition-transform text-amber-300" />
+                    <span className="text-[8px] font-bold uppercase bg-white/20 px-1.5 py-0.5 rounded-md">REAL ENGINE</span>
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-sm">Image Gen 🎨</h4>
+                    <p className="text-[10px] text-indigo-100 leading-tight mt-0.5">Generate real diagrams & visual art</p>
+                  </div>
+                </button>
+
+                {/* CARD 3: QUIZ */}
                 <button
                   onClick={() => setActiveTab('mockExam')}
-                  className="p-3.5 rounded-2xl bg-emerald-500 text-white text-left shadow-xs hover:bg-emerald-600 transition flex flex-col justify-between h-32"
+                  className="p-3.5 rounded-2xl bg-emerald-500 text-white text-left shadow-xs hover:bg-emerald-600 transition flex flex-col justify-between h-32 cursor-pointer"
                 >
                   <div className="flex justify-between items-start">
                     <GraduationCap className="w-6 h-6" />
@@ -784,10 +919,10 @@ export default function App() {
                   </div>
                 </button>
 
-                {/* CARD 3: NOTEBOOK */}
+                {/* CARD 4: NOTEBOOK */}
                 <button
                   onClick={() => setActiveTab('studyDocs')}
-                  className="p-3.5 rounded-2xl bg-amber-500 text-white text-left shadow-xs hover:bg-amber-600 transition flex flex-col justify-between h-32"
+                  className="p-3.5 rounded-2xl bg-amber-500 text-white text-left shadow-xs hover:bg-amber-600 transition flex flex-col justify-between h-32 cursor-pointer"
                 >
                   <div className="flex justify-between items-start">
                     <BookOpen className="w-6 h-6" />
@@ -795,47 +930,86 @@ export default function App() {
                   </div>
                   <div>
                     <h4 className="font-extrabold text-sm">Notebook 📝</h4>
-                    <p className="text-[10px] text-amber-100 leading-tight mt-0.5">Formula sheets & key facts</p>
-                  </div>
-                </button>
-
-                {/* CARD 4: PLANNER */}
-                <button
-                  onClick={() => openToolkitWithTool('planner')}
-                  className="p-3.5 rounded-2xl bg-purple-600 text-white text-left shadow-xs hover:bg-purple-700 transition flex flex-col justify-between h-32"
-                >
-                  <div className="flex justify-between items-start">
-                    <Calendar className="w-6 h-6" />
-                    <span className="text-[8px] font-bold uppercase bg-white/20 px-1.5 py-0.5 rounded-md">PLANNER</span>
-                  </div>
-                  <div>
-                    <h4 className="font-extrabold text-sm">Planner 📅</h4>
-                    <p className="text-[10px] text-purple-100 leading-tight mt-0.5">Class timings & assignments</p>
+                    <p className="text-[10px] text-amber-100 leading-tight mt-0.5">Formula sheets & visual notes</p>
                   </div>
                 </button>
               </div>
 
-              {/* ADVANCED STUDY TOOLKIT BANNER */}
-              <button
-                onClick={() => openToolkitWithTool()}
-                className="w-full p-4 rounded-2xl bg-slate-900 text-white text-left shadow-md hover:bg-slate-800 transition flex items-center justify-between group"
+              {/* ADVANCED STUDY TOOLKIT BANNER - ANIMATED PROFESSIONAL LOOK */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                whileHover={{ y: -2 }}
+                className="w-full p-4 rounded-3xl bg-slate-900 border border-slate-800 text-white shadow-xl relative overflow-hidden group"
               >
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shrink-0 shadow-xs">
-                    <Sparkles className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="text-[9px] font-extrabold text-indigo-400 uppercase tracking-wider">
-                      19+ ADVANCED TOOLS
+                {/* Ambient glow accent behind banner */}
+                <div className="absolute -right-10 -top-10 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl group-hover:bg-indigo-500/30 transition-all pointer-events-none" />
+                <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                <div className="flex items-start justify-between relative z-10">
+                  <div className="flex items-start space-x-3.5">
+                    <motion.div
+                      whileHover={{ rotate: 15, scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => openToolkitWithTool()}
+                      className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-600/30 cursor-pointer border border-indigo-400/30"
+                    >
+                      <Sparkles className="w-6 h-6 animate-pulse" />
+                    </motion.div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-black tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase">
+                          19+ ADVANCED TOOLS
+                        </span>
+                        <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+                      </div>
+                      <h4 
+                        onClick={() => openToolkitWithTool()}
+                        className="font-extrabold text-base text-white mt-1 cursor-pointer hover:text-indigo-300 transition"
+                      >
+                        Advanced Study Toolkit ⚡
+                      </h4>
+                      <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed max-w-sm">
+                        Scientific Calculator, Mind Maps, Mock Tests, Ambient Sounds & OCR Vision
+                      </p>
                     </div>
-                    <h4 className="font-extrabold text-sm text-white">Advanced Study Toolkit ⚡</h4>
-                    <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">
-                      Scientific Calculator, Mind Maps, Mock Tests, Sounds & OCR
-                    </p>
                   </div>
+
+                  <motion.button
+                    whileHover={{ scale: 1.08, x: 2 }}
+                    whileTap={{ scale: 0.92 }}
+                    onClick={() => openToolkitWithTool()}
+                    className="p-2.5 rounded-2xl bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white transition shadow-md border border-slate-700/60 cursor-pointer shrink-0"
+                    title="Launch Toolkit"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </motion.button>
                 </div>
-                <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-white transition" />
-              </button>
+
+                {/* Quick-Launch Animated Tool Chips */}
+                <div className="mt-3.5 pt-3 border-t border-slate-800/80 flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none relative z-10">
+                  {[
+                    { id: 'calc', name: '🧮 Sci-Calc' },
+                    { id: 'mindmap', name: '🌳 Mind Maps' },
+                    { id: 'ocr', name: '📷 Vision OCR' },
+                    { id: 'soundscapes', name: '🎧 Lo-Fi Sounds' },
+                    { id: 'goals', name: '🎯 Daily Goals' },
+                    { id: 'formula', name: '📐 Formula Vault' },
+                    { id: 'spaced', name: '🧠 Spaced Recall' },
+                    { id: 'exams', name: '⏳ Exam Timers' }
+                  ].map((tool) => (
+                    <motion.button
+                      key={tool.id}
+                      whileHover={{ scale: 1.05, y: -1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => openToolkitWithTool(tool.id)}
+                      className="px-2.5 py-1 rounded-xl bg-slate-800/90 hover:bg-indigo-950/80 border border-slate-700/60 hover:border-indigo-500/50 text-[10px] font-bold text-slate-300 hover:text-indigo-300 whitespace-nowrap transition cursor-pointer flex items-center gap-1 shadow-xs"
+                    >
+                      {tool.name}
+                    </motion.button>
+                  ))}
+                </div>
+              </motion.div>
             </div>
 
             {/* 4. 5-DAY STUDY STREAK */}
@@ -1763,6 +1937,7 @@ export default function App() {
         onSave={handleSaveProfile}
         onClose={() => setShowOnboardingModal(false)}
         isEditing={isEditingProfile}
+        onOpenAuth={() => setShowAuthModal(true)}
       />
 
       {/* AVATAR STUDIO MODAL */}
@@ -1775,6 +1950,18 @@ export default function App() {
         equippedAccessory={equippedAccessory}
         onSave={handleSaveAvatar}
         onClose={() => setShowAvatarModal(false)}
+      />
+
+      {/* AUTHENTICATION MODAL (SIGN IN, SIGN UP, GOOGLE, FORGOT PASSWORD) */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        userProfile={userProfile}
+        setUserProfile={setUserProfile}
+        appLanguage={appLanguage}
+        onAuthSuccess={(newProfile) => {
+          setUserProfile(newProfile);
+        }}
       />
 
       {/* PWA INSTALL & OFFLINE PROMPT BANNER */}

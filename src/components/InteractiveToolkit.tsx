@@ -42,7 +42,9 @@ import {
   Users,
   Plus,
   BookOpen,
-  Activity
+  Activity,
+  Layers,
+  Copy
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -91,21 +93,69 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
   const [j, ut] = useState("study"); // activeTab: "study" | "vocab_calc" | "productivity" | "focus" | "utilities"
   const [ve, L] = useState(false); // isSidebarOpen (mobile)
   const [u, dt] = useState(false); // isSidebarCollapsed (desktop)
-  const [p, xt] = useState(initialTool || "notes"); // activeTool: "notes" | "summarize" | "explain" | "mindmap" | "qpaper" | "ocr" | "pdf"
+  const [p, xt] = useState(initialTool || "notes"); // activeTool
+  const [showCatalogModal, setShowCatalogModal] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [catalogCategory, setCatalogCategory] = useState("all");
+  const [copiedToast, setCopiedToast] = useState<string | null>(null);
+
+  // Complete list of 19+ Advanced Toolkit Tools
+  const ADVANCED_TOOLS_CATALOG = [
+    { id: "notes", name: "AI Note Synthesizer", category: "study", icon: "📝", tab: "study", badge: "Live AI", desc: "Transforms any complex curriculum topic into structured, revision-ready note cards." },
+    { id: "summarize", name: "Academic Text Summarizer", category: "study", icon: "📑", tab: "study", badge: "Fast", desc: "Condenses lengthy textbook chapters and articles into high-yield takeaways." },
+    { id: "explain", name: "Deep Concept Explainer", category: "study", icon: "💡", tab: "study", badge: "Adaptive", desc: "Explains physics, chemistry, math, or biology concepts in 4 distinct comprehension styles." },
+    { id: "mindmap", name: "Visual Mind Map Visualizer", category: "study", icon: "🌳", tab: "study", badge: "Interactive", desc: "Generates interactive hierarchical visual mind maps with one-click AI explanations." },
+    { id: "qpaper", name: "CBSE & Board Question Papers", category: "study", icon: "📄", tab: "study", badge: "Exam Prep", desc: "Builds comprehensive mock exam papers with section-wise marking schemes." },
+    { id: "ocr", name: "Vision Textbook OCR Scanner", category: "study", icon: "📷", tab: "study", badge: "Multimodal", desc: "Extracts handwritten equations, notes, and textbook exercises from uploaded photos." },
+    { id: "pdf", name: "Document & PDF Analyzer", category: "study", icon: "📂", tab: "study", badge: "Doc AI", desc: "Uploads and summarizes entire syllabus guides, slides, and study PDFs." },
+    { id: "vocab", name: "AI Vocabulary & Flashcards", category: "vocab_calc", icon: "📚", tab: "vocab_calc", badge: "Active Deck", desc: "Builds your personal active vocabulary repository with parts of speech and examples." },
+    { id: "calc", name: "Interactive Scientific Calculator", category: "vocab_calc", icon: "🧮", tab: "vocab_calc", badge: "Tactile", desc: "Full scientific, trigonometric, exponential, and algebraic calculations." },
+    { id: "formula", name: "Math & Physics Formula Vault", category: "vocab_calc", icon: "📐", tab: "vocab_calc", badge: "Searchable", desc: "Instant searchable directory of core equations, constants, and theorem proofs." },
+    { id: "mocktest", name: "AI Mock Exam Engine", category: "focus", icon: "⚡", tab: "focus", badge: "Timed Test", desc: "Adaptive timed multiple-choice tests with real-time scoring and XP rewards." },
+    { id: "goals", name: "Smart Daily Goals & Streak XP", category: "productivity", icon: "🎯", tab: "productivity", badge: "+15 XP", desc: "Daily task checklists with completion progress bars and streak momentum bonuses." },
+    { id: "exams", name: "Target Exam Countdown Hub", category: "productivity", icon: "⏳", tab: "productivity", badge: "Countdown", desc: "Live day-by-day countdowns to board exams, unit tests, and semester finals." },
+    { id: "spaced", name: "Leitner Spaced Repetition Planner", category: "productivity", icon: "🧠", tab: "productivity", badge: "Recall", desc: "Scientific spaced interval revision system that schedules active recall reviews." },
+    { id: "soundscapes", name: "Multi-track Ambient Noise Mixer", category: "focus", icon: "🎧", tab: "focus", badge: "Binaural", desc: "Mix rain, forest birds, lo-fi chords, and coffee shop ambiance to block noise." },
+    { id: "focusroom", name: "Zen Pomodoro Focus Chamber", category: "focus", icon: "🧘", tab: "focus", badge: "Zero-Distraction", desc: "Full-screen minimalist study timer with built-in scratchpad and calming visuals." },
+    { id: "buddies", name: "Study Buddy Circles & Chat", category: "focus", icon: "👥", tab: "focus", badge: "Social", desc: "Connect with classmates, share revision decks, and track group study levels." },
+    { id: "dictation", name: "Smart Voice Dictation Notes", category: "study", icon: "🎙️", tab: "study", badge: "Voice AI", desc: "Speaks naturally to capture lecture notes and generate AI study responses." },
+    { id: "tts", name: "Neural Text-to-Speech Player", category: "study", icon: "🔊", tab: "study", badge: "Audio", desc: "Listens to any AI explanation, mind map node, or summary with native speech synthesis." },
+    { id: "backup", name: "Encrypted Cloud Data Sync", category: "utilities", icon: "💾", tab: "utilities", badge: "Secure", desc: "Exports and imports your entire notebook, study goals, exams, and flashcards." },
+    { id: "diagram", name: "AI Diagram & Flowchart Lab", category: "utilities", icon: "🎨", tab: "utilities", badge: "Visual Lab", desc: "Generates high-contrast textbook diagrams and academic flowchart visuals." }
+  ];
+
+  const handleSelectCatalogTool = (toolItem: typeof ADVANCED_TOOLS_CATALOG[0]) => {
+    xt(toolItem.id);
+    ut(toolItem.tab);
+    setShowCatalogModal(false);
+    if (toolItem.id === "diagram" && onOpenDiagramMaker) {
+      onClose();
+      onOpenDiagramMaker("Process Flow of Science Concept", "Concept Flowchart", f);
+    } else if (toolItem.id === "focusroom") {
+      zt(true);
+    }
+  };
+
+  const copyWithToast = (textToCopy: string, label = "Copied to clipboard!") => {
+    if (!textToCopy) return;
+    navigator.clipboard.writeText(textToCopy);
+    setCopiedToast(label);
+    setTimeout(() => setCopiedToast(null), 2500);
+  };
 
   useEffect(() => {
     if (initialTool) {
       xt(initialTool);
       // Map tool to tab
-      if (["notes", "summarize", "explain", "mindmap", "qpaper", "ocr", "pdf"].includes(initialTool)) {
+      if (["notes", "summarize", "explain", "mindmap", "qpaper", "ocr", "pdf", "dictation", "tts"].includes(initialTool)) {
         ut("study");
       } else if (["vocab", "calc", "formula"].includes(initialTool)) {
         ut("vocab_calc");
       } else if (["goals", "spaced", "exams"].includes(initialTool)) {
         ut("productivity");
-      } else if (["soundscapes", "timer"].includes(initialTool)) {
+      } else if (["soundscapes", "timer", "mocktest", "focusroom", "buddies"].includes(initialTool)) {
         ut("focus");
-      } else if (["buddies", "translate", "math", "tts", "dictation"].includes(initialTool)) {
+      } else if (["translate", "math", "backup", "diagram"].includes(initialTool)) {
         ut("utilities");
       }
     }
@@ -865,6 +915,23 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Animated 19+ Tools Catalog Trigger Button */}
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.96 }}
+            onClick={() => setShowCatalogModal(true)}
+            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-xs border transition-all ${
+              m 
+                ? "bg-gradient-to-r from-cyan-950 to-indigo-950 border-cyan-500/40 text-cyan-300 hover:border-cyan-400" 
+                : "bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-indigo-500 shadow-indigo-500/20"
+            }`}
+            title="Browse all 19+ Tools"
+          >
+            <Layers size={13} className="animate-pulse" />
+            <span className="hidden xs:inline">19+ Tools</span>
+            <span className="px-1.5 py-0.2 bg-white/20 rounded-md text-[8px] font-mono">ALL</span>
+          </motion.button>
+
           <div
             className={`hidden md:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border select-none text-[10px] font-black uppercase tracking-wider ${
               m ? "bg-cyan-950/40 border-cyan-500/20 text-cyan-400" : "bg-amber-50 border-amber-200 text-amber-800"
@@ -877,32 +944,188 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                 : `Toolkit: ${c.count}/${c.limit} Used`}
             </span>
           </div>
-          <button
+
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.96 }}
             onClick={() => zt(!m)}
-            className={`text-[10px] font-black uppercase px-2.5 py-1.5 sm:px-3 rounded-xl border transition-all duration-200 flex items-center gap-1.5 ${
+            className={`text-[10px] font-black uppercase px-2.5 py-1.5 sm:px-3 rounded-xl border transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
               m ? "bg-cyan-950 border-cyan-500/50 text-cyan-300 hover:bg-cyan-900" : "bg-indigo-50 border-indigo-100 hover:bg-indigo-100 text-indigo-700"
             }`}
           >
             <span>{m ? "Exit Focus" : "Focus Mode 🧘"}</span>
-          </button>
-          <button
-            className={`p-2 rounded-full transition-all duration-200 flex items-center justify-center ${
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setShowCatalogModal(true)}
+            className={`p-2 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer ${
               m ? "hover:bg-slate-800 text-cyan-500 hover:text-cyan-300" : "hover:bg-slate-100 text-slate-500 hover:text-slate-800"
             }`}
-            title="Search Toolkit"
+            title="Search 19+ Tools"
           >
             <Search size={16} />
-          </button>
+          </motion.button>
+
           <button
-            className={`p-2 rounded-full transition-all duration-200 flex items-center justify-center ${
+            onClick={() => setShowCatalogModal(true)}
+            className={`p-2 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer ${
               m ? "hover:bg-slate-800 text-cyan-500 hover:text-cyan-300" : "hover:bg-slate-100 text-slate-500 hover:text-slate-800"
             }`}
-            title="Toolkit Settings"
+            title="Toolkit Catalog"
           >
             <Settings size={16} />
           </button>
         </div>
       </header>
+
+      {/* Floating Copied Toast Alert */}
+      <AnimatePresence>
+        {copiedToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xl flex items-center gap-2 border border-slate-700"
+          >
+            <Check size={14} className="text-emerald-400" />
+            <span>{copiedToast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ALL 19+ ADVANCED TOOLS INTERACTIVE CATALOG MODAL */}
+      <AnimatePresence>
+        {showCatalogModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-4xl max-h-[88vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+            >
+              {/* Modal Header */}
+              <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20">
+                    <Sparkles className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight">
+                        19+ Advanced Toolkit Hub
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                        {ADVANCED_TOOLS_CATALOG.length} Tools Ready
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Explore our complete suite of AI engines, mathematical calculators, and focus utilities
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowCatalogModal(false)}
+                  className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-white transition cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Filter & Search Bar */}
+              <div className="p-4 border-b border-slate-100 dark:border-slate-800 space-y-3 bg-white dark:bg-slate-900">
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
+                  <input
+                    type="text"
+                    value={catalogSearch}
+                    onChange={(e) => setCatalogSearch(e.target.value)}
+                    placeholder="Search any tool (e.g. calculator, mindmap, soundscapes, goals, ocr, exam)..."
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs outline-none focus:border-indigo-500 text-slate-800 dark:text-slate-100 font-medium"
+                    autoFocus
+                  />
+                  {catalogSearch && (
+                    <button
+                      onClick={() => setCatalogSearch("")}
+                      className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Category Pills */}
+                <div className="flex gap-1.5 overflow-x-auto pb-1 text-[11px] font-bold scrollbar-none">
+                  {[
+                    { id: "all", label: "All 19+ Tools" },
+                    { id: "study", label: "🧠 AI Study Center" },
+                    { id: "vocab_calc", label: "🧮 Practice & Formulas" },
+                    { id: "productivity", label: "🎯 Goals & Recall" },
+                    { id: "focus", label: "🧘 Focus & Audio" },
+                    { id: "utilities", label: "⚡ Utilities & Sync" }
+                  ].map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setCatalogCategory(cat.id)}
+                      className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition cursor-pointer ${
+                        catalogCategory === cat.id
+                          ? "bg-indigo-600 text-white shadow-xs"
+                          : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tools Interactive Grid */}
+              <div className="p-4 sm:p-6 overflow-y-auto max-h-[55vh] grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {ADVANCED_TOOLS_CATALOG.filter((tool) => {
+                  const matchSearch =
+                    tool.name.toLowerCase().includes(catalogSearch.toLowerCase()) ||
+                    tool.desc.toLowerCase().includes(catalogSearch.toLowerCase()) ||
+                    tool.badge.toLowerCase().includes(catalogSearch.toLowerCase());
+                  const matchCategory = catalogCategory === "all" || tool.category === catalogCategory;
+                  return matchSearch && matchCategory;
+                }).map((tool, idx) => (
+                  <motion.div
+                    key={tool.id}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.02 }}
+                    whileHover={{ scale: 1.02, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleSelectCatalogTool(tool)}
+                    className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-indigo-50/40 dark:hover:bg-indigo-950/30 hover:border-indigo-300 dark:hover:border-indigo-700 transition cursor-pointer flex flex-col justify-between group shadow-xs"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-2xl">{tool.icon}</span>
+                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-slate-700">
+                          {tool.badge}
+                        </span>
+                      </div>
+                      <h4 className="font-extrabold text-xs text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
+                        {tool.name}
+                      </h4>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed mt-1">
+                        {tool.desc}
+                      </p>
+                    </div>
+
+                    <div className="mt-3 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                      <span>Launch Tool</span>
+                      <ChevronRight size={13} className="transform group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {m ? (
         <div className="flex-1 bg-slate-950 text-cyan-300 p-6 flex flex-col md:flex-row gap-6 overflow-y-auto">
@@ -1101,30 +1324,68 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
 
           <main className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-6">
             {j === "study" && (
-              <div className="space-y-4">
-                <div className="flex gap-1.5 flex-wrap bg-slate-100 p-1 rounded-2xl">
-                  {["notes", "summarize", "explain", "mindmap", "qpaper", "ocr", "pdf"].map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => {
-                        xt(t);
-                        H(null);
-                      }}
-                      className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-xl transition ${
-                        p === t ? "bg-white text-indigo-600 shadow" : "text-slate-500 hover:text-slate-800"
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  ))}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+                className="space-y-4"
+              >
+                {/* Visual Tool Selector Chips */}
+                <div className="flex gap-1.5 flex-wrap bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl border border-slate-200/60 dark:border-slate-700/60">
+                  {[
+                    { id: "notes", label: "Synthesize Notes", icon: "📝" },
+                    { id: "summarize", label: "Summarize", icon: "📑" },
+                    { id: "explain", label: "Deep Explain", icon: "💡" },
+                    { id: "mindmap", label: "Mind Map", icon: "🌳" },
+                    { id: "qpaper", label: "Question Paper", icon: "📄" },
+                    { id: "ocr", label: "Vision OCR", icon: "📷" },
+                    { id: "pdf", label: "PDF / Doc", icon: "📂" }
+                  ].map((t) => {
+                    const isSelected = p === t.id;
+                    return (
+                      <motion.button
+                        key={t.id}
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.96 }}
+                        onClick={() => {
+                          xt(t.id);
+                          H(null);
+                        }}
+                        className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                          isSelected
+                            ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-700/50"
+                        }`}
+                      >
+                        <span>{t.icon}</span>
+                        <span>{t.label}</span>
+                      </motion.button>
+                    );
+                  })}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-4 bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
-                    <h3 className="font-extrabold text-[11px] text-slate-800 uppercase tracking-wider">AI Parameters</h3>
+                  {/* Left Column: AI Control Parameters */}
+                  <motion.div
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="space-y-4 bg-slate-50/70 dark:bg-slate-900/60 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs"
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800 pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                        <h3 className="font-extrabold text-[11px] text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                          AI Parameters
+                        </h3>
+                      </div>
+                      <span className="text-[9px] font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md border border-indigo-100 dark:border-indigo-900/50">
+                        {p.toUpperCase()}
+                      </span>
+                    </div>
+
                     {p !== "ocr" && p !== "pdf" && (
                       <div>
-                        <label className="block text-[8px] uppercase font-black text-slate-400 tracking-wider mb-1">
+                        <label className="block text-[8px] uppercase font-black text-slate-400 dark:text-slate-500 tracking-wider mb-1">
                           Topic / Term
                         </label>
                         <div className="relative">
@@ -1132,14 +1393,15 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                             type="text"
                             value={E}
                             onChange={(t) => ge(t.target.value)}
-                            placeholder="e.g. Gravity, Organic Chemistry"
-                            className="w-full p-2.5 text-xs border border-slate-200 rounded-xl outline-none"
+                            placeholder="e.g. Gravity, Organic Chemistry, Photosynthesis"
+                            className="w-full p-2.5 pr-8 text-xs border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl outline-none focus:border-indigo-500 transition shadow-inner"
                           />
                           <button
                             onClick={_t}
-                            className={`absolute right-2 top-2.5 p-0.5 rounded-lg text-slate-400 hover:text-indigo-600 ${
-                              Ot ? "animate-pulse text-red-500" : ""
+                            className={`absolute right-2 top-2.5 p-1 rounded-lg text-slate-400 hover:text-indigo-600 transition cursor-pointer ${
+                              Ot ? "animate-pulse text-red-500 bg-red-50" : ""
                             }`}
+                            title="Dictate with voice"
                           >
                             <Mic size={14} />
                           </button>
@@ -1150,13 +1412,13 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                     {p !== "summarize" && p !== "mindmap" && p !== "ocr" && p !== "pdf" && (
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-[8px] uppercase font-black text-slate-400 tracking-wider mb-1">
+                          <label className="block text-[8px] uppercase font-black text-slate-400 dark:text-slate-500 tracking-wider mb-1">
                             Subject
                           </label>
                           <select
                             value={f}
                             onChange={(t) => Nt(t.target.value)}
-                            className="w-full p-2 text-xs border border-slate-200 rounded-xl bg-white outline-none"
+                            className="w-full p-2 text-xs border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-indigo-500"
                           >
                             {["Mathematics", "Science", "Biology", "Physics", "Chemistry", "English"].map((t) => (
                               <option key={t} value={t}>
@@ -1166,13 +1428,13 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                           </select>
                         </div>
                         <div>
-                          <label className="block text-[8px] uppercase font-black text-slate-400 tracking-wider mb-1">
+                          <label className="block text-[8px] uppercase font-black text-slate-400 dark:text-slate-500 tracking-wider mb-1">
                             Grade Level
                           </label>
                           <select
                             value={I}
                             onChange={(t) => bt(t.target.value)}
-                            className="w-full p-2 text-xs border border-slate-200 rounded-xl bg-white outline-none"
+                            className="w-full p-2 text-xs border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-indigo-500"
                           >
                             {["8", "9", "10", "11", "12"].map((t) => (
                               <option key={t} value={t}>
@@ -1186,13 +1448,13 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
 
                     {p === "explain" && (
                       <div>
-                        <label className="block text-[8px] uppercase font-black text-slate-400 tracking-wider mb-1">
+                        <label className="block text-[8px] uppercase font-black text-slate-400 dark:text-slate-500 tracking-wider mb-1">
                           Explanation Style
                         </label>
                         <select
                           value={ke}
                           onChange={(t) => ft(t.target.value)}
-                          className="w-full p-2 text-xs border border-slate-200 bg-white rounded-xl outline-none"
+                          className="w-full p-2 text-xs border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl outline-none focus:border-indigo-500"
                         >
                           <option value="Simple">Simple Student English</option>
                           <option value="Analogies">Vivid Analogy & Metaphor</option>
@@ -1204,40 +1466,66 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
 
                     {p === "ocr" && (
                       <div className="space-y-2">
-                        <label className="block text-[8px] uppercase font-black text-slate-400 tracking-wider mb-1">
+                        <label className="block text-[8px] uppercase font-black text-slate-400 dark:text-slate-500 tracking-wider mb-1">
                           Upload Homework / Textbook Image
                         </label>
-                        <div className="border border-dashed border-slate-200 rounded-2xl p-4 text-center hover:bg-slate-50 transition relative">
+                        <div className="border-2 border-dashed border-indigo-200 dark:border-indigo-800/60 rounded-2xl p-4 text-center hover:bg-indigo-50/40 dark:hover:bg-indigo-950/20 transition relative group cursor-pointer">
                           <input type="file" accept="image/*" onChange={ts} className="absolute inset-0 opacity-0 cursor-pointer" />
-                          <Upload className="w-8 h-8 text-slate-400 mx-auto mb-1.5" />
-                          <span className="text-[10px] text-slate-500 font-bold block">Click to select image file</span>
+                          <Upload className="w-8 h-8 text-indigo-400 group-hover:text-indigo-600 mx-auto mb-1.5 transition transform group-hover:-translate-y-0.5" />
+                          <span className="text-[10px] text-slate-600 dark:text-slate-300 font-bold block">Click to select image file</span>
+                          <span className="text-[8px] text-slate-400 block mt-0.5">Supports PNG, JPG & textbook camera photos</span>
                         </div>
-                        {Y && <img src={Y} alt="OCR Upload Preview" className="mt-2 w-full h-24 object-cover rounded-xl border" />}
+                        {Y && (
+                          <div className="relative overflow-hidden rounded-xl border border-indigo-200 shadow-sm mt-2">
+                            <img src={Y} alt="OCR Upload Preview" className="w-full h-28 object-cover" />
+                            {G && (
+                              <div className="absolute inset-0 bg-indigo-900/30 flex items-center justify-center">
+                                <div className="w-full h-1 bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.9)] animate-bounce" />
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
 
                     {p === "pdf" && (
                       <div>
-                        <label className="block text-[8px] uppercase font-black text-slate-400 tracking-wider mb-1">
+                        <label className="block text-[8px] uppercase font-black text-slate-400 dark:text-slate-500 tracking-wider mb-1">
                           Paste Document / Note Content
                         </label>
                         <textarea
                           value={Se}
                           onChange={(t) => Tt(t.target.value)}
                           placeholder="Paste your long notes, PDF texts, or study guides here..."
-                          className="w-full h-32 p-2 text-xs border border-slate-200 rounded-xl outline-none resize-none font-mono"
+                          className="w-full h-32 p-2.5 text-xs border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl outline-none resize-none font-mono focus:border-indigo-500"
                         />
                       </div>
                     )}
 
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.02, y: -1 }}
+                      whileTap={{ scale: 0.97 }}
                       onClick={() => We()}
                       disabled={G}
-                      className="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-wide flex justify-center items-center gap-1.5 shadow"
+                      className={`w-full py-3 rounded-2xl text-xs font-black uppercase tracking-wider flex justify-center items-center gap-2 shadow-md cursor-pointer transition ${
+                        G 
+                          ? "bg-indigo-400 text-white cursor-not-allowed" 
+                          : "bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-indigo-600/30"
+                      }`}
                     >
-                      {G ? "Gemini Reasoning..." : "Run AI Tool ⚡"}
-                    </button>
-                  </div>
+                      {G ? (
+                        <>
+                          <Activity className="w-4 h-4 animate-spin text-cyan-200" />
+                          <span className="animate-pulse">Gemini Reasoning...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          <span>Run AI Tool ⚡</span>
+                        </>
+                      )}
+                    </motion.button>
+                  </motion.div>
 
                   <div className="col-span-2 bg-slate-50/20 rounded-3xl border border-slate-100 p-4 min-h-[300px] flex flex-col justify-between">
                     {G ? (
@@ -1249,11 +1537,21 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                       <div className="space-y-4 flex-1 flex flex-col justify-between">
                         <div className="flex justify-between items-center border-b pb-2">
                           <h4 className="font-extrabold text-xs text-indigo-900">{a.title || "Gemini Extraction Result"}</h4>
-                          <div className="flex gap-1.5">
+                          <div className="flex gap-1.5 items-center">
+                            <button
+                              onClick={() => {
+                                const text = a.content || a.summary || a.explanation || a.paperText || "";
+                                copyWithToast(text, "Result copied to clipboard! 📋");
+                              }}
+                              className="text-[10px] font-bold px-2 py-1 rounded-lg border bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1 transition cursor-pointer"
+                              title="Copy Result"
+                            >
+                              <Copy size={12} /> Copy
+                            </button>
                             <button
                               onClick={() => Q(a.content || a.summary || a.explanation || a.paperText || "")}
                               className={`text-[10px] font-bold px-2 py-1 rounded-lg border flex items-center gap-1 ${
-                                re ? "bg-indigo-600 text-white" : "bg-white"
+                                re ? "bg-indigo-600 text-white" : "bg-white text-slate-700"
                               }`}
                             >
                               <Volume2 size={12} /> {re ? "Mute" : "Listen"}
@@ -1575,88 +1873,148 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                     )}
                   </div>
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {j === "vocab_calc" && (
-              <div className="space-y-6">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+                className="space-y-6"
+              >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100 flex flex-col justify-between">
+                  {/* AI Vocabulary Builder */}
+                  <motion.div
+                    whileHover={{ y: -2 }}
+                    className="bg-slate-50/70 dark:bg-slate-900/60 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between shadow-xs"
+                  >
                     <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <h3 className="font-extrabold text-[11px] text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                          <BookOpen size={14} className="text-indigo-600" /> AI Vocabulary Builder
+                      <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-800 pb-2">
+                        <h3 className="font-extrabold text-[11px] text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                          <BookOpen size={15} className="text-indigo-600 dark:text-indigo-400" /> AI Vocabulary Builder
                         </h3>
-                        <span className="text-[9px] font-mono bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg font-black uppercase">
-                          {g.length} WORDS
+                        <span className="text-[9px] font-mono bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-lg font-black uppercase border border-indigo-100 dark:border-indigo-900/50">
+                          {g.length} WORDS DECK
                         </span>
                       </div>
-                      <div className="flex gap-1.5">
+
+                      <div className="flex gap-2">
                         <input
                           type="text"
                           value={y}
                           onChange={(t) => $t(t.target.value)}
-                          placeholder="Type vocabulary word..."
-                          className="flex-1 p-2 border border-slate-200 bg-white rounded-xl text-xs outline-none"
+                          onKeyDown={(e) => e.key === 'Enter' && Gt()}
+                          placeholder="Type word (e.g. ubiquitous, entropy, pragmatic)..."
+                          className="flex-1 p-2.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl text-xs outline-none focus:border-indigo-500 transition shadow-inner font-medium"
                         />
-                        <button
+                        <motion.button
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.96 }}
                           onClick={Gt}
                           disabled={ze}
-                          className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold"
+                          className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer transition shadow-xs flex items-center gap-1"
                         >
-                          {ze ? "Looking..." : "Search"}
-                        </button>
+                          {ze ? (
+                            <>
+                              <Activity className="w-3.5 h-3.5 animate-spin" />
+                              <span>Searching...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Search size={13} />
+                              <span>Explore</span>
+                            </>
+                          )}
+                        </motion.button>
                       </div>
 
                       {d && (
-                        <div className="p-3 bg-white border border-indigo-100 rounded-2xl space-y-2 relative shadow-sm">
-                          <div className="flex justify-between items-center">
-                            <strong className="text-xs font-black text-indigo-900 uppercase tracking-tight">{d.word}</strong>
-                            <span className="text-[9px] font-bold text-slate-400 italic">({d.partOfSpeech})</span>
-                          </div>
-                          <p className="text-[10px] text-slate-600 leading-relaxed font-medium">
-                            <strong>Def:</strong> {d.definition}
-                          </p>
-                          <p className="text-[10px] text-slate-500 italic leading-none">
-                            <strong>Ex:</strong> "{d.example}"
-                          </p>
-                          <div className="flex justify-between items-center pt-1.5 border-t">
-                            <span className="text-[9px] font-bold text-slate-400">
-                              Synonyms: {d.synonyms?.join(", ")}
-                            </span>
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.96 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="p-4 bg-white dark:bg-slate-800/90 border border-indigo-100 dark:border-indigo-900/60 rounded-2xl space-y-2.5 relative shadow-sm"
+                        >
+                          <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700/60 pb-1.5">
+                            <div className="flex items-center gap-2">
+                              <strong className="text-sm font-black text-indigo-900 dark:text-indigo-300 uppercase tracking-tight">
+                                {d.word}
+                              </strong>
+                              <span className="text-[9px] font-bold text-slate-400 italic">({d.partOfSpeech})</span>
+                            </div>
                             <button
-                              onClick={Ht}
-                              className="text-[9px] font-black text-emerald-600 border border-emerald-200 bg-emerald-50 px-2 py-1 rounded-lg hover:bg-emerald-100"
+                              onClick={() => Q(`${d.word}. ${d.definition}`)}
+                              className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
+                              title="Listen pronunciation"
                             >
-                              + Save to Deck
+                              <Volume2 size={13} />
                             </button>
                           </div>
-                        </div>
+                          <p className="text-[11px] text-slate-700 dark:text-slate-200 leading-relaxed font-medium">
+                            <strong className="text-indigo-600 dark:text-indigo-400">Meaning:</strong> {d.definition}
+                          </p>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 italic leading-relaxed bg-slate-50 dark:bg-slate-900/50 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <strong>Example:</strong> "{d.example}"
+                          </p>
+                          <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-700/60">
+                            <span className="text-[9px] font-bold text-slate-400 truncate max-w-[180px]">
+                              Synonyms: {d.synonyms?.join(", ")}
+                            </span>
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={Ht}
+                              className="text-[9px] font-black text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition cursor-pointer shadow-xs"
+                            >
+                              + Save to Deck
+                            </motion.button>
+                          </div>
+                        </motion.div>
                       )}
                     </div>
 
                     {g.length > 0 && (
-                      <div className="mt-4 border-t pt-3 space-y-2">
-                        <span className="text-[9px] font-black uppercase text-slate-400 block">My Saved Deck</span>
-                        <div className="flex gap-1.5 flex-wrap max-h-[100px] overflow-y-auto">
+                      <div className="mt-4 border-t border-slate-200/60 dark:border-slate-800 pt-3 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">
+                            My Saved Vocab Deck
+                          </span>
+                          <span className="text-[9px] text-indigo-500 font-bold">{g.length} words stored</span>
+                        </div>
+                        <div className="flex gap-1.5 flex-wrap max-h-[100px] overflow-y-auto scrollbar-thin">
                           {g.map((t, s) => (
-                            <span key={s} className="text-[10px] font-bold bg-indigo-50 border border-indigo-100 text-indigo-700 px-2 py-1 rounded-lg">
+                            <motion.span
+                              key={s}
+                              whileHover={{ scale: 1.05 }}
+                              className="text-[10px] font-bold bg-white dark:bg-slate-800 border border-indigo-100 dark:border-indigo-900/60 text-indigo-700 dark:text-indigo-300 px-2.5 py-1 rounded-xl shadow-2xs"
+                            >
                               {t.word}
-                            </span>
+                            </motion.span>
                           ))}
                         </div>
                       </div>
                     )}
-                  </div>
+                  </motion.div>
 
-                  <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100 space-y-3">
-                    <h3 className="font-extrabold text-[11px] text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <Cpu size={14} className="text-cyan-600" /> Scientific Calculator
-                    </h3>
-                    <div className="bg-slate-900 p-3 rounded-2xl text-right text-white font-mono font-black text-lg select-none min-h-[48px] shadow-inner">
-                      {Oe}
+                  {/* Scientific Calculator with Tactile Sound & Buttons */}
+                  <motion.div
+                    whileHover={{ y: -2 }}
+                    className="bg-slate-50/70 dark:bg-slate-900/60 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-xs"
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800 pb-2">
+                      <h3 className="font-extrabold text-[11px] text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                        <Cpu size={15} className="text-cyan-600 dark:text-cyan-400" /> Scientific Precision Calculator
+                      </h3>
+                      <span className="text-[8px] font-mono uppercase px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 font-bold">
+                        DEG MODE
+                      </span>
                     </div>
-                    <div className="grid grid-cols-4 gap-1 text-[10px] font-mono">
+
+                    <div className="bg-slate-950 p-3.5 rounded-2xl text-right text-cyan-300 font-mono font-black text-xl select-none min-h-[52px] shadow-inner border border-slate-800 flex items-center justify-end tracking-wider overflow-x-auto">
+                      {Oe || "0"}
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-1.5 text-[10px] font-mono">
                       {[
                         "sin(", "cos(", "tan(", "DEL",
                         "log(", "ln(", "pi", "C",
@@ -1666,307 +2024,470 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                         "1", "2", "3", "+",
                         "0", ".", "e", "="
                       ].map((t) => (
-                        <button
+                        <motion.button
                           key={t}
+                          whileHover={{ scale: 1.04 }}
+                          whileTap={{ scale: 0.94 }}
                           onClick={() => Ut(t)}
-                          className={`py-2 rounded-lg font-black transition cursor-pointer ${
+                          className={`py-2.5 rounded-xl font-black transition-all cursor-pointer shadow-xs ${
                             t === "="
-                              ? "bg-cyan-600 text-white hover:bg-cyan-700 col-span-2"
+                              ? "bg-gradient-to-r from-cyan-600 to-indigo-600 text-white hover:from-cyan-500 hover:to-indigo-500 col-span-2 shadow-cyan-600/20"
                               : ["C", "DEL"].includes(t)
-                              ? "bg-rose-50 text-rose-600 hover:bg-rose-100"
-                              : "bg-white border border-slate-100 hover:bg-slate-100 text-slate-700"
+                              ? "bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/40 hover:bg-rose-100"
+                              : ["sin(", "cos(", "tan(", "log(", "ln(", "pi", "e", "^"].includes(t)
+                              ? "bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/40 hover:bg-indigo-100"
+                              : ["+", "-", "*", "/"].includes(t)
+                              ? "bg-slate-200/80 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300/80 dark:border-slate-700 font-extrabold"
+                              : "bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs"
                           }`}
                         >
                           {t}
-                        </button>
+                        </motion.button>
                       ))}
                     </div>
-                  </div>
+                  </motion.div>
                 </div>
 
-                <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-extrabold text-[11px] text-slate-800 uppercase tracking-wider">
-                      📐 Math & Physics Formula Library
-                    </h3>
-                    <div className="relative w-48">
-                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+                {/* Math & Physics Formula Vault with Search */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-slate-50/70 dark:bg-slate-900/60 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-xs"
+                >
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-200/60 dark:border-slate-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">📐</span>
+                      <div>
+                        <h3 className="font-extrabold text-[11px] text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                          Math & Physics Formula Vault
+                        </h3>
+                        <p className="text-[9px] text-slate-400 font-medium">Quick reference formulas with high-contrast expressions</p>
+                      </div>
+                    </div>
+                    <div className="relative w-full sm:w-56">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
                       <input
                         type="text"
                         value={_e}
                         onChange={(t) => At(t.target.value)}
-                        placeholder="Search formula..."
-                        className="w-full pl-8 pr-2 py-1.5 border border-slate-200 bg-white rounded-xl text-[10px] outline-none"
+                        placeholder="Search formula name / topic..."
+                        className="w-full pl-8 pr-3 py-1.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl text-[10px] outline-none focus:border-indigo-500 font-medium"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    {Mt.filter((t) => t.title.toLowerCase().includes(_e.toLowerCase())).map((t, s) => (
-                      <div key={s} className="bg-white p-3 rounded-2xl border border-slate-100 space-y-1.5 shadow-xs hover:border-indigo-300 transition">
-                        <span className="text-[8px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
-                          {t.subject}
-                        </span>
-                        <strong className="text-[10px] font-black text-slate-800 block">{t.title}</strong>
-                        <div className="bg-slate-50 p-2 rounded-lg font-mono text-[10px] font-black text-indigo-900 border text-center">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {Mt.filter((t) => t.title.toLowerCase().includes(_e.toLowerCase()) || t.subject.toLowerCase().includes(_e.toLowerCase())).map((t, s) => (
+                      <motion.div
+                        key={s}
+                        whileHover={{ scale: 1.02, y: -2 }}
+                        className="bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 space-y-2 shadow-xs hover:border-indigo-400 dark:hover:border-indigo-600 transition"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[8px] font-black uppercase text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/50 px-2 py-0.5 rounded-md">
+                            {t.subject}
+                          </span>
+                          <button
+                            onClick={() => copyWithToast(t.expr, `Formula copied: ${t.expr}`)}
+                            className="text-slate-400 hover:text-indigo-600 p-1 rounded-md transition"
+                            title="Copy formula"
+                          >
+                            <Copy size={11} />
+                          </button>
+                        </div>
+                        <strong className="text-[11px] font-black text-slate-900 dark:text-white block leading-snug">{t.title}</strong>
+                        <div className="bg-slate-950 p-2.5 rounded-xl font-mono text-[11px] font-black text-cyan-300 border border-slate-800 text-center tracking-wide shadow-inner select-all">
                           {t.expr}
                         </div>
-                        <p className="text-[9px] text-slate-400 font-bold leading-tight mt-1">{t.desc}</p>
-                      </div>
+                        <p className="text-[9px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed">{t.desc}</p>
+                      </motion.div>
                     ))}
                   </div>
-                </div>
-              </div>
+                </motion.div>
+              </motion.div>
             )}
 
             {j === "productivity" && (
-              <div className="space-y-6">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+                className="space-y-6"
+              >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100 flex flex-col justify-between space-y-4">
+                  <motion.div
+                    whileHover={{ y: -2 }}
+                    className="bg-slate-50/70 dark:bg-slate-900/60 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between space-y-4 shadow-xs"
+                  >
                     <div className="space-y-3">
-                      <h3 className="font-extrabold text-[11px] text-slate-800 uppercase tracking-wider">🎯 Daily Study Goals</h3>
-                      <div className="flex gap-1.5">
+                      <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-800 pb-2">
+                        <h3 className="font-extrabold text-[11px] text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                          🎯 Daily Focus Targets
+                        </h3>
+                        <span className="text-[9px] font-mono bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-lg font-black border border-indigo-100 dark:border-indigo-900/40">
+                          {D.filter((t) => t.completed).length}/{D.length} DONE
+                        </span>
+                      </div>
+
+                      <div className="flex gap-2">
                         <input
                           type="text"
                           value={se}
                           onChange={(t) => Le(t.target.value)}
-                          placeholder="Add study target (e.g. solve trigonometry quiz)..."
-                          className="flex-1 p-2 border border-slate-200 bg-white rounded-xl text-xs outline-none"
+                          onKeyDown={(e) => e.key === "Enter" && qt()}
+                          placeholder="Add study target (e.g. solve 10 physics questions)..."
+                          className="flex-1 p-2.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl text-xs outline-none focus:border-indigo-500 font-medium"
                         />
-                        <button onClick={qt} className="px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">
-                          +
-                        </button>
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={qt}
+                          className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase cursor-pointer shadow-xs transition"
+                        >
+                          Add
+                        </motion.button>
                       </div>
 
-                      <div className="space-y-2">
+                      <div className="space-y-2 max-h-[160px] overflow-y-auto scrollbar-thin">
                         {D.map((t) => (
-                          <div key={t.id} className="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-100 shadow-xs">
-                            <button onClick={() => Bt(t.id)} className="flex items-center gap-2 text-left">
+                          <motion.div
+                            key={t.id}
+                            layout
+                            initial={{ opacity: 0, x: -8 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="flex items-center justify-between p-2.5 bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs hover:border-indigo-300 dark:hover:border-indigo-700 transition"
+                          >
+                            <button onClick={() => Bt(t.id)} className="flex items-center gap-2.5 text-left flex-1 cursor-pointer">
                               {t.completed ? (
-                                <Check size={14} className="text-indigo-600" />
+                                <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center">
+                                  <Check size={12} strokeWidth={3} />
+                                </div>
                               ) : (
-                                <Circle size={14} className="text-slate-400" />
+                                <Circle size={18} className="text-slate-400 hover:text-indigo-600 transition" />
                               )}
-                              <span className={`text-[11px] font-bold ${t.completed ? "line-through text-slate-400" : "text-slate-700"}`}>
+                              <span className={`text-[11px] font-bold transition ${t.completed ? "line-through text-slate-400 dark:text-slate-500" : "text-slate-800 dark:text-slate-200"}`}>
                                 {t.text}
                               </span>
                             </button>
                             <button
                               onClick={() => q((s) => s.filter((i) => i.id !== t.id))}
-                              className="text-slate-300 hover:text-rose-600 p-0.5"
+                              className="text-slate-300 dark:text-slate-600 hover:text-rose-600 dark:hover:text-rose-400 p-1 rounded-lg transition cursor-pointer"
                             >
-                              <Trash2 size={12} />
+                              <Trash2 size={13} />
                             </button>
-                          </div>
+                          </motion.div>
                         ))}
                       </div>
                     </div>
 
-                    <div className="bg-indigo-50 border border-indigo-100/50 p-3 rounded-2xl flex items-center justify-between">
-                      <span className="text-[10px] text-indigo-900 font-bold">
-                        Completion: {D.filter((t) => t.completed).length} / {D.length}
+                    <div className="bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/50 p-3 rounded-2xl flex items-center justify-between">
+                      <span className="text-[10px] text-indigo-900 dark:text-indigo-300 font-bold">
+                        Progress: {D.length > 0 ? Math.round((D.filter((t) => t.completed).length / D.length) * 100) : 0}%
                       </span>
-                      <span className="text-[9px] font-black uppercase text-indigo-700 bg-white border border-indigo-100 px-2 py-0.5 rounded-lg">
-                        +15 XP local reward per goal
+                      <span className="text-[9px] font-black uppercase text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-800 border border-indigo-100 dark:border-indigo-900/60 px-2.5 py-0.5 rounded-lg shadow-2xs">
+                        +15 XP Earned Per Goal
                       </span>
                     </div>
-                  </div>
+                  </motion.div>
 
-                  <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100 space-y-4">
-                    <h3 className="font-extrabold text-[11px] text-slate-800 uppercase tracking-wider">⏳ Exam Countdown Timers</h3>
-                    <div className="grid grid-cols-3 gap-1.5 items-end">
+                  <motion.div
+                    whileHover={{ y: -2 }}
+                    className="bg-slate-50/70 dark:bg-slate-900/60 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-xs"
+                  >
+                    <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-800 pb-2">
+                      <h3 className="font-extrabold text-[11px] text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                        ⏳ Exam Countdown Timers
+                      </h3>
+                      <span className="text-[9px] font-mono text-rose-600 dark:text-rose-400 font-bold">
+                        {z.length} SCHEDULED
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 items-end">
                       <div className="col-span-2">
-                        <label className="block text-[8px] uppercase font-black text-slate-400 mb-1">Exam Title</label>
+                        <label className="block text-[8px] uppercase font-black text-slate-400 dark:text-slate-500 mb-1">Exam Title</label>
                         <input
                           type="text"
                           value={R.title}
                           onChange={(t) => le((s) => ({ ...s, title: t.target.value }))}
-                          placeholder="e.g. Science Finals"
-                          className="w-full p-2 border border-slate-200 bg-white rounded-xl text-[10px] outline-none"
+                          placeholder="e.g. Science Board Exam"
+                          className="w-full p-2.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl text-[10px] outline-none focus:border-indigo-500 font-medium"
                         />
                       </div>
                       <div>
-                        <label className="block text-[8px] uppercase font-black text-slate-400 mb-1">Date</label>
+                        <label className="block text-[8px] uppercase font-black text-slate-400 dark:text-slate-500 mb-1">Date</label>
                         <input
                           type="date"
                           value={R.date}
                           onChange={(t) => le((s) => ({ ...s, date: t.target.value }))}
-                          className="w-full p-2 border border-slate-200 bg-white rounded-xl text-[10px] outline-none"
+                          className="w-full p-2.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl text-[10px] outline-none focus:border-indigo-500 font-medium"
                         />
                       </div>
                     </div>
-                    <button onClick={Jt} className="w-full py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase">
-                      Add Exam Date
-                    </button>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={Jt}
+                      className="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow-xs transition"
+                    >
+                      + Save Exam Target
+                    </motion.button>
 
-                    <div className="space-y-2 max-h-[120px] overflow-y-auto">
+                    <div className="space-y-2 max-h-[130px] overflow-y-auto scrollbar-thin">
                       {z.length === 0 ? (
-                        <p className="text-[10px] text-slate-400 italic">No exams added yet.</p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 italic text-center py-2">No exams scheduled yet.</p>
                       ) : (
                         z.map((t) => (
-                          <div key={t.id} className="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-100 shadow-xs">
-                            <div>
-                              <span className="text-[8px] font-black uppercase bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded mr-1.5">
+                          <motion.div
+                            key={t.id}
+                            layout
+                            className="flex items-center justify-between p-2.5 bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-[8px] font-black uppercase bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/40 px-2 py-0.5 rounded-md">
                                 {t.subject}
                               </span>
-                              <strong className="text-[10px] font-black text-slate-800">{t.title}</strong>
+                              <strong className="text-[11px] font-black text-slate-800 dark:text-slate-200">{t.title}</strong>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-mono font-black text-indigo-600">{Wt(t.date)}</span>
-                              <button onClick={() => Qt(t.id)} className="text-slate-300 hover:text-rose-600 p-0.5">
-                                <Trash2 size={12} />
+                            <div className="flex items-center gap-2.5">
+                              <span className="text-[11px] font-mono font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-lg border border-indigo-100 dark:border-indigo-900/40">
+                                {Wt(t.date)}
+                              </span>
+                              <button onClick={() => Qt(t.id)} className="text-slate-300 dark:text-slate-600 hover:text-rose-600 dark:hover:text-rose-400 p-1 transition cursor-pointer">
+                                <Trash2 size={13} />
                               </button>
                             </div>
-                          </div>
+                          </motion.div>
                         ))
                       )}
                     </div>
-                  </div>
+                  </motion.div>
                 </div>
 
-                <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100 space-y-3">
-                  <h3 className="font-extrabold text-[11px] text-slate-800 uppercase tracking-wider">📅 Spaced Revision Planner</h3>
-                  <p className="text-[9px] text-slate-400 font-bold leading-none mb-2">
-                    Active recall intervals automatically logged on note creation.
-                  </p>
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-slate-50/70 dark:bg-slate-900/60 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-xs"
+                >
+                  <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-800 pb-2">
+                    <div>
+                      <h3 className="font-extrabold text-[11px] text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                        📅 Intelligent Spaced Revision Planner
+                      </h3>
+                      <p className="text-[9px] text-slate-400 font-medium">
+                        Active recall intervals automatically scheduled based on the Ebbinghaus forgetting curve.
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {notes.length === 0 ? (
-                      <p className="text-[10px] text-slate-400 italic">No notes logged in your Notebook tab yet.</p>
+                      <div className="col-span-2 text-center py-6 text-[10px] text-slate-400 dark:text-slate-500 italic bg-white dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+                        No notes logged in your Notebook yet. Create notes to activate automated spaced recall intervals!
+                      </div>
                     ) : (
                       notes.map((t) => {
                         const spacer = F.find((i) => i.noteId === t.id);
                         return (
-                          <div key={t.id} className="bg-white p-3 rounded-2xl border border-slate-100 flex items-center justify-between shadow-xs">
+                          <motion.div
+                            key={t.id}
+                            whileHover={{ scale: 1.01 }}
+                            className="bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between shadow-xs hover:border-indigo-400 dark:hover:border-indigo-600 transition"
+                          >
                             <div>
-                              <span className="text-[8px] font-black uppercase bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded mr-2">
-                                {t.subject}
-                              </span>
-                              <strong className="text-[10px] font-black text-slate-800">{t.title}</strong>
-                              <span className="block text-[8px] text-slate-400 mt-1">
-                                Stage: {spacer ? spacer.stage + 1 : "Not Scheduled"} | Next review: {spacer ? spacer.nextDate : "Pending study"}
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <span className="text-[8px] font-black uppercase bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40 px-2 py-0.5 rounded-md">
+                                  {t.subject}
+                                </span>
+                                <strong className="text-[11px] font-black text-slate-800 dark:text-slate-200">{t.title}</strong>
+                              </div>
+                              <span className="block text-[9px] text-slate-500 dark:text-slate-400 font-medium">
+                                Recall Stage: <strong className="text-indigo-600 dark:text-indigo-400">{spacer ? spacer.stage + 1 : "New"}</strong> | Next Date: {spacer ? spacer.nextDate : "Pending study"}
                               </span>
                             </div>
-                            <button
+                            <motion.button
+                              whileHover={{ scale: 1.04 }}
+                              whileTap={{ scale: 0.96 }}
                               onClick={() => es(t.id, t.title)}
-                              className="text-[9px] font-black uppercase text-indigo-600 border border-indigo-200 bg-indigo-50/55 px-2.5 py-1.5 rounded-xl hover:bg-indigo-100"
+                              className="text-[9px] font-black uppercase text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition cursor-pointer shadow-2xs"
                             >
-                              Log Study Session
-                            </button>
-                          </div>
+                              Log Review
+                            </motion.button>
+                          </motion.div>
                         );
                       })
                     )}
                   </div>
-                </div>
-              </div>
+                </motion.div>
+              </motion.div>
             )}
 
             {j === "focus" && (
-              <div className="space-y-6">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+                className="space-y-6"
+              >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100 flex flex-col justify-between">
+                  {/* Buddy Study Circles */}
+                  <motion.div
+                    whileHover={{ y: -2 }}
+                    className="bg-slate-50/70 dark:bg-slate-900/60 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between shadow-xs"
+                  >
                     <div className="space-y-3">
-                      <h3 className="font-extrabold text-[11px] text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                        <Users size={14} className="text-indigo-600" /> Buddy Study Circles
-                      </h3>
+                      <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-800 pb-2">
+                        <h3 className="font-extrabold text-[11px] text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                          <Users size={15} className="text-indigo-600 dark:text-indigo-400" /> Buddy Study Circles
+                        </h3>
+                        <span className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                          {V.filter((t) => t.online).length} LIVE ONLINE
+                        </span>
+                      </div>
+
                       <div className="space-y-2">
                         {V.map((t) => (
-                          <button
+                          <motion.button
                             key={t.id}
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.99 }}
                             onClick={() => Ft(t.id)}
-                            className={`w-full p-2.5 bg-white rounded-2xl border flex items-center justify-between hover:border-indigo-200 transition text-left ${
-                              w === t.id ? "border-indigo-600" : "border-slate-100"
+                            className={`w-full p-3 rounded-2xl border flex items-center justify-between transition text-left cursor-pointer shadow-2xs ${
+                              w === t.id
+                                ? "bg-indigo-50/80 dark:bg-indigo-950/60 border-indigo-500 ring-2 ring-indigo-500/20"
+                                : "bg-white dark:bg-slate-800/90 border-slate-200/80 dark:border-slate-700/80 hover:border-indigo-300"
                             }`}
                           >
-                            <div className="flex items-center gap-2">
-                              <span className="text-lg">🧑‍🎓</span>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xl">🧑‍🎓</span>
                               <div>
-                                <strong className="text-[11px] font-black text-slate-800 block">{t.name}</strong>
+                                <strong className="text-[11px] font-black text-slate-800 dark:text-slate-200 block">{t.name}</strong>
                                 <span className="text-[8px] text-slate-400 font-bold">
-                                  Level {Math.floor(t.xp / 100) + 1} | {t.xp} XP
+                                  Level {Math.floor(t.xp / 100) + 1} • {t.xp} XP
                                 </span>
                               </div>
                             </div>
                             <span
-                              className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-lg ${
-                                t.online ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-400"
+                              className={`text-[8px] font-black uppercase px-2.5 py-0.5 rounded-lg border ${
+                                t.online
+                                  ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+                                  : "bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700"
                               }`}
                             >
-                              {t.online ? "ONLINE" : "OFFLINE"}
+                              {t.online ? "● LIVE" : "OFFLINE"}
                             </span>
-                          </button>
+                          </motion.button>
                         ))}
                       </div>
                     </div>
 
                     {w && (
-                      <div className="mt-4 border-t pt-3 space-y-2">
-                        <span className="text-[9px] font-black uppercase text-slate-400 block">
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        className="mt-4 border-t border-slate-200/60 dark:border-slate-800 pt-3 space-y-2"
+                      >
+                        <span className="text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider block">
                           Direct message with {V.find((t) => t.id === w)?.name}
                         </span>
-                        <div className="bg-white p-2.5 rounded-2xl border max-h-[80px] overflow-y-auto space-y-1 text-[9px] font-medium leading-none text-slate-600 font-sans">
+                        <div className="bg-white dark:bg-slate-800/90 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 max-h-[90px] overflow-y-auto space-y-1.5 text-[10px] font-medium text-slate-700 dark:text-slate-300">
                           {V.find((t) => t.id === w)?.chat.map((t: string, s: number) => (
-                            <div key={s} className={`p-1 rounded ${t.startsWith("Me") ? "bg-indigo-50/60" : "bg-slate-50"}`}>
+                            <div key={s} className={`p-1.5 rounded-xl ${t.startsWith("Me") ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/40" : "bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-slate-300"}`}>
                               {t}
                             </div>
                           )) || <span className="italic text-slate-400">Start a chat...</span>}
                         </div>
-                        <div className="flex gap-1.5">
+                        <div className="flex gap-2">
                           <input
                             type="text"
                             value={oe}
                             onChange={(t) => Be(t.target.value)}
-                            placeholder="Send materials..."
-                            className="flex-1 p-2 border border-slate-200 rounded-xl text-[10px] bg-white outline-none"
+                            onKeyDown={(e) => e.key === "Enter" && Kt()}
+                            placeholder="Share study notes / formula..."
+                            className="flex-1 p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-indigo-500 font-medium"
                           />
-                          <button onClick={Kt} className="px-3 bg-indigo-600 text-white rounded-xl text-[10px] font-bold">
-                            Send
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100 space-y-4">
-                    <h3 className="font-extrabold text-[11px] text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <Volume2 size={14} className="text-indigo-600" /> Focus Soundscapes & White Noise
-                    </h3>
-                    {Ge.map((t) => (
-                      <div key={t.id} className="flex items-center justify-between p-2.5 bg-white border border-slate-100 rounded-2xl shadow-xs">
-                        <span className="text-xs text-slate-700 font-extrabold">
-                          {t.icon} {t.name}
-                        </span>
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            value={t.volume}
-                            onChange={(s) => Je(t.id, parseInt(s.target.value))}
-                            className="w-20 accent-indigo-600 cursor-pointer"
-                          />
-                          <button
-                            onClick={() => Qe(t.id)}
-                            className={`p-2 rounded-xl text-[10px] ${t.playing ? "bg-indigo-600 text-white" : "bg-indigo-50 text-indigo-600"}`}
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={Kt}
+                            className="px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase cursor-pointer transition shadow-xs"
                           >
-                            {t.playing ? "PAUSE" : "PLAY"}
-                          </button>
+                            Send
+                          </motion.button>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      </motion.div>
+                    )}
+                  </motion.div>
+
+                  {/* Focus Soundscapes & White Noise */}
+                  <motion.div
+                    whileHover={{ y: -2 }}
+                    className="bg-slate-50/70 dark:bg-slate-900/60 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-xs"
+                  >
+                    <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-800 pb-2">
+                      <h3 className="font-extrabold text-[11px] text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                        <Volume2 size={15} className="text-indigo-600 dark:text-indigo-400" /> Focus Soundscapes & White Noise
+                      </h3>
+                      <span className="text-[9px] font-mono text-indigo-500 font-bold">SYNTH SOUNDS</span>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {Ge.map((t) => (
+                        <motion.div
+                          key={t.id}
+                          whileHover={{ scale: 1.01 }}
+                          className={`flex items-center justify-between p-3 rounded-2xl border transition shadow-2xs ${
+                            t.playing
+                              ? "bg-indigo-50/80 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-700"
+                              : "bg-white dark:bg-slate-800/90 border-slate-200/80 dark:border-slate-700/80"
+                          }`}
+                        >
+                          <span className="text-xs text-slate-800 dark:text-slate-200 font-extrabold flex items-center gap-2">
+                            <span className="text-base">{t.icon}</span> {t.name}
+                          </span>
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={t.volume}
+                              onChange={(s) => Je(t.id, parseInt(s.target.value))}
+                              className="w-20 accent-indigo-600 cursor-pointer"
+                            />
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => Qe(t.id)}
+                              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition cursor-pointer shadow-xs ${
+                                t.playing
+                                  ? "bg-indigo-600 text-white shadow-indigo-600/30"
+                                  : "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100"
+                              }`}
+                            >
+                              {t.playing ? "PAUSE ⏸" : "PLAY ▶"}
+                            </motion.button>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </motion.div>
                 </div>
 
-                <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100 space-y-4">
-                  <div className="flex justify-between items-center border-b pb-2">
-                    <h3 className="font-extrabold text-[11px] text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>AI Mock Test System</span>
+                {/* AI Mock Test System */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-slate-50/70 dark:bg-slate-900/60 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-xs"
+                >
+                  <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-800 pb-2">
+                    <h3 className="font-extrabold text-[11px] text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      <span>Adaptive AI Mock Test Simulator</span>
                     </h3>
                     {A && (
-                      <span className="text-[10px] font-mono bg-rose-50 text-rose-700 border border-rose-200 px-3 py-1 rounded-xl font-black flex items-center gap-1">
-                        <Activity className="w-3 h-3 animate-pulse" />
-                        Time Left: {Math.floor(U / 60)}:{(U % 60).toString().padStart(2, "0")}
+                      <span className="text-[10px] font-mono bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 px-3 py-1 rounded-xl font-black flex items-center gap-1.5 shadow-2xs">
+                        <Activity className="w-3.5 h-3.5 animate-pulse" />
+                        Time Remaining: {Math.floor(U / 60)}:{(U % 60).toString().padStart(2, "0")}
                       </span>
                     )}
                   </div>
@@ -1978,14 +2499,14 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8 }}
-                        className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end"
+                        className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end"
                       >
                         <div>
-                          <label className="block text-[8px] uppercase font-black text-slate-400 mb-1">Subject</label>
+                          <label className="block text-[8px] uppercase font-black text-slate-400 dark:text-slate-500 mb-1">Subject</label>
                           <select
                             value={quizSubject}
                             onChange={(t) => setQuizSubject(t.target.value)}
-                            className="w-full p-2 border border-slate-200 bg-white rounded-xl text-xs outline-none"
+                            className="w-full p-2.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl text-xs outline-none focus:border-indigo-500 font-medium"
                           >
                             {["Mathematics", "Science", "Biology", "Physics", "Chemistry", "English"].map((t) => (
                               <option key={t} value={t}>
@@ -1995,11 +2516,11 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                           </select>
                         </div>
                         <div>
-                          <label className="block text-[8px] uppercase font-black text-slate-400 mb-1">Grade</label>
+                          <label className="block text-[8px] uppercase font-black text-slate-400 dark:text-slate-500 mb-1">Grade</label>
                           <select
                             value={Ce}
                             onChange={(t) => Vt(t.target.value)}
-                            className="w-full p-2 border border-slate-200 bg-white rounded-xl text-xs outline-none"
+                            className="w-full p-2.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl text-xs outline-none focus:border-indigo-500 font-medium"
                           >
                             {["8", "9", "10", "11", "12"].map((t) => (
                               <option key={t} value={t}>
@@ -2009,16 +2530,16 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                           </select>
                         </div>
                         <motion.button
-                          whileHover={{ scale: 1.01 }}
-                          whileTap={{ scale: 0.98 }}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.97 }}
                           onClick={Lt}
                           disabled={Z}
-                          className="py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wide cursor-pointer transition shadow-xs flex items-center justify-center gap-1.5"
+                          className="py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black uppercase tracking-wide cursor-pointer transition shadow-md flex items-center justify-center gap-1.5"
                         >
                           {Z ? (
                             <>
                               <Activity className="w-3.5 h-3.5 animate-spin" />
-                              <span>Generating questions...</span>
+                              <span>Generating Questions...</span>
                             </>
                           ) : (
                             <>
@@ -2042,12 +2563,12 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                             initial={{ opacity: 0, y: 6 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: idx * 0.05 }}
-                            className="p-4 bg-white border border-slate-200/90 rounded-2xl space-y-2.5 shadow-xs"
+                            className="p-4 bg-white dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/90 rounded-2xl space-y-2.5 shadow-xs"
                           >
-                            <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                            <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md border border-indigo-100 dark:border-indigo-900/40">
                               Question {idx + 1}
                             </span>
-                            <p className="text-xs font-bold text-slate-800">{qItem.question}</p>
+                            <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{qItem.question}</p>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                               {qItem.options.map((optionText: string, oIdx: number) => (
                                 <motion.button
@@ -2059,10 +2580,10 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                                       n.map((curr, cIdx) => (cIdx === idx ? oIdx : curr))
                                     )
                                   }
-                                  className={`p-2.5 rounded-xl text-left font-semibold border transition cursor-pointer ${
+                                  className={`p-3 rounded-xl text-left font-semibold border transition cursor-pointer ${
                                     ee[idx] === oIdx
                                       ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
-                                      : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                                      : "bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                                   }`}
                                 >
                                   {optionText}
@@ -2075,9 +2596,10 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                           whileHover={{ scale: 1.01 }}
                           whileTap={{ scale: 0.98 }}
                           onClick={Ye}
-                          className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase shadow-xs transition cursor-pointer"
+                          className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md transition cursor-pointer flex items-center justify-center gap-2"
                         >
-                          Submit Test & Log Score
+                          <Check size={14} strokeWidth={3} />
+                          <span>Submit Test & Log Score (+50 XP)</span>
                         </motion.button>
                       </motion.div>
                     ) : (
@@ -2086,49 +2608,65 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
-                        className="p-5 bg-white border border-slate-200/90 rounded-2xl text-center space-y-3 shadow-xs"
+                        className="p-6 bg-white dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/90 rounded-2xl text-center space-y-3 shadow-xs"
                       >
-                        <strong className="text-xs font-black text-indigo-900 uppercase">
+                        <div className="text-3xl">🏆</div>
+                        <strong className="text-xs font-black text-indigo-900 dark:text-indigo-300 uppercase">
                           Grade Report Processed Successfully!
                         </strong>
-                        <div className="flex justify-center gap-6 text-xs text-slate-600 font-semibold">
+                        <div className="flex justify-center gap-6 text-xs text-slate-700 dark:text-slate-300 font-semibold bg-slate-50 dark:bg-slate-900/60 py-2.5 px-4 rounded-xl border border-slate-200/80 dark:border-slate-700 max-w-sm mx-auto">
                           <span>Total Questions: {v.length}</span>
-                          <span>Score: {v.filter((t: any, s: number) => ee[s] === t.answer).length} / {v.length}</span>
+                          <span className="text-emerald-600 dark:text-emerald-400 font-black">Score: {v.filter((t: any, s: number) => ee[s] === t.answer).length} / {v.length}</span>
                         </div>
-                        <button
+                        <motion.button
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.97 }}
                           onClick={() => te(false)}
-                          className="px-6 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl text-xs font-bold uppercase transition cursor-pointer shadow-xs"
+                          className="px-6 py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer shadow-xs"
                         >
                           Start New Test
-                        </button>
+                        </motion.button>
                       </motion.div>
                     )}
                   </AnimatePresence>
-                </div>
-              </div>
+                </motion.div>
+              </motion.div>
             )}
 
             {j === "utilities" && (
-              <div className="space-y-4">
-                <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100 space-y-4 text-center">
-                  <span className="text-3xl">📂</span>
-                  <h3 className="font-extrabold text-[12px] text-slate-800 uppercase tracking-wider">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+                className="space-y-4"
+              >
+                <div className="bg-slate-50/70 dark:bg-slate-900/60 p-6 sm:p-8 rounded-3xl border border-slate-200/80 dark:border-slate-800 space-y-4 text-center shadow-xs">
+                  <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto text-2xl">
+                    <Cloud className="w-7 h-7" />
+                  </div>
+                  <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-200 uppercase tracking-wider">
                     Cloud Backup & Restore Manager
                   </h3>
-                  <p className="text-[10px] text-slate-500 max-w-md mx-auto leading-relaxed">
-                    Download complete client application databases - notes, schedule timers, goals, achievements, and buddy lists in an encrypted local backup file, or upload past configuration files to retrieve previous configurations.
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+                    Download complete encrypted backups of your notes, flashcards, formula deck, study goals, exam timers, and buddy sync data to keep your progress safe offline or migrate to another device.
                   </p>
-                  <div className="flex gap-4 justify-center pt-2">
-                    <button
+                  <div className="flex flex-wrap gap-3 justify-center pt-2">
+                    <motion.button
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
                       onClick={Yt}
-                      className="px-6 py-2.5 bg-indigo-600 text-white font-black text-xs uppercase rounded-xl shadow hover:bg-indigo-700 transition flex items-center gap-2"
+                      className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
                     >
-                      <Cloud size={14} /> Export Backup File
-                    </button>
+                      <Cloud size={15} /> Export Complete Backup
+                    </motion.button>
                     <div className="relative">
-                      <button className="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 font-black text-xs uppercase rounded-xl hover:bg-slate-50 transition flex items-center gap-2">
-                        <Upload size={14} /> Import Backup File
-                      </button>
+                      <motion.button
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
+                        className="px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-black text-xs uppercase tracking-wider rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition flex items-center gap-2 cursor-pointer shadow-xs"
+                      >
+                        <Upload size={15} /> Import Backup File
+                      </motion.button>
                       <input
                         type="file"
                         accept=".json"
@@ -2138,7 +2676,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                     </div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             )}
           </main>
         </div>

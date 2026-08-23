@@ -1,20 +1,110 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper functions for zero-trust security
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Validation for User Profile
+    function isValidUser(data) {
+      return data.uid is string && data.uid == request.auth.uid
+        && (data.name is string && data.name.size() <= 100)
+        && (data.xp is int || data.xp is float)
+        && (data.streak is int || data.streak is float);
+    }
+
+    // Validation for Room Chat Message
+    function isValidChatMessage(data) {
+      return data.senderId is string && data.senderId == request.auth.uid
+        && (data.roomId is string && data.roomId.size() <= 100)
+        && (data.text is string && data.text.size() <= 2000);
+    }
+
+    // Validation for Whiteboard Element
+    function isValidWhiteboardElement(data) {
+      return (data.senderId is string && data.senderId == request.auth.uid)
+        && (data.roomId is string && data.roomId.size() <= 100)
+        && (data.type is string && data.type.size() <= 50);
+    }
+
+    // Validation for Mock Exam
+    function isValidMockExam(data) {
+      return data.userId is string && data.userId == request.auth.uid
+        && (data.subject is string && data.subject.size() <= 100)
+        && (data.score is int || data.score is float);
+    }
+
+    // Validation for Study Document
+    function isValidStudyDocument(data) {
+      return data.ownerId is string && data.ownerId == request.auth.uid
+        && (data.title is string && data.title.size() <= 200)
+        && (data.content is string && data.content.size() <= 50000);
+    }
+
+    // Default deny all unknown collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 1. Users collection: User can only access and update their own document
     match /users/{userId} {
-      allow read, write: if true;
+      allow get: if isOwner(userId);
+      allow list: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming());
+      allow delete: if isOwner(userId);
     }
+
+    // 2. Collaborative Study Room Chats
     match /rooms/{roomId}/chats/{chatId} {
-      allow read, write: if true;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidChatMessage(incoming());
+      allow update: if isSignedIn() && existing().senderId == request.auth.uid && isValidChatMessage(incoming());
+      allow delete: if isSignedIn() && existing().senderId == request.auth.uid;
     }
+
+    // 3. Collaborative Whiteboard Elements
     match /rooms/{roomId}/whiteboard/{elementId} {
-      allow read, write: if true;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidWhiteboardElement(incoming());
+      allow update: if isSignedIn() && existing().senderId == request.auth.uid && isValidWhiteboardElement(incoming());
+      allow delete: if isSignedIn();
     }
+
+    // 4. Mock Exams: Strictly isolated to the student taking the exam
     match /exams/{examId} {
-      allow read, write: if true;
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid && isValidMockExam(incoming());
+      allow update: if isSignedIn() && existing().userId == request.auth.uid && isValidMockExam(incoming());
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
     }
+
+    // 5. Study Documents: Private to owner or shared if flagged
     match /documents/{docId} {
-      allow read, write: if true;
+      allow get: if isSignedIn() && (resource.data.ownerId == request.auth.uid || resource.data.isShared == true);
+      allow list: if isSignedIn() && (resource.data.ownerId == request.auth.uid || resource.data.isShared == true);
+      allow create: if isSignedIn() && incoming().ownerId == request.auth.uid && isValidStudyDocument(incoming());
+      allow update: if isSignedIn() && existing().ownerId == request.auth.uid && isValidStudyDocument(incoming());
+      allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
     }
   }
 }
