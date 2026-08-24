@@ -138,6 +138,11 @@ export function getFriendlyAuthErrorMessage(errorCodeOrMessage: string, lang: 'e
       ? 'अमान्य ईमेल पता। कृपया सही ईमेल दर्ज करें।' 
       : 'Please enter a valid email address.';
   }
+  if (code.includes('unauthorized-domain')) {
+    return lang === 'hi' 
+      ? 'Vercel डोमेन Firebase Auth में अधिकृत (Authorized) नहीं है। Firebase Console > Authentication > Settings > Authorized domains में अपना vercel.app डोमेन जोड़ें।' 
+      : 'This Vercel domain is not authorized in Firebase. Add your vercel.app domain in Firebase Console > Authentication > Settings > Authorized domains.';
+  }
   if (code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) {
     return lang === 'hi' 
       ? 'गूगल साइन-इन विंडो बंद कर दी गई थी।' 
