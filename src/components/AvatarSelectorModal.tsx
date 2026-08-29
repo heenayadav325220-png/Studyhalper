@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { ChangeEvent } from 'react';
 import { 
   X, 
@@ -118,6 +118,16 @@ export default function AvatarSelectorModal({
   const [isGenerating, setIsGenerating] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedAvatar(currentAvatar || '🧑‍🎓');
+      setSelectedType(currentAvatarType || 'emoji');
+      setSelectedBg(currentAvatarBg || GRADIENT_THEMES[0].class);
+      setCustomUrlInput('');
+      setUrlError('');
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

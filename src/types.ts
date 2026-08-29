@@ -151,3 +151,27 @@ export interface StudyDocument {
   isShared: boolean;
   timestamp: string;
 }
+
+export type AppThemeLook = 'cyber_glass' | 'wooden_parchment' | 'midnight_amoled' | 'aurora_synthwave';
+export type LightingEffect = 'rainbow_spin' | 'aurora_pulse' | 'golden_radiance' | 'minimal_glow';
+export type FontFamilyStyle = 'sans' | 'serif' | 'mono' | 'rounded';
+export type AiTutorCardStyle = 'cyber_neon' | 'retro_arcade' | 'parchment_desk' | 'bento_minimal';
+export type StatBoxesLayout = '3_col_compact' | 'horizontal_bar' | 'hexagon_badges' | 'card_grid';
+export type DashboardLayoutPreset = 'tutor_first' | 'toolkit_hero' | 'quiz_first' | 'compact_grid';
+export type CardBorderRadius = 'curved' | 'pill' | 'sharp' | 'hexagon';
+export type NeonIntensity = 'high' | 'medium' | 'soft' | 'off';
+export type WallpaperAmbiance = 'science_chalkboard' | 'cosmic_nebula' | 'cyber_matrix' | 'deep_obsidian';
+export type AudioFeedback = 'cyber_synth' | 'tactile_click' | 'zen_water' | 'silent';
+
+export interface UiCustomization {
+  appThemeLook: AppThemeLook;
+  lightingEffect: LightingEffect;
+  fontFamilyStyle: FontFamilyStyle;
+  aiTutorCardStyle: AiTutorCardStyle;
+  statBoxesLayout: StatBoxesLayout;
+  dashboardLayoutPreset: DashboardLayoutPreset;
+  neonIntensity: NeonIntensity;
+  cardBorderRadius: CardBorderRadius;
+  wallpaperAmbiance: WallpaperAmbiance;
+  audioFeedback: AudioFeedback;
+}

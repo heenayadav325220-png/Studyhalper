@@ -21,21 +21,25 @@ import {
   ChevronRight,
   BrainCircuit,
   LayoutGrid,
+  List,
   ChevronDown,
   Mail,
   X,
   Image as ImageIcon,
   LogIn,
-  UserCheck,
   Edit3,
-  User as UserIcon
+  User as UserIcon,
+  Settings2,
+  Terminal
 } from 'lucide-react';
 import InteractiveToolkit from './components/InteractiveToolkit';
 import AiTutorApp from './components/AiTutorApp';
 import ImageGenerator from './components/ImageGenerator';
 import OnboardingModal from './components/OnboardingModal';
 import AuthModal from './components/AuthModal';
+import SelfCustomizeModal, { DEFAULT_UI_CUSTOMIZATION } from './components/SelfCustomizeModal';
 import { TRANSLATIONS, Language } from './services/translations';
+import { playUiSound } from './services/soundEffects';
 import { 
   auth, 
   onAuthStateChanged,
@@ -66,7 +70,8 @@ import type {
   WhiteboardElement, 
   MockExam, 
   StudyDocument, 
-  Subject 
+  Subject,
+  UiCustomization 
 } from './types';
 
 const SUBJECTS: Subject[] = ['Mathematics', 'Science', 'Biology', 'Physics', 'Chemistry', 'English'];
@@ -99,7 +104,34 @@ export default function App() {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [playgroundViewMode, setPlaygroundViewMode] = useState<'list' | 'grid'>('list');
+
+  // UI Self-Customization State (User editable UI, Lighting, AI Tutor box, Theme)
+  const [uiCustomization, setUiCustomization] = useState<UiCustomization>(() => {
+    try {
+      const saved = localStorage.getItem('ascend_ui_customization');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          return { ...DEFAULT_UI_CUSTOMIZATION, ...parsed };
+        }
+      }
+    } catch (e) {
+      console.error("Error loading UI customization", e);
+    }
+    return DEFAULT_UI_CUSTOMIZATION;
+  });
+
+  const handleUpdateCustomization = (updated: UiCustomization) => {
+    setUiCustomization(updated);
+    try {
+      localStorage.setItem('ascend_ui_customization', JSON.stringify(updated));
+    } catch (e) {
+      console.error("Error saving UI customization", e);
+    }
+  };
 
   // User & Onboarding State - Sourced from localStorage
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
@@ -212,18 +244,24 @@ export default function App() {
   }, []);
 
   const handleSaveAvatar = (data: AvatarSelectionData) => {
-    const updated: UserProfile = {
-      ...userProfile,
-      avatar: data.avatar,
-      avatarType: data.avatarType,
-      avatarBg: data.avatarBg || userProfile.avatarBg
-    };
-    setUserProfile(updated);
-    localStorage.setItem('ascend_user_profile', JSON.stringify(updated));
-    localStorage.setItem('user_profile_data', JSON.stringify(updated));
-    localStorage.setItem(`user_profile_${userProfile.uid}`, JSON.stringify(updated));
-    updateUserProfile(userProfile.uid, updated);
-    addXp(20);
+    setUserProfile((prev) => {
+      const newXp = (prev.xp || 0) + 20;
+      const newLevel = Math.floor(newXp / 100) + 1;
+      const updated: UserProfile = {
+        ...prev,
+        avatar: data.avatar,
+        avatarType: data.avatarType,
+        avatarBg: data.avatarBg || prev.avatarBg,
+        xp: newXp,
+        level: newLevel
+      };
+      localStorage.setItem('ascend_user_profile', JSON.stringify(updated));
+      localStorage.setItem('user_profile_data', JSON.stringify(updated));
+      localStorage.setItem(`user_profile_${prev.uid}`, JSON.stringify(updated));
+      updateUserProfile(prev.uid, updated);
+      return updated;
+    });
+    setShowAvatarModal(false);
   };
 
   const handleSaveProfile = (data: { 
@@ -236,29 +274,34 @@ export default function App() {
     className: string; 
     targetGoal: string;
   }) => {
-    const updated: UserProfile = {
-      ...userProfile,
-      name: data.name,
-      email: data.email || '',
-      avatar: data.avatar || userProfile.avatar,
-      avatarType: data.avatarType || userProfile.avatarType,
-      avatarBg: data.avatarBg || userProfile.avatarBg,
-      schoolName: data.schoolName,
-      className: data.className,
-      targetGoal: data.targetGoal,
-      isOnboarded: true
-    };
-    setUserProfile(updated);
-    // Persist cleanly to localStorage
-    localStorage.setItem('ascend_user_profile', JSON.stringify(updated));
-    localStorage.setItem('user_profile_data', JSON.stringify(updated));
-    localStorage.setItem(`user_profile_${userProfile.uid}`, JSON.stringify(updated));
-    localStorage.setItem(`ascend_onboarded_${userProfile.uid}`, 'true');
-    localStorage.setItem('ascend_onboarded', 'true');
-    updateUserProfile(userProfile.uid, updated);
+    setUserProfile((prev) => {
+      const newXp = (prev.xp || 0) + 50;
+      const newLevel = Math.floor(newXp / 100) + 1;
+      const updated: UserProfile = {
+        ...prev,
+        name: data.name,
+        email: data.email || prev.email || '',
+        avatar: data.avatar || prev.avatar || '🧑‍🎓',
+        avatarType: data.avatarType || prev.avatarType || 'emoji',
+        avatarBg: data.avatarBg || prev.avatarBg || 'bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600',
+        schoolName: data.schoolName,
+        className: data.className,
+        targetGoal: data.targetGoal,
+        isOnboarded: true,
+        xp: newXp,
+        level: newLevel
+      };
+      // Persist cleanly to localStorage
+      localStorage.setItem('ascend_user_profile', JSON.stringify(updated));
+      localStorage.setItem('user_profile_data', JSON.stringify(updated));
+      localStorage.setItem(`user_profile_${prev.uid}`, JSON.stringify(updated));
+      localStorage.setItem(`ascend_onboarded_${prev.uid}`, 'true');
+      localStorage.setItem('ascend_onboarded', 'true');
+      updateUserProfile(prev.uid, updated);
+      return updated;
+    });
     setShowOnboardingModal(false);
     setIsEditingProfile(false);
-    addXp(50);
   };
 
   // Subscribe to User Profile
@@ -321,15 +364,20 @@ export default function App() {
 
   // Helper to add XP and update level / pet level
   const addXp = (amount: number) => {
-    const newXp = Math.max(0, userProfile.xp + amount);
-    const newLevel = Math.floor(newXp / 100) + 1;
-    const updated = {
-      ...userProfile,
-      xp: newXp,
-      level: newLevel
-    };
-    setUserProfile(updated);
-    updateUserProfile(userProfile.uid, updated);
+    setUserProfile((prev) => {
+      const newXp = Math.max(0, (prev.xp || 0) + amount);
+      const newLevel = Math.floor(newXp / 100) + 1;
+      const updated: UserProfile = {
+        ...prev,
+        xp: newXp,
+        level: newLevel
+      };
+      localStorage.setItem('ascend_user_profile', JSON.stringify(updated));
+      localStorage.setItem('user_profile_data', JSON.stringify(updated));
+      localStorage.setItem(`user_profile_${prev.uid}`, JSON.stringify(updated));
+      updateUserProfile(prev.uid, { xp: newXp, level: newLevel });
+      return updated;
+    });
   };
 
   // --- STREAK & GOALS STATE ---
@@ -611,74 +659,154 @@ export default function App() {
 
   // Open specific tool in Toolkit
   const openToolkitWithTool = (toolName?: string) => {
+    playUiSound(uiCustomization.audioFeedback);
     setInitialTool(toolName);
     setActiveTab('toolkit');
   };
 
+  // Helper for font family class based on user customization
+  const getAppFontClass = () => {
+    switch (uiCustomization.fontFamilyStyle) {
+      case 'serif': return 'font-serif';
+      case 'mono': return 'font-mono';
+      case 'rounded': return 'font-sans tracking-wide font-medium';
+      default: return 'font-sans';
+    }
+  };
+
+  // Helper for top card lighting effect - Clean Rotating Neon Perimeter Strip / Ribbon (Patti)
+  const getLightingGlows = () => {
+    switch (uiCustomization.lightingEffect) {
+      case 'aurora_pulse':
+        return {
+          stripGradient: 'conic-gradient(from 0deg at 50% 50%, #10b981 0%, #06b6d4 30%, #3b82f6 60%, #10b981 100%)',
+          animOuter: 'animate-spin-slow',
+          accentColor: 'border-emerald-400/40',
+          previewCss: 'conic-gradient(from 0deg, #10b981, #06b6d4, #3b82f6, #10b981)'
+        };
+      case 'golden_radiance':
+        return {
+          stripGradient: 'conic-gradient(from 0deg at 50% 50%, #f59e0b 0%, #d97706 25%, #fbbf24 50%, #b45309 75%, #f59e0b 100%)',
+          animOuter: 'animate-spin-slow',
+          accentColor: 'border-amber-400/40',
+          previewCss: 'conic-gradient(from 0deg, #f59e0b, #fbbf24, #d97706, #f59e0b)'
+        };
+      case 'minimal_glow':
+        return {
+          stripGradient: 'conic-gradient(from 0deg at 50% 50%, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.9) 100%)',
+          animOuter: 'animate-spin-slow',
+          accentColor: 'border-white/40',
+          previewCss: 'conic-gradient(from 0deg, #ffffff, #64748b, #ffffff)'
+        };
+      case 'rainbow_spin':
+      default:
+        return {
+          stripGradient: 'conic-gradient(from 0deg at 50% 50%, #00f0ff 0%, #0077ff 12%, #a855f7 25%, #ec4899 38%, #f43f5e 50%, #ff6b00 62%, #eab308 75%, #10b981 88%, #00f0ff 100%)',
+          animOuter: 'animate-spin-slow',
+          accentColor: 'border-cyan-400/40',
+          previewCss: 'conic-gradient(from 0deg, #00f0ff, #a855f7, #f43f5e, #ff6b00, #10b981, #00f0ff)'
+        };
+    }
+  };
+
+  // Helper for neon strip thickness & opacity (4 modes: 3.5px, 2.5px, 1.5px, 0px)
+  const getNeonIntensityGlow = () => {
+    switch (uiCustomization.neonIntensity) {
+      case 'medium': return { padding: 'p-[2.5px]', opacity: 'opacity-85', show: true };
+      case 'soft': return { padding: 'p-[1.5px]', opacity: 'opacity-60', show: true };
+      case 'off': return { padding: 'p-[1px]', opacity: 'opacity-0', show: false };
+      case 'high':
+      default:
+        return { padding: 'p-[3.5px]', opacity: 'opacity-100', show: true };
+    }
+  };
+
+  // Helper for card corner radius (4 modes)
+  const getCardRadiusClasses = () => {
+    switch (uiCustomization.cardBorderRadius) {
+      case 'pill':
+        return {
+          casing: 'rounded-[38px]',
+          inner: 'rounded-[36px]',
+          tile: 'rounded-3xl',
+          badge: 'rounded-2xl'
+        };
+      case 'sharp':
+        return {
+          casing: 'rounded-xl',
+          inner: 'rounded-lg',
+          tile: 'rounded-md',
+          badge: 'rounded-md'
+        };
+      case 'hexagon':
+        return {
+          casing: 'rounded-2xl border-dashed',
+          inner: 'rounded-xl border-dashed',
+          tile: 'rounded-xl border-dashed',
+          badge: 'rounded-xl'
+        };
+      case 'curved':
+      default:
+        return {
+          casing: 'rounded-[28px]',
+          inner: 'rounded-[26px]',
+          tile: 'rounded-2xl sm:rounded-3xl',
+          badge: 'rounded-xl'
+        };
+    }
+  };
+
+  // Helper for theme styling on the top card
+  const getThemeCardClasses = () => {
+    switch (uiCustomization.appThemeLook) {
+      case 'wooden_parchment':
+        return 'bg-[#2b1e15]/95 backdrop-blur-2xl border-[#8a5d3b]/80 text-[#faecd9]';
+      case 'midnight_amoled':
+        return 'bg-black backdrop-blur-none border-slate-800 text-white';
+      case 'aurora_synthwave':
+        return 'bg-gradient-to-br from-[#180829]/95 via-[#0b0318]/95 to-[#1c0836]/95 border-pink-500/40 text-pink-50';
+      case 'cyber_glass':
+      default:
+        return 'bg-slate-950/85 backdrop-blur-2xl border-white/20 text-white';
+    }
+  };
+
+  const lightingGlows = getLightingGlows();
+  const neonIntensityGlow = getNeonIntensityGlow();
+  const cornerRadius = getCardRadiusClasses();
+
   return (
-    <div className="min-h-screen text-slate-100 font-sans flex flex-col selection:bg-emerald-500 selection:text-white w-full max-w-full overflow-x-hidden relative bg-[#0d1117]">
-      {/* FULL-PAGE SCIENCE CHALKBOARD BACKGROUND */}
-      <div 
-        className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-95"
-        style={{ backgroundImage: `url('/science_bg.jpg')` }}
-      />
+    <div className={`min-h-screen text-slate-100 ${getAppFontClass()} flex flex-col selection:bg-emerald-500 selection:text-white w-full max-w-full overflow-x-hidden relative bg-[#0d1117]`}>
+      {/* FULL-PAGE LIVE WALLPAPER AMBIANCE (4 MODES) */}
+      {uiCustomization.wallpaperAmbiance === 'cosmic_nebula' ? (
+        <div 
+          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-95"
+          style={{ 
+            background: 'radial-gradient(ellipse at 50% 0%, #1e1b4b 0%, #030712 60%, #000000 100%)' 
+          }}
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(#818cf8_1px,transparent_1px)] [background-size:24px_24px] opacity-40" />
+        </div>
+      ) : uiCustomization.wallpaperAmbiance === 'cyber_matrix' ? (
+        <div 
+          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-95"
+          style={{ 
+            background: 'radial-gradient(ellipse at top, #022c22 0%, #020617 80%)' 
+          }}
+        >
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#00ffcc0a_1px,transparent_1px),linear-gradient(to_bottom,#00ffcc0a_1px,transparent_1px)] [background-size:28px_28px] opacity-70" />
+        </div>
+      ) : uiCustomization.wallpaperAmbiance === 'deep_obsidian' ? (
+        <div className="fixed inset-0 pointer-events-none z-0 bg-[#030712]" />
+      ) : (
+        /* science_chalkboard (default) */
+        <div 
+          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-95"
+          style={{ backgroundImage: `url('/science_bg.jpg')` }}
+        />
+      )}
       {/* AMBIENT CHALKBOARD VIGNETTE OVERLAY */}
       <div className="fixed inset-0 pointer-events-none z-0 bg-gradient-to-b from-black/60 via-black/35 to-black/75 backdrop-brightness-95" />
-
-      {/* COMPACT TOP HEADER - DARK SLATE & GOLD CHALK STYLING */}
-      <header className="sticky top-0 z-40 bg-[#12161f]/90 backdrop-blur-md border-b border-slate-700/60 px-3 sm:px-4 py-2 flex items-center justify-between shadow-lg w-full max-w-full overflow-hidden transition-colors duration-200">
-        <div className="flex items-center space-x-2 shrink min-w-0">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-emerald-600 via-teal-500 to-indigo-600 border border-emerald-400/40 flex items-center justify-center text-white shadow-[0_0_12px_rgba(16,185,129,0.4)] font-black text-lg shrink-0">
-            🎓
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-xs font-black tracking-wider text-[#dfc285] uppercase truncate drop-shadow-xs flex items-center gap-1.5">
-              <span>ASCEND STUDY</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#34d399]" />
-            </h1>
-            <p className="text-[9px] font-extrabold text-[#a39071] uppercase tracking-wider truncate max-w-[130px] sm:max-w-[220px]">
-              {userProfile.name ? `${userProfile.name.toUpperCase()}` : 'STUDENT'}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-1.5 shrink-0">
-          {/* THEME TOGGLE BUTTON - PURPLE MOON */}
-          <ThemeToggle variant="lunar" />
-
-          {/* WALLPAPER / PRESET SELECTOR BUTTON */}
-          <button
-            onClick={() => setShowAvatarModal(true)}
-            title="Theme Wallpaper / Preset"
-            className="flex items-center space-x-1 p-1 pl-1.5 pr-2 rounded-full bg-[#2a2420] hover:bg-[#38312b] border border-[#483e36] text-[#dfc285] transition cursor-pointer shadow-xs active:scale-95 shrink-0"
-          >
-            <div className="w-5 h-5 rounded-full overflow-hidden border border-[#5a4e44] bg-sky-300 flex items-center justify-center text-[10px]">
-              🌅
-            </div>
-            <span className="text-[9px] text-[#a39071]">▾</span>
-          </button>
-
-          {/* LANGUAGE TOGGLE */}
-          <button 
-            onClick={toggleLanguage}
-            className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-[#2a2420] hover:bg-[#38312b] border border-[#483e36] text-[#dfc285] text-[11px] font-extrabold transition cursor-pointer shrink-0 shadow-xs"
-            title="Toggle Language"
-          >
-            <span className="text-[11px]">🌐</span>
-            <span className="font-bold">{appLanguage.toUpperCase()}</span>
-          </button>
-
-          {/* AUTH / ACCOUNT BUTTON */}
-          <button
-            onClick={() => setShowAuthModal(true)}
-            className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-[#2a2420] hover:bg-[#38312b] border border-[#483e36] text-[#dfc285] text-[11px] font-extrabold transition cursor-pointer shrink-0 shadow-xs active:scale-95"
-            title={currentUser && !currentUser.isAnonymous ? 'Manage Account' : 'Sign In / Register'}
-          >
-            <UserCheck className="w-3.5 h-3.5 text-[#dfc285]" />
-            <span>Me</span>
-          </button>
-        </div>
-      </header>
 
       {/* MAIN CONTENT AREA - WITH pb-24 TO AVOID BOTTOM NAV OVERLAP */}
       <main className="relative z-10 flex-1 p-3 sm:p-4 md:p-5 max-w-xl mx-auto w-full space-y-4 pb-24 overflow-x-hidden">
@@ -686,61 +814,92 @@ export default function App() {
         {activeTab === 'home' && (
           <div className="space-y-4">
             
-            {/* 1. TOP USER CARD - PARCHMENT & MAHOGANY LUXURY AESTHETIC MATCHING REFERENCE IMAGE */}
-            <div className="bg-[#2d221a] p-2 sm:p-2.5 rounded-[30px] border border-[#3e3025] shadow-2xl">
-              <div className="bg-gradient-to-b from-[#f6efe1] via-[#ece2ce] to-[#e4d6bf] rounded-[22px] border-2 border-[#d5c2a3] p-4 sm:p-5 shadow-[inset_0_2px_4px_rgba(255,255,255,0.8),0_4px_12px_rgba(0,0,0,0.25)] space-y-3.5 sm:space-y-4 text-[#3d2e1f]">
-                {/* Top Row: Greeting Tag, Target Goal & Edit Action */}
-                <div className="flex items-center justify-between gap-2 border-b border-[#ddcdb4] pb-3">
-                  <div className="flex items-center flex-wrap gap-2">
-                    <span className="text-[10.5px] sm:text-[11px] font-extrabold text-[#544026] bg-[#ddcfb6] px-3 py-1 rounded-full inline-flex items-center space-x-1.5 border border-[#c5b497] shadow-xs uppercase tracking-wider">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#8c6b3e]"></span>
-                      <span>{realtimeGreeting || getDynamicGreeting()}</span>
-                    </span>
-                    <span className="text-[10.5px] sm:text-[11px] font-bold text-[#544026] bg-[#ddcfb6] px-3 py-1 rounded-full border border-[#c5b497] shadow-xs inline-flex items-center space-x-1">
-                      <span className="text-[#8c6b3e] font-bold">@</span>
-                      <span className="truncate max-w-[130px] sm:max-w-[200px]">{userProfile.targetGoal || 'Jee Exams'}</span>
-                    </span>
-                  </div>
+            {/* 1. TOP USER CARD - ULTRA-MODERN FROSTED GLASSMORPHISM WITH DYNAMIC ROTATING NEON PERIMETER STRIP & SELF CUSTOMIZE */}
+            <div className="relative">
+              {/* CARD CASING WITH CRISP ROTATING NEON STRIP / PATTI (BORDER ONLY, NO SCATTERED SHADOWS) */}
+              <div className={`relative ${neonIntensityGlow.padding} ${cornerRadius.casing} overflow-hidden transition-all duration-300 ${neonIntensityGlow.show ? 'bg-slate-900/90' : 'border border-white/20'}`}>
+                {neonIntensityGlow.show && (
+                  <div 
+                    className={`absolute -top-[120%] -left-[120%] w-[340%] h-[340%] ${lightingGlows.animOuter} pointer-events-none ${neonIntensityGlow.opacity}`}
+                    style={{ background: lightingGlows.stripGradient }}
+                  />
+                )}
+                <div className={`relative ${cornerRadius.inner} p-4 sm:p-5 shadow-[inset_0_1px_3px_rgba(255,255,255,0.35)] space-y-3.5 sm:space-y-4 overflow-hidden ${getThemeCardClasses()}`}>
+                  {/* Subtle Ambient Light Reflections */}
+                  <div className="absolute -top-12 -right-12 w-36 h-36 bg-indigo-500/25 rounded-full blur-2xl pointer-events-none" />
+                  <div className="absolute -bottom-12 -left-12 w-36 h-36 bg-pink-500/20 rounded-full blur-2xl pointer-events-none" />
 
-                  <button
-                    onClick={() => {
-                      setIsEditingProfile(true);
-                      setShowOnboardingModal(true);
-                    }}
-                    className="p-1.5 text-[#544026] hover:text-[#3d2e1f] hover:bg-[#d5c5a7]/60 rounded-lg transition border border-transparent hover:border-[#c5b497] cursor-pointer flex items-center space-x-1 text-xs font-semibold"
-                    title="Edit Profile"
-                  >
-                    <Edit3 className="w-4 h-4" />
-                  </button>
+                {/* Top Row: Greeting Tag & Target Goal Facing Each Other with Gear Customize Button */}
+                <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2.5 relative z-10">
+                  <div className="flex items-center justify-between w-full gap-2">
+                    {/* Left: Greeting Badge (Frosted Glass) */}
+                    <div className="flex-1 min-w-0 bg-white/[0.08] backdrop-blur-md border border-white/15 rounded-xl px-2.5 py-1.5 shadow-xs flex items-center space-x-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] shrink-0 animate-pulse"></span>
+                      <span className="text-[10px] sm:text-[11px] font-black text-slate-100 uppercase tracking-wider truncate">
+                        {realtimeGreeting || getDynamicGreeting()}
+                      </span>
+                    </div>
+
+                    {/* Right: Target Goal Badge (Frosted Glass) with integrated Edit action */}
+                    <div className="flex-1 min-w-0 bg-white/[0.08] backdrop-blur-md border border-white/15 rounded-xl px-2.5 py-1.5 shadow-xs flex items-center justify-between space-x-1.5">
+                      <div className="flex items-center space-x-1.5 min-w-0 truncate">
+                        <span className="text-amber-400 font-black text-xs shrink-0">🎯</span>
+                        <span className="text-[10px] sm:text-[11px] font-bold text-slate-100 truncate">
+                          {userProfile.targetGoal || 'JEE Exams'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setIsEditingProfile(true);
+                          setShowOnboardingModal(true);
+                        }}
+                        className="p-1 text-amber-300 hover:text-white hover:bg-white/10 rounded-md transition cursor-pointer shrink-0"
+                        title="Edit Profile Goal"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Self Customize Gear Trigger Button */}
+                    <motion.button
+                      whileHover={{ rotate: 90, scale: 1.08 }}
+                      whileTap={{ scale: 0.92 }}
+                      onClick={() => setShowCustomizeModal(true)}
+                      className="p-1.5 text-pink-300 hover:text-white bg-pink-500/20 hover:bg-pink-500/30 border border-pink-400/40 rounded-xl transition cursor-pointer shrink-0 shadow-xs flex items-center space-x-1"
+                      title="Self Customize UI / खुद डिज़ाइन करें"
+                    >
+                      <Settings2 className="w-3.5 h-3.5 text-pink-300" />
+                    </motion.button>
+                  </div>
                 </div>
 
                 {/* Main Student Profile & Avatar Section */}
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start justify-between gap-3 relative z-10">
                   <div className="space-y-2 flex-1 min-w-0">
                     <div>
-                      <h2 className="text-2xl sm:text-3xl font-serif font-black text-[#947447] drop-shadow-[0_1px_0_rgba(255,255,255,0.9)] tracking-tight flex items-center gap-2">
+                      <h2 className="text-2xl sm:text-3xl font-black text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.2)] tracking-tight flex items-center gap-2">
                         <span className="truncate">{userProfile.name || 'Student'}</span>
                         <span className="text-xl shrink-0">🚀</span>
                       </h2>
-                      <p className="text-xs text-[#6b583e] font-bold flex items-center space-x-1.5 mt-0.5">
-                        <UserIcon className="w-3.5 h-3.5 text-[#8c6b3e] shrink-0" />
+                      <p className="text-xs text-slate-300 font-medium flex items-center space-x-1.5 mt-0.5">
+                        <UserIcon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                         <span className="truncate">{userProfile.schoolName || 'School / College Not Set'}</span>
                       </p>
                     </div>
 
-                    {/* Organized Student Info Badges - Dark Charcoal & Metallic Look */}
+                    {/* Organized Student Info Badges - Frosted Glass Capsules */}
                     <div className="flex flex-col gap-1.5 pt-0.5">
                       <div className="inline-flex">
-                        <span className="px-3 py-1 bg-[#3f3933] text-[#eae2d5] text-xs font-bold rounded-xl border border-[#595249] flex items-center space-x-1.5 shadow-sm">
-                          <GraduationCap className="w-3.5 h-3.5 text-[#dfc285] shrink-0" />
+                        <span className="px-3 py-1 bg-white/[0.08] backdrop-blur-md text-slate-200 text-xs font-semibold rounded-xl border border-white/15 flex items-center space-x-1.5 shadow-xs">
+                          <GraduationCap className="w-3.5 h-3.5 text-indigo-300 shrink-0" />
                           <span>{userProfile.className ? (userProfile.className.startsWith('Class') ? userProfile.className : `Class ${userProfile.className}`) : 'Class 12th (Science)'}</span>
                         </span>
                       </div>
 
                       {userProfile.email && (
                         <div className="inline-flex">
-                          <span className="px-3 py-1 bg-[#3f3933] text-[#eae2d5] text-xs font-medium rounded-xl border border-[#595249] flex items-center space-x-1.5 shadow-sm truncate max-w-[240px]">
-                            <Mail className="w-3.5 h-3.5 text-[#dfc285] shrink-0" />
+                          <span className="px-3 py-1 bg-white/[0.08] backdrop-blur-md text-slate-200 text-xs font-medium rounded-xl border border-white/15 flex items-center space-x-1.5 shadow-xs truncate max-w-[240px]">
+                            <Mail className="w-3.5 h-3.5 text-indigo-300 shrink-0" />
                             <span className="truncate">{userProfile.email}</span>
                           </span>
                         </div>
@@ -748,11 +907,11 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Avatar with click action - Navy & Golden Metallic Frame */}
+                  {/* Avatar with click action - Glass Frame */}
                   <div className="shrink-0 flex flex-col items-center">
                     <div 
                       onClick={() => setShowAvatarModal(true)}
-                      className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-[#1b3452] via-[#162c46] to-[#0d1c2e] border-2 border-[#d6c4a6] shadow-lg flex items-center justify-center relative cursor-pointer group active:scale-95 transition overflow-hidden p-1"
+                      className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl bg-white/[0.08] backdrop-blur-md border-2 border-white/30 shadow-[0_8px_20px_rgba(0,0,0,0.35)] flex items-center justify-center relative cursor-pointer group active:scale-95 transition overflow-hidden p-1"
                       title="Change Avatar"
                     >
                       <UserAvatar
@@ -763,85 +922,158 @@ export default function App() {
                         size="xl"
                         className="w-full h-full flex items-center justify-center"
                       />
-                      {/* Golden Coin / Cog Badge */}
-                      <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-gradient-to-tr from-[#c99b42] via-[#f5d98b] to-[#b8860b] border-2 border-[#3f3933] flex items-center justify-center text-[10px] shadow-sm font-black text-[#3d2e1f] z-20">
+                      {/* Floating Glass Cog Badge */}
+                      <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-indigo-600/90 backdrop-blur-md border border-white/40 flex items-center justify-center text-[10px] shadow-md font-black text-white z-20">
                         ⚙️
                       </div>
                     </div>
                     <span 
                       onClick={() => setShowAvatarModal(true)}
-                      className="text-[11px] font-extrabold text-[#6b583e] hover:text-[#3d2e1f] text-center mt-1 cursor-pointer"
+                      className="text-[11px] font-bold text-slate-300 hover:text-white text-center mt-1 cursor-pointer transition"
                     >
                       Change
                     </span>
                   </div>
                 </div>
 
-                {/* 3-Column Skeuomorphic & Metallic Stats Boxes */}
-                <div className="grid grid-cols-3 gap-2 sm:gap-2.5 pt-1">
-                  {/* BOX 1: STREAK (Metallic Bronze) */}
-                  <div className="bg-gradient-to-b from-[#4d3e33] via-[#3a2e26] to-[#2b211a] border-2 border-[#7e644e] rounded-2xl p-2 sm:p-2.5 text-center shadow-md relative overflow-hidden">
-                    <div className="text-[10px] sm:text-[11px] text-[#dfc285] font-black uppercase tracking-wider flex items-center justify-center space-x-1 drop-shadow-xs">
-                      <span>🔥</span>
-                      <span>STREAK</span>
+                {/* STAT BOXES - 4 CONFIGURABLE UI LAYOUTS */}
+                {uiCustomization.statBoxesLayout === 'horizontal_bar' ? (
+                  /* Option 2: Unified Gaming HUD Power Bar */
+                  <div className="bg-white/[0.08] backdrop-blur-md border border-white/15 rounded-2xl p-2.5 sm:p-3 relative z-10 flex items-center justify-between gap-2 shadow-xs">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 font-black text-xs">
+                        🔥
+                      </div>
+                      <div>
+                        <div className="text-[9px] text-amber-300 font-extrabold uppercase">STREAK</div>
+                        <div className="text-xs font-black text-white">{userProfile.streak || 5}d</div>
+                      </div>
                     </div>
-                    <div className="text-base sm:text-lg font-black text-white mt-0.5">
-                      {userProfile.streak || 5} <span className="text-xs font-semibold text-[#c5b497]">days</span>
+
+                    <div className="h-6 w-[1px] bg-white/20" />
+
+                    <div className="flex items-center space-x-2">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 font-black text-xs">
+                        📓
+                      </div>
+                      <div>
+                        <div className="text-[9px] text-emerald-300 font-extrabold uppercase">RANK</div>
+                        <div className="text-xs font-black text-white">Lvl {userProfile.level || 7}</div>
+                      </div>
+                    </div>
+
+                    <div className="h-6 w-[1px] bg-white/20" />
+
+                    <div className="flex items-center space-x-2">
+                      <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-300 font-black text-xs">
+                        ⭐
+                      </div>
+                      <div>
+                        <div className="text-[9px] text-purple-300 font-extrabold uppercase">ENERGY</div>
+                        <div className="text-xs font-black text-white">{userProfile.xp || 665} XP</div>
+                      </div>
                     </div>
                   </div>
-
-                  {/* BOX 2: LEVEL (Brushed Silver Steel) */}
-                  <div className="bg-gradient-to-b from-[#e5e5e5] via-[#cccccc] to-[#a8a8a8] border-2 border-[#828282] rounded-2xl p-2 sm:p-2.5 text-center shadow-md relative overflow-hidden">
-                    <div className="text-[10px] sm:text-[11px] text-slate-700 font-black uppercase tracking-wider flex items-center justify-center space-x-1">
-                      <span>📓</span>
-                      <span>LEVEL</span>
+                ) : uiCustomization.statBoxesLayout === 'hexagon_badges' ? (
+                  /* Option 3: Hexagon Cyber Badges */
+                  <div className="grid grid-cols-3 gap-1.5 pt-0.5 relative z-10">
+                    <div className="bg-gradient-to-b from-amber-500/20 to-black/40 border-2 border-amber-400/50 rounded-xl py-2 px-1 text-center shadow-md">
+                      <div className="text-[9px] text-amber-300 font-black tracking-widest uppercase">✦ STREAK ✦</div>
+                      <div className="text-sm font-black text-amber-100">{userProfile.streak || 5} Days</div>
                     </div>
-                    <div className="text-base sm:text-lg font-black text-slate-900 mt-0.5">
-                      Lvl {userProfile.level || 7}
+                    <div className="bg-gradient-to-b from-emerald-500/20 to-black/40 border-2 border-emerald-400/50 rounded-xl py-2 px-1 text-center shadow-md">
+                      <div className="text-[9px] text-emerald-300 font-black tracking-widest uppercase">✦ LEVEL ✦</div>
+                      <div className="text-sm font-black text-emerald-100">LVL {userProfile.level || 7}</div>
                     </div>
-                  </div>
-
-                  {/* BOX 3: TOTAL XP (Metallic Bronze) */}
-                  <div className="bg-gradient-to-b from-[#4d3e33] via-[#3a2e26] to-[#2b211a] border-2 border-[#7e644e] rounded-2xl p-2 sm:p-2.5 text-center shadow-md relative overflow-hidden">
-                    <div className="text-[10px] sm:text-[11px] text-[#dfc285] font-black uppercase tracking-wider flex items-center justify-center space-x-1 drop-shadow-xs">
-                      <span>⭐</span>
-                      <span>TOTAL XP</span>
-                    </div>
-                    <div className="text-base sm:text-lg font-black text-white mt-0.5">
-                      {userProfile.xp || 665} <span className="text-xs font-semibold text-[#c5b497]">XP</span>
+                    <div className="bg-gradient-to-b from-purple-500/20 to-black/40 border-2 border-purple-400/50 rounded-xl py-2 px-1 text-center shadow-md">
+                      <div className="text-[9px] text-purple-300 font-black tracking-widest uppercase">✦ EXP ✦</div>
+                      <div className="text-sm font-black text-purple-100">{userProfile.xp || 665}</div>
                     </div>
                   </div>
-                </div>
+                ) : uiCustomization.statBoxesLayout === 'card_grid' ? (
+                  /* Option 4: Glass Floating Capsules */
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2 pt-0.5 relative z-10">
+                    <div className="bg-white/10 backdrop-blur-xl border border-white/25 rounded-full py-1.5 px-2 text-center flex items-center justify-center space-x-1.5 shadow-sm">
+                      <span className="text-xs">🔥</span>
+                      <span className="text-xs font-black text-white">{userProfile.streak || 5}d Streak</span>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-xl border border-white/25 rounded-full py-1.5 px-2 text-center flex items-center justify-center space-x-1.5 shadow-sm">
+                      <span className="text-xs">📓</span>
+                      <span className="text-xs font-black text-white">Lvl {userProfile.level || 7}</span>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-xl border border-white/25 rounded-full py-1.5 px-2 text-center flex items-center justify-center space-x-1.5 shadow-sm">
+                      <span className="text-xs">⭐</span>
+                      <span className="text-xs font-black text-white">{userProfile.xp || 665} XP</span>
+                    </div>
+                  </div>
+                ) : (
+                  /* Option 1 (Default): 3-Column Glassmorphism Color Stat Tiles */
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2 pt-0.5 relative z-10">
+                    {/* BOX 1: STREAK (Glass Amber) */}
+                    <div className="bg-amber-500/15 backdrop-blur-md border border-amber-400/30 rounded-2xl py-2 px-1 sm:px-2 text-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] relative overflow-hidden">
+                      <div className="text-[9.5px] sm:text-[10px] text-amber-300 font-extrabold uppercase tracking-wider flex items-center justify-center space-x-0.5">
+                        <span className="text-xs">🔥</span>
+                        <span>STREAK</span>
+                      </div>
+                      <div className="text-sm sm:text-base font-black text-amber-100 mt-0.5 leading-tight drop-shadow-xs">
+                        {userProfile.streak || 5} <span className="text-[10px] font-normal text-amber-200/80">days</span>
+                      </div>
+                    </div>
 
-                {/* Level & XP Progress Section - Deep Navy & Golden Border */}
-                <div className="bg-gradient-to-r from-[#0d2238] via-[#102a45] to-[#0d2238] border-2 border-[#b89c68] rounded-2xl p-3 shadow-md space-y-2">
+                    {/* BOX 2: LEVEL (Glass Emerald) */}
+                    <div className="bg-emerald-500/15 backdrop-blur-md border border-emerald-400/30 rounded-2xl py-2 px-1 sm:px-2 text-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] relative overflow-hidden">
+                      <div className="text-[9.5px] sm:text-[10px] text-emerald-300 font-extrabold uppercase tracking-wider flex items-center justify-center space-x-0.5">
+                        <span className="text-xs">📓</span>
+                        <span>LEVEL</span>
+                      </div>
+                      <div className="text-sm sm:text-base font-black text-emerald-100 mt-0.5 leading-tight drop-shadow-xs">
+                        Lvl {userProfile.level || 7}
+                      </div>
+                    </div>
+
+                    {/* BOX 3: TOTAL XP (Glass Violet) */}
+                    <div className="bg-purple-500/15 backdrop-blur-md border border-purple-400/30 rounded-2xl py-2 px-1 sm:px-2 text-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] relative overflow-hidden">
+                      <div className="text-[9.5px] sm:text-[10px] text-purple-300 font-extrabold uppercase tracking-wider flex items-center justify-center space-x-0.5">
+                        <span className="text-xs">⭐</span>
+                        <span>TOTAL XP</span>
+                      </div>
+                      <div className="text-sm sm:text-base font-black text-purple-100 mt-0.5 leading-tight drop-shadow-xs">
+                        {userProfile.xp || 665} <span className="text-[10px] font-normal text-purple-200/80">XP</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Level & XP Progress Section - Frosted Glass Container */}
+                <div className="bg-white/[0.06] backdrop-blur-md border border-white/15 rounded-2xl p-3 shadow-xs space-y-2 relative z-10">
                   <div className="flex items-center justify-between text-xs font-bold">
                     <div className="flex items-center space-x-1.5">
-                      <span className="text-sky-200 text-[11px] font-bold">Level {userProfile.level || 7} Progress:</span>
+                      <span className="text-slate-300 text-[11px] font-semibold">Level {userProfile.level || 7} Progress:</span>
                       <span className="text-white text-[11px] font-black">
-                        {userProfile.xp ? (userProfile.xp % 100) : 65} / 100 <span className="text-sky-300 font-normal">XP</span>
+                        {userProfile.xp ? (userProfile.xp % 100) : 65} / 100 <span className="text-slate-300 font-normal">XP</span>
                       </span>
                     </div>
                     <button 
                       onClick={() => addXp(10)}
-                      className="text-xs text-sky-100 hover:text-white bg-[#18395c] hover:bg-[#204a75] border border-[#3b6d9e] flex items-center space-x-1 cursor-pointer font-bold transition px-2.5 py-1 rounded-xl shadow-xs active:scale-95"
+                      className="text-xs text-amber-300 hover:text-white bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 flex items-center space-x-1 cursor-pointer font-bold transition px-2.5 py-1 rounded-xl shadow-xs active:scale-95"
                     >
                       <Sparkles className="w-3 h-3 text-amber-300" />
                       <span>+10 XP Booster</span>
                     </button>
                   </div>
-                  <div className="w-full h-3.5 bg-[#091522] border border-[#2b4c6e] rounded-full relative p-0.5 shadow-inner flex items-center">
+                  <div className="w-full h-3 bg-black/40 border border-white/10 rounded-full relative p-0.5 shadow-inner flex items-center">
                     <div 
-                      className="h-full bg-gradient-to-r from-[#1d4ed8] via-[#3b82f6] to-[#d4af37] rounded-full relative transition-all duration-500 flex items-center"
+                      className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-amber-400 rounded-full relative transition-all duration-500 flex items-center shadow-[0_0_12px_rgba(99,102,241,0.5)]"
                       style={{ width: `${Math.max(10, userProfile.xp ? (userProfile.xp % 100) : 65)}%` }}
                     >
-                      {/* Golden Pip / Slider Knob */}
-                      <div className="w-4 h-4 bg-gradient-to-tr from-[#ffd700] to-[#fff8dc] border-2 border-[#8b6914] rounded-full shadow-[0_0_10px_rgba(255,215,0,0.9)] absolute right-0 top-1/2 -translate-y-1/2"></div>
+                      {/* Luminous Slider Knob */}
+                      <div className="w-3.5 h-3.5 bg-white border-2 border-amber-300 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.9)] absolute right-0 top-1/2 -translate-y-1/2"></div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
 
             {/* CLOUD AUTH & SYNC BANNER (WHEN NOT FULLY AUTHENTICATED) */}
             {(!currentUser || currentUser.isAnonymous) && (
@@ -867,166 +1099,588 @@ export default function App() {
               </div>
             )}
 
-            {/* 2. ACADEMY PLAYGROUND - MATCHING USER EDIT DESIGN */}
+            {/* 2. ACADEMY PLAYGROUND - WITH LISTED VIEW AS DEFAULT & VIEW SWITCHER */}
             <div className="space-y-3">
-              <h3 className="font-black text-white text-xs tracking-wider uppercase flex items-center space-x-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-                <Sparkles className="w-4 h-4 text-cyan-400" />
-                <span className="bg-gradient-to-r from-white via-cyan-100 to-indigo-200 bg-clip-text text-transparent">ACADEMY PLAYGROUND 🚀</span>
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-white text-xs tracking-wider uppercase flex items-center space-x-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+                  <Sparkles className="w-4 h-4 text-cyan-400" />
+                  <span className="bg-gradient-to-r from-white via-cyan-100 to-indigo-200 bg-clip-text text-transparent">ACADEMY PLAYGROUND 🚀</span>
+                </h3>
 
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5">
-                {/* CARD 1: AI TUTOR - CYAN NEON GLOW */}
-                <motion.button
-                  whileHover={{ y: -2, scale: 1.01 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setActiveTab('aiTutor')}
-                  className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-cyan-400/90 hover:border-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.22)] bg-gradient-to-br from-slate-950 via-[#071d2c] to-[#042436] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
-                >
-                  {/* Subtle cosmic particles / grid overlay */}
-                  <div className="absolute inset-0 pointer-events-none opacity-40">
-                    <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="20%" cy="30%" r="1.5" fill="#38bdf8" />
-                      <circle cx="75%" cy="25%" r="2" fill="#38bdf8" />
-                      <circle cx="85%" cy="65%" r="1" fill="#38bdf8" />
-                      <circle cx="45%" cy="80%" r="1.5" fill="#38bdf8" />
-                      <circle cx="15%" cy="75%" r="1" fill="#38bdf8" />
-                      <circle cx="60%" cy="45%" r="2" fill="#38bdf8" />
-                    </svg>
-                  </div>
-                  <div className="absolute -top-12 -right-12 w-28 h-28 bg-cyan-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-cyan-500/30 transition-all" />
-
-                  <div className="flex justify-between items-start relative z-10">
-                    <div className="text-cyan-300 group-hover:scale-110 transition-transform">
-                      <BrainCircuit className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 backdrop-blur-md">
-                      STANDALONE APP
-                    </span>
-                  </div>
-
-                  <div className="relative z-10">
-                    <h4 className="font-black text-xs sm:text-base text-white flex items-center gap-1 tracking-tight">
-                      <span>AI Tutor</span>
-                      <span className="text-amber-400">⚡</span>
-                    </h4>
-                    <p className="text-[9px] sm:text-[11px] text-cyan-100/70 font-medium leading-tight mt-0.5 line-clamp-1 sm:line-clamp-none">
-                      Full AI Assistant • Step-by-step solver
-                    </p>
-                  </div>
-                </motion.button>
-
-                {/* CARD 2: IMAGE GEN - PURPLE NEON GLOW */}
-                <motion.button
-                  whileHover={{ y: -2, scale: 1.01 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setActiveTab('imageGen')}
-                  className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-purple-500/90 hover:border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.22)] bg-gradient-to-br from-slate-950 via-[#18092a] to-[#290b47] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
-                >
-                  {/* Glowing purple energy wave SVG */}
-                  <div className="absolute inset-0 pointer-events-none opacity-40">
-                    <svg className="w-full h-full" viewBox="0 0 200 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M0 60 C 50 30, 100 80, 200 40" stroke="#c084fc" strokeWidth="1.5" strokeDasharray="3 3" />
-                      <circle cx="65%" cy="35%" r="2" fill="#e879f9" />
-                      <circle cx="85%" cy="55%" r="1.5" fill="#c084fc" />
-                      <circle cx="20%" cy="40%" r="1" fill="#e879f9" />
-                    </svg>
-                  </div>
-                  <div className="absolute -top-12 -right-12 w-28 h-28 bg-purple-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/30 transition-all" />
-
-                  <div className="flex justify-between items-start relative z-10">
-                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl bg-amber-500/20 border border-amber-400/60 flex items-center justify-center text-amber-300 group-hover:scale-110 transition-transform shadow-xs">
-                      <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300" />
-                    </div>
-                    <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 backdrop-blur-md">
-                      REAL ENGINE
-                    </span>
+                <div className="flex items-center space-x-2">
+                  {/* View Mode Switcher: Listed View vs Grid View */}
+                  <div className="flex items-center bg-slate-900/80 border border-white/15 p-0.5 rounded-xl backdrop-blur-md shadow-inner">
+                    <button
+                      onClick={() => {
+                        playUiSound(uiCustomization.audioFeedback);
+                        setPlaygroundViewMode('list');
+                      }}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-extrabold flex items-center space-x-1 transition cursor-pointer ${
+                        playgroundViewMode === 'list' 
+                          ? 'bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.65)]' 
+                          : 'text-slate-300 hover:text-white'
+                      }`}
+                      title="Listed View / लिस्ट व्यू"
+                    >
+                      <List className="w-3 h-3" />
+                      <span>{appLanguage === 'hi' ? 'लिस्ट' : 'List'}</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        playUiSound(uiCustomization.audioFeedback);
+                        setPlaygroundViewMode('grid');
+                      }}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-extrabold flex items-center space-x-1 transition cursor-pointer ${
+                        playgroundViewMode === 'grid' 
+                          ? 'bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.65)]' 
+                          : 'text-slate-300 hover:text-white'
+                      }`}
+                      title="Grid View / ग्रिड व्यू"
+                    >
+                      <LayoutGrid className="w-3 h-3" />
+                      <span>{appLanguage === 'hi' ? 'ग्रिड' : 'Grid'}</span>
+                    </button>
                   </div>
 
-                  <div className="relative z-10">
-                    <h4 className="font-black text-xs sm:text-base text-white flex items-center gap-1 tracking-tight">
-                      <span>Image Gen</span>
-                      <span className="text-amber-300">🎨</span>
-                    </h4>
-                    <p className="text-[9px] sm:text-[11px] text-purple-200/70 font-medium leading-tight mt-0.5 line-clamp-1 sm:line-clamp-none">
-                      Generate real diagrams & visual art
-                    </p>
-                  </div>
-                </motion.button>
-
-                {/* CARD 3: QUIZ - EMERALD NEON GLOW */}
-                <motion.button
-                  whileHover={{ y: -2, scale: 1.01 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setActiveTab('mockExam')}
-                  className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-emerald-400/90 hover:border-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.22)] bg-gradient-to-br from-slate-950 via-[#051f16] to-[#043321] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
-                >
-                  {/* Subtle sacred geometry / wireframe lines */}
-                  <div className="absolute inset-0 pointer-events-none opacity-20 flex items-center justify-center">
-                    <svg className="w-40 h-40" viewBox="0 0 100 100" fill="none" stroke="#34d399" strokeWidth="0.75">
-                      <polygon points="50 5, 90 25, 90 75, 50 95, 10 75, 10 25" />
-                      <polygon points="50 15, 80 30, 80 70, 50 85, 20 70, 20 30" />
-                      <circle cx="50" cy="50" r="30" />
-                    </svg>
-                  </div>
-                  <div className="absolute -top-12 -right-12 w-28 h-28 bg-emerald-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-emerald-500/30 transition-all" />
-
-                  <div className="flex justify-between items-start relative z-10">
-                    <div className="text-emerald-300 group-hover:scale-110 transition-transform">
-                      <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 backdrop-blur-md">
-                      QUIZ
-                    </span>
-                  </div>
-
-                  <div className="relative z-10">
-                    <h4 className="font-black text-xs sm:text-base text-white flex items-center gap-1 tracking-tight">
-                      <span>Quiz</span>
-                      <span className="text-amber-400">🏆</span>
-                    </h4>
-                    <p className="text-[9px] sm:text-[11px] text-emerald-100/70 font-medium leading-tight mt-0.5 line-clamp-1 sm:line-clamp-none">
-                      Test subject skills, earn XP
-                    </p>
-                  </div>
-                </motion.button>
-
-                {/* CARD 4: NOTEBOOK - AMBER NEON GLOW */}
-                <motion.button
-                  whileHover={{ y: -2, scale: 1.01 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setActiveTab('studyDocs')}
-                  className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-amber-400/90 hover:border-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.22)] bg-gradient-to-br from-slate-950 via-[#221504] to-[#3a2003] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
-                >
-                  {/* Subtle sacred geometry / star lines */}
-                  <div className="absolute inset-0 pointer-events-none opacity-20 flex items-center justify-center">
-                    <svg className="w-40 h-40" viewBox="0 0 100 100" fill="none" stroke="#fbbf24" strokeWidth="0.75">
-                      <polygon points="50 5, 90 25, 90 75, 50 95, 10 75, 10 25" />
-                      <circle cx="50" cy="50" r="38" />
-                      <circle cx="50" cy="50" r="22" />
-                    </svg>
-                  </div>
-                  <div className="absolute -top-12 -right-12 w-28 h-28 bg-amber-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-amber-500/30 transition-all" />
-
-                  <div className="flex justify-between items-start relative z-10">
-                    <div className="text-amber-300 group-hover:scale-110 transition-transform">
-                      <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 backdrop-blur-md">
-                      NOTEBOOK
-                    </span>
-                  </div>
-
-                  <div className="relative z-10">
-                    <h4 className="font-black text-xs sm:text-base text-white flex items-center gap-1 tracking-tight">
-                      <span>Notebook</span>
-                      <span className="text-amber-200">📝</span>
-                    </h4>
-                    <p className="text-[9px] sm:text-[11px] text-amber-100/70 font-medium leading-tight mt-0.5 line-clamp-1 sm:line-clamp-none">
-                      Formula sheets & visual notes
-                    </p>
-                  </div>
-                </motion.button>
+                  {/* Self Customize Gear Button */}
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      playUiSound(uiCustomization.audioFeedback);
+                      setShowCustomizeModal(true);
+                    }}
+                    className="p-1.5 px-2.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/60 border border-indigo-400/40 text-indigo-200 hover:text-white text-[10.5px] font-black tracking-wider uppercase flex items-center space-x-1.5 shadow-sm transition cursor-pointer"
+                    title="Self Customize UI / खुद डिज़ाइन करें"
+                  >
+                    <Settings2 className="w-3.5 h-3.5 text-pink-400 animate-spin-slow" />
+                    <span className="hidden xs:inline">{appLanguage === 'hi' ? 'कस्टमाइज़' : 'Customize'}</span>
+                  </motion.button>
+                </div>
               </div>
+
+              {/* LISTED VIEW (DEFAULT) */}
+              {playgroundViewMode === 'list' ? (
+                <div className="space-y-2.5 sm:space-y-3">
+                  {/* LIST ITEM 1: AI TUTOR - 4 CONFIGURABLE STYLES IN LIST FORMAT */}
+                  {uiCustomization.aiTutorCardStyle === 'retro_arcade' ? (
+                    /* Retro Arcade List Item */
+                    <motion.button
+                      whileHover={{ x: 3, scale: 1.006 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        playUiSound(uiCustomization.audioFeedback);
+                        setActiveTab('aiTutor');
+                      }}
+                      className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-emerald-400/90 hover:border-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.25)] bg-gradient-to-r from-slate-950 via-[#031d0c] to-[#011408] text-emerald-300 text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300 font-mono"
+                    >
+                      <div className="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:8px_8px]" />
+                      <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-emerald-950/90 border border-emerald-500/50 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform shrink-0 shadow-inner">
+                          <Terminal className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center space-x-2">
+                            <h4 className="font-black text-sm sm:text-base text-emerald-200 flex items-center gap-1.5 truncate">
+                              <span>AI Tutor [v1.0]</span>
+                              <span className="text-emerald-400">👾</span>
+                            </h4>
+                            <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-emerald-950/90 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/40 shrink-0">
+                              8-BIT RETRO
+                            </span>
+                          </div>
+                          <p className="text-[10px] sm:text-[11.5px] text-emerald-400/80 font-medium mt-0.5 truncate">
+                            CRT Terminal • 24/7 Step-by-Step Problem Solver
+                          </p>
+                        </div>
+                      </div>
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 group-hover:translate-x-1 transition-all shrink-0 ml-2 shadow-xs">
+                        <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                      </div>
+                    </motion.button>
+                  ) : uiCustomization.aiTutorCardStyle === 'parchment_desk' ? (
+                    /* Parchment Scholar List Item */
+                    <motion.button
+                      whileHover={{ x: 3, scale: 1.006 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        playUiSound(uiCustomization.audioFeedback);
+                        setActiveTab('aiTutor');
+                      }}
+                      className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-amber-500/90 hover:border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.22)] bg-gradient-to-r from-[#2b1e15] via-[#3a281c] to-[#1f150e] text-amber-100 text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300 font-serif"
+                    >
+                      <div className="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(#d97706_1px,transparent_1px)] [background-size:12px_12px]" />
+                      <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-amber-950/90 border border-amber-500/50 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform shrink-0 shadow-inner">
+                          <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center space-x-2">
+                            <h4 className="font-black text-sm sm:text-base text-amber-100 flex items-center gap-1.5 truncate">
+                              <span>AI Tutor</span>
+                              <span className="text-amber-400">📜</span>
+                            </h4>
+                            <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-amber-950/90 text-amber-200 px-2 py-0.5 rounded-full border border-amber-500/40 shrink-0">
+                              ROYAL DESK
+                            </span>
+                          </div>
+                          <p className="text-[10px] sm:text-[11.5px] text-amber-200/80 font-medium mt-0.5 truncate font-sans">
+                            Royal Library • Conceptual Guidance & Solutions
+                          </p>
+                        </div>
+                      </div>
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 group-hover:translate-x-1 transition-all shrink-0 ml-2 shadow-xs font-sans">
+                        <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                      </div>
+                    </motion.button>
+                  ) : uiCustomization.aiTutorCardStyle === 'bento_minimal' ? (
+                    /* Bento Minimalist List Item */
+                    <motion.button
+                      whileHover={{ x: 3, scale: 1.006 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        playUiSound(uiCustomization.audioFeedback);
+                        setActiveTab('aiTutor');
+                      }}
+                      className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-white/40 hover:border-white/70 shadow-[0_0_20px_rgba(255,255,255,0.15)] bg-gradient-to-r from-white/15 via-white/10 to-white/5 backdrop-blur-xl text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
+                    >
+                      <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-white/15 border border-white/30 flex items-center justify-center text-white group-hover:scale-110 transition-transform shrink-0 shadow-inner">
+                          <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center space-x-2">
+                            <h4 className="font-black text-sm sm:text-base text-white flex items-center gap-1.5 truncate">
+                              <span>AI Tutor</span>
+                              <span className="text-cyan-300">💎</span>
+                            </h4>
+                            <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-white/15 text-white px-2 py-0.5 rounded-full border border-white/30 shrink-0">
+                              CLEAN BENTO
+                            </span>
+                          </div>
+                          <p className="text-[10px] sm:text-[11.5px] text-slate-200 font-medium mt-0.5 truncate">
+                            Minimalist Direct Solver • Interactive Learning
+                          </p>
+                        </div>
+                      </div>
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white/15 border border-white/30 flex items-center justify-center text-white group-hover:translate-x-1 transition-all shrink-0 ml-2 shadow-xs">
+                        <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                      </div>
+                    </motion.button>
+                  ) : (
+                    /* Cyber Neon Default List Item */
+                    <motion.button
+                      whileHover={{ x: 3, scale: 1.006 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        playUiSound(uiCustomization.audioFeedback);
+                        setActiveTab('aiTutor');
+                      }}
+                      className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-cyan-400/90 hover:border-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.22)] bg-gradient-to-r from-slate-950 via-[#071d2c] to-[#042436] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
+                    >
+                      <div className="absolute inset-0 pointer-events-none opacity-40">
+                        <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="10%" cy="50%" r="1.5" fill="#38bdf8" />
+                          <circle cx="50%" cy="20%" r="2" fill="#38bdf8" />
+                          <circle cx="80%" cy="80%" r="1.5" fill="#38bdf8" />
+                        </svg>
+                      </div>
+                      <div className="absolute -top-10 -right-10 w-32 h-32 bg-cyan-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-cyan-500/30 transition-all" />
+
+                      <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-cyan-500/20 border border-cyan-400/50 flex items-center justify-center text-cyan-300 group-hover:scale-110 transition-transform shrink-0 shadow-inner">
+                          <BrainCircuit className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center space-x-2">
+                            <h4 className="font-black text-sm sm:text-base text-white flex items-center gap-1.5 truncate">
+                              <span>AI Tutor</span>
+                              <span className="text-amber-400">⚡</span>
+                            </h4>
+                            <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-2 py-0.5 rounded-full border border-white/20 backdrop-blur-md shrink-0">
+                              STANDALONE APP
+                            </span>
+                          </div>
+                          <p className="text-[10px] sm:text-[11.5px] text-cyan-100/80 font-medium mt-0.5 truncate">
+                            Full AI Assistant • Step-by-step solver & 24/7 doubts
+                          </p>
+                        </div>
+                      </div>
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 group-hover:translate-x-1 transition-all shrink-0 ml-2 shadow-xs">
+                        <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                      </div>
+                    </motion.button>
+                  )}
+
+                  {/* LIST ITEM 2: IMAGE GEN */}
+                  <motion.button
+                    whileHover={{ x: 3, scale: 1.006 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      playUiSound(uiCustomization.audioFeedback);
+                      setActiveTab('imageGen');
+                    }}
+                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-purple-500/90 hover:border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.22)] bg-gradient-to-r from-slate-950 via-[#18092a] to-[#290b47] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
+                  >
+                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-purple-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/30 transition-all" />
+
+                    <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
+                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-purple-500/20 border border-purple-400/50 flex items-center justify-center text-amber-300 group-hover:scale-110 transition-transform shrink-0 shadow-inner">
+                        <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-amber-300" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-black text-sm sm:text-base text-white flex items-center gap-1.5 truncate">
+                            <span>Image Gen Studio</span>
+                            <span className="text-amber-300">🎨</span>
+                          </h4>
+                          <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-2 py-0.5 rounded-full border border-white/20 backdrop-blur-md shrink-0">
+                            REAL ENGINE
+                          </span>
+                        </div>
+                        <p className="text-[10px] sm:text-[11.5px] text-purple-200/80 font-medium mt-0.5 truncate">
+                          Generate real academic diagrams, charts & visual study art
+                        </p>
+                      </div>
+                    </div>
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-300 group-hover:translate-x-1 transition-all shrink-0 ml-2 shadow-xs">
+                      <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </div>
+                  </motion.button>
+
+                  {/* LIST ITEM 3: QUIZ & PRACTICE */}
+                  <motion.button
+                    whileHover={{ x: 3, scale: 1.006 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      playUiSound(uiCustomization.audioFeedback);
+                      setActiveTab('mockExam');
+                    }}
+                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-emerald-400/90 hover:border-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.22)] bg-gradient-to-r from-slate-950 via-[#051f16] to-[#043321] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
+                  >
+                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-emerald-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-emerald-500/30 transition-all" />
+
+                    <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
+                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-emerald-500/20 border border-emerald-400/50 flex items-center justify-center text-emerald-300 group-hover:scale-110 transition-transform shrink-0 shadow-inner">
+                        <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-black text-sm sm:text-base text-white flex items-center gap-1.5 truncate">
+                            <span>Quiz & Mock Exams</span>
+                            <span className="text-amber-400">🏆</span>
+                          </h4>
+                          <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-2 py-0.5 rounded-full border border-white/20 backdrop-blur-md shrink-0">
+                            QUIZ
+                          </span>
+                        </div>
+                        <p className="text-[10px] sm:text-[11.5px] text-emerald-100/80 font-medium mt-0.5 truncate">
+                          Test subject skills, solve timed mock tests & earn XP
+                        </p>
+                      </div>
+                    </div>
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 group-hover:translate-x-1 transition-all shrink-0 ml-2 shadow-xs">
+                      <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </div>
+                  </motion.button>
+
+                  {/* LIST ITEM 4: NOTEBOOK & FORMULAE */}
+                  <motion.button
+                    whileHover={{ x: 3, scale: 1.006 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      playUiSound(uiCustomization.audioFeedback);
+                      setActiveTab('studyDocs');
+                    }}
+                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-amber-400/90 hover:border-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.22)] bg-gradient-to-r from-slate-950 via-[#221504] to-[#3a2003] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
+                  >
+                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-amber-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-amber-500/30 transition-all" />
+
+                    <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
+                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-300 group-hover:scale-110 transition-transform shrink-0 shadow-inner">
+                        <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-black text-sm sm:text-base text-white flex items-center gap-1.5 truncate">
+                            <span>Notebook & Formula Vault</span>
+                            <span className="text-amber-200">📝</span>
+                          </h4>
+                          <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-2 py-0.5 rounded-full border border-white/20 backdrop-blur-md shrink-0">
+                            NOTEBOOK
+                          </span>
+                        </div>
+                        <p className="text-[10px] sm:text-[11.5px] text-amber-100/80 font-medium mt-0.5 truncate">
+                          Formula cheat-sheets, chapter summaries & visual notes
+                        </p>
+                      </div>
+                    </div>
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 group-hover:translate-x-1 transition-all shrink-0 ml-2 shadow-xs">
+                      <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </div>
+                  </motion.button>
+                </div>
+              ) : (
+                /* GRID VIEW (ALTERNATIVE VIEW) */
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5">
+                  {/* CARD 1: AI TUTOR - 4 CONFIGURABLE UI STYLES */}
+                  {uiCustomization.aiTutorCardStyle === 'retro_arcade' ? (
+                    /* Style 2: Retro 8-bit Pixel CRT Arcade Terminal */
+                    <motion.button
+                      whileHover={{ y: -2, scale: 1.01 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        playUiSound(uiCustomization.audioFeedback);
+                        setActiveTab('aiTutor');
+                      }}
+                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-emerald-400/90 hover:border-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.35)] bg-gradient-to-br from-slate-950 via-[#031d0c] to-[#011408] text-emerald-300 text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300 font-mono"
+                    >
+                      <div className="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:8px_8px]" />
+                      <div className="flex justify-between items-start relative z-10">
+                        <div className="text-emerald-400 group-hover:scale-110 transition-transform">
+                          <Terminal className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
+                        </div>
+                        <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-emerald-950/80 text-emerald-300 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-emerald-500/40">
+                          8-BIT RETRO
+                        </span>
+                      </div>
+                      <div className="relative z-10">
+                        <h4 className="font-black text-xs sm:text-base text-emerald-200 flex items-center gap-1 tracking-tight">
+                          <span>AI Tutor [v1.0]</span>
+                          <span className="text-emerald-400">👾</span>
+                        </h4>
+                        <p className="text-[9px] sm:text-[11px] text-emerald-400/80 font-medium leading-tight mt-0.5 line-clamp-1">
+                          CRT Terminal • 24/7 Solver
+                        </p>
+                      </div>
+                    </motion.button>
+                  ) : uiCustomization.aiTutorCardStyle === 'parchment_desk' ? (
+                    /* Style 3: Antique Scholar Walnut Wood & Parchment */
+                    <motion.button
+                      whileHover={{ y: -2, scale: 1.01 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        playUiSound(uiCustomization.audioFeedback);
+                        setActiveTab('aiTutor');
+                      }}
+                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-amber-500/90 hover:border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)] bg-gradient-to-br from-[#2b1e15] via-[#3a281c] to-[#1f150e] text-amber-100 text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300 font-serif"
+                    >
+                      <div className="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(#d97706_1px,transparent_1px)] [background-size:12px_12px]" />
+                      <div className="flex justify-between items-start relative z-10">
+                        <div className="text-amber-400 group-hover:scale-110 transition-transform">
+                          <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
+                        </div>
+                        <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-amber-950/80 text-amber-200 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-amber-500/40 font-serif">
+                          ROYAL DESK
+                        </span>
+                      </div>
+                      <div className="relative z-10">
+                        <h4 className="font-black text-xs sm:text-base text-amber-100 flex items-center gap-1 tracking-tight font-serif">
+                          <span>AI Tutor</span>
+                          <span className="text-amber-400">📜</span>
+                        </h4>
+                        <p className="text-[9px] sm:text-[11px] text-amber-200/80 font-medium leading-tight mt-0.5 line-clamp-1">
+                          Royal Library • Step Guidance
+                        </p>
+                      </div>
+                    </motion.button>
+                  ) : uiCustomization.aiTutorCardStyle === 'bento_minimal' ? (
+                    /* Style 4: Bento Minimalist Clean Glass */
+                    <motion.button
+                      whileHover={{ y: -2, scale: 1.01 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        playUiSound(uiCustomization.audioFeedback);
+                        setActiveTab('aiTutor');
+                      }}
+                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-white/40 hover:border-white/70 shadow-[0_0_20px_rgba(255,255,255,0.15)] bg-gradient-to-br from-white/15 via-white/5 to-white/10 backdrop-blur-xl text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
+                    >
+                      <div className="flex justify-between items-start relative z-10">
+                        <div className="text-white group-hover:scale-110 transition-transform">
+                          <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
+                        </div>
+                        <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/15 text-white px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/30">
+                          CLEAN BENTO
+                        </span>
+                      </div>
+                      <div className="relative z-10">
+                        <h4 className="font-black text-xs sm:text-base text-white flex items-center gap-1 tracking-tight">
+                          <span>AI Tutor</span>
+                          <span className="text-cyan-300">💎</span>
+                        </h4>
+                        <p className="text-[9px] sm:text-[11px] text-slate-200 font-medium leading-tight mt-0.5 line-clamp-1">
+                          Minimalist Solver • Direct Mode
+                        </p>
+                      </div>
+                    </motion.button>
+                  ) : (
+                    /* Style 1 (Default): Cyber Neon Glow */
+                    <motion.button
+                      whileHover={{ y: -2, scale: 1.01 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        playUiSound(uiCustomization.audioFeedback);
+                        setActiveTab('aiTutor');
+                      }}
+                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-cyan-400/90 hover:border-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.22)] bg-gradient-to-br from-slate-950 via-[#071d2c] to-[#042436] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
+                    >
+                      {/* Subtle cosmic particles / grid overlay */}
+                      <div className="absolute inset-0 pointer-events-none opacity-40">
+                        <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="20%" cy="30%" r="1.5" fill="#38bdf8" />
+                          <circle cx="75%" cy="25%" r="2" fill="#38bdf8" />
+                          <circle cx="85%" cy="65%" r="1" fill="#38bdf8" />
+                          <circle cx="45%" cy="80%" r="1.5" fill="#38bdf8" />
+                          <circle cx="15%" cy="75%" r="1" fill="#38bdf8" />
+                          <circle cx="60%" cy="45%" r="2" fill="#38bdf8" />
+                        </svg>
+                      </div>
+                      <div className="absolute -top-12 -right-12 w-28 h-28 bg-cyan-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-cyan-500/30 transition-all" />
+
+                      <div className="flex justify-between items-start relative z-10">
+                        <div className="text-cyan-300 group-hover:scale-110 transition-transform">
+                          <BrainCircuit className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
+                        </div>
+                        <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 backdrop-blur-md">
+                          STANDALONE APP
+                        </span>
+                      </div>
+
+                      <div className="relative z-10">
+                        <h4 className="font-black text-xs sm:text-base text-white flex items-center gap-1 tracking-tight">
+                          <span>AI Tutor</span>
+                          <span className="text-amber-400">⚡</span>
+                        </h4>
+                        <p className="text-[9px] sm:text-[11px] text-cyan-100/70 font-medium leading-tight mt-0.5 line-clamp-1 sm:line-clamp-none">
+                          Full AI Assistant • Step-by-step solver
+                        </p>
+                      </div>
+                    </motion.button>
+                  )}
+
+                  {/* CARD 2: IMAGE GEN - PURPLE NEON GLOW */}
+                  <motion.button
+                    whileHover={{ y: -2, scale: 1.01 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      playUiSound(uiCustomization.audioFeedback);
+                      setActiveTab('imageGen');
+                    }}
+                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-purple-500/90 hover:border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.22)] bg-gradient-to-br from-slate-950 via-[#18092a] to-[#290b47] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
+                  >
+                    {/* Glowing purple energy wave SVG */}
+                    <div className="absolute inset-0 pointer-events-none opacity-40">
+                      <svg className="w-full h-full" viewBox="0 0 200 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M0 60 C 50 30, 100 80, 200 40" stroke="#c084fc" strokeWidth="1.5" strokeDasharray="3 3" />
+                        <circle cx="65%" cy="35%" r="2" fill="#e879f9" />
+                        <circle cx="85%" cy="55%" r="1.5" fill="#c084fc" />
+                        <circle cx="20%" cy="40%" r="1" fill="#e879f9" />
+                      </svg>
+                    </div>
+                    <div className="absolute -top-12 -right-12 w-28 h-28 bg-purple-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/30 transition-all" />
+
+                    <div className="flex justify-between items-start relative z-10">
+                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl bg-amber-500/20 border border-amber-400/60 flex items-center justify-center text-amber-300 group-hover:scale-110 transition-transform shadow-xs">
+                        <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300" />
+                      </div>
+                      <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 backdrop-blur-md">
+                        REAL ENGINE
+                      </span>
+                    </div>
+
+                    <div className="relative z-10">
+                      <h4 className="font-black text-xs sm:text-base text-white flex items-center gap-1 tracking-tight">
+                        <span>Image Gen</span>
+                        <span className="text-amber-300">🎨</span>
+                      </h4>
+                      <p className="text-[9px] sm:text-[11px] text-purple-200/70 font-medium leading-tight mt-0.5 line-clamp-1 sm:line-clamp-none">
+                        Generate real diagrams & visual art
+                      </p>
+                    </div>
+                  </motion.button>
+
+                  {/* CARD 3: QUIZ - EMERALD NEON GLOW */}
+                  <motion.button
+                    whileHover={{ y: -2, scale: 1.01 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      playUiSound(uiCustomization.audioFeedback);
+                      setActiveTab('mockExam');
+                    }}
+                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-emerald-400/90 hover:border-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.22)] bg-gradient-to-br from-slate-950 via-[#051f16] to-[#043321] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
+                  >
+                    {/* Subtle sacred geometry / wireframe lines */}
+                    <div className="absolute inset-0 pointer-events-none opacity-20 flex items-center justify-center">
+                      <svg className="w-40 h-40" viewBox="0 0 100 100" fill="none" stroke="#34d399" strokeWidth="0.75">
+                        <polygon points="50 5, 90 25, 90 75, 50 95, 10 75, 10 25" />
+                        <polygon points="50 15, 80 30, 80 70, 50 85, 20 70, 20 30" />
+                        <circle cx="50" cy="50" r="30" />
+                      </svg>
+                    </div>
+                    <div className="absolute -top-12 -right-12 w-28 h-28 bg-emerald-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-emerald-500/30 transition-all" />
+
+                    <div className="flex justify-between items-start relative z-10">
+                      <div className="text-emerald-300 group-hover:scale-110 transition-transform">
+                        <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
+                      </div>
+                      <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 backdrop-blur-md">
+                        QUIZ
+                      </span>
+                    </div>
+
+                    <div className="relative z-10">
+                      <h4 className="font-black text-xs sm:text-base text-white flex items-center gap-1 tracking-tight">
+                        <span>Quiz</span>
+                        <span className="text-amber-400">🏆</span>
+                      </h4>
+                      <p className="text-[9px] sm:text-[11px] text-emerald-100/70 font-medium leading-tight mt-0.5 line-clamp-1 sm:line-clamp-none">
+                        Test subject skills, earn XP
+                      </p>
+                    </div>
+                  </motion.button>
+
+                  {/* CARD 4: NOTEBOOK - AMBER NEON GLOW */}
+                  <motion.button
+                    whileHover={{ y: -2, scale: 1.01 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      playUiSound(uiCustomization.audioFeedback);
+                      setActiveTab('studyDocs');
+                    }}
+                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-amber-400/90 hover:border-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.22)] bg-gradient-to-br from-slate-950 via-[#221504] to-[#3a2003] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
+                  >
+                    {/* Subtle sacred geometry / star lines */}
+                    <div className="absolute inset-0 pointer-events-none opacity-20 flex items-center justify-center">
+                      <svg className="w-40 h-40" viewBox="0 0 100 100" fill="none" stroke="#fbbf24" strokeWidth="0.75">
+                        <polygon points="50 5, 90 25, 90 75, 50 95, 10 75, 10 25" />
+                        <circle cx="50" cy="50" r="38" />
+                        <circle cx="50" cy="50" r="22" />
+                      </svg>
+                    </div>
+                    <div className="absolute -top-12 -right-12 w-28 h-28 bg-amber-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-amber-500/30 transition-all" />
+
+                    <div className="flex justify-between items-start relative z-10">
+                      <div className="text-amber-300 group-hover:scale-110 transition-transform">
+                        <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
+                      </div>
+                      <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 backdrop-blur-md">
+                        NOTEBOOK
+                      </span>
+                    </div>
+
+                    <div className="relative z-10">
+                      <h4 className="font-black text-xs sm:text-base text-white flex items-center gap-1 tracking-tight">
+                        <span>Notebook</span>
+                        <span className="text-amber-200">📝</span>
+                      </h4>
+                      <p className="text-[9px] sm:text-[11px] text-amber-100/70 font-medium leading-tight mt-0.5 line-clamp-1 sm:line-clamp-none">
+                        Formula sheets & visual notes
+                      </p>
+                    </div>
+                  </motion.button>
+                </div>
+              )}
+            </div>
 
               {/* ADVANCED STUDY TOOLKIT BANNER - EXACT MATCH WITH REFERENCE IMAGE */}
               <motion.div
@@ -1115,7 +1769,6 @@ export default function App() {
                   ))}
                 </div>
               </motion.div>
-            </div>
 
             {/* 4. 5-DAY STUDY STREAK - MATCHING USER EDIT DESIGN */}
             <div className="rounded-3xl p-4 sm:p-5 border-2 border-indigo-500/70 bg-gradient-to-b from-[#101432] via-[#0b0e26] to-[#070a1e] text-white shadow-[0_0_30px_rgba(99,102,241,0.25)] space-y-3.5 sm:space-y-4 relative overflow-hidden">
@@ -2124,6 +2777,7 @@ export default function App() {
             <button
               key={tab.id}
               onClick={() => {
+                playUiSound(uiCustomization.audioFeedback);
                 setShowMoreMenu(false);
                 if (tab.id === 'toolkit') setInitialTool(undefined);
                 setActiveTab(tab.id as any);
@@ -2207,6 +2861,15 @@ export default function App() {
         onAuthSuccess={(newProfile) => {
           setUserProfile(newProfile);
         }}
+      />
+
+      {/* SELF CUSTOMIZE STUDIO MODAL (USER EDITABLE UI, 4-UI PER OBJECT, LIGHTING, THEMES) */}
+      <SelfCustomizeModal
+        isOpen={showCustomizeModal}
+        onClose={() => setShowCustomizeModal(false)}
+        customization={uiCustomization}
+        onUpdate={handleUpdateCustomization}
+        language={appLanguage}
       />
 
       {/* PWA INSTALL & OFFLINE PROMPT BANNER */}

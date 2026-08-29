@@ -50,18 +50,18 @@ export default function OnboardingModal({
   const [showAvatarStudio, setShowAvatarStudio] = useState(false);
 
   useEffect(() => {
-    if (initialData) {
-      setName(initialData.name || '');
-      setEmail(initialData.email || '');
-      setAvatar(initialData.avatar || '🧑‍🎓');
-      setAvatarType(initialData.avatarType || 'emoji');
-      setAvatarBg(initialData.avatarBg || 'bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600');
-      setSchoolName(initialData.schoolName || '');
-      setClassName(initialData.className || 'Class 12th (Science/PCM)');
-      setTargetGoal(initialData.targetGoal || 'JEE Main / Board Exams');
+    if (isOpen) {
+      setName(initialData?.name || '');
+      setEmail(initialData?.email || '');
+      setAvatar(initialData?.avatar || '🧑‍🎓');
+      setAvatarType(initialData?.avatarType || 'emoji');
+      setAvatarBg(initialData?.avatarBg || 'bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600');
+      setSchoolName(initialData?.schoolName || '');
+      setClassName(initialData?.className || 'Class 12th (Science/PCM)');
+      setTargetGoal(initialData?.targetGoal || 'JEE Main / Board Exams');
       setError('');
     }
-  }, [initialData, isOpen]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
