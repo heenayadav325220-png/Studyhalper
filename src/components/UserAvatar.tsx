@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Camera } from 'lucide-react';
 
 interface UserAvatarProps {
@@ -76,6 +76,10 @@ export default function UserAvatar({
 }: UserAvatarProps) {
   const [imageError, setImageError] = useState(false);
   const sizeConfig = SIZE_MAP[size] || SIZE_MAP.md;
+
+  useEffect(() => {
+    setImageError(false);
+  }, [avatar]);
 
   const isImageAvatar = Boolean(
     avatar &&

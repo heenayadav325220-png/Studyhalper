@@ -389,6 +389,8 @@ export function generateContextualSuggestions(context: SuggestionContext): Acade
   ];
 }
 
+const clientSuggCache = new Map<string, { data: AcademicSuggestion[]; timestamp: number }>();
+
 /**
  * Fetch dynamic AI-generated suggestions from backend (or fallback to heuristic engine)
  */
@@ -398,6 +400,12 @@ export async function getAiTutorSuggestions(context: SuggestionContext): Promise
   // If there are no messages, return standard starter suggestions
   if (!context.messages || context.messages.length <= 1) {
     return heuristic;
+  }
+
+  const cacheKey = `${context.subject || 'gen'}_${context.language || 'en'}_${context.messages.length}`;
+  const cached = clientSuggCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < 5 * 60 * 1000)) {
+    return cached.data;
   }
 
   try {
@@ -421,7 +429,7 @@ export async function getAiTutorSuggestions(context: SuggestionContext): Promise
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data.suggestions) && data.suggestions.length === 3) {
-        return data.suggestions.map((s: any, idx: number) => ({
+        const result = data.suggestions.map((s: any, idx: number) => ({
           id: `ai_sugg_${Date.now()}_${idx}`,
           icon: s.icon || (idx === 0 ? 'deepen' : idx === 1 ? 'practice' : 'analogy'),
           label: s.label || heuristic[idx].label,
@@ -430,6 +438,8 @@ export async function getAiTutorSuggestions(context: SuggestionContext): Promise
           category: s.category || (idx === 0 ? 'deep_dive' : idx === 1 ? 'practice' : 'concept'),
           badge: s.badge || (idx === 1 ? '+15 XP' : 'High Yield')
         }));
+        clientSuggCache.set(cacheKey, { data: result, timestamp: Date.now() });
+        return result;
       }
     }
   } catch (e) {

@@ -7,10 +7,9 @@ import {
   Volume2, 
   Copy, 
   Check, 
-  BrainCircuit, 
+  BrainCircuit,
   Loader2, 
   Mic, 
-  BookOpen, 
   Bot, 
   User as UserIcon,
   Calculator,
@@ -28,8 +27,17 @@ import {
   MoreVertical,
   SlidersHorizontal,
   Sparkles,
-  ArrowRight,
-  Sliders
+  Sliders,
+  FlaskConical,
+  GraduationCap,
+  TrendingUp,
+  Lightbulb,
+  ClipboardList,
+  Table,
+  Languages,
+  Zap,
+  HelpCircle,
+  Download
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -57,6 +65,7 @@ interface AiTutorAppProps {
     name: string;
     xp: number;
     level: number;
+    avatar?: string;
     schoolName?: string;
     className?: string;
     targetGoal?: string;
@@ -338,7 +347,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
 
   return (
     <div
-      className="markdown-body text-xs text-slate-200 leading-relaxed space-y-3 overflow-x-auto relative group cursor-pointer"
+      className="markdown-body text-xs sm:text-sm text-slate-900 font-normal leading-relaxed space-y-2.5 overflow-x-auto relative group cursor-pointer select-text"
       onClick={() => {
         if (!isAllRevealed) {
           setVisibleCount(blocks.length);
@@ -349,15 +358,21 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
       {blocks.slice(0, visibleCount).map((block, index) => (
         <motion.div
           key={index}
-          initial={{ opacity: 0, y: 8, scale: 0.99 }}
+          initial={{ opacity: 0, y: 6, scale: 0.99 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.28, ease: "easeOut" }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
           className="space-y-1.5"
         >
           <ReactMarkdown
             remarkPlugins={[remarkMath]}
             rehypePlugins={[rehypeKatex]}
             components={{
+              p({ children }) {
+                return <p className="mb-2 last:mb-0 leading-relaxed text-slate-900">{children}</p>;
+              },
+              strong({ children }) {
+                return <strong className="font-bold text-slate-900">{children}</strong>;
+              },
               code({ node, className, children, ...props }: any) {
                 const match = /language-(\w+)/.exec(className || '');
                 const codeString = String(children).replace(/\n$/, '');
@@ -366,16 +381,16 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
                 if (isMultiLine) {
                   const lang = match ? match[1] : 'code';
                   return (
-                    <div className="relative my-2 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 text-left">
-                      <div className="bg-slate-900/90 px-3 py-1.5 flex items-center justify-between text-[10px] text-slate-400 font-mono border-b border-slate-800">
-                        <span className="uppercase font-bold text-indigo-400">{lang}</span>
+                    <div className="relative my-2 rounded-xl overflow-hidden border border-slate-300 bg-slate-900 text-left">
+                      <div className="bg-slate-800 px-3 py-1.5 flex items-center justify-between text-[10px] text-slate-300 font-mono border-b border-slate-700">
+                        <span className="uppercase font-bold text-cyan-400">{lang}</span>
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             navigator.clipboard.writeText(codeString);
                           }}
-                          className="hover:text-slate-100 transition font-sans text-[10px] bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded-md text-slate-300"
+                          className="hover:text-white transition font-sans text-[10px] bg-slate-700 hover:bg-slate-600 px-2 py-0.5 rounded-md text-slate-200"
                         >
                           Copy Code
                         </button>
@@ -384,7 +399,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
                         style={oneDark}
                         language={lang === 'code' ? 'text' : lang}
                         PreTag="div"
-                        customStyle={{ margin: 0, padding: '0.75rem', fontSize: '0.75rem', background: '#090d16' }}
+                        customStyle={{ margin: 0, padding: '0.75rem', fontSize: '0.75rem', background: '#0f172a' }}
                         {...props}
                       >
                         {codeString}
@@ -394,7 +409,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
                 }
 
                 return (
-                  <code className="bg-slate-800/90 text-indigo-300 px-1.5 py-0.5 rounded text-[11px] font-mono border border-slate-700/50" {...props}>
+                  <code className="bg-blue-100/80 text-blue-950 px-1.5 py-0.5 rounded font-mono text-[11px] font-semibold border border-blue-200" {...props}>
                     {children}
                   </code>
                 );
@@ -410,9 +425,9 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex items-center space-x-1.5 text-[10px] text-indigo-400 font-bold pt-1"
+          className="flex items-center space-x-1.5 text-[10px] text-blue-600 font-bold pt-1"
         >
-          <span className="inline-block w-1.5 h-3 bg-indigo-400 animate-pulse rounded-xs" />
+          <span className="inline-block w-1.5 h-3 bg-blue-600 animate-pulse rounded-xs" />
           <span>Generating explanation...</span>
           <span className="text-slate-500 font-normal ml-2">(Click anywhere to reveal all)</span>
         </motion.div>
@@ -1021,112 +1036,84 @@ export const AiTutorApp = memo(function AiTutorApp({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950 text-slate-100 flex flex-col font-sans overflow-hidden">
-      {/* APP TOP HEADER */}
-      <header className="bg-slate-900/90 backdrop-blur-lg border-b border-slate-800 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between shrink-0 shadow-lg">
-        <div className="flex items-center space-x-2.5">
+    <div className="fixed inset-0 z-50 bg-[#f8fafc] text-slate-900 flex flex-col font-sans overflow-hidden">
+      {/* APP TOP HEADER - MATCHING EXACT DESIGN IN IMAGE */}
+      <header className="bg-white border-b border-slate-200/80 px-3 sm:px-5 py-2.5 sm:py-3 flex items-center justify-between shrink-0 shadow-xs z-10">
+        <div className="flex items-center space-x-2.5 sm:space-x-3">
           <button
             onClick={onBack}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition flex items-center space-x-1.5 border border-slate-700/60 group"
+            className="p-1.5 sm:p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center space-x-1 border border-slate-200 group cursor-pointer"
             title="Back to Ascend Study"
           >
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-            <span className="text-xs font-bold hidden sm:inline">Back</span>
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform text-slate-700" />
+            <span className="text-xs font-bold text-slate-700 hidden sm:inline">Back</span>
           </button>
 
-          <div className="flex items-center space-x-2">
-            <div className={`relative w-8 h-8 sm:w-9 sm:h-9 rounded-xl ${getSubjectTheme(selectedSubject).botBg} p-0.5 shadow-md flex items-center justify-center transition-colors`}>
-              <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full" />
+          <div className="flex items-center space-x-2.5">
+            {/* LOGO ICON BOX (Navy square with teal A) */}
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#0f172a] shadow-xs flex items-center justify-center text-cyan-400 font-black text-lg tracking-wider shrink-0 select-none border border-slate-800">
+              A
             </div>
 
             <div>
-              <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
-                <h1 className="text-xs sm:text-sm font-black tracking-tight text-white flex items-center space-x-1">
-                  <span>AI TUTOR</span>
+              <div className="flex items-center space-x-2 flex-wrap">
+                <h1 className="text-xs sm:text-sm font-black tracking-tight text-slate-900 uppercase">
+                  ASCEND AI TUTOR
                 </h1>
-                <span className={`${getSubjectTheme(selectedSubject).badgeBg} ${getSubjectTheme(selectedSubject).badgeText} border ${getSubjectTheme(selectedSubject).badgeBorder} text-[9px] font-bold px-1.5 py-0.5 rounded-md`}>
-                  {selectedSubject}
-                </span>
-                {/* ACTIVE TUTOR MODE STATUS PILL */}
-                <button
-                  type="button"
-                  id="active-tutor-mode-pill"
-                  onClick={() => setShowMoreMenu(true)}
-                  className={`${TUTOR_MODE_CONFIG[tutorMode].badgeBg} ${TUTOR_MODE_CONFIG[tutorMode].badgeText} border ${TUTOR_MODE_CONFIG[tutorMode].badgeBorder} text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center space-x-1 shadow-xs transition-all cursor-pointer active:scale-95`}
-                  title={`Current Tutor Mode: ${TUTOR_MODE_CONFIG[tutorMode].label} (Click to switch)`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${TUTOR_MODE_CONFIG[tutorMode].glow} animate-pulse`} />
-                  <span>{TUTOR_MODE_CONFIG[tutorMode].icon}</span>
-                  <span className="capitalize">{TUTOR_MODE_CONFIG[tutorMode].shortLabel}</span>
-                </button>
+                <span className="text-slate-400 font-bold text-xs">v2.5</span>
+                
+                {/* ONLINE STATUS BADGE */}
+                <div className="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-[10px] px-2 py-0.5 rounded-full flex items-center space-x-1 shadow-2xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Online</span>
+                </div>
               </div>
-              <p className="text-[9px] sm:text-[10px] text-slate-400 font-medium flex items-center space-x-1.5 mt-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-emerald-400 font-semibold">Online</span>
-                <span className="text-slate-600">•</span>
-                <span className="text-slate-300 font-normal">{TUTOR_MODE_CONFIG[tutorMode].label}</span>
+              <p className="text-[10px] text-slate-500 font-medium flex items-center space-x-1 mt-0.5">
+                <span>Powered by Gemini AI</span>
               </p>
             </div>
           </div>
         </div>
 
-        {/* HEADER CONTROLS */}
-        <div className="flex items-center space-x-1.5 sm:space-x-2">
-          {/* DESKTOP SUBJECT SELECTOR */}
-          <div className="hidden sm:block">
-            <select
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value as Subject)}
-              className="bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
-            >
-              {SUBJECT_LIST.map((sub) => (
-                <option key={sub} value={sub}>{sub}</option>
-              ))}
-            </select>
+        {/* HEADER RIGHT PROFILE PILLS & CONTROLS */}
+        <div className="flex items-center space-x-2">
+          {/* PROFILE CONTEXT PILLS (3 PASTEL CAPSULES MATCHING IMAGE) */}
+          <div className="hidden md:flex items-center space-x-1.5">
+            <div className="bg-[#e0f2fe] border border-[#bae6fd] text-slate-800 text-xs font-semibold px-3 py-1 rounded-full flex items-center space-x-1.5 shadow-2xs">
+              <UserIcon className="w-3.5 h-3.5 text-sky-700" />
+              <span className="truncate max-w-[110px]">{user.name || 'full Yadav'}</span>
+            </div>
+
+            <div className="bg-[#cffafe] border border-[#a5f3fc] text-slate-800 text-xs font-semibold px-3 py-1 rounded-full flex items-center space-x-1.5 shadow-2xs">
+              <GraduationCap className="w-3.5 h-3.5 text-cyan-700" />
+              <span className="truncate max-w-[130px]">{user.className || 'Class 11th (PCB)'}</span>
+            </div>
+
+            <div className="bg-[#ccfbf1] border border-[#99f6e4] text-slate-800 text-xs font-semibold px-3 py-1 rounded-full flex items-center space-x-1.5 shadow-2xs">
+              <UserIcon className="w-3.5 h-3.5 text-teal-700" />
+              <span className="truncate max-w-[100px]">{user.schoolName || 'chhabra'}</span>
+            </div>
           </div>
 
-          {/* DESKTOP EXPORT PDF BUTTON */}
-          <button
-            onClick={handleExportPdf}
-            disabled={messages.length === 0 || isExportingPdf}
-            className={`hidden sm:flex px-3 py-1.5 rounded-xl text-xs font-bold transition items-center space-x-1.5 border shadow-sm ${
-              messages.length === 0
-                ? 'bg-slate-800/60 text-slate-500 border-slate-700/40 cursor-not-allowed'
-                : isExportingPdf
-                ? 'bg-indigo-700 text-indigo-200 border-indigo-500/60 cursor-wait'
-                : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-500 shadow-indigo-600/20 active:scale-95 cursor-pointer'
-            }`}
-            title="Export conversation thread as formatted PDF for offline studying"
-          >
-            {isExportingPdf ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
-            ) : (
-              <FileDown className="w-3.5 h-3.5 text-white" />
-            )}
-            <span>{isExportingPdf ? 'Exporting...' : 'Export PDF'}</span>
-          </button>
-
-          {/* DESKTOP CLEAR CHAT */}
+          {/* CLEAR CHAT BUTTON */}
           {messages.length > 0 && (
             <button
               onClick={handleClearChat}
-              className="hidden sm:flex p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition"
+              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
               title="Clear Conversation"
             >
               <Trash2 className="w-4 h-4" />
             </button>
           )}
 
-          {/* THREE-DOTS (MORE OPTIONS & TOOLS) BUTTON */}
+          {/* THREE-DOTS MENU BUTTON */}
           <button
             type="button"
             onClick={() => setShowMoreMenu(true)}
-            className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition flex items-center justify-center relative shadow-sm active:scale-95"
+            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition flex items-center justify-center relative shadow-2xs cursor-pointer active:scale-95"
             title="Tools, Modes, Subject & Settings"
           >
-            <MoreVertical className="w-4 h-4 text-indigo-300" />
-            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-indigo-500 rounded-full ring-2 ring-slate-900" />
+            <MoreVertical className="w-4 h-4 text-slate-700" />
           </button>
         </div>
       </header>
@@ -1137,7 +1124,7 @@ export const AiTutorApp = memo(function AiTutorApp({
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
-          className="bg-emerald-600/90 text-white px-4 py-2 text-xs font-bold flex items-center justify-between shadow-xl z-20"
+          className="bg-emerald-600 text-white px-4 py-2 text-xs font-bold flex items-center justify-between shadow-md z-20"
         >
           <div className="flex items-center space-x-2">
             <Check className="w-4 h-4 text-white" />
@@ -1149,65 +1136,120 @@ export const AiTutorApp = memo(function AiTutorApp({
         </motion.div>
       )}
 
-      {/* STUDENT PROFILE CONTEXT BANNER - HIDDEN ON MOBILE TO PREVENT CLUTTER */}
-      <div className="hidden sm:flex bg-slate-900/90 border-b border-indigo-900/40 px-4 py-1.5 items-center justify-between text-[11px] text-indigo-200 shrink-0">
-        <div className="flex items-center space-x-2 truncate">
-          <span className="font-bold text-white flex items-center space-x-1">
-            <span>👤</span>
-            <span>{user.name || 'Student'}</span>
-          </span>
-          <span className="text-slate-600">•</span>
-          {user.className && (
-            <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-mono text-[10px]">
-              📚 {user.className}
-            </span>
-          )}
-          {user.schoolName && (
-            <span className="hidden sm:inline bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-full text-[10px] truncate max-w-[160px]">
-              🏫 {user.schoolName}
-            </span>
-          )}
+      {/* TOP PASTEL COLORFUL ACTION RIBBON (MATCHING EXACT 8 ITEMS IN IMAGE) */}
+      <div className="bg-white border-b border-slate-200/80 px-3 sm:px-5 py-2 flex items-center space-x-2 overflow-x-auto no-scrollbar shrink-0 shadow-2xs">
+        {/* 1. Subject Selector / Pill: Mint Green */}
+        <div className="relative shrink-0">
+          <select
+            value={selectedSubject}
+            onChange={(e) => setSelectedSubject(e.target.value as Subject)}
+            className="appearance-none bg-[#dcfce7] hover:bg-[#bbf7d0] border border-[#86efac] text-[#15803d] font-bold text-xs pl-8 pr-4 py-1.5 rounded-xl cursor-pointer shadow-2xs transition focus:outline-none"
+          >
+            {SUBJECT_LIST.map((sub) => (
+              <option key={sub} value={sub} className="text-slate-900 bg-white">{sub}</option>
+            ))}
+          </select>
+          <FlaskConical className="w-3.5 h-3.5 text-[#15803d] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>
-        {user.targetGoal && (
-          <span className="text-[10px] text-amber-300 font-bold bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full shrink-0">
-            🎯 {user.targetGoal}
-          </span>
-        )}
-      </div>
 
-      {/* MODE TABS BAR - DESKTOP ONLY; ON MOBILE MANAGED VIA THREE-DOTS MENU */}
-      <div className="hidden sm:flex bg-slate-900/60 border-b border-slate-800/80 px-4 py-2 items-center justify-between overflow-x-auto no-scrollbar shrink-0">
-        <div className="flex items-center space-x-2">
-          {[
-            { id: 'homework', label: '⚡ Homework Solver' },
-            { id: 'step', label: '📐 Step-by-Step Math' },
-            { id: 'explain', label: '💡 Concept Explainer' },
-            { id: 'quiz', label: '📝 Practice Quiz' }
-          ].map((mode) => (
-            <button
-              key={mode.id}
-              onClick={() => setTutorMode(mode.id as any)}
-              className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all border ${
-                tutorMode === mode.id
-                  ? 'bg-indigo-600 text-white border-indigo-500 shadow-xs'
-                  : 'bg-slate-800/80 text-slate-400 border-slate-700/60 hover:text-slate-200'
-              }`}
-            >
-              {mode.label}
-            </button>
-          ))}
-        </div>
+        {/* 2. Export PDF: Coral Red */}
+        <button
+          type="button"
+          onClick={handleExportPdf}
+          disabled={messages.length === 0 || isExportingPdf}
+          className="bg-[#fee2e2] hover:bg-[#fecaca] disabled:opacity-50 border border-[#fca5a5] text-[#b91c1c] font-bold text-xs px-3.5 py-1.5 rounded-xl flex items-center space-x-1.5 shadow-2xs transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95"
+        >
+          {isExportingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
+          <span>Export PDF</span>
+        </button>
+
+        {/* 3. Homework Solver: Peach / Orange */}
+        <button
+          type="button"
+          onClick={() => setTutorMode('homework')}
+          className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center space-x-1.5 shadow-2xs transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95 ${
+            tutorMode === 'homework'
+              ? 'bg-[#ffedd5] border-2 border-[#ea580c] text-[#9a3412]'
+              : 'bg-[#ffedd5] hover:bg-[#fed7aa] border border-[#fdba74] text-[#c2410c]'
+          }`}
+        >
+          <Zap className="w-3.5 h-3.5" />
+          <span>Homework Solver</span>
+        </button>
+
+        {/* 4. Step-by-Step Math: Lemon Yellow */}
+        <button
+          type="button"
+          onClick={() => setTutorMode('step')}
+          className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center space-x-1.5 shadow-2xs transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95 ${
+            tutorMode === 'step'
+              ? 'bg-[#fef9c3] border-2 border-[#ca8a04] text-[#854d0e]'
+              : 'bg-[#fef9c3] hover:bg-[#fef08a] border border-[#fde047] text-[#a16207]'
+          }`}
+        >
+          <TrendingUp className="w-3.5 h-3.5" />
+          <span>Step-by-Step Math</span>
+        </button>
+
+        {/* 5. Concept Explainer: Sky Blue */}
+        <button
+          type="button"
+          onClick={() => setTutorMode('explain')}
+          className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center space-x-1.5 shadow-2xs transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95 ${
+            tutorMode === 'explain'
+              ? 'bg-[#e0f2fe] border-2 border-[#0284c7] text-[#075985]'
+              : 'bg-[#e0f2fe] hover:bg-[#bae6fd] border border-[#7dd3fc] text-[#0369a1]'
+          }`}
+        >
+          <Lightbulb className="w-3.5 h-3.5" />
+          <span>Concept Explainer</span>
+        </button>
+
+        {/* 6. Practice Quiz: Pink / Rose */}
+        <button
+          type="button"
+          onClick={() => setTutorMode('quiz')}
+          className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center space-x-1.5 shadow-2xs transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95 ${
+            tutorMode === 'quiz'
+              ? 'bg-[#fce7f3] border-2 border-[#db2777] text-[#9d174d]'
+              : 'bg-[#fce7f3] hover:bg-[#fbcfe8] border border-[#f472b6] text-[#be185d]'
+          }`}
+        >
+          <ClipboardList className="w-3.5 h-3.5" />
+          <span>Practice Quiz</span>
+        </button>
+
+        {/* 7. JEE Main / Exams: Lavender / Purple */}
+        <button
+          type="button"
+          onClick={() => handleSendMessage(`Give me key high-yield exam insights, formula tricks, and JEE Main / Board questions for ${selectedSubject}.`)}
+          className="bg-[#ede9fe] hover:bg-[#ddd6fe] border border-[#c4b5fd] text-[#6d28d9] font-bold text-xs px-3.5 py-1.5 rounded-xl flex items-center space-x-1.5 shadow-2xs transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>JEE Main / Exams</span>
+        </button>
+
+        {/* 8. Download PDF: Cyan / Aqua */}
+        <button
+          type="button"
+          onClick={handleExportPdf}
+          disabled={messages.length === 0 || isExportingPdf}
+          className="bg-[#cffafe] hover:bg-[#a5f3fc] disabled:opacity-50 border border-[#67e8f9] text-[#0e7490] font-bold text-xs px-3.5 py-1.5 rounded-xl flex items-center space-x-1.5 shadow-2xs transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95"
+        >
+          <Download className="w-3.5 h-3.5" />
+          <span>Download PDF</span>
+        </button>
       </div>
 
       {/* CHAT MESSAGES BODY */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 max-w-3xl mx-auto w-full">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4 max-w-4xl mx-auto w-full">
         {messages.length === 0 ? (
           /* EMPTY STATE HERO */
           <motion.div 
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, ease: "easeOut" }}
-            className="h-full flex flex-col items-center justify-center text-center space-y-6 py-8 px-4"
+            className="h-full flex flex-col items-center justify-center text-center space-y-5 py-8 px-4"
           >
             <motion.div 
               initial={{ scale: 0.8, rotate: -6 }}
@@ -1215,11 +1257,11 @@ export const AiTutorApp = memo(function AiTutorApp({
               transition={{ type: "spring", stiffness: 260, damping: 20 }}
               className="relative"
             >
-              <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-indigo-600 to-indigo-800 flex items-center justify-center text-white shadow-xl shadow-indigo-600/20">
-                <BrainCircuit className="w-10 h-10 animate-pulse" />
+              <div className="w-18 h-18 rounded-3xl bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black text-2xl shadow-md border border-slate-800">
+                A
               </div>
-              <span className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full bg-emerald-500 text-[10px] font-black text-slate-950 uppercase tracking-wider shadow-sm">
-                READY
+              <span className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full bg-emerald-500 text-[10px] font-black text-white uppercase tracking-wider shadow-xs">
+                ONLINE
               </span>
             </motion.div>
 
@@ -1227,13 +1269,13 @@ export const AiTutorApp = memo(function AiTutorApp({
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1, duration: 0.3 }}
-              className="space-y-2 max-w-md"
+              className="space-y-1.5 max-w-md"
             >
-              <h2 className="text-xl font-black text-white tracking-tight">
-                Welcome to your AI Tutor, {user.name}! 🚀
+              <h2 className="text-lg font-black text-slate-900 tracking-tight">
+                Welcome to Ascend AI Tutor, {user.name}! 🚀
               </h2>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                I can solve step-by-step math problems, explain complex scientific concepts, check grammar, or generate custom quizzes.
+              <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                Ask any question in Science, Math, Physics, Chemistry, Biology, or English.
               </p>
             </motion.div>
 
@@ -1245,7 +1287,7 @@ export const AiTutorApp = memo(function AiTutorApp({
               className="w-full max-w-lg space-y-2 text-left pt-2"
             >
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block text-center">
-                TRY ASKING ONE OF THESE:
+                POPULAR STUDY QUESTIONS:
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {QUICK_PROMPTS.map((qp, idx) => {
@@ -1256,16 +1298,16 @@ export const AiTutorApp = memo(function AiTutorApp({
                       whileHover={{ scale: 1.02, y: -1 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => handleSendMessage(qp.prompt)}
-                      className="p-3 bg-slate-900 hover:bg-slate-800/90 border border-slate-800 hover:border-indigo-500/50 rounded-2xl transition text-left group flex items-start space-x-2.5 shadow-xs"
+                      className="p-3 bg-white hover:bg-slate-50 border border-slate-200 hover:border-blue-400 rounded-2xl transition text-left group flex items-start space-x-2.5 shadow-2xs cursor-pointer"
                     >
-                      <div className="p-2 rounded-xl bg-indigo-600/20 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white transition shrink-0">
+                      <div className="p-2 rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition shrink-0">
                         <Icon className="w-4 h-4" />
                       </div>
                       <div>
-                        <span className="font-bold text-xs text-slate-200 group-hover:text-indigo-300 block">
+                        <span className="font-bold text-xs text-slate-900 group-hover:text-blue-700 block">
                           {qp.label}
                         </span>
-                        <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
+                        <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">
                           {qp.prompt}
                         </p>
                       </div>
@@ -1279,284 +1321,175 @@ export const AiTutorApp = memo(function AiTutorApp({
           /* MESSAGES LIST */
           messages.map((msg, idx) => {
             const isLatest = idx === messages.length - 1;
-            const messageSubject = msg.subject || selectedSubject;
-            const theme = getSubjectTheme(messageSubject);
 
-            return (
-              <motion.div
-                key={msg.id}
-                initial={{ 
-                  opacity: 0, 
-                  x: msg.sender === 'ai' ? -24 : 24, 
-                  y: 12, 
-                  scale: 0.97 
-                }}
-                animate={{ 
-                  opacity: 1, 
-                  x: 0, 
-                  y: 0, 
-                  scale: 1 
-                }}
-                transition={{ 
-                  type: "spring",
-                  stiffness: 300,
-                  damping: 26,
-                  mass: 0.8
-                }}
-                className={`flex items-start space-x-3 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                {msg.sender === 'ai' && (
-                  <motion.div 
-                    initial={{ scale: 0, rotate: -20 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ type: "spring", stiffness: 350, damping: 22 }}
-                    className={`w-8 h-8 rounded-xl ${theme.botBg} flex items-center justify-center text-white shrink-0 mt-1 shadow-md transition-colors duration-200`}
-                  >
-                    <Bot className="w-4 h-4" />
-                  </motion.div>
-                )}
-
+            if (msg.sender === 'user') {
+              return (
                 <motion.div
-                  initial={msg.sender === 'ai' && isLatest ? { opacity: 0.85, y: 6 } : false}
+                  key={msg.id}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className={`max-w-[85%] sm:max-w-[80%] rounded-2xl p-4 shadow-sm border transition-all duration-200 ${
-                    msg.sender === 'user'
-                      ? 'bg-indigo-600 text-white border-indigo-500 rounded-tr-none'
-                      : `bg-slate-900 ${theme.border} ${theme.glow} text-slate-200 rounded-tl-none space-y-2`
-                  }`}
+                  className="flex items-start justify-end space-x-2.5"
                 >
-                  {/* MESSAGE METADATA HEADER */}
-                  <div className="flex items-center justify-between text-[10px] text-slate-400 pb-1 border-b border-slate-800/60 mb-2">
-                    <span className={`font-bold ${msg.sender === 'user' ? 'text-indigo-200' : theme.accentText} uppercase tracking-wider`}>
-                      {msg.sender === 'user' ? 'YOU' : 'AI TUTOR'}
+                  <div className="flex flex-col items-end max-w-[85%] sm:max-w-[75%] space-y-1">
+                    <span className="text-[11px] text-slate-400 font-medium pr-1">
+                      {msg.timestamp}
                     </span>
-                    <div className="flex items-center space-x-2">
-                      {msg.subject && (
-                        <span className={`${theme.badgeBg} ${theme.badgeText} border ${theme.badgeBorder} px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wide`}>
-                          {msg.subject}
-                        </span>
-                      )}
-                      <span>{msg.timestamp}</span>
-                    </div>
-                  </div>
-
-                  {/* CONTENT */}
-                  {msg.sender === 'user' ? (
-                    <div className="space-y-2">
-                      {/* MULTIPLE / SINGLE ATTACHED IMAGES */}
+                    <div className="bg-[#e9f5be] border border-[#d9f99d] text-slate-900 rounded-2xl rounded-tr-xs p-3.5 shadow-2xs space-y-2">
                       {msg.images && msg.images.length > 0 ? (
                         <div className={`grid gap-2 ${msg.images.length === 1 ? 'grid-cols-1 max-w-xs' : 'grid-cols-2 max-w-sm'}`}>
-                          {msg.images.map((img, idx) => (
-                            <div key={idx} className="relative group overflow-hidden rounded-xl border border-white/20 shadow-md bg-slate-950/40">
-                              <img
-                                src={img}
-                                alt={`Homework page ${idx + 1}`}
-                                className="w-full max-h-48 object-contain rounded-xl"
-                              />
-                              <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-slate-950/80 backdrop-blur-xs text-[9px] font-bold text-white rounded-md border border-white/20">
-                                Page {idx + 1}
-                              </span>
-                            </div>
+                          {msg.images.map((img, i) => (
+                            <img key={i} src={img} alt={`Attached ${i + 1}`} className="w-full max-h-48 object-contain rounded-xl border border-slate-300" />
                           ))}
                         </div>
                       ) : msg.image ? (
-                        <div className="relative group max-w-xs overflow-hidden rounded-xl border border-white/20 shadow-md bg-slate-950/40">
-                          <img
-                            src={msg.image}
-                            alt="Handwritten homework problem"
-                            className="w-full max-h-56 object-contain rounded-xl"
-                          />
-                        </div>
+                        <img src={msg.image} alt="Attached homework" className="w-full max-h-56 object-contain rounded-xl border border-slate-300" />
                       ) : null}
-
-                      <p className="text-xs text-white whitespace-pre-wrap leading-relaxed font-medium">
+                      <p className="text-xs sm:text-sm text-slate-900 whitespace-pre-wrap leading-relaxed font-medium">
                         {msg.text}
                       </p>
                     </div>
-                  ) : (
-                    <StaggeredRevealMarkdown text={msg.text} isLatest={isLatest} />
-                  )}
+                  </div>
 
-                {/* AI ACTION TOOLBAR */}
-                {msg.sender === 'ai' && (
-                  <div className="space-y-2 pt-2 border-t border-slate-800/80">
-                    <div className="flex items-center justify-between text-[11px] text-slate-400">
-                      <div className="flex items-center space-x-1.5">
-                        <button
-                          onClick={() => handleCopyText(msg.id, msg.text)}
-                          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition flex items-center space-x-1"
-                        >
-                          {copiedId === msg.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                          <span className="text-[10px] font-bold">{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
-                        </button>
-
-                        <button
-                          onClick={() => handleSpeakText(msg.text)}
-                          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition flex items-center space-x-1"
-                          title="Read Aloud"
-                        >
-                          <Volume2 className="w-3 h-3" />
-                          <span className="text-[10px] font-bold">Listen</span>
-                        </button>
-
-                        {onAddNote && (
-                          <button
-                            onClick={() => handleSaveToNotebook(msg)}
-                            className={`px-2 py-1 bg-slate-800 hover:bg-slate-700 ${theme.accentText} rounded-lg transition flex items-center space-x-1`}
-                          >
-                            <BookOpen className="w-3 h-3" />
-                            <span className="text-[10px] font-bold">
-                              {savedNoteId === msg.id ? 'Saved! ✓' : 'Save Note'}
-                            </span>
-                          </button>
-                        )}
-                      </div>
-
-                      <span className="text-[9px] text-slate-500 font-semibold">
-                        Ascend AI • {msg.subject || selectedSubject}
-                      </span>
-                    </div>
-
-                    {/* CONTEXTUAL SUGGESTION ENGINE: 3 DYNAMIC ACADEMIC FOLLOW-UP CHIPS */}
-                    {idx === messages.length - 1 ? (
-                      <motion.div
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.25 }}
-                        className="mt-2.5 pt-2.5 border-t border-slate-800/80 space-y-2"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-1.5 text-[11px] font-bold text-slate-300">
-                            <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-                            <span className="text-slate-200">
-                              Suggestion Engine
-                            </span>
-                            <span className="text-[9px] font-semibold bg-indigo-500/20 text-indigo-300 px-1.5 py-0.2 rounded-full border border-indigo-500/30">
-                              3 Smart Next Steps
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleRefreshSuggestions}
-                            disabled={isGeneratingSuggestions}
-                            className="text-[10px] text-slate-400 hover:text-indigo-300 flex items-center space-x-1 px-1.5 py-0.5 rounded-md hover:bg-slate-800 transition disabled:opacity-50 cursor-pointer"
-                            title="Generate fresh alternative study suggestions"
-                          >
-                            <RefreshCw className={`w-3 h-3 ${isGeneratingSuggestions ? 'animate-spin text-indigo-400' : ''}`} />
-                            <span className="hidden sm:inline">Refresh ideas</span>
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                          {suggestions.map((sugg, sIdx) => (
-                            <motion.button
-                              key={sugg.id || sIdx}
-                              whileHover={{ scale: 1.02, y: -1 }}
-                              whileTap={{ scale: 0.98 }}
-                              onClick={() => handleSendMessage(sugg.prompt)}
-                              className="group text-left p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-800/90 border border-slate-800 hover:border-indigo-500/60 transition-all flex flex-col justify-between space-y-1.5 shadow-xs relative overflow-hidden cursor-pointer"
-                            >
-                              <div className="flex items-center justify-between w-full">
-                                <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-400 bg-indigo-950/80 px-1.5 py-0.5 rounded-md border border-indigo-800/40 truncate max-w-[130px]">
-                                  {sugg.badge || 'Follow-up'}
-                                </span>
-                                <ArrowRight className="w-3 h-3 text-slate-500 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition" />
-                              </div>
-                              <div>
-                                <div className="text-[11px] font-bold text-slate-100 group-hover:text-indigo-200 transition line-clamp-1">
-                                  {sugg.label}
-                                </div>
-                                {sugg.subtitle && (
-                                  <p className="text-[10px] text-slate-400 group-hover:text-slate-300 transition line-clamp-1 mt-0.5">
-                                    {sugg.subtitle}
-                                  </p>
-                                )}
-                              </div>
-                            </motion.button>
-                          ))}
-                        </div>
-                      </motion.div>
+                  {/* USER PROFILE AVATAR */}
+                  <div className="w-8 h-8 rounded-full border border-slate-300 shadow-2xs overflow-hidden bg-slate-200 flex items-center justify-center shrink-0 mt-4">
+                    {user.avatar ? (
+                      <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
                     ) : (
-                      /* COMPACT QUICK ACTION CHIPS FOR PREVIOUS MESSAGES */
-                      <motion.div 
-                        className="flex flex-wrap gap-1.5 pt-1"
-                        initial="hidden"
-                        animate="visible"
-                        variants={{
-                          visible: { transition: { staggerChildren: 0.05 } }
-                        }}
-                      >
-                        <motion.button
-                          variants={{
-                            hidden: { opacity: 0, scale: 0.8 },
-                            visible: { opacity: 1, scale: 1 }
-                          }}
-                          onClick={() => handleSendMessage("Can you explain this concept in even simpler terms with a super easy real-world analogy?")}
-                          className={`px-2 py-0.5 ${theme.chipBg} ${theme.chipText} border ${theme.chipBorder} rounded-lg text-[10px] font-semibold transition flex items-center space-x-1`}
-                        >
-                          <span>💡 Simpler Analogy</span>
-                        </motion.button>
-                        <motion.button
-                          variants={{
-                            hidden: { opacity: 0, scale: 0.8 },
-                            visible: { opacity: 1, scale: 1 }
-                          }}
-                          onClick={() => handleSendMessage("Give me 1 practice question based on this topic so I can test my understanding.")}
-                          className={`px-2 py-0.5 ${theme.chipBg} ${theme.chipText} border ${theme.chipBorder} rounded-lg text-[10px] font-semibold transition flex items-center space-x-1`}
-                        >
-                          <span>📝 Practice Quiz</span>
-                        </motion.button>
-                        <motion.button
-                          variants={{
-                            hidden: { opacity: 0, scale: 0.8 },
-                            visible: { opacity: 1, scale: 1 }
-                          }}
-                          onClick={() => handleSendMessage("Summarize the key formulas and core takeaways from this in a clean table.")}
-                          className={`px-2 py-0.5 ${theme.chipBg} ${theme.chipText} border ${theme.chipBorder} rounded-lg text-[10px] font-semibold transition flex items-center space-x-1`}
-                        >
-                          <span>📌 Summary Table</span>
-                        </motion.button>
-                      </motion.div>
+                      <UserIcon className="w-4 h-4 text-slate-600" />
                     )}
                   </div>
-                )}
-              </motion.div>
+                </motion.div>
+              );
+            }
 
-              {msg.sender === 'user' && (
-                <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0 mt-1 shadow-xs">
-                  <UserIcon className="w-4 h-4" />
+            // AI TUTOR MESSAGE
+            return (
+              <motion.div
+                key={msg.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-start space-x-2.5 justify-start"
+              >
+                {/* BOT AVATAR CIRCLE */}
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-blue-100 border border-blue-300 flex items-center justify-center text-blue-600 shadow-2xs shrink-0 mt-4">
+                  <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
                 </div>
-              )}
-            </motion.div>
-          );
-        })
-      )}
+
+                <div className="flex flex-col items-start max-w-[90%] sm:max-w-[82%] space-y-1.5 w-full">
+                  <div className="flex items-center space-x-2 pl-1 text-xs">
+                    <span className="font-bold text-slate-900">Al_Tutor</span>
+                    <span className="text-slate-400 font-medium">{msg.timestamp}</span>
+                  </div>
+
+                  {/* AI RESPONSE BUBBLE */}
+                  <div className="bg-[#e0f2fe] border border-[#bae6fd] text-slate-900 rounded-2xl rounded-tl-xs p-4 shadow-2xs space-y-3 w-full">
+                    <StaggeredRevealMarkdown text={msg.text} isLatest={isLatest} />
+
+                    {/* VIBRANT ACTION PILL ROW (EXACTLY MATCHING IMAGE 2) */}
+                    <div className="pt-2 border-t border-sky-200/80 flex flex-wrap items-center gap-1.5">
+                      {/* Copy */}
+                      <button
+                        type="button"
+                        onClick={() => handleCopyText(msg.id, msg.text)}
+                        className="bg-[#86efac]/60 hover:bg-[#86efac] border border-[#4ade80] text-[#166534] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
+                      >
+                        {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-[#166534]" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
+                      </button>
+
+                      {/* Listen */}
+                      <button
+                        type="button"
+                        onClick={() => handleSpeakText(msg.text)}
+                        className="bg-[#fca5a5]/60 hover:bg-[#fca5a5] border border-[#f87171] text-[#991b1b] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
+                      >
+                        <Volume2 className="w-3.5 h-3.5" />
+                        <span>Listen</span>
+                      </button>
+
+                      {/* Save Note */}
+                      {onAddNote && (
+                        <button
+                          type="button"
+                          onClick={() => handleSaveToNotebook(msg)}
+                          className="bg-[#fed7aa] hover:bg-[#fdba74] border border-[#fb923c] text-[#9a3412] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
+                        >
+                          <Bookmark className="w-3.5 h-3.5" />
+                          <span>{savedNoteId === msg.id ? 'Saved! ✓' : 'Save Note'}</span>
+                        </button>
+                      )}
+
+                      {/* Static badge: Ascend AI Tutor v2.5 */}
+                      <span className="bg-[#fef08a] border border-[#facc15] text-[#854d0e] text-xs font-bold px-3 py-1.5 rounded-xl shadow-2xs select-none">
+                        Ascend AI Tutor v2.5
+                      </span>
+
+                      {/* Explain Simpler */}
+                      <button
+                        type="button"
+                        onClick={() => handleSendMessage("Can you explain this concept in simpler terms with a super easy everyday analogy?")}
+                        className="bg-[#bae6fd] hover:bg-[#7dd3fc] border border-[#38bdf8] text-[#075985] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
+                      >
+                        <Lightbulb className="w-3.5 h-3.5" />
+                        <span>Explain Simpler</span>
+                      </button>
+
+                      {/* Practice Question */}
+                      <button
+                        type="button"
+                        onClick={() => handleSendMessage("Give me 1 practice question based on this topic so I can test my understanding.")}
+                        className="bg-[#fbcfe8] hover:bg-[#f472b6] border border-[#f472b6] text-[#9d174d] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
+                      >
+                        <HelpCircle className="w-3.5 h-3.5" />
+                        <span>Practice Question</span>
+                      </button>
+
+                      {/* JEE Main / Hinglish */}
+                      <button
+                        type="button"
+                        onClick={() => handleSendMessage("Please explain this in easy Hinglish with important key points for JEE Main / Board exams.")}
+                        className="bg-[#ddd6fe] hover:bg-[#c4b5fd] border border-[#a78bfa] text-[#5b21b6] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
+                      >
+                        <Languages className="w-3.5 h-3.5" />
+                        <span>JEE Main / Hinglish</span>
+                      </button>
+
+                      {/* Summary Table */}
+                      <button
+                        type="button"
+                        onClick={() => handleSendMessage("Summarize the key concepts, formulas, and takeaways in a clean structured table.")}
+                        className="bg-[#a5f3fc] hover:bg-[#67e8f9] border border-[#22d3ee] text-[#155e75] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
+                      >
+                        <Table className="w-3.5 h-3.5" />
+                        <span>Summary Table</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })
+        )}
 
         {/* LOADING INDICATOR */}
         {isLoading && (
           <motion.div 
-            initial={{ opacity: 0, x: -20, y: 8 }}
-            animate={{ opacity: 1, x: 0, y: 0 }}
-            exit={{ opacity: 0, x: -10 }}
-            transition={{ type: "spring", stiffness: 320, damping: 25 }}
-            className="flex items-start space-x-3"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="flex items-start space-x-2.5"
           >
-            <motion.div 
-              animate={{ rotate: [0, -5, 5, 0] }}
-              transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
-              className={`w-8 h-8 rounded-xl ${getSubjectTheme(selectedSubject).botBg} flex items-center justify-center text-white shrink-0 mt-1 shadow-md transition-colors duration-200`}
-            >
-              <Bot className="w-4 h-4" />
-            </motion.div>
-            <div className={`bg-slate-900 border ${getSubjectTheme(selectedSubject).border} ${getSubjectTheme(selectedSubject).glow} rounded-2xl rounded-tl-none p-4 shadow-sm space-y-2 max-w-xs transition-all duration-200`}>
-              <div className={`flex items-center space-x-2 ${getSubjectTheme(selectedSubject).accentText} text-xs font-bold`}>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>AI Tutor is analyzing {selectedSubject}...</span>
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-blue-100 border border-blue-300 flex items-center justify-center text-blue-600 shadow-2xs shrink-0 mt-2">
+              <Bot className="w-4 h-4 text-blue-600 animate-spin" />
+            </div>
+            <div className="bg-[#e0f2fe] border border-[#bae6fd] rounded-2xl rounded-tl-xs p-3.5 shadow-2xs space-y-1.5 max-w-sm">
+              <div className="flex items-center space-x-2 text-blue-700 text-xs font-bold">
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                <span>Ascend AI Tutor is thinking...</span>
               </div>
-              <div className="space-y-1.5">
-                <div className="h-2 bg-slate-800 rounded-full w-3/4 animate-pulse" />
-                <div className="h-2 bg-slate-800 rounded-full w-1/2 animate-pulse" />
+              <div className="space-y-1 pt-1">
+                <div className="h-2 bg-blue-200/80 rounded-full w-3/4 animate-pulse" />
+                <div className="h-2 bg-blue-200/60 rounded-full w-1/2 animate-pulse" />
               </div>
             </div>
           </motion.div>
@@ -1566,8 +1499,8 @@ export const AiTutorApp = memo(function AiTutorApp({
       </div>
 
       {/* BOTTOM INPUT DOCK */}
-      <footer className="bg-slate-900 border-t border-slate-800 p-3 sm:p-4 shrink-0 relative">
-        <div className="max-w-3xl mx-auto space-y-2">
+      <footer className="bg-white border-t border-slate-200/80 p-2.5 sm:p-4 shrink-0 relative shadow-2xs">
+        <div className="max-w-4xl mx-auto space-y-2">
           {/* SAVED FORMULAS SLIDE-UP PANEL */}
           <AnimatePresence>
             {showSavedFormulasPanel && (
@@ -1576,13 +1509,13 @@ export const AiTutorApp = memo(function AiTutorApp({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 12, scale: 0.95 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="absolute bottom-full mb-2 left-3 right-3 sm:left-auto sm:right-4 sm:w-96 bg-slate-900/95 backdrop-blur-xl border border-amber-500/40 rounded-2xl p-3 shadow-2xl z-30 space-y-2.5"
+                className="absolute bottom-full mb-2 left-3 right-3 sm:left-auto sm:right-4 sm:w-96 bg-white border border-amber-300 rounded-2xl p-3 shadow-xl z-30 space-y-2.5"
               >
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <div className="flex items-center space-x-1.5">
-                    <Bookmark className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                    <span className="text-xs font-bold text-slate-100">Saved Formulas</span>
-                    <span className="bg-amber-500/20 text-amber-300 text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-amber-500/30">
+                    <Bookmark className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                    <span className="text-xs font-bold text-slate-900">Saved Formulas</span>
+                    <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-amber-200">
                       {savedFormulas.length}
                     </span>
                   </div>
@@ -1590,7 +1523,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                     <button
                       type="button"
                       onClick={() => setShowAddFormulaForm(!showAddFormulaForm)}
-                      className="px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg text-[10px] font-semibold transition flex items-center space-x-1"
+                      className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300 rounded-lg text-[10px] font-semibold transition flex items-center space-x-1 cursor-pointer"
                     >
                       <Plus className="w-3 h-3" />
                       <span>Add Custom</span>
@@ -1598,7 +1531,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                     <button
                       type="button"
                       onClick={() => setShowSavedFormulasPanel(false)}
-                      className="p-1 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800 transition"
+                      className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -1607,25 +1540,25 @@ export const AiTutorApp = memo(function AiTutorApp({
 
               {/* ADD FORMULA FORM */}
               {showAddFormulaForm && (
-                <form onSubmit={handleAddFormula} className="bg-slate-950/80 border border-amber-500/30 p-2.5 rounded-xl space-y-2 animate-in fade-in duration-100">
+                <form onSubmit={handleAddFormula} className="bg-slate-50 border border-amber-200 p-2.5 rounded-xl space-y-2">
                   <input
                     type="text"
                     placeholder="Formula Name (e.g. Newton's 2nd Law)"
                     value={newFormulaName}
                     onChange={(e) => setNewFormulaName(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-amber-500"
                   />
                   <input
                     type="text"
                     placeholder="LaTeX Code (e.g. F = ma or \int x^2 dx)"
                     value={newFormulaLatex}
                     onChange={(e) => setNewFormulaLatex(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs text-amber-300 font-mono placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs text-amber-700 font-mono placeholder:text-slate-400 focus:outline-none focus:border-amber-500"
                   />
 
                   {/* PREVIEW */}
                   {newFormulaLatex.trim() && (
-                    <div className="p-1.5 bg-slate-900 border border-slate-800 rounded-lg text-center overflow-x-auto text-xs text-slate-200">
+                    <div className="p-1.5 bg-white border border-slate-200 rounded-lg text-center overflow-x-auto text-xs text-slate-900">
                       <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
                         {`$${newFormulaLatex.trim()}$`}
                       </ReactMarkdown>
@@ -1636,14 +1569,14 @@ export const AiTutorApp = memo(function AiTutorApp({
                     <button
                       type="button"
                       onClick={() => setShowAddFormulaForm(false)}
-                      className="px-2 py-1 text-[10px] text-slate-400 hover:text-slate-200 rounded-md font-medium"
+                      className="px-2 py-1 text-[10px] text-slate-500 hover:text-slate-700 rounded-md font-medium cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={!newFormulaLatex.trim()}
-                      className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-bold text-[10px] rounded-lg transition"
+                      className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-bold text-[10px] rounded-lg transition cursor-pointer"
                     >
                       Save Formula
                     </button>
@@ -1654,18 +1587,18 @@ export const AiTutorApp = memo(function AiTutorApp({
               {/* FORMULAS LIST */}
               <div className="space-y-1.5 max-h-52 overflow-y-auto no-scrollbar pr-0.5">
                 {savedFormulas.length === 0 ? (
-                  <div className="text-center py-6 text-slate-500 text-xs font-medium">
+                  <div className="text-center py-6 text-slate-400 text-xs font-medium">
                     No saved formulas yet. Click "+ Add Custom" or save math snippets!
                   </div>
                 ) : (
                   savedFormulas.map((f) => (
                     <div
                       key={f.id}
-                      className="group bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-amber-500/40 p-2 rounded-xl transition flex items-center justify-between space-x-2"
+                      className="group bg-slate-50 hover:bg-slate-100 border border-slate-200 p-2 rounded-xl transition flex items-center justify-between space-x-2"
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="text-[10px] font-bold text-slate-400 truncate">{f.name}</div>
-                        <div className="text-xs text-slate-100 overflow-x-auto py-0.5 no-scrollbar font-mono">
+                        <div className="text-[10px] font-bold text-slate-500 truncate">{f.name}</div>
+                        <div className="text-xs text-slate-900 overflow-x-auto py-0.5 no-scrollbar font-mono">
                           <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
                             {`$${f.latex}$`}
                           </ReactMarkdown>
@@ -1676,7 +1609,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                         <button
                           type="button"
                           onClick={() => handleInsertFormula(f.latex)}
-                          className="px-2 py-1 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 rounded-lg text-[10px] font-bold transition"
+                          className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-[10px] font-bold transition cursor-pointer"
                           title="Insert into chat input"
                         >
                           Insert
@@ -1685,16 +1618,16 @@ export const AiTutorApp = memo(function AiTutorApp({
                         <button
                           type="button"
                           onClick={() => handleCopyFormula(f.id, f.latex)}
-                          className="p-1 bg-slate-900/80 hover:bg-slate-700 text-slate-300 rounded-lg transition"
+                          className="p-1 bg-white hover:bg-slate-200 text-slate-600 rounded-lg transition border border-slate-200 cursor-pointer"
                           title="Copy LaTeX"
                         >
-                          {copiedFormulaId === f.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          {copiedFormulaId === f.id ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
                         </button>
 
                         <button
                           type="button"
                           onClick={() => handleDeleteFormula(f.id)}
-                          className="p-1 bg-slate-900/80 hover:bg-rose-950/80 text-slate-400 hover:text-rose-400 rounded-lg transition"
+                          className="p-1 bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition border border-slate-200 cursor-pointer"
                           title="Delete"
                         >
                           <Trash2 className="w-3 h-3" />
@@ -1716,17 +1649,17 @@ export const AiTutorApp = memo(function AiTutorApp({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 12, scale: 0.95 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="absolute bottom-full mb-2 left-3 right-3 sm:left-auto sm:right-4 sm:w-96 bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl p-3 shadow-2xl z-30 space-y-2.5"
+                className="absolute bottom-full mb-2 left-3 right-3 sm:left-auto sm:right-4 sm:w-96 bg-white border border-slate-200 rounded-2xl p-3 shadow-xl z-30 space-y-2.5"
               >
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                  <span className="text-xs font-bold text-slate-200 flex items-center space-x-1.5">
-                    <Variable className="w-3.5 h-3.5 text-indigo-400" />
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <span className="text-xs font-bold text-slate-900 flex items-center space-x-1.5">
+                    <Variable className="w-3.5 h-3.5 text-blue-600" />
                     <span>Math & LaTeX Symbols</span>
                   </span>
                   <button
                     type="button"
                     onClick={() => setShowMathPalette(false)}
-                    className="p-1 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800 transition"
+                    className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -1739,10 +1672,10 @@ export const AiTutorApp = memo(function AiTutorApp({
                       key={cat}
                       type="button"
                       onClick={() => setActiveMathCategory(cat)}
-                      className={`px-2 py-0.5 rounded-md font-semibold transition ${
+                      className={`px-2 py-0.5 rounded-md font-semibold transition cursor-pointer ${
                         activeMathCategory === cat
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:text-slate-900'
                       }`}
                     >
                       {cat}
@@ -1759,7 +1692,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                       key={idx}
                       type="button"
                       onClick={() => insertSymbol(sym.value)}
-                      className="p-2 bg-slate-800/80 hover:bg-indigo-600 hover:text-white text-slate-200 border border-slate-700/60 rounded-xl text-xs font-semibold transition flex items-center justify-center shadow-xs active:scale-95"
+                      className="p-2 bg-slate-50 hover:bg-blue-600 hover:text-white text-slate-800 border border-slate-200 rounded-xl text-xs font-semibold transition flex items-center justify-center shadow-2xs active:scale-95 cursor-pointer"
                       title={sym.value}
                     >
                       {sym.label}
@@ -1778,18 +1711,18 @@ export const AiTutorApp = memo(function AiTutorApp({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.98 }}
                 transition={{ duration: 0.2 }}
-                className="bg-indigo-950/90 border border-indigo-500/60 p-2.5 rounded-2xl text-xs text-indigo-200 shadow-lg space-y-2"
+                className="bg-blue-50 border border-blue-200 p-2.5 rounded-2xl text-xs text-blue-900 shadow-sm space-y-2"
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-1.5 font-bold text-white text-[11px]">
-                    <Images className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>{selectedImages.length} {selectedImages.length === 1 ? 'Page Attached' : 'Pages Attached (Sequence)'}</span>
+                  <div className="flex items-center space-x-1.5 font-bold text-slate-900 text-[11px]">
+                    <Images className="w-3.5 h-3.5 text-blue-600" />
+                    <span>{selectedImages.length} {selectedImages.length === 1 ? 'Page Attached' : 'Pages Attached'}</span>
                   </div>
                   <div className="flex items-center space-x-1.5">
                     <button
                       type="button"
                       onClick={() => setShowCameraModal(true)}
-                      className="text-[10px] bg-indigo-600/80 hover:bg-indigo-600 text-white font-bold px-2 py-0.5 rounded-md flex items-center space-x-1 transition"
+                      className="text-[10px] bg-blue-600 hover:bg-blue-700 text-white font-bold px-2 py-0.5 rounded-md flex items-center space-x-1 transition cursor-pointer"
                     >
                       <Plus className="w-3 h-3" />
                       <span>Add Page</span>
@@ -1797,7 +1730,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                     <button
                       type="button"
                       onClick={() => setSelectedImages([])}
-                      className="text-[10px] text-slate-400 hover:text-rose-400 px-1.5 py-0.5 rounded-md hover:bg-slate-900 transition"
+                      className="text-[10px] text-slate-500 hover:text-rose-600 px-1.5 py-0.5 rounded-md hover:bg-white transition cursor-pointer"
                     >
                       Clear all
                     </button>
@@ -1816,15 +1749,15 @@ export const AiTutorApp = memo(function AiTutorApp({
                       <img
                         src={img}
                         alt={`Page ${idx + 1}`}
-                        className="w-14 h-14 rounded-xl object-cover border border-indigo-400/50 shadow-sm bg-slate-950"
+                        className="w-14 h-14 rounded-xl object-cover border border-slate-300 shadow-2xs bg-white"
                       />
-                      <span className="absolute bottom-1 left-1 px-1 py-0.2 bg-slate-950/80 backdrop-blur-xs text-[8px] font-black text-white rounded">
+                      <span className="absolute bottom-1 left-1 px-1 py-0.2 bg-slate-900/80 backdrop-blur-xs text-[8px] font-black text-white rounded">
                         P{idx + 1}
                       </span>
                       <button
                         type="button"
                         onClick={() => handleRemoveImage(idx)}
-                        className="absolute -top-1.5 -right-1.5 p-1 bg-rose-600 hover:bg-rose-500 text-white rounded-full shadow-md transition"
+                        className="absolute -top-1.5 -right-1.5 p-1 bg-rose-600 hover:bg-rose-500 text-white rounded-full shadow-md transition cursor-pointer"
                         title="Remove page"
                       >
                         <X className="w-2.5 h-2.5" />
@@ -1836,33 +1769,42 @@ export const AiTutorApp = memo(function AiTutorApp({
             )}
           </AnimatePresence>
 
-          {/* QUICK DYNAMIC CONTEXTUAL SUGGESTION STRIP */}
-          <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar pb-1 text-[11px]">
-            <div className="flex items-center space-x-1 shrink-0 text-slate-400 text-[10px] font-bold pr-1">
-              <Sparkles className="w-3 h-3 text-indigo-400" />
-              <span className="hidden sm:inline">Suggestions:</span>
-            </div>
-            {suggestions.map((sugg, idx) => (
+          {/* QUICK DYNAMIC ACADEMIC SUGGESTIONS */}
+          {suggestions.length > 0 && (
+            <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar pb-0.5 text-[11px]">
               <button
-                key={sugg.id || idx}
                 type="button"
-                onClick={() => handleSendMessage(sugg.prompt)}
-                className="px-2.5 py-1 bg-slate-800/80 hover:bg-slate-800 text-slate-200 hover:text-indigo-200 border border-slate-700/60 hover:border-indigo-500/40 rounded-full font-medium whitespace-nowrap transition flex items-center space-x-1 shrink-0 cursor-pointer text-[10px] sm:text-[11px]"
-                title={sugg.prompt}
+                onClick={handleRefreshSuggestions}
+                disabled={isGeneratingSuggestions}
+                className="flex items-center space-x-1 shrink-0 text-slate-500 hover:text-blue-600 px-1.5 py-1 rounded-md text-[10px] font-bold cursor-pointer transition"
+                title="Refresh suggested study prompts"
               >
-                <span>{sugg.label}</span>
+                <Sparkles className={`w-3 h-3 text-blue-600 ${isGeneratingSuggestions ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Suggestions</span>
               </button>
-            ))}
-          </div>
+              {suggestions.map((sugg, idx) => (
+                <button
+                  key={sugg.id || idx}
+                  type="button"
+                  onClick={() => handleSendMessage(sugg.prompt)}
+                  className="px-2.5 py-1 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-300 rounded-full font-medium whitespace-nowrap transition flex items-center space-x-1 shrink-0 cursor-pointer text-[10px] sm:text-[11px] shadow-2xs"
+                  title={sugg.prompt}
+                >
+                  <span>{sugg.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
-          <div className="relative flex items-center bg-slate-950 border border-slate-800 focus-within:border-indigo-500 rounded-2xl p-1.5 transition shadow-inner">
+          {/* MAIN CHAT INPUT BAR */}
+          <div className="relative flex items-center bg-[#f8fafc] border border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 rounded-2xl p-1.5 transition shadow-2xs">
             <button
               type="button"
               onClick={handleVoiceInputToggle}
-              className={`p-2 sm:p-2.5 rounded-xl transition ${
+              className={`p-2 sm:p-2.5 rounded-xl transition cursor-pointer ${
                 isListening 
                   ? 'bg-rose-600 text-white animate-bounce' 
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/60'
               }`}
               title={isListening ? "Listening... Click to stop" : "Voice Input"}
             >
@@ -1873,10 +1815,10 @@ export const AiTutorApp = memo(function AiTutorApp({
             <button
               type="button"
               onClick={() => setShowCameraModal(true)}
-              className={`p-2 sm:p-2.5 rounded-xl transition flex items-center justify-center shrink-0 ${
+              className={`p-2 sm:p-2.5 rounded-xl transition flex items-center justify-center shrink-0 cursor-pointer ${
                 selectedImages.length > 0 
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-400/50' 
-                  : 'text-indigo-400 hover:bg-slate-800 hover:text-indigo-300'
+                  ? 'bg-emerald-600 text-white shadow-xs' 
+                  : 'text-blue-600 hover:bg-blue-50'
               }`}
               title="Snap or Upload Homework Assignment Pages"
             >
@@ -1897,10 +1839,10 @@ export const AiTutorApp = memo(function AiTutorApp({
                 setShowMathPalette(!showMathPalette);
                 if (showSavedFormulasPanel) setShowSavedFormulasPanel(false);
               }}
-              className={`hidden sm:flex p-2 rounded-xl transition font-mono text-[11px] font-black items-center justify-center shrink-0 ${
+              className={`hidden sm:flex p-2 rounded-xl transition font-mono text-[11px] font-black items-center justify-center shrink-0 cursor-pointer ${
                 showMathPalette 
-                  ? 'bg-indigo-600 text-white' 
-                  : 'text-indigo-400 hover:bg-slate-800 hover:text-indigo-300'
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-blue-600 hover:bg-blue-50'
               }`}
               title="Insert Math Symbols & LaTeX"
             >
@@ -1914,10 +1856,10 @@ export const AiTutorApp = memo(function AiTutorApp({
                 setShowSavedFormulasPanel(!showSavedFormulasPanel);
                 if (showMathPalette) setShowMathPalette(false);
               }}
-              className={`hidden sm:flex p-2 rounded-xl transition text-[11px] font-bold items-center space-x-1 shrink-0 ${
+              className={`hidden sm:flex p-2 rounded-xl transition text-[11px] font-bold items-center space-x-1 shrink-0 cursor-pointer ${
                 showSavedFormulasPanel 
-                  ? 'bg-amber-500 text-slate-950 font-extrabold shadow-md' 
-                  : 'text-amber-400 hover:bg-slate-800 hover:text-amber-300'
+                  ? 'bg-amber-500 text-white font-extrabold shadow-xs' 
+                  : 'text-amber-700 hover:bg-amber-50'
               }`}
               title="Saved Formulas & Equations"
             >
@@ -1943,7 +1885,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                   ? `${selectedImages.length} page(s) attached! Press Send...` 
                   : `Ask AI Tutor about ${selectedSubject}...`
               }
-              className="flex-1 bg-transparent border-0 px-2.5 sm:px-3 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none resize-none max-h-24 py-2"
+              className="flex-1 bg-transparent border-0 px-2.5 sm:px-3 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none resize-none max-h-24 py-2 font-medium"
             />
 
             {inputQuery.length > 0 && (
@@ -1956,7 +1898,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                   } catch (e) {}
                   textareaRef.current?.focus();
                 }}
-                className="p-2 sm:p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl transition flex items-center justify-center shrink-0 border border-slate-700/60 mr-1 cursor-pointer"
+                className="p-2 sm:p-2.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-xl transition flex items-center justify-center shrink-0 mr-1 cursor-pointer"
                 title="Clear Input"
               >
                 <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -1967,24 +1909,24 @@ export const AiTutorApp = memo(function AiTutorApp({
               type="button"
               onClick={() => handleSendMessage()}
               disabled={(!inputQuery.trim() && selectedImages.length === 0) || isLoading}
-              className="p-2 sm:p-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center shrink-0 cursor-pointer"
+              className="p-2.5 sm:p-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600 text-white font-bold rounded-xl shadow-xs transition flex items-center justify-center shrink-0 cursor-pointer active:scale-95"
               title="Send Message"
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>
           </div>
 
-          <div className="flex items-center justify-between text-[10px] text-slate-500 px-1">
+          <div className="flex items-center justify-between text-[10px] text-slate-400 px-1 font-medium">
             <div className="flex items-center space-x-2">
-              <span>Subject: <strong className="text-slate-300">{selectedSubject}</strong></span>
+              <span>Subject: <strong className="text-slate-700">{selectedSubject}</strong></span>
               {inputQuery.trim().length > 0 && (
-                <span className="text-[9px] text-emerald-400 font-semibold flex items-center space-x-1 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-[9px] text-emerald-700 font-semibold flex items-center space-x-1 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   <span>Draft saved</span>
                 </span>
               )}
             </div>
-            <span className="hidden sm:inline">Shift + Enter for new line</span>
+            <span className="hidden sm:inline">Shift + Enter for new line • Enter to send</span>
           </div>
         </div>
 

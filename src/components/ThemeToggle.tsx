@@ -4,11 +4,24 @@ import { useTheme } from '../context/ThemeContext';
 
 interface ThemeToggleProps {
   className?: string;
-  variant?: 'header' | 'compact' | 'pill';
+  variant?: 'header' | 'compact' | 'pill' | 'lunar';
 }
 
 export const ThemeToggle: React.FC<ThemeToggleProps> = ({ className = '', variant = 'header' }) => {
   const { toggleTheme, isDark } = useTheme();
+
+  if (variant === 'lunar') {
+    return (
+      <button
+        type="button"
+        onClick={toggleTheme}
+        className={`w-8 h-8 rounded-full bg-[#2a2420] hover:bg-[#38312b] border border-[#483e36] text-purple-300 flex items-center justify-center cursor-pointer transition shadow-xs active:scale-95 shrink-0 ${className}`}
+        title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+      >
+        <span className="text-sm select-none">🌙</span>
+      </button>
+    );
+  }
 
   if (variant === 'pill') {
     return (
