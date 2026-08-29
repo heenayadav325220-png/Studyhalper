@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { 
   Sparkles, 
@@ -58,6 +58,7 @@ import {
 } from './services/firebaseDb';
 import UserAvatar from './components/UserAvatar';
 import AvatarSelectorModal, { AvatarSelectionData } from './components/AvatarSelectorModal';
+import ThemeToggle from './components/ThemeToggle';
 import QuizSection from './components/QuizSection';
 import PWAInstallBanner, { PWAHeaderButton } from './components/PWAInstallBanner';
 import type { 
@@ -607,24 +608,27 @@ export default function App() {
   };
 
   return (
-    <div className="bg-[#f8fafc] text-slate-800 min-h-screen font-sans flex flex-col selection:bg-indigo-500 selection:text-white w-full max-w-full overflow-x-hidden">
+    <div className="bg-[#f8fafc] dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen font-sans flex flex-col selection:bg-indigo-500 selection:text-white w-full max-w-full overflow-x-hidden transition-colors duration-200">
       {/* COMPACT TOP HEADER */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-3 sm:px-4 py-2 flex items-center justify-between shadow-xs w-full max-w-full overflow-hidden">
+      <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 px-3 sm:px-4 py-2 flex items-center justify-between shadow-xs w-full max-w-full overflow-hidden transition-colors duration-200">
         <div className="flex items-center space-x-2 shrink min-w-0">
           <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-xs font-black text-lg shrink-0">
             🎓
           </div>
           <div className="min-w-0">
-            <h1 className="text-xs font-black tracking-tight text-slate-900 truncate">
+            <h1 className="text-xs font-black tracking-tight text-slate-900 dark:text-white truncate">
               ASCEND STUDY
             </h1>
-            <p className="text-[9px] font-bold text-indigo-600 uppercase tracking-wider truncate max-w-[120px] sm:max-w-[220px]">
+            <p className="text-[9px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider truncate max-w-[120px] sm:max-w-[220px]">
               {userProfile.name ? `${userProfile.name}'s Companion` : 'Student Companion'}
             </p>
           </div>
         </div>
 
         <div className="flex items-center space-x-1.5 shrink-0">
+          {/* THEME TOGGLE BUTTON */}
+          <ThemeToggle />
+
           {/* USER AVATAR BUTTON (DIRECT ACCESS) */}
           <button
             onClick={() => setShowAvatarModal(true)}
@@ -866,128 +870,232 @@ export default function App() {
               </div>
             )}
 
-            {/* 2. ACADEMY PLAYGROUND */}
-            <div className="space-y-2.5">
+            {/* 2. ACADEMY PLAYGROUND - MATCHING USER EDIT DESIGN */}
+            <div className="space-y-3">
               <h3 className="font-extrabold text-slate-900 text-xs tracking-wide uppercase flex items-center space-x-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
                 <span>ACADEMY PLAYGROUND 🚀</span>
               </h3>
 
-              <div className="grid grid-cols-2 gap-2.5">
-                {/* CARD 1: AI TUTOR QUICK LINK - OPENS DEDICATED FULL AI APP INTERFACE */}
-                <button
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5">
+                {/* CARD 1: AI TUTOR - CYAN NEON GLOW */}
+                <motion.button
+                  whileHover={{ y: -2, scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => setActiveTab('aiTutor')}
-                  className="p-3.5 rounded-2xl bg-indigo-600 text-white text-left shadow-xs hover:bg-indigo-700 transition flex flex-col justify-between h-32 group cursor-pointer"
+                  className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-cyan-400/90 hover:border-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.22)] bg-gradient-to-br from-slate-950 via-[#071d2c] to-[#042436] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
                 >
-                  <div className="flex justify-between items-start">
-                    <BrainCircuit className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                    <span className="text-[8px] font-bold uppercase bg-white/20 px-1.5 py-0.5 rounded-md">STANDALONE APP</span>
+                  {/* Subtle cosmic particles / grid overlay */}
+                  <div className="absolute inset-0 pointer-events-none opacity-40">
+                    <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="20%" cy="30%" r="1.5" fill="#38bdf8" />
+                      <circle cx="75%" cy="25%" r="2" fill="#38bdf8" />
+                      <circle cx="85%" cy="65%" r="1" fill="#38bdf8" />
+                      <circle cx="45%" cy="80%" r="1.5" fill="#38bdf8" />
+                      <circle cx="15%" cy="75%" r="1" fill="#38bdf8" />
+                      <circle cx="60%" cy="45%" r="2" fill="#38bdf8" />
+                    </svg>
                   </div>
-                  <div>
-                    <h4 className="font-extrabold text-sm">AI Tutor ⚡</h4>
-                    <p className="text-[10px] text-indigo-100 leading-tight mt-0.5">Full AI Assistant • Step-by-step solver</p>
-                  </div>
-                </button>
+                  <div className="absolute -top-12 -right-12 w-28 h-28 bg-cyan-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-cyan-500/30 transition-all" />
 
-                {/* CARD 2: REAL AI IMAGE GENERATOR ENGINE */}
-                <button
+                  <div className="flex justify-between items-start relative z-10">
+                    <div className="text-cyan-300 group-hover:scale-110 transition-transform">
+                      <BrainCircuit className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 backdrop-blur-md">
+                      STANDALONE APP
+                    </span>
+                  </div>
+
+                  <div className="relative z-10">
+                    <h4 className="font-black text-xs sm:text-base text-white flex items-center gap-1 tracking-tight">
+                      <span>AI Tutor</span>
+                      <span className="text-amber-400">⚡</span>
+                    </h4>
+                    <p className="text-[9px] sm:text-[11px] text-cyan-100/70 font-medium leading-tight mt-0.5 line-clamp-1 sm:line-clamp-none">
+                      Full AI Assistant • Step-by-step solver
+                    </p>
+                  </div>
+                </motion.button>
+
+                {/* CARD 2: IMAGE GEN - PURPLE NEON GLOW */}
+                <motion.button
+                  whileHover={{ y: -2, scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => setActiveTab('imageGen')}
-                  className="p-3.5 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 text-white text-left shadow-xs hover:opacity-95 transition flex flex-col justify-between h-32 group cursor-pointer"
+                  className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-purple-500/90 hover:border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.22)] bg-gradient-to-br from-slate-950 via-[#18092a] to-[#290b47] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
                 >
-                  <div className="flex justify-between items-start">
-                    <ImageIcon className="w-6 h-6 group-hover:scale-110 transition-transform text-amber-300" />
-                    <span className="text-[8px] font-bold uppercase bg-white/20 px-1.5 py-0.5 rounded-md">REAL ENGINE</span>
+                  {/* Glowing purple energy wave SVG */}
+                  <div className="absolute inset-0 pointer-events-none opacity-40">
+                    <svg className="w-full h-full" viewBox="0 0 200 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M0 60 C 50 30, 100 80, 200 40" stroke="#c084fc" strokeWidth="1.5" strokeDasharray="3 3" />
+                      <circle cx="65%" cy="35%" r="2" fill="#e879f9" />
+                      <circle cx="85%" cy="55%" r="1.5" fill="#c084fc" />
+                      <circle cx="20%" cy="40%" r="1" fill="#e879f9" />
+                    </svg>
                   </div>
-                  <div>
-                    <h4 className="font-extrabold text-sm">Image Gen 🎨</h4>
-                    <p className="text-[10px] text-indigo-100 leading-tight mt-0.5">Generate real diagrams & visual art</p>
-                  </div>
-                </button>
+                  <div className="absolute -top-12 -right-12 w-28 h-28 bg-purple-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/30 transition-all" />
 
-                {/* CARD 3: QUIZ */}
-                <button
+                  <div className="flex justify-between items-start relative z-10">
+                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl bg-amber-500/20 border border-amber-400/60 flex items-center justify-center text-amber-300 group-hover:scale-110 transition-transform shadow-xs">
+                      <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300" />
+                    </div>
+                    <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 backdrop-blur-md">
+                      REAL ENGINE
+                    </span>
+                  </div>
+
+                  <div className="relative z-10">
+                    <h4 className="font-black text-xs sm:text-base text-white flex items-center gap-1 tracking-tight">
+                      <span>Image Gen</span>
+                      <span className="text-amber-300">🎨</span>
+                    </h4>
+                    <p className="text-[9px] sm:text-[11px] text-purple-200/70 font-medium leading-tight mt-0.5 line-clamp-1 sm:line-clamp-none">
+                      Generate real diagrams & visual art
+                    </p>
+                  </div>
+                </motion.button>
+
+                {/* CARD 3: QUIZ - EMERALD NEON GLOW */}
+                <motion.button
+                  whileHover={{ y: -2, scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => setActiveTab('mockExam')}
-                  className="p-3.5 rounded-2xl bg-emerald-500 text-white text-left shadow-xs hover:bg-emerald-600 transition flex flex-col justify-between h-32 cursor-pointer"
+                  className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-emerald-400/90 hover:border-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.22)] bg-gradient-to-br from-slate-950 via-[#051f16] to-[#043321] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
                 >
-                  <div className="flex justify-between items-start">
-                    <GraduationCap className="w-6 h-6" />
-                    <span className="text-[8px] font-bold uppercase bg-white/20 px-1.5 py-0.5 rounded-md">QUIZ</span>
+                  {/* Subtle sacred geometry / wireframe lines */}
+                  <div className="absolute inset-0 pointer-events-none opacity-20 flex items-center justify-center">
+                    <svg className="w-40 h-40" viewBox="0 0 100 100" fill="none" stroke="#34d399" strokeWidth="0.75">
+                      <polygon points="50 5, 90 25, 90 75, 50 95, 10 75, 10 25" />
+                      <polygon points="50 15, 80 30, 80 70, 50 85, 20 70, 20 30" />
+                      <circle cx="50" cy="50" r="30" />
+                    </svg>
                   </div>
-                  <div>
-                    <h4 className="font-extrabold text-sm">Quiz 🏆</h4>
-                    <p className="text-[10px] text-emerald-100 leading-tight mt-0.5">Test subject skills, earn XP</p>
-                  </div>
-                </button>
+                  <div className="absolute -top-12 -right-12 w-28 h-28 bg-emerald-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-emerald-500/30 transition-all" />
 
-                {/* CARD 4: NOTEBOOK */}
-                <button
+                  <div className="flex justify-between items-start relative z-10">
+                    <div className="text-emerald-300 group-hover:scale-110 transition-transform">
+                      <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 backdrop-blur-md">
+                      QUIZ
+                    </span>
+                  </div>
+
+                  <div className="relative z-10">
+                    <h4 className="font-black text-xs sm:text-base text-white flex items-center gap-1 tracking-tight">
+                      <span>Quiz</span>
+                      <span className="text-amber-400">🏆</span>
+                    </h4>
+                    <p className="text-[9px] sm:text-[11px] text-emerald-100/70 font-medium leading-tight mt-0.5 line-clamp-1 sm:line-clamp-none">
+                      Test subject skills, earn XP
+                    </p>
+                  </div>
+                </motion.button>
+
+                {/* CARD 4: NOTEBOOK - AMBER NEON GLOW */}
+                <motion.button
+                  whileHover={{ y: -2, scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => setActiveTab('studyDocs')}
-                  className="p-3.5 rounded-2xl bg-amber-500 text-white text-left shadow-xs hover:bg-amber-600 transition flex flex-col justify-between h-32 cursor-pointer"
+                  className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-amber-400/90 hover:border-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.22)] bg-gradient-to-br from-slate-950 via-[#221504] to-[#3a2003] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
                 >
-                  <div className="flex justify-between items-start">
-                    <BookOpen className="w-6 h-6" />
-                    <span className="text-[8px] font-bold uppercase bg-white/20 px-1.5 py-0.5 rounded-md">NOTEBOOK</span>
+                  {/* Subtle sacred geometry / star lines */}
+                  <div className="absolute inset-0 pointer-events-none opacity-20 flex items-center justify-center">
+                    <svg className="w-40 h-40" viewBox="0 0 100 100" fill="none" stroke="#fbbf24" strokeWidth="0.75">
+                      <polygon points="50 5, 90 25, 90 75, 50 95, 10 75, 10 25" />
+                      <circle cx="50" cy="50" r="38" />
+                      <circle cx="50" cy="50" r="22" />
+                    </svg>
                   </div>
-                  <div>
-                    <h4 className="font-extrabold text-sm">Notebook 📝</h4>
-                    <p className="text-[10px] text-amber-100 leading-tight mt-0.5">Formula sheets & visual notes</p>
+                  <div className="absolute -top-12 -right-12 w-28 h-28 bg-amber-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-amber-500/30 transition-all" />
+
+                  <div className="flex justify-between items-start relative z-10">
+                    <div className="text-amber-300 group-hover:scale-110 transition-transform">
+                      <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 backdrop-blur-md">
+                      NOTEBOOK
+                    </span>
                   </div>
-                </button>
+
+                  <div className="relative z-10">
+                    <h4 className="font-black text-xs sm:text-base text-white flex items-center gap-1 tracking-tight">
+                      <span>Notebook</span>
+                      <span className="text-amber-200">📝</span>
+                    </h4>
+                    <p className="text-[9px] sm:text-[11px] text-amber-100/70 font-medium leading-tight mt-0.5 line-clamp-1 sm:line-clamp-none">
+                      Formula sheets & visual notes
+                    </p>
+                  </div>
+                </motion.button>
               </div>
 
-              {/* ADVANCED STUDY TOOLKIT BANNER - ANIMATED PROFESSIONAL LOOK */}
+              {/* ADVANCED STUDY TOOLKIT BANNER - EXACT MATCH WITH REFERENCE IMAGE */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 whileHover={{ y: -2 }}
-                className="w-full p-4 rounded-3xl bg-slate-900 border border-slate-800 text-white shadow-xl relative overflow-hidden group"
+                className="w-full p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-[#080d20] via-[#0f1738] to-[#1a0f3d] border-2 border-indigo-500/50 shadow-[0_0_35px_rgba(99,102,241,0.3)] text-white relative overflow-hidden group"
               >
-                {/* Ambient glow accent behind banner */}
-                <div className="absolute -right-10 -top-10 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl group-hover:bg-indigo-500/30 transition-all pointer-events-none" />
-                <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+                {/* Ambient cosmic glows */}
+                <div className="absolute -right-10 -top-10 w-48 h-48 bg-indigo-500/25 rounded-full blur-3xl group-hover:bg-indigo-500/35 transition-all pointer-events-none" />
+                <div className="absolute -left-10 -bottom-10 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
 
-                <div className="flex items-start justify-between relative z-10">
-                  <div className="flex items-start space-x-3.5">
+                {/* Subtle digital code / matrix watermark overlay */}
+                <div className="absolute right-12 top-2 bottom-2 w-48 opacity-10 pointer-events-none hidden sm:block font-mono text-[8px] text-indigo-300 select-none overflow-hidden">
+                  <div>const studyFlow = async () =&gt; &#123;</div>
+                  <div>&nbsp;&nbsp;await brain.activate();</div>
+                  <div>&nbsp;&nbsp;return &#123; solved: true, xp: +50 &#125;;</div>
+                  <div>&#125;</div>
+                </div>
+
+                <div className="flex items-center justify-between relative z-10">
+                  <div className="flex items-center space-x-3.5">
+                    {/* Glowing Sparkle Badge */}
                     <motion.div
-                      whileHover={{ rotate: 15, scale: 1.1 }}
+                      whileHover={{ rotate: 12, scale: 1.08 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => openToolkitWithTool()}
-                      className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-600/30 cursor-pointer border border-indigo-400/30"
+                      className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-indigo-500 via-indigo-600 to-purple-500 flex items-center justify-center text-white shrink-0 shadow-[0_0_20px_rgba(99,102,241,0.5)] cursor-pointer border border-indigo-300/40"
                     >
-                      <Sparkles className="w-6 h-6 animate-pulse" />
+                      <Sparkles className="w-7 h-7 text-white animate-pulse" />
                     </motion.div>
+
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-black tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase">
-                          19+ ADVANCED TOOLS
+                        <span className="text-[10px] font-black tracking-wider px-2.5 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/40 uppercase">
+                          18 ➔ ADVANCED TOOLS
                         </span>
-                        <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
                       </div>
                       <h4 
                         onClick={() => openToolkitWithTool()}
-                        className="font-extrabold text-base text-white mt-1 cursor-pointer hover:text-indigo-300 transition"
+                        className="font-extrabold text-base sm:text-lg text-white mt-1 cursor-pointer hover:text-indigo-300 transition flex items-center gap-1.5"
                       >
-                        Advanced Study Toolkit ⚡
+                        <span>Advanced Study Toolkit</span>
+                        <span className="text-amber-400">⚡</span>
                       </h4>
-                      <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed max-w-sm">
+                      <p className="text-[11px] text-slate-300/80 mt-0.5 leading-relaxed max-w-md font-medium">
                         Scientific Calculator, Mind Maps, Mock Tests, Ambient Sounds & OCR Vision
                       </p>
                     </div>
                   </div>
 
+                  {/* Circular Chevron Button */}
                   <motion.button
-                    whileHover={{ scale: 1.08, x: 2 }}
+                    whileHover={{ scale: 1.1, x: 2 }}
                     whileTap={{ scale: 0.92 }}
                     onClick={() => openToolkitWithTool()}
-                    className="p-2.5 rounded-2xl bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white transition shadow-md border border-slate-700/60 cursor-pointer shrink-0"
+                    className="w-10 h-10 rounded-full bg-white/10 hover:bg-indigo-600 text-slate-200 hover:text-white transition-all shadow-md border border-white/20 flex items-center justify-center cursor-pointer shrink-0"
                     title="Launch Toolkit"
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="w-5 h-5" />
                   </motion.button>
                 </div>
 
                 {/* Quick-Launch Animated Tool Chips */}
-                <div className="mt-3.5 pt-3 border-t border-slate-800/80 flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none relative z-10">
+                <div className="mt-4 pt-3.5 border-t border-white/10 flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-none relative z-10">
                   {[
                     { id: 'calc', name: '🧮 Sci-Calc' },
                     { id: 'mindmap', name: '🌳 Mind Maps' },
@@ -1003,7 +1111,7 @@ export default function App() {
                       whileHover={{ scale: 1.05, y: -1 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => openToolkitWithTool(tool.id)}
-                      className="px-2.5 py-1 rounded-xl bg-slate-800/90 hover:bg-indigo-950/80 border border-slate-700/60 hover:border-indigo-500/50 text-[10px] font-bold text-slate-300 hover:text-indigo-300 whitespace-nowrap transition cursor-pointer flex items-center gap-1 shadow-xs"
+                      className="px-3 py-1.5 rounded-2xl bg-slate-900/90 hover:bg-indigo-950/90 border border-slate-700/80 hover:border-indigo-400/60 text-[11px] font-bold text-slate-200 hover:text-white whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 shadow-sm"
                     >
                       {tool.name}
                     </motion.button>
@@ -1012,43 +1120,56 @@ export default function App() {
               </motion.div>
             </div>
 
-            {/* 4. 5-DAY STUDY STREAK */}
-            <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs space-y-3">
+            {/* 4. 5-DAY STUDY STREAK - MATCHING USER EDIT DESIGN */}
+            <div className="rounded-3xl p-4 sm:p-5 border-2 border-indigo-500/70 bg-gradient-to-b from-[#101432] via-[#0b0e26] to-[#070a1e] text-white shadow-[0_0_30px_rgba(99,102,241,0.25)] space-y-3.5 sm:space-y-4 relative overflow-hidden">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-extrabold text-slate-900 text-xs tracking-wide uppercase flex items-center space-x-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                  <h3 className="font-extrabold text-white text-xs sm:text-sm tracking-wide uppercase flex items-center space-x-1.5">
+                    <Calendar className="w-4 h-4 text-purple-400" />
                     <span>5-DAY STUDY STREAK</span>
                   </h3>
-                  <p className="text-[11px] text-slate-500">Complete goals to keep momentum high</p>
+                  <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">Complete goals to keep momentum high</p>
                 </div>
 
-                <div className="px-2.5 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-full text-[10px] font-bold flex items-center space-x-1">
-                  <Flame className="w-3 h-3 fill-emerald-500 text-emerald-500" />
-                  <span>Streak: {userProfile.streak}/5 Days</span>
+                {/* Streak Badge Pill */}
+                <div className="px-3 py-1.5 sm:px-3.5 sm:py-1.5 bg-gradient-to-r from-amber-500/20 via-amber-600/10 to-amber-500/20 border border-amber-400/60 rounded-2xl text-xs font-black text-amber-200 flex items-center gap-2 shadow-[0_0_15px_rgba(251,191,36,0.3)]">
+                  <span className="text-sm">💎</span>
+                  <div className="leading-tight text-right sm:text-left">
+                    <div className="font-black text-[11px] sm:text-xs text-amber-100">Streak: {userProfile.streak}/5</div>
+                    <div className="text-[9px] font-bold text-amber-300/80 uppercase tracking-wider">Days</div>
+                  </div>
                 </div>
               </div>
 
-              {/* DAY PILLS */}
-              <div className="grid grid-cols-5 gap-1.5">
-                {['DAY 1\nMon', 'DAY 2\nTue', 'DAY 3\nWed', 'DAY 4\nThu', 'DAY 5\nFri'].map((dayStr, idx) => {
-                  const [d, w] = dayStr.split('\n');
+              {/* DAY PILLS (5-DAY CARDS) */}
+              <div className="grid grid-cols-5 gap-1.5 sm:gap-2.5">
+                {[
+                  { d: 'DAY 1', w: 'Mon' },
+                  { d: 'DAY 2', w: 'Tue' },
+                  { d: 'DAY 3', w: 'Wed' },
+                  { d: 'DAY 4', w: 'Thu' },
+                  { d: 'DAY 5', w: 'Fri' }
+                ].map((item, idx) => {
                   const isDone = streakCompletedDays[idx];
+                  const isDay1 = idx === 0;
+                  const isHighlighted = isDay1 || isDone;
                   return (
                     <div 
                       key={idx}
-                      className={`p-2 rounded-xl border text-center transition-all ${
-                        isDone || idx === 0
-                          ? 'bg-indigo-50/60 border-indigo-300 text-indigo-900'
-                          : 'bg-slate-50 border-slate-200 text-slate-400'
+                      className={`p-2 sm:p-3 rounded-2xl text-center flex flex-col items-center justify-between h-22 sm:h-26 transition-all ${
+                        isHighlighted
+                          ? 'border-2 border-amber-400 bg-slate-900/90 shadow-[0_0_15px_rgba(251,191,36,0.35)] text-amber-100'
+                          : 'border border-slate-800/80 bg-[#0d122b]/80 text-slate-300'
                       }`}
                     >
-                      <div className="text-[9px] font-bold text-slate-500">{d}</div>
-                      <div className="font-bold text-[11px]">{w}</div>
-                      <div className="mt-1 flex justify-center">
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${isDone ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-400'}`}>
-                          🎯
-                        </div>
+                      <div className={`text-[8.5px] sm:text-[10px] font-black uppercase tracking-wider ${isHighlighted ? 'text-amber-300' : 'text-slate-500'}`}>
+                        {item.d}
+                      </div>
+                      <div className={`font-black text-xs sm:text-sm ${isHighlighted ? 'text-amber-100' : 'text-slate-200'}`}>
+                        {item.w}
+                      </div>
+                      <div className="flex justify-center items-center">
+                        <span className="text-xs sm:text-sm">🎯</span>
                       </div>
                     </div>
                   );
@@ -1056,67 +1177,83 @@ export default function App() {
               </div>
 
               {/* GOAL BOX */}
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
-                <div>
+              <div className="p-3.5 sm:p-4 bg-[#0c122e]/90 border border-indigo-950/80 rounded-2xl flex items-center justify-between relative overflow-hidden">
+                <div className="pr-2">
                   <div className="flex items-center space-x-1.5">
-                    <span className="text-[9px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">
+                    <span className="text-[9px] sm:text-[10px] font-black bg-indigo-950 text-indigo-300 border border-indigo-700/60 px-2 py-0.5 rounded-full uppercase tracking-wider">
                       DAY 1 GOAL
                     </span>
-                    <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">
+                    <span className="text-[9px] sm:text-[10px] font-black bg-emerald-950 text-emerald-300 border border-emerald-600/60 px-2 py-0.5 rounded-full">
                       +20 XP
                     </span>
                   </div>
-                  <p className="font-bold text-slate-800 text-xs mt-1">
+                  <p className="font-extrabold text-white text-xs sm:text-sm mt-1.5 max-w-xs leading-snug">
                     Ask AI Tutor a homework question
                   </p>
                 </div>
 
-                <button
-                  onClick={handleCompleteDayGoal}
-                  className={`px-3 py-1.5 rounded-xl font-bold text-[11px] transition shadow-xs ${
-                    day1GoalCompleted
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-emerald-500 hover:bg-emerald-600 text-white'
-                  }`}
-                >
-                  {day1GoalCompleted ? 'Done ✓' : 'Complete ✓'}
-                </button>
+                {/* Task Complete Button with Festive Confetti Sprinkles */}
+                <div className="relative shrink-0">
+                  <div className="absolute -top-2.5 -left-2.5 pointer-events-none text-xs animate-bounce select-none">🎉</div>
+                  <div className="absolute -bottom-2 -left-1.5 pointer-events-none text-[10px] select-none text-cyan-400">✦</div>
+                  <div className="absolute -top-2 -right-1.5 pointer-events-none text-[10px] select-none text-amber-300">★</div>
+                  <div className="absolute -bottom-2.5 -right-2 pointer-events-none text-xs select-none">🎊</div>
+                  
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleCompleteDayGoal}
+                    className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl font-black text-xs sm:text-sm bg-emerald-500 hover:bg-emerald-400 text-white shadow-[0_0_20px_rgba(16,185,129,0.5)] transition flex flex-col items-center justify-center leading-tight cursor-pointer"
+                  >
+                    <span>Task</span>
+                    <span>Complete!</span>
+                  </motion.button>
+                </div>
               </div>
             </div>
 
-            {/* 5. DAILY STUDY QUESTS */}
-            <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs space-y-2.5">
+            {/* 5. DAILY STUDY QUESTS - MATCHING USER EDIT DESIGN */}
+            <div className="rounded-3xl p-4 sm:p-5 border-2 border-slate-800/90 bg-gradient-to-b from-[#0e142e] via-[#090d22] to-[#060919] text-white shadow-[0_0_25px_rgba(30,58,138,0.25)] space-y-3.5 relative overflow-hidden">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-extrabold text-slate-900 text-xs tracking-wide uppercase flex items-center space-x-1.5">
-                    <Flame className="w-3.5 h-3.5 text-amber-500" />
+                  <h3 className="font-extrabold text-white text-xs sm:text-sm tracking-wide uppercase flex items-center space-x-1.5">
+                    <Flame className="w-4 h-4 text-amber-500" />
                     <span>DAILY STUDY QUESTS</span>
                   </h3>
-                  <p className="text-[11px] text-slate-500">Finish missions, gain bonus XP</p>
+                  <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">Finish missions, gain bonus XP</p>
                 </div>
-                <span className="px-2.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-[10px] font-bold">
-                  🔥 Streak: 5 Days
-                </span>
+                <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/40 text-amber-300 font-bold text-[11px] sm:text-xs rounded-full flex items-center gap-1.5 shadow-[0_0_12px_rgba(245,158,11,0.25)]">
+                  <Flame className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                  <span>Streak: 5 Days</span>
+                </div>
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-2 sm:space-y-2.5">
                 {quests.map((q) => (
-                  <div key={q.id} className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
-                    <div className="flex items-center space-x-2.5">
+                  <motion.div 
+                    key={q.id} 
+                    whileHover={{ y: -1, scale: 1.005 }}
+                    onClick={() => handleCompleteQuest(q.id)}
+                    className="p-3 sm:p-3.5 bg-[#0c1430]/80 hover:bg-[#101b3d] border border-indigo-950/80 rounded-2xl flex items-center justify-between transition group cursor-pointer shadow-xs"
+                  >
+                    <div className="flex items-center space-x-3 pr-2">
                       <button 
-                        onClick={() => handleCompleteQuest(q.id)}
-                        className={`w-5 h-5 rounded-full flex items-center justify-center transition ${q.completed ? 'bg-emerald-500 text-white' : 'border-2 border-slate-300'}`}
+                        className={`w-6 h-6 rounded-full flex items-center justify-center transition shrink-0 ${
+                          q.completed 
+                            ? 'bg-emerald-500 text-white shadow-[0_0_10px_rgba(16,185,129,0.5)]' 
+                            : 'border-2 border-indigo-400/40 group-hover:border-indigo-400'
+                        }`}
                       >
-                        {q.completed && <Check className="w-3 h-3" />}
+                        {q.completed ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : null}
                       </button>
-                      <span className={`text-xs font-bold ${q.completed ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                      <span className={`text-xs sm:text-sm font-bold transition ${q.completed ? 'line-through text-slate-500' : 'text-slate-100 group-hover:text-white'}`}>
                         {q.title}
                       </span>
                     </div>
-                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    <span className="text-[10px] sm:text-[11px] font-black text-emerald-300 bg-emerald-950/90 px-2.5 py-1 rounded-full border border-emerald-500/40 shadow-xs shrink-0">
                       +{q.xp} XP
                     </span>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </div>
@@ -1850,23 +1987,25 @@ export default function App() {
               })}
             </div>
 
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2 text-[11px]">
               <button
                 onClick={() => {
                   toggleLanguage();
                 }}
-                className="w-full py-1.5 px-2 bg-slate-100 hover:bg-slate-200/80 text-slate-700 rounded-xl font-bold flex items-center justify-center space-x-1.5 transition"
+                className="py-1.5 px-2 bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold flex items-center justify-center space-x-1.5 transition"
               >
-                <Globe className="w-3.5 h-3.5 text-indigo-600" />
+                <Globe className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                 <span>Lang: {appLanguage.toUpperCase()}</span>
               </button>
+
+              <ThemeToggle variant="pill" className="w-full justify-center" />
             </div>
           </div>
         </>
       )}
 
       {/* COMPACT & SLIM BOTTOM STICKY NAVIGATION BAR */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-4 py-1 flex items-center justify-around shadow-xs h-12">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 px-4 py-1 flex items-center justify-around shadow-xs h-12 transition-colors duration-200">
         {[
           { id: 'home', label: 'Home', icon: BookOpen },
           { id: 'aiTutor', label: 'AI Tutor', icon: BrainCircuit, badge: 'PRO' },

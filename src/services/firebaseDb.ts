@@ -8,7 +8,8 @@ import {
   onSnapshot, 
   query, 
   where, 
-  orderBy 
+  orderBy,
+  limit
 } from './firebase';
 import type { UserProfile, RoomChatMessage, WhiteboardElement, MockExam, StudyDocument } from '../types';
 
@@ -70,7 +71,7 @@ export function subscribeToChats(roomId: string, callback: (messages: RoomChatMe
   }
   try {
     const chatsRef = collection(db, `rooms/${roomId}/chats`);
-    const q = query(chatsRef, orderBy("timestamp", "asc"));
+    const q = query(chatsRef, orderBy("timestamp", "asc"), limit(100));
     return onSnapshot(q, (snapshot) => {
       const messages: RoomChatMessage[] = [];
       snapshot.forEach((d) => {
@@ -123,7 +124,7 @@ export function subscribeToWhiteboard(roomId: string, callback: (elements: White
   }
   try {
     const wbRef = collection(db, `rooms/${roomId}/whiteboard`);
-    const q = query(wbRef, orderBy("timestamp", "asc"));
+    const q = query(wbRef, orderBy("timestamp", "asc"), limit(200));
     return onSnapshot(q, (snapshot) => {
       const elements: WhiteboardElement[] = [];
       snapshot.forEach((d) => {
@@ -205,7 +206,7 @@ export function subscribeToMockExams(userId: string, callback: (exams: MockExam[
   }
   try {
     const examsRef = collection(db, "exams");
-    const q = query(examsRef, where("userId", "==", userId), orderBy("timestamp", "desc"));
+    const q = query(examsRef, where("userId", "==", userId), orderBy("timestamp", "desc"), limit(50));
     return onSnapshot(q, (snapshot) => {
       const exams: MockExam[] = [];
       snapshot.forEach((d) => {
@@ -265,7 +266,7 @@ export function subscribeToStudyDocuments(ownerId: string, callback: (docs: Stud
   }
   try {
     const docsRef = collection(db, "documents");
-    const q = query(docsRef, where("ownerId", "==", ownerId), orderBy("timestamp", "desc"));
+    const q = query(docsRef, where("ownerId", "==", ownerId), orderBy("timestamp", "desc"), limit(100));
     return onSnapshot(q, (snapshot) => {
       const documents: StudyDocument[] = [];
       snapshot.forEach((d) => {

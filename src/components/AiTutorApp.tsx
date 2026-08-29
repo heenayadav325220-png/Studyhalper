@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, memo } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   ArrowLeft, 
   Send, 
@@ -23,7 +23,13 @@ import {
   Camera,
   Upload,
   RefreshCw,
-  FileDown
+  FileDown,
+  Images,
+  MoreVertical,
+  SlidersHorizontal,
+  Sparkles,
+  ArrowRight,
+  Sliders
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -33,6 +39,16 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { getStudyAnswer } from '../services/geminiService';
 import { exportConversationToPdf } from '../utils/pdfExport';
+import { 
+  AcademicSuggestion, 
+  generateContextualSuggestions, 
+  getAiTutorSuggestions 
+} from '../services/suggestionEngine';
+import {
+  ImageFilterType,
+  HOMEWORK_IMAGE_FILTERS,
+  applyFilterToCanvas
+} from '../utils/imageEnhancement';
 import type { Subject } from '../types';
 
 interface AiTutorAppProps {
@@ -58,9 +74,192 @@ interface ChatMessage {
   subject?: string;
   mode?: string;
   image?: string;
+  images?: string[];
 }
 
 const SUBJECT_LIST: Subject[] = ['Mathematics', 'Science', 'Physics', 'Chemistry', 'Biology', 'English'];
+
+interface SubjectTheme {
+  border: string;
+  glow: string;
+  badgeBg: string;
+  badgeText: string;
+  badgeBorder: string;
+  botBg: string;
+  accentText: string;
+  accentBg: string;
+  pulseColor: string;
+  chipBorder: string;
+  chipBg: string;
+  chipText: string;
+}
+
+const SUBJECT_THEMES: Record<string, SubjectTheme> = {
+  Mathematics: {
+    border: 'border-blue-500/50 hover:border-blue-400/70',
+    glow: 'shadow-blue-950/40 shadow-lg',
+    badgeBg: 'bg-blue-950/80',
+    badgeText: 'text-blue-300',
+    badgeBorder: 'border-blue-500/40',
+    botBg: 'bg-blue-600',
+    accentText: 'text-blue-400',
+    accentBg: 'bg-blue-950/60',
+    pulseColor: 'bg-blue-400',
+    chipBorder: 'border-blue-700/50',
+    chipBg: 'bg-blue-950/60 hover:bg-blue-900/80',
+    chipText: 'text-blue-300',
+  },
+  Science: {
+    border: 'border-emerald-500/50 hover:border-emerald-400/70',
+    glow: 'shadow-emerald-950/40 shadow-lg',
+    badgeBg: 'bg-emerald-950/80',
+    badgeText: 'text-emerald-300',
+    badgeBorder: 'border-emerald-500/40',
+    botBg: 'bg-emerald-600',
+    accentText: 'text-emerald-400',
+    accentBg: 'bg-emerald-950/60',
+    pulseColor: 'bg-emerald-400',
+    chipBorder: 'border-emerald-700/50',
+    chipBg: 'bg-emerald-950/60 hover:bg-emerald-900/80',
+    chipText: 'text-emerald-300',
+  },
+  Physics: {
+    border: 'border-purple-500/50 hover:border-purple-400/70',
+    glow: 'shadow-purple-950/40 shadow-lg',
+    badgeBg: 'bg-purple-950/80',
+    badgeText: 'text-purple-300',
+    badgeBorder: 'border-purple-500/40',
+    botBg: 'bg-purple-600',
+    accentText: 'text-purple-400',
+    accentBg: 'bg-purple-950/60',
+    pulseColor: 'bg-purple-400',
+    chipBorder: 'border-purple-700/50',
+    chipBg: 'bg-purple-950/60 hover:bg-purple-900/80',
+    chipText: 'text-purple-300',
+  },
+  Chemistry: {
+    border: 'border-amber-500/50 hover:border-amber-400/70',
+    glow: 'shadow-amber-950/40 shadow-lg',
+    badgeBg: 'bg-amber-950/80',
+    badgeText: 'text-amber-300',
+    badgeBorder: 'border-amber-500/40',
+    botBg: 'bg-amber-600',
+    accentText: 'text-amber-400',
+    accentBg: 'bg-amber-950/60',
+    pulseColor: 'bg-amber-400',
+    chipBorder: 'border-amber-700/50',
+    chipBg: 'bg-amber-950/60 hover:bg-amber-900/80',
+    chipText: 'text-amber-300',
+  },
+  Biology: {
+    border: 'border-teal-500/50 hover:border-teal-400/70',
+    glow: 'shadow-teal-950/40 shadow-lg',
+    badgeBg: 'bg-teal-950/80',
+    badgeText: 'text-teal-300',
+    badgeBorder: 'border-teal-500/40',
+    botBg: 'bg-teal-600',
+    accentText: 'text-teal-400',
+    accentBg: 'bg-teal-950/60',
+    pulseColor: 'bg-teal-400',
+    chipBorder: 'border-teal-700/50',
+    chipBg: 'bg-teal-950/60 hover:bg-teal-900/80',
+    chipText: 'text-teal-300',
+  },
+  English: {
+    border: 'border-rose-500/50 hover:border-rose-400/70',
+    glow: 'shadow-rose-950/40 shadow-lg',
+    badgeBg: 'bg-rose-950/80',
+    badgeText: 'text-rose-300',
+    badgeBorder: 'border-rose-500/40',
+    botBg: 'bg-rose-600',
+    accentText: 'text-rose-400',
+    accentBg: 'bg-rose-950/60',
+    pulseColor: 'bg-rose-400',
+    chipBorder: 'border-rose-700/50',
+    chipBg: 'bg-rose-950/60 hover:bg-rose-900/80',
+    chipText: 'text-rose-300',
+  },
+};
+
+function getSubjectTheme(subject?: string): SubjectTheme {
+  if (subject && SUBJECT_THEMES[subject]) {
+    return SUBJECT_THEMES[subject];
+  }
+  // Default Indigo / Slate theme
+  return {
+    border: 'border-indigo-500/50 hover:border-indigo-400/70',
+    glow: 'shadow-indigo-950/40 shadow-lg',
+    badgeBg: 'bg-indigo-950/80',
+    badgeText: 'text-indigo-300',
+    badgeBorder: 'border-indigo-500/40',
+    botBg: 'bg-indigo-600',
+    accentText: 'text-indigo-400',
+    accentBg: 'bg-indigo-950/60',
+    pulseColor: 'bg-indigo-400',
+    chipBorder: 'border-indigo-700/50',
+    chipBg: 'bg-indigo-950/60 hover:bg-indigo-900/80',
+    chipText: 'text-indigo-300',
+  };
+}
+
+export interface TutorModeConfig {
+  id: 'homework' | 'explain' | 'step' | 'quiz';
+  label: string;
+  shortLabel: string;
+  icon: string;
+  badgeBg: string;
+  badgeText: string;
+  badgeBorder: string;
+  glow: string;
+  description: string;
+}
+
+export const TUTOR_MODE_CONFIG: Record<'homework' | 'explain' | 'step' | 'quiz', TutorModeConfig> = {
+  homework: {
+    id: 'homework',
+    label: 'Homework Solver',
+    shortLabel: 'Homework',
+    icon: '⚡',
+    badgeBg: 'bg-amber-500/15 hover:bg-amber-500/25',
+    badgeText: 'text-amber-300',
+    badgeBorder: 'border-amber-500/35',
+    glow: 'bg-amber-400',
+    description: 'Instant solutions with full steps and formulas'
+  },
+  step: {
+    id: 'step',
+    label: 'Step-by-Step Math',
+    shortLabel: 'Step Math',
+    icon: '📐',
+    badgeBg: 'bg-cyan-500/15 hover:bg-cyan-500/25',
+    badgeText: 'text-cyan-300',
+    badgeBorder: 'border-cyan-500/35',
+    glow: 'bg-cyan-400',
+    description: 'Pedagogical breakdown with intermediate derivations'
+  },
+  explain: {
+    id: 'explain',
+    label: 'Concept Explainer',
+    shortLabel: 'Explainer',
+    icon: '💡',
+    badgeBg: 'bg-emerald-500/15 hover:bg-emerald-500/25',
+    badgeText: 'text-emerald-300',
+    badgeBorder: 'border-emerald-500/35',
+    glow: 'bg-emerald-400',
+    description: 'Intuitive analogies and real-world examples'
+  },
+  quiz: {
+    id: 'quiz',
+    label: 'Practice Quiz',
+    shortLabel: 'Quiz Mode',
+    icon: '📝',
+    badgeBg: 'bg-purple-500/15 hover:bg-purple-500/25',
+    badgeText: 'text-purple-300',
+    badgeBorder: 'border-purple-500/35',
+    glow: 'bg-purple-400',
+    description: 'Self-assessment questions to test comprehension'
+  }
+};
 
 const QUICK_PROMPTS = [
   { icon: Calculator, label: "Solve Equation", prompt: "Solve step-by-step: 2x² + 5x - 3 = 0" },
@@ -81,107 +280,142 @@ function preprocessLaTeX(content: string): string {
 }
 
 /**
- * TypewriterMarkdown renders AI Markdown response progressively with smooth typing animation
+ * Helper to split markdown text into logical blocks (paragraphs, code blocks, math equations, lists)
  */
-const TypewriterMarkdown = memo(function TypewriterMarkdown({
+function parseMarkdownBlocks(text: string): string[] {
+  if (!text) return [];
+  const normalized = text.trim();
+  
+  // Split on double newlines or standalone math blocks while preserving delimiters
+  const rawBlocks = normalized.split(/\n\s*\n+/);
+  const blocks: string[] = [];
+  
+  for (const block of rawBlocks) {
+    const trimmed = block.trim();
+    if (!trimmed) continue;
+    
+    // If a block contains distinct math formulas $$...$$, preserve them
+    blocks.push(trimmed);
+  }
+  
+  return blocks.length > 0 ? blocks : [text];
+}
+
+/**
+ * StaggeredRevealMarkdown renders AI response with a smooth staggered reveal animation,
+ * revealing blocks of content (paragraphs, formulas, code snippets) one by one for optimal readability.
+ */
+const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
   text,
   isLatest,
 }: {
   text: string;
   isLatest?: boolean;
 }) {
-  const [displayedText, setDisplayedText] = useState(() => (isLatest ? '' : text));
-  const [isDone, setIsDone] = useState(() => !isLatest);
+  const blocks = parseMarkdownBlocks(text);
+  const [visibleCount, setVisibleCount] = useState(() => (isLatest ? 1 : blocks.length));
+  const isAllRevealed = visibleCount >= blocks.length;
 
   useEffect(() => {
     if (!isLatest) {
-      setDisplayedText(text);
-      setIsDone(true);
+      setVisibleCount(blocks.length);
       return;
     }
 
-    let currentIndex = 0;
-    setDisplayedText('');
-    setIsDone(false);
+    setVisibleCount(1);
+    const interval = setInterval(() => {
+      setVisibleCount((prev) => {
+        if (prev >= blocks.length) {
+          clearInterval(interval);
+          return prev;
+        }
+        return prev + 1;
+      });
+    }, 280); // Stagger interval of 280ms per logical paragraph/formula block
 
-    // Dynamic chunk size based on text length for smooth & natural cadence
-    const step = Math.max(3, Math.ceil(text.length / 120));
-    const timer = setInterval(() => {
-      currentIndex += step;
-      if (currentIndex >= text.length) {
-        setDisplayedText(text);
-        setIsDone(true);
-        clearInterval(timer);
-      } else {
-        setDisplayedText(text.slice(0, currentIndex));
-      }
-    }, 16);
-
-    return () => clearInterval(timer);
-  }, [text, isLatest]);
+    return () => clearInterval(interval);
+  }, [text, isLatest, blocks.length]);
 
   return (
     <div
-      className="markdown-body text-xs text-slate-200 leading-relaxed space-y-2 overflow-x-auto relative group cursor-pointer"
+      className="markdown-body text-xs text-slate-200 leading-relaxed space-y-3 overflow-x-auto relative group cursor-pointer"
       onClick={() => {
-        if (!isDone) {
-          setDisplayedText(text);
-          setIsDone(true);
+        if (!isAllRevealed) {
+          setVisibleCount(blocks.length);
         }
       }}
-      title={!isDone ? "Click to reveal answer immediately" : undefined}
+      title={!isAllRevealed ? "Click to reveal full answer immediately" : undefined}
     >
-      <ReactMarkdown
-        remarkPlugins={[remarkMath]}
-        rehypePlugins={[rehypeKatex]}
-        components={{
-          code({ node, className, children, ...props }: any) {
-            const match = /language-(\w+)/.exec(className || '');
-            const codeString = String(children).replace(/\n$/, '');
-            const isMultiLine = String(children).includes('\n') || !!match;
+      {blocks.slice(0, visibleCount).map((block, index) => (
+        <motion.div
+          key={index}
+          initial={{ opacity: 0, y: 8, scale: 0.99 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.28, ease: "easeOut" }}
+          className="space-y-1.5"
+        >
+          <ReactMarkdown
+            remarkPlugins={[remarkMath]}
+            rehypePlugins={[rehypeKatex]}
+            components={{
+              code({ node, className, children, ...props }: any) {
+                const match = /language-(\w+)/.exec(className || '');
+                const codeString = String(children).replace(/\n$/, '');
+                const isMultiLine = String(children).includes('\n') || !!match;
 
-            if (isMultiLine) {
-              const lang = match ? match[1] : 'code';
-              return (
-                <div className="relative my-2.5 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 text-left">
-                  <div className="bg-slate-900/90 px-3 py-1.5 flex items-center justify-between text-[10px] text-slate-400 font-mono border-b border-slate-800">
-                    <span className="uppercase font-bold text-indigo-400">{lang}</span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigator.clipboard.writeText(codeString);
-                      }}
-                      className="hover:text-slate-100 transition font-sans text-[10px] bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded-md text-slate-300"
-                    >
-                      Copy Code
-                    </button>
-                  </div>
-                  <SyntaxHighlighter
-                    style={oneDark}
-                    language={lang === 'code' ? 'text' : lang}
-                    PreTag="div"
-                    customStyle={{ margin: 0, padding: '0.75rem', fontSize: '0.75rem', background: '#090d16' }}
-                    {...props}
-                  >
-                    {codeString}
-                  </SyntaxHighlighter>
-                </div>
-              );
-            }
+                if (isMultiLine) {
+                  const lang = match ? match[1] : 'code';
+                  return (
+                    <div className="relative my-2 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 text-left">
+                      <div className="bg-slate-900/90 px-3 py-1.5 flex items-center justify-between text-[10px] text-slate-400 font-mono border-b border-slate-800">
+                        <span className="uppercase font-bold text-indigo-400">{lang}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(codeString);
+                          }}
+                          className="hover:text-slate-100 transition font-sans text-[10px] bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded-md text-slate-300"
+                        >
+                          Copy Code
+                        </button>
+                      </div>
+                      <SyntaxHighlighter
+                        style={oneDark}
+                        language={lang === 'code' ? 'text' : lang}
+                        PreTag="div"
+                        customStyle={{ margin: 0, padding: '0.75rem', fontSize: '0.75rem', background: '#090d16' }}
+                        {...props}
+                      >
+                        {codeString}
+                      </SyntaxHighlighter>
+                    </div>
+                  );
+                }
 
-            return (
-              <code className="bg-slate-800/90 text-indigo-300 px-1.5 py-0.5 rounded text-[11px] font-mono border border-slate-700/50" {...props}>
-                {children}
-              </code>
-            );
-          }
-        }}
-      >
-        {preprocessLaTeX(displayedText)}
-      </ReactMarkdown>
-      {!isDone && (
-        <span className="inline-block w-1.5 h-3.5 bg-indigo-400 animate-pulse ml-1 align-middle rounded-xs" />
+                return (
+                  <code className="bg-slate-800/90 text-indigo-300 px-1.5 py-0.5 rounded text-[11px] font-mono border border-slate-700/50" {...props}>
+                    {children}
+                  </code>
+                );
+              }
+            }}
+          >
+            {preprocessLaTeX(block)}
+          </ReactMarkdown>
+        </motion.div>
+      ))}
+
+      {!isAllRevealed && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex items-center space-x-1.5 text-[10px] text-indigo-400 font-bold pt-1"
+        >
+          <span className="inline-block w-1.5 h-3 bg-indigo-400 animate-pulse rounded-xs" />
+          <span>Generating explanation...</span>
+          <span className="text-slate-500 font-normal ml-2">(Click anywhere to reveal all)</span>
+        </motion.div>
       )}
     </div>
   );
@@ -235,7 +469,13 @@ export const AiTutorApp = memo(function AiTutorApp({
     ];
   });
 
-  const [inputQuery, setInputQuery] = useState('');
+  const [inputQuery, setInputQuery] = useState(() => {
+    try {
+      return localStorage.getItem(`ai_tutor_input_draft_${user.uid}`) || '';
+    } catch {
+      return '';
+    }
+  });
   const [selectedSubject, setSelectedSubject] = useState<Subject>('Science');
   const [tutorMode, setTutorMode] = useState<'homework' | 'explain' | 'step' | 'quiz'>('homework');
   const [isLoading, setIsLoading] = useState(false);
@@ -267,11 +507,33 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [pdfExportSuccess, setPdfExportSuccess] = useState(false);
 
-  // Camera & Image Attachment State
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  // Mobile More Options (Three-Dots) Menu State
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+
+  // Suggestion Engine State (3 dynamic academic follow-up questions or study actions)
+  const [suggestions, setSuggestions] = useState<AcademicSuggestion[]>(() => {
+    return generateContextualSuggestions({
+      messages,
+      subject: selectedSubject,
+      studentContext: {
+        name: user.name,
+        className: user.className,
+        school: user.schoolName,
+        targetGoal: user.targetGoal
+      },
+      tutorMode
+    });
+  });
+  const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
+
+  // Camera & Multiple Image Attachment State
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [flashAnimation, setFlashAnimation] = useState(false);
+  const [cameraFilter, setCameraFilter] = useState<ImageFilterType>('none');
+  const [filterPreviewImageIndex, setFilterPreviewImageIndex] = useState<number | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -322,32 +584,69 @@ export const AiTutorApp = memo(function AiTutorApp({
     };
   }, [showCameraModal, cameraFacing]);
 
-  const handleCapturePhoto = () => {
+  const handleCapturePhoto = (keepOpen: boolean = false) => {
     if (!videoRef.current) return;
-    const video = videoRef.current;
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/png');
-      setSelectedImage(dataUrl);
-      setShowCameraModal(false);
+    const dataUrl = applyFilterToCanvas(videoRef.current, cameraFilter);
+    if (dataUrl) {
+      setSelectedImages((prev) => [...prev, dataUrl]);
+      
+      // Trigger camera flash visual feedback
+      setFlashAnimation(true);
+      setTimeout(() => setFlashAnimation(false), 200);
+
+      if (!keepOpen) {
+        setShowCameraModal(false);
+      }
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setSelectedImage(event.target.result as string);
-        setShowCameraModal(false);
+  const handleApplyFilterToCaptured = (index: number, filterType: ImageFilterType) => {
+    const targetImgSrc = selectedImages[index];
+    if (!targetImgSrc) return;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const processed = applyFilterToCanvas(img, filterType);
+      if (processed) {
+        setSelectedImages((prev) => prev.map((item, i) => i === index ? processed : item));
       }
     };
-    reader.readAsDataURL(file);
+    img.src = targetImgSrc;
+  };
+
+  const handleRemoveImage = (indexToRemove: number) => {
+    setSelectedImages((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const fileList = Array.from(files);
+    fileList.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          const rawData = event.target!.result as string;
+          // If a filter is actively selected (other than 'none'), apply it to the uploaded image for convenience
+          if (cameraFilter !== 'none') {
+            const img = new Image();
+            img.onload = () => {
+              const processed = applyFilterToCanvas(img, cameraFilter);
+              setSelectedImages((prev) => [...prev, processed || rawData]);
+            };
+            img.src = rawData;
+          } else {
+            setSelectedImages((prev) => [...prev, rawData]);
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    setShowCameraModal(false);
+    // Reset file input so same file can be re-selected if needed
+    e.target.value = '';
   };
 
   const MATH_SYMBOLS = [
@@ -424,6 +723,20 @@ export const AiTutorApp = memo(function AiTutorApp({
     }
   }, [messages, user.uid]);
 
+  // Save input draft to localStorage
+  useEffect(() => {
+    try {
+      const draftKey = `ai_tutor_input_draft_${user.uid}`;
+      if (inputQuery.trim()) {
+        localStorage.setItem(draftKey, inputQuery);
+      } else {
+        localStorage.removeItem(draftKey);
+      }
+    } catch (e) {
+      console.error("Error writing input draft to storage", e);
+    }
+  }, [inputQuery, user.uid]);
+
   // Save formulas to localStorage
   useEffect(() => {
     try {
@@ -467,11 +780,81 @@ export const AiTutorApp = memo(function AiTutorApp({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
+  // Contextual Suggestion Engine: Dynamically generate 3 academic follow-ups or study actions
+  useEffect(() => {
+    let isCancelled = false;
+
+    // 1. Instant zero-latency heuristic computation
+    const immediateSuggestions = generateContextualSuggestions({
+      messages,
+      subject: selectedSubject,
+      studentContext: {
+        name: user.name,
+        className: user.className,
+        school: user.schoolName,
+        targetGoal: user.targetGoal
+      },
+      tutorMode
+    });
+    setSuggestions(immediateSuggestions);
+
+    // 2. Async enhancement via backend AI model if active conversation
+    if (messages.length > 1) {
+      setIsGeneratingSuggestions(true);
+      getAiTutorSuggestions({
+        messages,
+        subject: selectedSubject,
+        studentContext: {
+          name: user.name,
+          className: user.className,
+          school: user.schoolName,
+          targetGoal: user.targetGoal
+        },
+        tutorMode
+      })
+        .then((aiSuggestions) => {
+          if (!isCancelled && aiSuggestions && aiSuggestions.length === 3) {
+            setSuggestions(aiSuggestions);
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (!isCancelled) setIsGeneratingSuggestions(false);
+        });
+    }
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [messages.length, selectedSubject, tutorMode, user.name, user.className, user.schoolName, user.targetGoal]);
+
+  const handleRefreshSuggestions = async () => {
+    setIsGeneratingSuggestions(true);
+    try {
+      const refreshed = await getAiTutorSuggestions({
+        messages,
+        subject: selectedSubject,
+        studentContext: {
+          name: user.name,
+          className: user.className,
+          school: user.schoolName,
+          targetGoal: user.targetGoal
+        },
+        tutorMode
+      });
+      if (refreshed && refreshed.length === 3) {
+        setSuggestions(refreshed);
+      }
+    } finally {
+      setIsGeneratingSuggestions(false);
+    }
+  };
+
   const handleSendMessage = async (customText?: string | unknown) => {
-    const imageToSend = selectedImage;
+    const imagesToSend = [...selectedImages];
     const queryText = typeof customText === 'string' ? customText : inputQuery;
     const cleanQuery = typeof queryText === 'string' ? queryText.trim() : '';
-    const effectiveQuery = cleanQuery || (imageToSend ? "Please solve and explain the math problem shown in this handwritten image step-by-step with full LaTeX formatting and intermediate calculations." : "");
+    const effectiveQuery = cleanQuery || (imagesToSend.length > 0 ? `Please solve and explain the homework problem(s) shown in the ${imagesToSend.length > 1 ? `${imagesToSend.length} attached pages` : 'attached image'} step-by-step with full LaTeX formatting and intermediate calculations.` : "");
 
     if (!effectiveQuery || isLoading) return;
 
@@ -483,12 +866,18 @@ export const AiTutorApp = memo(function AiTutorApp({
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       subject: selectedSubject,
       mode: tutorMode,
-      image: imageToSend || undefined
+      images: imagesToSend.length > 0 ? imagesToSend : undefined,
+      image: imagesToSend.length > 0 ? imagesToSend[0] : undefined
     };
 
     setMessages((prev) => [...prev, userMsg]);
-    if (typeof customText !== 'string') setInputQuery('');
-    setSelectedImage(null);
+    if (typeof customText !== 'string') {
+      setInputQuery('');
+      try {
+        localStorage.removeItem(`ai_tutor_input_draft_${user.uid}`);
+      } catch (e) {}
+    }
+    setSelectedImages([]);
     setIsLoading(true);
 
     try {
@@ -503,7 +892,7 @@ export const AiTutorApp = memo(function AiTutorApp({
         promptContext = `${studentInfo} Generate a 3-question practice quiz suitable for ${user.className || 'student level'}: ${effectiveQuery}`;
       }
 
-      const answer = await getStudyAnswer(promptContext, imageToSend || undefined);
+      const answer = await getStudyAnswer(promptContext, imagesToSend.length > 0 ? imagesToSend : undefined);
 
       const aiMsg: ChatMessage = {
         id: 'msg_ai_' + Date.now(),
@@ -634,8 +1023,8 @@ export const AiTutorApp = memo(function AiTutorApp({
   return (
     <div className="fixed inset-0 z-50 bg-slate-950 text-slate-100 flex flex-col font-sans overflow-hidden">
       {/* APP TOP HEADER */}
-      <header className="bg-slate-900/90 backdrop-blur-lg border-b border-slate-800 px-4 py-3 flex items-center justify-between shrink-0 shadow-lg">
-        <div className="flex items-center space-x-3">
+      <header className="bg-slate-900/90 backdrop-blur-lg border-b border-slate-800 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between shrink-0 shadow-lg">
+        <div className="flex items-center space-x-2.5">
           <button
             onClick={onBack}
             className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition flex items-center space-x-1.5 border border-slate-700/60 group"
@@ -645,45 +1034,63 @@ export const AiTutorApp = memo(function AiTutorApp({
             <span className="text-xs font-bold hidden sm:inline">Back</span>
           </button>
 
-          <div className="flex items-center space-x-2.5">
-            <div className="relative w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 p-0.5 shadow-md flex items-center justify-center">
-              <Bot className="w-5 h-5 text-white" />
-              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-slate-900 rounded-full" />
+          <div className="flex items-center space-x-2">
+            <div className={`relative w-8 h-8 sm:w-9 sm:h-9 rounded-xl ${getSubjectTheme(selectedSubject).botBg} p-0.5 shadow-md flex items-center justify-center transition-colors`}>
+              <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full" />
             </div>
 
             <div>
-              <div className="flex items-center space-x-2">
-                <h1 className="text-sm font-black tracking-tight text-white flex items-center space-x-1">
-                  <span>ASCEND AI TUTOR</span>
-                  <span className="text-[9px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 px-1.5 py-0.2 rounded-md">v2.5</span>
+              <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                <h1 className="text-xs sm:text-sm font-black tracking-tight text-white flex items-center space-x-1">
+                  <span>AI TUTOR</span>
                 </h1>
+                <span className={`${getSubjectTheme(selectedSubject).badgeBg} ${getSubjectTheme(selectedSubject).badgeText} border ${getSubjectTheme(selectedSubject).badgeBorder} text-[9px] font-bold px-1.5 py-0.5 rounded-md`}>
+                  {selectedSubject}
+                </span>
+                {/* ACTIVE TUTOR MODE STATUS PILL */}
+                <button
+                  type="button"
+                  id="active-tutor-mode-pill"
+                  onClick={() => setShowMoreMenu(true)}
+                  className={`${TUTOR_MODE_CONFIG[tutorMode].badgeBg} ${TUTOR_MODE_CONFIG[tutorMode].badgeText} border ${TUTOR_MODE_CONFIG[tutorMode].badgeBorder} text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center space-x-1 shadow-xs transition-all cursor-pointer active:scale-95`}
+                  title={`Current Tutor Mode: ${TUTOR_MODE_CONFIG[tutorMode].label} (Click to switch)`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${TUTOR_MODE_CONFIG[tutorMode].glow} animate-pulse`} />
+                  <span>{TUTOR_MODE_CONFIG[tutorMode].icon}</span>
+                  <span className="capitalize">{TUTOR_MODE_CONFIG[tutorMode].shortLabel}</span>
+                </button>
               </div>
-              <p className="text-[10px] text-emerald-400 font-medium flex items-center space-x-1">
+              <p className="text-[9px] sm:text-[10px] text-slate-400 font-medium flex items-center space-x-1.5 mt-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Online • Powered by Gemini AI</span>
+                <span className="text-emerald-400 font-semibold">Online</span>
+                <span className="text-slate-600">•</span>
+                <span className="text-slate-300 font-normal">{TUTOR_MODE_CONFIG[tutorMode].label}</span>
               </p>
             </div>
           </div>
         </div>
 
         {/* HEADER CONTROLS */}
-        <div className="flex items-center space-x-2">
-          {/* SUBJECT SELECTOR */}
-          <select
-            value={selectedSubject}
-            onChange={(e) => setSelectedSubject(e.target.value as Subject)}
-            className="bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
-          >
-            {SUBJECT_LIST.map((sub) => (
-              <option key={sub} value={sub}>{sub}</option>
-            ))}
-          </select>
+        <div className="flex items-center space-x-1.5 sm:space-x-2">
+          {/* DESKTOP SUBJECT SELECTOR */}
+          <div className="hidden sm:block">
+            <select
+              value={selectedSubject}
+              onChange={(e) => setSelectedSubject(e.target.value as Subject)}
+              className="bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
+            >
+              {SUBJECT_LIST.map((sub) => (
+                <option key={sub} value={sub}>{sub}</option>
+              ))}
+            </select>
+          </div>
 
-          {/* EXPORT PDF BUTTON */}
+          {/* DESKTOP EXPORT PDF BUTTON */}
           <button
             onClick={handleExportPdf}
             disabled={messages.length === 0 || isExportingPdf}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border shadow-sm ${
+            className={`hidden sm:flex px-3 py-1.5 rounded-xl text-xs font-bold transition items-center space-x-1.5 border shadow-sm ${
               messages.length === 0
                 ? 'bg-slate-800/60 text-slate-500 border-slate-700/40 cursor-not-allowed'
                 : isExportingPdf
@@ -697,20 +1104,30 @@ export const AiTutorApp = memo(function AiTutorApp({
             ) : (
               <FileDown className="w-3.5 h-3.5 text-white" />
             )}
-            <span className="hidden sm:inline">
-              {isExportingPdf ? 'Exporting...' : 'Export PDF'}
-            </span>
+            <span>{isExportingPdf ? 'Exporting...' : 'Export PDF'}</span>
           </button>
 
+          {/* DESKTOP CLEAR CHAT */}
           {messages.length > 0 && (
             <button
               onClick={handleClearChat}
-              className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition"
+              className="hidden sm:flex p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition"
               title="Clear Conversation"
             >
               <Trash2 className="w-4 h-4" />
             </button>
           )}
+
+          {/* THREE-DOTS (MORE OPTIONS & TOOLS) BUTTON */}
+          <button
+            type="button"
+            onClick={() => setShowMoreMenu(true)}
+            className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition flex items-center justify-center relative shadow-sm active:scale-95"
+            title="Tools, Modes, Subject & Settings"
+          >
+            <MoreVertical className="w-4 h-4 text-indigo-300" />
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-indigo-500 rounded-full ring-2 ring-slate-900" />
+          </button>
         </div>
       </header>
 
@@ -732,8 +1149,8 @@ export const AiTutorApp = memo(function AiTutorApp({
         </motion.div>
       )}
 
-      {/* STUDENT PROFILE CONTEXT BANNER */}
-      <div className="bg-slate-900/90 border-b border-indigo-900/40 px-4 py-1.5 flex items-center justify-between text-[11px] text-indigo-200 shrink-0">
+      {/* STUDENT PROFILE CONTEXT BANNER - HIDDEN ON MOBILE TO PREVENT CLUTTER */}
+      <div className="hidden sm:flex bg-slate-900/90 border-b border-indigo-900/40 px-4 py-1.5 items-center justify-between text-[11px] text-indigo-200 shrink-0">
         <div className="flex items-center space-x-2 truncate">
           <span className="font-bold text-white flex items-center space-x-1">
             <span>👤</span>
@@ -758,8 +1175,8 @@ export const AiTutorApp = memo(function AiTutorApp({
         )}
       </div>
 
-      {/* MODE TABS BAR */}
-      <div className="bg-slate-900/60 border-b border-slate-800/80 px-4 py-2 flex items-center justify-between overflow-x-auto no-scrollbar shrink-0">
+      {/* MODE TABS BAR - DESKTOP ONLY; ON MOBILE MANAGED VIA THREE-DOTS MENU */}
+      <div className="hidden sm:flex bg-slate-900/60 border-b border-slate-800/80 px-4 py-2 items-center justify-between overflow-x-auto no-scrollbar shrink-0">
         <div className="flex items-center space-x-2">
           {[
             { id: 'homework', label: '⚡ Homework Solver' },
@@ -780,48 +1197,53 @@ export const AiTutorApp = memo(function AiTutorApp({
             </button>
           ))}
         </div>
-
-        {/* COMPACT EXPORT PDF BUTTON IN MODE BAR */}
-        <button
-          onClick={handleExportPdf}
-          disabled={messages.length === 0 || isExportingPdf}
-          className={`ml-2 px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition-all border flex items-center space-x-1 shrink-0 ${
-            messages.length === 0
-              ? 'opacity-40 border-slate-700 text-slate-500 cursor-not-allowed'
-              : 'bg-slate-800/90 hover:bg-indigo-600/90 text-indigo-300 hover:text-white border-indigo-500/40 cursor-pointer shadow-xs active:scale-95'
-          }`}
-          title="Export conversation as PDF"
-        >
-          <FileDown className="w-3.5 h-3.5" />
-          <span className="hidden md:inline">Download PDF</span>
-        </button>
       </div>
 
       {/* CHAT MESSAGES BODY */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 max-w-3xl mx-auto w-full">
         {messages.length === 0 ? (
           /* EMPTY STATE HERO */
-          <div className="h-full flex flex-col items-center justify-center text-center space-y-6 py-8 px-4">
-            <div className="relative">
+          <motion.div 
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            className="h-full flex flex-col items-center justify-center text-center space-y-6 py-8 px-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.8, rotate: -6 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: "spring", stiffness: 260, damping: 20 }}
+              className="relative"
+            >
               <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-indigo-600 to-indigo-800 flex items-center justify-center text-white shadow-xl shadow-indigo-600/20">
                 <BrainCircuit className="w-10 h-10 animate-pulse" />
               </div>
-              <span className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full bg-emerald-500 text-[10px] font-black text-slate-950 uppercase tracking-wider">
+              <span className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full bg-emerald-500 text-[10px] font-black text-slate-950 uppercase tracking-wider shadow-sm">
                 READY
               </span>
-            </div>
+            </motion.div>
 
-            <div className="space-y-2 max-w-md">
+            <motion.div 
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.3 }}
+              className="space-y-2 max-w-md"
+            >
               <h2 className="text-xl font-black text-white tracking-tight">
                 Welcome to your AI Tutor, {user.name}! 🚀
               </h2>
               <p className="text-xs text-slate-400 leading-relaxed">
                 I can solve step-by-step math problems, explain complex scientific concepts, check grammar, or generate custom quizzes.
               </p>
-            </div>
+            </motion.div>
 
             {/* QUICK STARTER PROMPTS */}
-            <div className="w-full max-w-lg space-y-2 text-left pt-2">
+            <motion.div 
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.35 }}
+              className="w-full max-w-lg space-y-2 text-left pt-2"
+            >
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block text-center">
                 TRY ASKING ONE OF THESE:
               </span>
@@ -829,8 +1251,10 @@ export const AiTutorApp = memo(function AiTutorApp({
                 {QUICK_PROMPTS.map((qp, idx) => {
                   const Icon = qp.icon;
                   return (
-                    <button
+                    <motion.button
                       key={idx}
+                      whileHover={{ scale: 1.02, y: -1 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => handleSendMessage(qp.prompt)}
                       className="p-3 bg-slate-900 hover:bg-slate-800/90 border border-slate-800 hover:border-indigo-500/50 rounded-2xl transition text-left group flex items-start space-x-2.5 shadow-xs"
                     >
@@ -845,42 +1269,71 @@ export const AiTutorApp = memo(function AiTutorApp({
                           {qp.prompt}
                         </p>
                       </div>
-                    </button>
+                    </motion.button>
                   );
                 })}
               </div>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         ) : (
           /* MESSAGES LIST */
           messages.map((msg, idx) => {
             const isLatest = idx === messages.length - 1;
+            const messageSubject = msg.subject || selectedSubject;
+            const theme = getSubjectTheme(messageSubject);
+
             return (
-              <div
+              <motion.div
                 key={msg.id}
+                initial={{ 
+                  opacity: 0, 
+                  x: msg.sender === 'ai' ? -24 : 24, 
+                  y: 12, 
+                  scale: 0.97 
+                }}
+                animate={{ 
+                  opacity: 1, 
+                  x: 0, 
+                  y: 0, 
+                  scale: 1 
+                }}
+                transition={{ 
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 26,
+                  mass: 0.8
+                }}
                 className={`flex items-start space-x-3 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {msg.sender === 'ai' && (
-                  <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shrink-0 mt-1 shadow-md">
+                  <motion.div 
+                    initial={{ scale: 0, rotate: -20 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ type: "spring", stiffness: 350, damping: 22 }}
+                    className={`w-8 h-8 rounded-xl ${theme.botBg} flex items-center justify-center text-white shrink-0 mt-1 shadow-md transition-colors duration-200`}
+                  >
                     <Bot className="w-4 h-4" />
-                  </div>
+                  </motion.div>
                 )}
 
-                <div
-                  className={`max-w-[85%] sm:max-w-[80%] rounded-2xl p-4 shadow-sm border ${
+                <motion.div
+                  initial={msg.sender === 'ai' && isLatest ? { opacity: 0.85, y: 6 } : false}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className={`max-w-[85%] sm:max-w-[80%] rounded-2xl p-4 shadow-sm border transition-all duration-200 ${
                     msg.sender === 'user'
                       ? 'bg-indigo-600 text-white border-indigo-500 rounded-tr-none'
-                      : 'bg-slate-900 border-slate-800 text-slate-200 rounded-tl-none space-y-2'
+                      : `bg-slate-900 ${theme.border} ${theme.glow} text-slate-200 rounded-tl-none space-y-2`
                   }`}
                 >
                   {/* MESSAGE METADATA HEADER */}
                   <div className="flex items-center justify-between text-[10px] text-slate-400 pb-1 border-b border-slate-800/60 mb-2">
-                    <span className="font-bold text-indigo-400 uppercase tracking-wider">
+                    <span className={`font-bold ${msg.sender === 'user' ? 'text-indigo-200' : theme.accentText} uppercase tracking-wider`}>
                       {msg.sender === 'user' ? 'YOU' : 'AI TUTOR'}
                     </span>
                     <div className="flex items-center space-x-2">
                       {msg.subject && (
-                        <span className="bg-slate-800 px-1.5 py-0.5 rounded text-[9px] text-slate-300">
+                        <span className={`${theme.badgeBg} ${theme.badgeText} border ${theme.badgeBorder} px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wide`}>
                           {msg.subject}
                         </span>
                       )}
@@ -891,21 +1344,38 @@ export const AiTutorApp = memo(function AiTutorApp({
                   {/* CONTENT */}
                   {msg.sender === 'user' ? (
                     <div className="space-y-2">
-                      {msg.image && (
+                      {/* MULTIPLE / SINGLE ATTACHED IMAGES */}
+                      {msg.images && msg.images.length > 0 ? (
+                        <div className={`grid gap-2 ${msg.images.length === 1 ? 'grid-cols-1 max-w-xs' : 'grid-cols-2 max-w-sm'}`}>
+                          {msg.images.map((img, idx) => (
+                            <div key={idx} className="relative group overflow-hidden rounded-xl border border-white/20 shadow-md bg-slate-950/40">
+                              <img
+                                src={img}
+                                alt={`Homework page ${idx + 1}`}
+                                className="w-full max-h-48 object-contain rounded-xl"
+                              />
+                              <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-slate-950/80 backdrop-blur-xs text-[9px] font-bold text-white rounded-md border border-white/20">
+                                Page {idx + 1}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : msg.image ? (
                         <div className="relative group max-w-xs overflow-hidden rounded-xl border border-white/20 shadow-md bg-slate-950/40">
                           <img
                             src={msg.image}
-                            alt="Handwritten math problem"
+                            alt="Handwritten homework problem"
                             className="w-full max-h-56 object-contain rounded-xl"
                           />
                         </div>
-                      )}
+                      ) : null}
+
                       <p className="text-xs text-white whitespace-pre-wrap leading-relaxed font-medium">
                         {msg.text}
                       </p>
                     </div>
                   ) : (
-                    <TypewriterMarkdown text={msg.text} isLatest={isLatest} />
+                    <StaggeredRevealMarkdown text={msg.text} isLatest={isLatest} />
                   )}
 
                 {/* AI ACTION TOOLBAR */}
@@ -933,7 +1403,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                         {onAddNote && (
                           <button
                             onClick={() => handleSaveToNotebook(msg)}
-                            className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-300 rounded-lg transition flex items-center space-x-1"
+                            className={`px-2 py-1 bg-slate-800 hover:bg-slate-700 ${theme.accentText} rounded-lg transition flex items-center space-x-1`}
                           >
                             <BookOpen className="w-3 h-3" />
                             <span className="text-[10px] font-bold">
@@ -943,90 +1413,153 @@ export const AiTutorApp = memo(function AiTutorApp({
                         )}
                       </div>
 
-                      <span className="text-[9px] text-slate-500 font-semibold">Ascend AI Tutor v2.5</span>
+                      <span className="text-[9px] text-slate-500 font-semibold">
+                        Ascend AI • {msg.subject || selectedSubject}
+                      </span>
                     </div>
 
-                    {/* QUICK FOLLOW-UP ACTION CHIPS */}
-                    <motion.div 
-                      className="flex flex-wrap gap-1.5 pt-1"
-                      initial="hidden"
-                      animate="visible"
-                      variants={{
-                        visible: { transition: { staggerChildren: 0.05 } }
-                      }}
-                    >
-                      <motion.button
-                        variants={{
-                          hidden: { opacity: 0, scale: 0.8 },
-                          visible: { opacity: 1, scale: 1 }
-                        }}
-                        onClick={() => handleSendMessage("Can you explain this concept in even simpler terms with a super easy real-world analogy?")}
-                        className="px-2 py-0.5 bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-800/50 rounded-lg text-[10px] font-semibold transition flex items-center space-x-1"
+                    {/* CONTEXTUAL SUGGESTION ENGINE: 3 DYNAMIC ACADEMIC FOLLOW-UP CHIPS */}
+                    {idx === messages.length - 1 ? (
+                      <motion.div
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className="mt-2.5 pt-2.5 border-t border-slate-800/80 space-y-2"
                       >
-                        <span>💡 Explain Simpler</span>
-                      </motion.button>
-                      <motion.button
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-1.5 text-[11px] font-bold text-slate-300">
+                            <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                            <span className="text-slate-200">
+                              Suggestion Engine
+                            </span>
+                            <span className="text-[9px] font-semibold bg-indigo-500/20 text-indigo-300 px-1.5 py-0.2 rounded-full border border-indigo-500/30">
+                              3 Smart Next Steps
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleRefreshSuggestions}
+                            disabled={isGeneratingSuggestions}
+                            className="text-[10px] text-slate-400 hover:text-indigo-300 flex items-center space-x-1 px-1.5 py-0.5 rounded-md hover:bg-slate-800 transition disabled:opacity-50 cursor-pointer"
+                            title="Generate fresh alternative study suggestions"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${isGeneratingSuggestions ? 'animate-spin text-indigo-400' : ''}`} />
+                            <span className="hidden sm:inline">Refresh ideas</span>
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          {suggestions.map((sugg, sIdx) => (
+                            <motion.button
+                              key={sugg.id || sIdx}
+                              whileHover={{ scale: 1.02, y: -1 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => handleSendMessage(sugg.prompt)}
+                              className="group text-left p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-800/90 border border-slate-800 hover:border-indigo-500/60 transition-all flex flex-col justify-between space-y-1.5 shadow-xs relative overflow-hidden cursor-pointer"
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-400 bg-indigo-950/80 px-1.5 py-0.5 rounded-md border border-indigo-800/40 truncate max-w-[130px]">
+                                  {sugg.badge || 'Follow-up'}
+                                </span>
+                                <ArrowRight className="w-3 h-3 text-slate-500 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition" />
+                              </div>
+                              <div>
+                                <div className="text-[11px] font-bold text-slate-100 group-hover:text-indigo-200 transition line-clamp-1">
+                                  {sugg.label}
+                                </div>
+                                {sugg.subtitle && (
+                                  <p className="text-[10px] text-slate-400 group-hover:text-slate-300 transition line-clamp-1 mt-0.5">
+                                    {sugg.subtitle}
+                                  </p>
+                                )}
+                              </div>
+                            </motion.button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    ) : (
+                      /* COMPACT QUICK ACTION CHIPS FOR PREVIOUS MESSAGES */
+                      <motion.div 
+                        className="flex flex-wrap gap-1.5 pt-1"
+                        initial="hidden"
+                        animate="visible"
                         variants={{
-                          hidden: { opacity: 0, scale: 0.8 },
-                          visible: { opacity: 1, scale: 1 }
+                          visible: { transition: { staggerChildren: 0.05 } }
                         }}
-                        onClick={() => handleSendMessage("Give me 1 practice question based on this topic so I can test my understanding.")}
-                        className="px-2 py-0.5 bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-800/50 rounded-lg text-[10px] font-semibold transition flex items-center space-x-1"
                       >
-                        <span>📝 Practice Question</span>
-                      </motion.button>
-                      <motion.button
-                        variants={{
-                          hidden: { opacity: 0, scale: 0.8 },
-                          visible: { opacity: 1, scale: 1 }
-                        }}
-                        onClick={() => handleSendMessage("Explain this exact concept in simple, friendly Hinglish (Hindi + English mix).")}
-                        className="px-2 py-0.5 bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-800/50 rounded-lg text-[10px] font-semibold transition flex items-center space-x-1"
-                      >
-                        <span>🌐 Explain in Hinglish</span>
-                      </motion.button>
-                      <motion.button
-                        variants={{
-                          hidden: { opacity: 0, scale: 0.8 },
-                          visible: { opacity: 1, scale: 1 }
-                        }}
-                        onClick={() => handleSendMessage("Summarize the key formulas and core takeaways from this in a clean table.")}
-                        className="px-2 py-0.5 bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-800/50 rounded-lg text-[10px] font-semibold transition flex items-center space-x-1"
-                      >
-                        <span>📌 Summary Table</span>
-                      </motion.button>
-                    </motion.div>
+                        <motion.button
+                          variants={{
+                            hidden: { opacity: 0, scale: 0.8 },
+                            visible: { opacity: 1, scale: 1 }
+                          }}
+                          onClick={() => handleSendMessage("Can you explain this concept in even simpler terms with a super easy real-world analogy?")}
+                          className={`px-2 py-0.5 ${theme.chipBg} ${theme.chipText} border ${theme.chipBorder} rounded-lg text-[10px] font-semibold transition flex items-center space-x-1`}
+                        >
+                          <span>💡 Simpler Analogy</span>
+                        </motion.button>
+                        <motion.button
+                          variants={{
+                            hidden: { opacity: 0, scale: 0.8 },
+                            visible: { opacity: 1, scale: 1 }
+                          }}
+                          onClick={() => handleSendMessage("Give me 1 practice question based on this topic so I can test my understanding.")}
+                          className={`px-2 py-0.5 ${theme.chipBg} ${theme.chipText} border ${theme.chipBorder} rounded-lg text-[10px] font-semibold transition flex items-center space-x-1`}
+                        >
+                          <span>📝 Practice Quiz</span>
+                        </motion.button>
+                        <motion.button
+                          variants={{
+                            hidden: { opacity: 0, scale: 0.8 },
+                            visible: { opacity: 1, scale: 1 }
+                          }}
+                          onClick={() => handleSendMessage("Summarize the key formulas and core takeaways from this in a clean table.")}
+                          className={`px-2 py-0.5 ${theme.chipBg} ${theme.chipText} border ${theme.chipBorder} rounded-lg text-[10px] font-semibold transition flex items-center space-x-1`}
+                        >
+                          <span>📌 Summary Table</span>
+                        </motion.button>
+                      </motion.div>
+                    )}
                   </div>
                 )}
-              </div>
+              </motion.div>
 
               {msg.sender === 'user' && (
                 <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0 mt-1 shadow-xs">
                   <UserIcon className="w-4 h-4" />
                 </div>
               )}
-            </div>
+            </motion.div>
           );
         })
       )}
 
         {/* LOADING INDICATOR */}
         {isLoading && (
-          <div className="flex items-start space-x-3">
-            <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shrink-0 mt-1 shadow-md">
+          <motion.div 
+            initial={{ opacity: 0, x: -20, y: 8 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            exit={{ opacity: 0, x: -10 }}
+            transition={{ type: "spring", stiffness: 320, damping: 25 }}
+            className="flex items-start space-x-3"
+          >
+            <motion.div 
+              animate={{ rotate: [0, -5, 5, 0] }}
+              transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
+              className={`w-8 h-8 rounded-xl ${getSubjectTheme(selectedSubject).botBg} flex items-center justify-center text-white shrink-0 mt-1 shadow-md transition-colors duration-200`}
+            >
               <Bot className="w-4 h-4" />
-            </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl rounded-tl-none p-4 shadow-sm space-y-2 max-w-xs">
-              <div className="flex items-center space-x-2 text-indigo-400 text-xs font-bold">
-                <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
-                <span>AI Tutor is thinking...</span>
+            </motion.div>
+            <div className={`bg-slate-900 border ${getSubjectTheme(selectedSubject).border} ${getSubjectTheme(selectedSubject).glow} rounded-2xl rounded-tl-none p-4 shadow-sm space-y-2 max-w-xs transition-all duration-200`}>
+              <div className={`flex items-center space-x-2 ${getSubjectTheme(selectedSubject).accentText} text-xs font-bold`}>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>AI Tutor is analyzing {selectedSubject}...</span>
               </div>
               <div className="space-y-1.5">
                 <div className="h-2 bg-slate-800 rounded-full w-3/4 animate-pulse" />
                 <div className="h-2 bg-slate-800 rounded-full w-1/2 animate-pulse" />
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
         <div ref={messagesEndRef} />
@@ -1036,34 +1569,41 @@ export const AiTutorApp = memo(function AiTutorApp({
       <footer className="bg-slate-900 border-t border-slate-800 p-3 sm:p-4 shrink-0 relative">
         <div className="max-w-3xl mx-auto space-y-2">
           {/* SAVED FORMULAS SLIDE-UP PANEL */}
-          {showSavedFormulasPanel && (
-            <div className="absolute bottom-full mb-2 left-3 right-3 sm:left-auto sm:right-4 sm:w-96 bg-slate-900/95 backdrop-blur-xl border border-amber-500/40 rounded-2xl p-3 shadow-2xl z-30 space-y-2.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <div className="flex items-center space-x-1.5">
-                  <Bookmark className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                  <span className="text-xs font-bold text-slate-100">Saved Formulas</span>
-                  <span className="bg-amber-500/20 text-amber-300 text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-amber-500/30">
-                    {savedFormulas.length}
-                  </span>
+          <AnimatePresence>
+            {showSavedFormulasPanel && (
+              <motion.div 
+                initial={{ opacity: 0, y: 12, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 12, scale: 0.95 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="absolute bottom-full mb-2 left-3 right-3 sm:left-auto sm:right-4 sm:w-96 bg-slate-900/95 backdrop-blur-xl border border-amber-500/40 rounded-2xl p-3 shadow-2xl z-30 space-y-2.5"
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <div className="flex items-center space-x-1.5">
+                    <Bookmark className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                    <span className="text-xs font-bold text-slate-100">Saved Formulas</span>
+                    <span className="bg-amber-500/20 text-amber-300 text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-amber-500/30">
+                      {savedFormulas.length}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddFormulaForm(!showAddFormulaForm)}
+                      className="px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg text-[10px] font-semibold transition flex items-center space-x-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Add Custom</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowSavedFormulasPanel(false)}
+                      className="p-1 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800 transition"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddFormulaForm(!showAddFormulaForm)}
-                    className="px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg text-[10px] font-semibold transition flex items-center space-x-1"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>Add Custom</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowSavedFormulasPanel(false)}
-                    className="p-1 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800 transition"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
 
               {/* ADD FORMULA FORM */}
               {showAddFormulaForm && (
@@ -1164,100 +1704,153 @@ export const AiTutorApp = memo(function AiTutorApp({
                   ))
                 )}
               </div>
-            </div>
+            </motion.div>
           )}
+        </AnimatePresence>
 
           {/* MATH & LATEX SYMBOLS POPUP PALETTE */}
-          {showMathPalette && (
-            <div className="absolute bottom-full mb-2 left-3 right-3 sm:left-auto sm:right-4 sm:w-96 bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl p-3 shadow-2xl z-30 space-y-2.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <span className="text-xs font-bold text-slate-200 flex items-center space-x-1.5">
-                  <Variable className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Math & LaTeX Symbols</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setShowMathPalette(false)}
-                  className="p-1 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800 transition"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* CATEGORY TABS */}
-              <div className="flex items-center space-x-1 overflow-x-auto no-scrollbar text-[10px]">
-                {(['All', 'Greek', 'Algebra', 'Operators', 'Calculus'] as const).map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setActiveMathCategory(cat)}
-                    className={`px-2 py-0.5 rounded-md font-semibold transition ${
-                      activeMathCategory === cat
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-
-              {/* SYMBOLS GRID */}
-              <div className="grid grid-cols-6 gap-1.5 max-h-40 overflow-y-auto no-scrollbar p-0.5">
-                {MATH_SYMBOLS.filter(
-                  (s) => activeMathCategory === 'All' || s.category === activeMathCategory
-                ).map((sym, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => insertSymbol(sym.value)}
-                    className="p-2 bg-slate-800/80 hover:bg-indigo-600 hover:text-white text-slate-200 border border-slate-700/60 rounded-xl text-xs font-semibold transition flex items-center justify-center shadow-xs active:scale-95"
-                    title={sym.value}
-                  >
-                    {sym.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ATTACHED IMAGE PREVIEW BADGE */}
-          {selectedImage && (
-            <div className="flex items-center space-x-2 bg-indigo-950/90 border border-indigo-500/60 p-2 px-3 rounded-2xl text-xs text-indigo-200 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-150">
-              <img
-                src={selectedImage}
-                alt="Captured handwritten math problem"
-                className="w-10 h-10 rounded-xl object-cover border border-indigo-400/50 shrink-0"
-              />
-              <div className="flex-1 min-w-0">
-                <span className="font-bold text-white text-[11px] flex items-center space-x-1 truncate">
-                  <Camera className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                  <span>Handwritten Math Photo Attached</span>
-                </span>
-                <span className="text-[10px] text-indigo-300 block truncate">
-                  AI Tutor will recognize equations & provide step-by-step solutions
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedImage(null)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-indigo-900/80 transition"
-                title="Remove attached image"
+          <AnimatePresence>
+            {showMathPalette && (
+              <motion.div 
+                initial={{ opacity: 0, y: 12, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 12, scale: 0.95 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="absolute bottom-full mb-2 left-3 right-3 sm:left-auto sm:right-4 sm:w-96 bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl p-3 shadow-2xl z-30 space-y-2.5"
               >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          )}
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <span className="text-xs font-bold text-slate-200 flex items-center space-x-1.5">
+                    <Variable className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Math & LaTeX Symbols</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowMathPalette(false)}
+                    className="p-1 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800 transition"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
 
-          {/* QUICK SUGGESTION CHIPS ABOVE INPUT */}
+                {/* CATEGORY TABS */}
+                <div className="flex items-center space-x-1 overflow-x-auto no-scrollbar text-[10px]">
+                  {(['All', 'Greek', 'Algebra', 'Operators', 'Calculus'] as const).map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setActiveMathCategory(cat)}
+                      className={`px-2 py-0.5 rounded-md font-semibold transition ${
+                        activeMathCategory === cat
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+
+                {/* SYMBOLS GRID */}
+                <div className="grid grid-cols-6 gap-1.5 max-h-40 overflow-y-auto no-scrollbar p-0.5">
+                  {MATH_SYMBOLS.filter(
+                    (s) => activeMathCategory === 'All' || s.category === activeMathCategory
+                  ).map((sym, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => insertSymbol(sym.value)}
+                      className="p-2 bg-slate-800/80 hover:bg-indigo-600 hover:text-white text-slate-200 border border-slate-700/60 rounded-xl text-xs font-semibold transition flex items-center justify-center shadow-xs active:scale-95"
+                      title={sym.value}
+                    >
+                      {sym.label}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* ATTACHED IMAGES PREVIEW CAROUSEL / STRIP */}
+          <AnimatePresence>
+            {selectedImages.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                transition={{ duration: 0.2 }}
+                className="bg-indigo-950/90 border border-indigo-500/60 p-2.5 rounded-2xl text-xs text-indigo-200 shadow-lg space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1.5 font-bold text-white text-[11px]">
+                    <Images className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>{selectedImages.length} {selectedImages.length === 1 ? 'Page Attached' : 'Pages Attached (Sequence)'}</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowCameraModal(true)}
+                      className="text-[10px] bg-indigo-600/80 hover:bg-indigo-600 text-white font-bold px-2 py-0.5 rounded-md flex items-center space-x-1 transition"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Add Page</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedImages([])}
+                      className="text-[10px] text-slate-400 hover:text-rose-400 px-1.5 py-0.5 rounded-md hover:bg-slate-900 transition"
+                    >
+                      Clear all
+                    </button>
+                  </div>
+                </div>
+
+                {/* THUMBNAIL STRIP */}
+                <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1">
+                  {selectedImages.map((img, idx) => (
+                    <motion.div 
+                      key={idx} 
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="relative group shrink-0"
+                    >
+                      <img
+                        src={img}
+                        alt={`Page ${idx + 1}`}
+                        className="w-14 h-14 rounded-xl object-cover border border-indigo-400/50 shadow-sm bg-slate-950"
+                      />
+                      <span className="absolute bottom-1 left-1 px-1 py-0.2 bg-slate-950/80 backdrop-blur-xs text-[8px] font-black text-white rounded">
+                        P{idx + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(idx)}
+                        className="absolute -top-1.5 -right-1.5 p-1 bg-rose-600 hover:bg-rose-500 text-white rounded-full shadow-md transition"
+                        title="Remove page"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* QUICK DYNAMIC CONTEXTUAL SUGGESTION STRIP */}
           <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar pb-1 text-[11px]">
-            {['Step-by-step', 'Give example', 'Summarize', 'Practice questions'].map((chip) => (
+            <div className="flex items-center space-x-1 shrink-0 text-slate-400 text-[10px] font-bold pr-1">
+              <Sparkles className="w-3 h-3 text-indigo-400" />
+              <span className="hidden sm:inline">Suggestions:</span>
+            </div>
+            {suggestions.map((sugg, idx) => (
               <button
-                key={chip}
-                onClick={() => setInputQuery((prev) => prev ? `${prev} (${chip})` : `Please ${chip.toLowerCase()}: `)}
-                className="px-2.5 py-1 bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700/60 rounded-full font-medium whitespace-nowrap transition"
+                key={sugg.id || idx}
+                type="button"
+                onClick={() => handleSendMessage(sugg.prompt)}
+                className="px-2.5 py-1 bg-slate-800/80 hover:bg-slate-800 text-slate-200 hover:text-indigo-200 border border-slate-700/60 hover:border-indigo-500/40 rounded-full font-medium whitespace-nowrap transition flex items-center space-x-1 shrink-0 cursor-pointer text-[10px] sm:text-[11px]"
+                title={sugg.prompt}
               >
-                + {chip}
+                <span>{sugg.label}</span>
               </button>
             ))}
           </div>
@@ -1266,7 +1859,7 @@ export const AiTutorApp = memo(function AiTutorApp({
             <button
               type="button"
               onClick={handleVoiceInputToggle}
-              className={`p-2.5 rounded-xl transition ${
+              className={`p-2 sm:p-2.5 rounded-xl transition ${
                 isListening 
                   ? 'bg-rose-600 text-white animate-bounce' 
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
@@ -1280,23 +1873,31 @@ export const AiTutorApp = memo(function AiTutorApp({
             <button
               type="button"
               onClick={() => setShowCameraModal(true)}
-              className={`p-2.5 rounded-xl transition flex items-center justify-center shrink-0 ${
-                selectedImage 
+              className={`p-2 sm:p-2.5 rounded-xl transition flex items-center justify-center shrink-0 ${
+                selectedImages.length > 0 
                   ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-400/50' 
                   : 'text-indigo-400 hover:bg-slate-800 hover:text-indigo-300'
               }`}
-              title="Snap or Upload Handwritten Math Problem"
+              title="Snap or Upload Homework Assignment Pages"
             >
-              <Camera className="w-4 h-4" />
+              <div className="relative">
+                <Camera className="w-4 h-4" />
+                {selectedImages.length > 0 && (
+                  <span className="absolute -top-1.5 -right-2 bg-white text-emerald-700 text-[8px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center shadow-xs">
+                    {selectedImages.length}
+                  </span>
+                )}
+              </div>
             </button>
 
+            {/* DESKTOP MATH SYMBOLS BUTTON */}
             <button
               type="button"
               onClick={() => {
                 setShowMathPalette(!showMathPalette);
                 if (showSavedFormulasPanel) setShowSavedFormulasPanel(false);
               }}
-              className={`p-2 rounded-xl transition font-mono text-[11px] font-black flex items-center justify-center shrink-0 ${
+              className={`hidden sm:flex p-2 rounded-xl transition font-mono text-[11px] font-black items-center justify-center shrink-0 ${
                 showMathPalette 
                   ? 'bg-indigo-600 text-white' 
                   : 'text-indigo-400 hover:bg-slate-800 hover:text-indigo-300'
@@ -1306,13 +1907,14 @@ export const AiTutorApp = memo(function AiTutorApp({
               <span>f(x)</span>
             </button>
 
+            {/* DESKTOP FORMULAS BUTTON */}
             <button
               type="button"
               onClick={() => {
                 setShowSavedFormulasPanel(!showSavedFormulasPanel);
                 if (showMathPalette) setShowMathPalette(false);
               }}
-              className={`p-2 rounded-xl transition text-[11px] font-bold flex items-center space-x-1 shrink-0 ${
+              className={`hidden sm:flex p-2 rounded-xl transition text-[11px] font-bold items-center space-x-1 shrink-0 ${
                 showSavedFormulasPanel 
                   ? 'bg-amber-500 text-slate-950 font-extrabold shadow-md' 
                   : 'text-amber-400 hover:bg-slate-800 hover:text-amber-300'
@@ -1320,7 +1922,7 @@ export const AiTutorApp = memo(function AiTutorApp({
               title="Saved Formulas & Equations"
             >
               <Bookmark className="w-3.5 h-3.5 fill-current" />
-              <span className="hidden sm:inline text-[10px]">Formulas</span>
+              <span className="text-[10px]">Formulas</span>
             </button>
 
             <textarea
@@ -1337,11 +1939,11 @@ export const AiTutorApp = memo(function AiTutorApp({
               placeholder={
                 isListening 
                   ? "Listening to your voice..." 
-                  : selectedImage 
-                  ? "Photo attached! Type additional instructions or press Send to solve..." 
-                  : `Ask AI Tutor about ${selectedSubject}... (Press Enter)`
+                  : selectedImages.length > 0 
+                  ? `${selectedImages.length} page(s) attached! Press Send...` 
+                  : `Ask AI Tutor about ${selectedSubject}...`
               }
-              className="flex-1 bg-transparent border-0 px-3 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none resize-none max-h-24 py-2"
+              className="flex-1 bg-transparent border-0 px-2.5 sm:px-3 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none resize-none max-h-24 py-2"
             />
 
             {inputQuery.length > 0 && (
@@ -1349,20 +1951,23 @@ export const AiTutorApp = memo(function AiTutorApp({
                 type="button"
                 onClick={() => {
                   setInputQuery('');
+                  try {
+                    localStorage.removeItem(`ai_tutor_input_draft_${user.uid}`);
+                  } catch (e) {}
                   textareaRef.current?.focus();
                 }}
-                className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl transition flex items-center justify-center shrink-0 border border-slate-700/60"
+                className="p-2 sm:p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl transition flex items-center justify-center shrink-0 border border-slate-700/60 mr-1 cursor-pointer"
                 title="Clear Input"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
             )}
 
             <button
               type="button"
               onClick={() => handleSendMessage()}
-              disabled={(!inputQuery.trim() && !selectedImage) || isLoading}
-              className="p-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center shrink-0"
+              disabled={(!inputQuery.trim() && selectedImages.length === 0) || isLoading}
+              className="p-2 sm:p-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center shrink-0 cursor-pointer"
               title="Send Message"
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -1370,116 +1975,499 @@ export const AiTutorApp = memo(function AiTutorApp({
           </div>
 
           <div className="flex items-center justify-between text-[10px] text-slate-500 px-1">
-            <span>Subject: <strong className="text-slate-300">{selectedSubject}</strong></span>
-            <span>Shift + Enter for new line</span>
+            <div className="flex items-center space-x-2">
+              <span>Subject: <strong className="text-slate-300">{selectedSubject}</strong></span>
+              {inputQuery.trim().length > 0 && (
+                <span className="text-[9px] text-emerald-400 font-semibold flex items-center space-x-1 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Draft saved</span>
+                </span>
+              )}
+            </div>
+            <span className="hidden sm:inline">Shift + Enter for new line</span>
           </div>
         </div>
 
-      {/* HIDDEN FILE INPUT FOR CAMERA/IMAGE FALLBACK */}
+      {/* HIDDEN FILE INPUT FOR CAMERA/IMAGE FALLBACK - SUPPORTS MULTIPLE */}
       <input
         type="file"
         ref={fileInputRef}
         accept="image/*"
+        multiple
         capture="environment"
         onChange={handleFileUpload}
         className="hidden"
       />
 
-      {/* CAMERA CAPTURE MODAL OVERLAY */}
-      {showCameraModal && (
-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col space-y-3 p-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <div className="flex items-center space-x-2">
-                <div className="p-2 bg-indigo-600/20 text-indigo-400 rounded-xl">
-                  <Camera className="w-5 h-5" />
+      {/* THREE-DOTS (MORE OPTIONS & TOOLS) MODAL / BOTTOM SHEET */}
+      <AnimatePresence>
+        {showMoreMenu && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+            onClick={() => setShowMoreMenu(false)}
+          >
+            <motion.div 
+              initial={{ y: "100%", opacity: 0.5 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              className="w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto no-scrollbar"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* SHEET HEADER */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center space-x-2">
+                  <div className="p-2 rounded-xl bg-indigo-600/20 text-indigo-400">
+                    <SlidersHorizontal className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs sm:text-sm font-black text-white tracking-wide uppercase">AI Tutor Tools & Settings</h3>
+                    <p className="text-[10px] text-slate-400">Switch mode, subject, or open math tools</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-xs font-black text-white tracking-wide uppercase">Snap Math Problem</h3>
-                  <p className="text-[10px] text-slate-400">Position handwritten equation or note in the viewport frame</p>
+                <button
+                  type="button"
+                  onClick={() => setShowMoreMenu(false)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* SUBJECT SELECTION */}
+              <div className="space-y-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                  Select Subject
+                </span>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {SUBJECT_LIST.map((sub) => {
+                    const theme = getSubjectTheme(sub);
+                    const isSelected = selectedSubject === sub;
+                    return (
+                      <button
+                        key={sub}
+                        type="button"
+                        onClick={() => {
+                          setSelectedSubject(sub);
+                        }}
+                        className={`p-2 rounded-xl text-xs font-bold transition flex items-center justify-center border text-center ${
+                          isSelected
+                            ? `${theme.badgeBg} ${theme.badgeText} ${theme.badgeBorder} shadow-sm ring-1 ring-indigo-400/30`
+                            : 'bg-slate-800/80 text-slate-300 border-slate-700/60 hover:bg-slate-800'
+                        }`}
+                      >
+                        {sub}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowCameraModal(false)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
 
-            {/* LIVE CAMERA VIEWPORT */}
-            <div className="relative bg-slate-950 rounded-2xl overflow-hidden aspect-4/3 flex items-center justify-center border border-slate-800 shadow-inner">
-              {cameraError ? (
-                <div className="text-center p-6 space-y-3">
-                  <div className="p-3 bg-rose-500/10 text-rose-400 rounded-full w-fit mx-auto border border-rose-500/20">
-                    <Camera className="w-8 h-8" />
-                  </div>
-                  <p className="text-xs text-rose-300 font-medium max-w-xs mx-auto">{cameraError}</p>
+              {/* TUTOR MODE SELECTION */}
+              <div className="space-y-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                  Tutor Mode
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'homework', label: '⚡ Homework Solver', desc: 'Step-by-step complete solutions' },
+                    { id: 'step', label: '📐 Step Math', desc: 'Detailed mathematical breakdown' },
+                    { id: 'explain', label: '💡 Explainer', desc: 'Concepts with easy analogies' },
+                    { id: 'quiz', label: '📝 Practice Quiz', desc: 'Custom 3-question testing quiz' }
+                  ].map((m) => {
+                    const isSelected = tutorMode === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setTutorMode(m.id as any);
+                        }}
+                        className={`p-2.5 rounded-2xl text-left border transition ${
+                          isSelected
+                            ? 'bg-indigo-600/20 border-indigo-500 text-indigo-200'
+                            : 'bg-slate-800/60 border-slate-700/60 text-slate-300 hover:bg-slate-800'
+                        }`}
+                      >
+                        <div className="text-xs font-bold">{m.label}</div>
+                        <div className="text-[9px] text-slate-400 mt-0.5">{m.desc}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* MATH & SCIENCE TOOLS */}
+              <div className="space-y-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                  Math & Formula Tools
+                </span>
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 mx-auto shadow-md"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setShowMathPalette(true);
+                      setShowSavedFormulasPanel(false);
+                    }}
+                    className="p-3 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-2xl transition text-left flex items-center space-x-2.5"
                   >
-                    <Upload className="w-4 h-4" />
-                    <span>Choose Image File from Device</span>
+                    <div className="p-2 rounded-xl bg-indigo-600/20 text-indigo-400">
+                      <Variable className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-slate-200 block">LaTeX Palette</span>
+                      <span className="text-[9px] text-slate-400">Insert math symbols</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setShowSavedFormulasPanel(true);
+                      setShowMathPalette(false);
+                    }}
+                    className="p-3 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-2xl transition text-left flex items-center space-x-2.5"
+                  >
+                    <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+                      <Bookmark className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-slate-200 block">Saved Formulas</span>
+                      <span className="text-[9px] text-slate-400">Quick formula book</span>
+                    </div>
                   </button>
                 </div>
-              ) : (
-                <>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full h-full object-cover"
-                  />
-                  {/* VIEWPORT SCANNING GUIDELINE */}
-                  <div className="absolute inset-8 border-2 border-dashed border-indigo-400/60 rounded-2xl pointer-events-none flex items-center justify-center">
-                    <span className="bg-slate-950/80 text-indigo-300 text-[10px] font-bold px-2.5 py-1 rounded-full border border-indigo-500/30 backdrop-blur-xs">
-                      Center handwritten equation here
-                    </span>
-                  </div>
-                </>
-              )}
-            </div>
+              </div>
 
-            {/* CAMERA ACTION CONTROLS */}
-            <div className="flex items-center justify-between pt-1">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition flex items-center space-x-1.5 border border-slate-700/60"
-              >
-                <Upload className="w-3.5 h-3.5 text-slate-400" />
-                <span>Upload File</span>
-              </button>
-
-              {!cameraError && (
+              {/* CHAT ACTIONS */}
+              <div className="space-y-2 pt-1 border-t border-slate-800">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                  Actions
+                </span>
                 <div className="flex items-center space-x-2">
                   <button
                     type="button"
-                    onClick={() => setCameraFacing(prev => prev === 'environment' ? 'user' : 'environment')}
-                    className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition border border-slate-700/60"
-                    title="Flip Camera"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      handleExportPdf();
+                    }}
+                    disabled={messages.length === 0 || isExportingPdf}
+                    className="flex-1 p-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2"
                   >
-                    <RefreshCw className="w-4 h-4" />
+                    {isExportingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                    <span>Export Study PDF</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={handleCapturePhoto}
-                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black transition flex items-center space-x-2 shadow-lg shadow-indigo-600/30 active:scale-95"
-                  >
-                    <Camera className="w-4 h-4" />
-                    <span>Capture Photo</span>
-                  </button>
+                  {messages.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowMoreMenu(false);
+                        handleClearChat();
+                      }}
+                      className="p-2.5 bg-slate-800 hover:bg-rose-950/80 text-rose-400 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Clear</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* STUDENT CONTEXT CARD */}
+              <div className="bg-slate-950/80 border border-slate-800/80 p-3 rounded-2xl text-[11px] text-slate-300 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white">👤 {user.name}</span>
+                  {user.className && <span className="text-indigo-400 font-mono text-[10px]">{user.className}</span>}
+                </div>
+                {user.schoolName && <div className="text-slate-400 text-[10px] truncate">🏫 {user.schoolName}</div>}
+                {user.targetGoal && <div className="text-amber-300 text-[10px]">🎯 Goal: {user.targetGoal}</div>}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* CAMERA CAPTURE MODAL OVERLAY - WITH MULTI-PAGE SEQUENCE SUPPORT */}
+      <AnimatePresence>
+        {showCameraModal && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.92, opacity: 0, y: 16 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.92, opacity: 0, y: 16 }}
+              transition={{ type: "spring", damping: 25, stiffness: 350 }}
+              className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col space-y-3 p-4"
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <div className="flex items-center space-x-2">
+                  <div className="p-2 bg-indigo-600/20 text-indigo-400 rounded-xl">
+                    <Camera className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black text-white tracking-wide uppercase">
+                      Capture Homework Pages {selectedImages.length > 0 && `(${selectedImages.length} captured)`}
+                    </h3>
+                    <p className="text-[10px] text-slate-400">Position page in the frame. Snap multiple pages in sequence!</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCameraModal(false)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* IMAGE ENHANCEMENT FILTERS MENU */}
+              <div className="space-y-1.5 bg-slate-950/70 p-2.5 rounded-2xl border border-slate-800/80">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1.5 text-[11px] font-bold text-slate-300">
+                    <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Readability Filters</span>
+                  </div>
+                  <span className="text-[9px] font-semibold text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                    {HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.label || 'Normal'}
+                  </span>
+                </div>
+
+                {/* FILTER PRESETS HORIZONTAL SCROLLER */}
+                <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-0.5">
+                  {HOMEWORK_IMAGE_FILTERS.map((f) => {
+                    const isSelected = cameraFilter === f.id;
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setCameraFilter(f.id)}
+                        className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center space-x-1.5 shrink-0 border cursor-pointer ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white border-indigo-400 shadow-sm shadow-indigo-600/30'
+                            : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <span className="text-xs">{f.emoji}</span>
+                        <span className="whitespace-nowrap">{f.shortLabel}</span>
+                        {f.badge && (
+                          <span className={`text-[8px] uppercase tracking-wider px-1 py-0.2 rounded font-black ${
+                            isSelected ? 'bg-white/20 text-white' : 'bg-indigo-500/20 text-indigo-300'
+                          }`}>
+                            {f.badge}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* CURRENT FILTER DESCRIPTION HINT */}
+                <div className="text-[10px] text-slate-400 flex items-center space-x-1 pt-0.5">
+                  <span className="text-indigo-400 font-semibold shrink-0">Preview:</span>
+                  <span className="truncate">
+                    {HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.description}
+                  </span>
+                </div>
+              </div>
+
+              {/* LIVE CAMERA VIEWPORT */}
+              <div className="relative bg-slate-950 rounded-2xl overflow-hidden aspect-4/3 flex items-center justify-center border border-slate-800 shadow-inner">
+                {/* FLASH ANIMATION EFFECT */}
+                {flashAnimation && (
+                  <div className="absolute inset-0 bg-white/70 z-20 pointer-events-none animate-out fade-out duration-200" />
+                )}
+
+                {cameraError ? (
+                  <div className="text-center p-6 space-y-3">
+                    <div className="p-3 bg-rose-500/10 text-rose-400 rounded-full w-fit mx-auto border border-rose-500/20">
+                      <Camera className="w-8 h-8" />
+                    </div>
+                    <p className="text-xs text-rose-300 font-medium max-w-xs mx-auto">{cameraError}</p>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 mx-auto shadow-md cursor-pointer"
+                    >
+                      <Upload className="w-4 h-4" />
+                      <span>Choose Images from Device</span>
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      style={{
+                        filter: HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.cssFilter || 'none'
+                      }}
+                      className="w-full h-full object-cover transition-[filter] duration-200"
+                    />
+
+                    {/* TOP QUICK FILTER BADGE & CYCLER */}
+                    <div className="absolute top-3 right-3 z-10">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const filterIds: ImageFilterType[] = ['none', 'document', 'grayscale', 'contrast', 'brighten'];
+                          const currentIdx = filterIds.indexOf(cameraFilter);
+                          const nextIdx = (currentIdx + 1) % filterIds.length;
+                          setCameraFilter(filterIds[nextIdx]);
+                        }}
+                        className="bg-slate-950/80 hover:bg-slate-900 text-slate-200 text-[10px] font-bold px-2.5 py-1 rounded-full border border-indigo-500/30 backdrop-blur-md flex items-center space-x-1 shadow-md transition cursor-pointer"
+                        title="Tap to cycle readability filters"
+                      >
+                        <span>{HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.emoji}</span>
+                        <span>{HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.shortLabel}</span>
+                        <RefreshCw className="w-2.5 h-2.5 text-indigo-400 ml-0.5" />
+                      </button>
+                    </div>
+
+                    {/* VIEWPORT SCANNING GUIDELINE */}
+                    <div className="absolute inset-5 border-2 border-dashed border-indigo-400/60 rounded-2xl pointer-events-none flex flex-col items-center justify-between p-3">
+                      <span className="bg-slate-950/80 text-indigo-300 text-[10px] font-bold px-2.5 py-1 rounded-full border border-indigo-500/30 backdrop-blur-xs">
+                        Page {selectedImages.length + 1}
+                      </span>
+                      <span className="text-[10px] text-slate-300 bg-slate-950/80 px-2.5 py-1 rounded-full border border-slate-700/60 backdrop-blur-xs">
+                        {cameraFilter !== 'none' ? `Filter: ${HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.label}` : 'Align text & equations in frame'}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* SEQUENCE THUMBNAILS & PER-PAGE FILTER SELECTOR IN MODAL */}
+              {selectedImages.length > 0 && (
+                <div className="space-y-1.5 bg-slate-950/60 p-2 rounded-xl border border-slate-800">
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
+                    <span className="font-bold">Captured Pages ({selectedImages.length}):</span>
+                    <span className="text-[9px] text-indigo-300">Tap page to apply filter</span>
+                  </div>
+                  <div className="flex items-center space-x-2 overflow-x-auto py-0.5">
+                    {selectedImages.map((img, idx) => (
+                      <div key={idx} className="relative shrink-0 group">
+                        <button
+                          type="button"
+                          onClick={() => setFilterPreviewImageIndex(filterPreviewImageIndex === idx ? null : idx)}
+                          className="focus:outline-none cursor-pointer"
+                        >
+                          <img 
+                            src={img} 
+                            alt={`Page ${idx + 1}`} 
+                            className={`w-12 h-12 rounded-lg object-cover border transition ${
+                              filterPreviewImageIndex === idx 
+                                ? 'border-indigo-400 ring-2 ring-indigo-500/50 scale-105' 
+                                : 'border-indigo-500/40 hover:border-indigo-400'
+                            }`} 
+                          />
+                        </button>
+                        <span className="absolute bottom-0.5 left-0.5 bg-slate-950/90 text-white text-[8px] font-bold px-1 rounded pointer-events-none">
+                          P{idx + 1}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (filterPreviewImageIndex === idx) setFilterPreviewImageIndex(null);
+                            handleRemoveImage(idx);
+                          }}
+                          className="absolute -top-1 -right-1 bg-rose-600 hover:bg-rose-500 text-white rounded-full p-0.5 shadow transition cursor-pointer"
+                          title="Remove image"
+                        >
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* QUICK FILTER CHANGER FOR SELECTED THUMBNAIL */}
+                  {filterPreviewImageIndex !== null && selectedImages[filterPreviewImageIndex] && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="pt-1.5 border-t border-slate-800 flex items-center space-x-1.5 overflow-x-auto no-scrollbar"
+                    >
+                      <span className="text-[9px] text-slate-400 font-bold shrink-0">Enhance P{filterPreviewImageIndex + 1}:</span>
+                      {HOMEWORK_IMAGE_FILTERS.map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => handleApplyFilterToCaptured(filterPreviewImageIndex!, f.id)}
+                          className="px-2 py-0.5 bg-slate-900 hover:bg-indigo-900/60 text-slate-300 hover:text-indigo-200 border border-slate-800 hover:border-indigo-500/50 rounded-lg text-[9px] font-semibold whitespace-nowrap transition cursor-pointer"
+                        >
+                          {f.emoji} {f.shortLabel}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
+
+              {/* CAMERA ACTION CONTROLS */}
+              <div className="flex items-center justify-between pt-1 gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition flex items-center space-x-1.5 border border-slate-700/60 shrink-0 cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Upload</span>
+                </button>
+
+                {!cameraError && (
+                  <div className="flex items-center space-x-2 flex-1 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setCameraFacing(prev => prev === 'environment' ? 'user' : 'environment')}
+                      className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition border border-slate-700/60 cursor-pointer"
+                      title="Flip Camera"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </button>
+
+                    {/* SNAP & ADD NEXT PAGE (KEEP CAMERA OPEN) */}
+                    <button
+                      type="button"
+                      onClick={() => handleCapturePhoto(true)}
+                      className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-indigo-300 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border border-indigo-500/40 active:scale-95 cursor-pointer"
+                      title="Capture this page with active filter and snap next page"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Snap & Add Next</span>
+                    </button>
+
+                    {/* SNAP & FINISH */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedImages.length > 0) {
+                          setShowCameraModal(false);
+                        } else {
+                          handleCapturePhoto(false);
+                        }
+                      }}
+                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black transition flex items-center space-x-1.5 shadow-lg shadow-indigo-600/30 active:scale-95 cursor-pointer"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>{selectedImages.length > 0 ? `Done (${selectedImages.length})` : 'Capture'}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </footer>
   </div>
 );

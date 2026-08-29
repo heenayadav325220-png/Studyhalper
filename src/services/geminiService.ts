@@ -361,7 +361,7 @@ async function callClientGeminiWithRetry(
 
 export async function getStudyAnswer(
   prompt: string, 
-  imageBase64?: string, 
+  imageBase64?: string | string[], 
   studentContext?: { name: string; school: string; className: string; country?: string }, 
   language: string = "English",
   persona: 'default' | 'socratic' | 'debugger' | 'translator' | 'math' = 'default',
@@ -372,6 +372,12 @@ export async function getStudyAnswer(
     ? history.map(h => ({ role: h.role === 'user' ? ('user' as const) : ('model' as const), text: typeof h.text === 'string' ? h.text : String(h.text || '') }))
     : undefined;
 
+  const imagesArray = Array.isArray(imageBase64)
+    ? imageBase64
+    : imageBase64
+    ? [imageBase64]
+    : [];
+
   // 1. Try secure backend server route (Primary route)
   try {
     const response = await safeFetch("/api/gemini/answer", {
@@ -379,7 +385,15 @@ export async function getStudyAnswer(
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ prompt: cleanPrompt, imageBase64, studentContext, language, persona, history: cleanHistory }),
+      body: JSON.stringify({ 
+        prompt: cleanPrompt, 
+        imageBase64: imagesArray.length === 1 ? imagesArray[0] : undefined,
+        imagesBase64: imagesArray,
+        studentContext, 
+        language, 
+        persona, 
+        history: cleanHistory 
+      }),
     });
 
     if (response.ok) {
@@ -410,13 +424,15 @@ export async function getStudyAnswer(
       }));
     }
     const currentParts: any[] = [{ text: prompt }];
-    if (imageBase64) {
-      currentParts.push({
-        inlineData: {
-          mimeType: "image/png",
-          data: imageBase64.split(',')[1] || imageBase64
-        }
-      });
+    for (const img of imagesArray) {
+      if (img) {
+        currentParts.push({
+          inlineData: {
+            mimeType: "image/png",
+            data: img.split(',')[1] || img
+          }
+        });
+      }
     }
     contentsList.push({
       role: 'user',

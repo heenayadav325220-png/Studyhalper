@@ -1,4 +1,4 @@
-import { auth } from './firebase.ts';
+import { auth } from './firebase';
 
 // Get current user auth token
 async function getAuthToken(): Promise<string | null> {

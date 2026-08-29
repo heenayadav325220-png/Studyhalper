@@ -10,8 +10,10 @@
   },
   "dependencies": {
     "@google/genai": "^0.11.0",
+    "@types/compression": "^1.8.1",
     "@types/pg": "^8.23.1",
     "@types/react-syntax-highlighter": "^15.5.13",
+    "compression": "^1.8.1",
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",

@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import compression from "compression";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { requireAuth, AuthRequest } from "./src/middleware/auth.ts";
@@ -7,6 +8,68 @@ import { getOrCreateUser, getUserProfile, updateUserStats } from "./src/db/users
 import { getUserNotes, createNote, deleteNote, logStudySession, logMockExam } from "./src/db/notes.ts";
 
 const PORT = 3000;
+
+// High-Scale In-Memory LRU Cache with TTL to handle 100k+ concurrent users smoothly
+interface CacheEntry<T> {
+  data: T;
+  expiry: number;
+}
+
+class SmartCache {
+  private cache = new Map<string, CacheEntry<any>>();
+  private maxItems: number;
+  private defaultTTL: number;
+
+  constructor(maxItems = 3000, defaultTTLMinutes = 60) {
+    this.maxItems = maxItems;
+    this.defaultTTL = defaultTTLMinutes * 60 * 1000;
+    // Auto purge expired items every 3 minutes
+    setInterval(() => this.purgeExpired(), 3 * 60 * 1000);
+  }
+
+  get<T>(key: string): T | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiry) {
+      this.cache.delete(key);
+      return null;
+    }
+    // Refresh LRU position
+    this.cache.delete(key);
+    this.cache.set(key, entry);
+    return entry.data;
+  }
+
+  set<T>(key: string, data: T, ttlMs?: number): void {
+    if (this.cache.size >= this.maxItems) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey) this.cache.delete(firstKey);
+    }
+    this.cache.set(key, {
+      data,
+      expiry: Date.now() + (ttlMs || this.defaultTTL)
+    });
+  }
+
+  private purgeExpired(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.cache.entries()) {
+      if (now > entry.expiry) {
+        this.cache.delete(key);
+      }
+    }
+  }
+}
+
+const apiCache = new SmartCache(3000, 60);
+
+// Global Unhandled Process Protection
+process.on('unhandledRejection', (reason) => {
+  console.warn('Process resilience: unhandled rejection caught:', reason);
+});
+process.on('uncaughtException', (error) => {
+  console.error('Process resilience: uncaught exception caught:', error);
+});
 
 // Lazy-initialized Gemini Client
 let aiClient: GoogleGenAI | null = null;
@@ -30,15 +93,50 @@ function getAiClient(): GoogleGenAI {
 
 async function startServer() {
   const app = express();
+  app.disable('x-powered-by');
+
+  // GZIP / Deflate Compression for high-bandwidth efficiency (saves up to 80% wire transfer)
+  app.use(compression({
+    filter: (req, res) => {
+      if (req.headers['x-no-compression']) return false;
+      return compression.filter(req, res);
+    },
+    level: 6
+  }));
+
+  // JSON Body Parser with safe memory limits
   app.use(express.json({ limit: '10mb' }));
+
+  // Health and System Diagnostics Endpoint
+  app.get("/api/health", (_req, res) => {
+    res.json({ 
+      status: "ok", 
+      uptime: Math.round(process.uptime()),
+      memoryUsageMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      cacheEntries: (apiCache as any).cache?.size || 0
+    });
+  });
 
   // API Route: World-class AI Tutor Answer / Explanation
   app.post("/api/gemini/answer", async (req, res) => {
     try {
-      const { prompt, imageBase64, studentContext, language, persona, history } = req.body;
-      if (!prompt) {
-        res.status(400).json({ error: "Prompt is required." });
+      const { prompt, imageBase64, imagesBase64, studentContext, language, persona, history } = req.body;
+      if (!prompt && !imageBase64 && (!imagesBase64 || imagesBase64.length === 0)) {
+        res.status(400).json({ error: "Prompt or image is required." });
         return;
+      }
+
+      // Check cache for text-only queries with low history depth
+      const hasImages = (imageBase64 || (imagesBase64 && imagesBase64.length > 0));
+      const hasHistory = Array.isArray(history) && history.length > 0;
+      let cacheKey = '';
+      if (!hasImages && !hasHistory && prompt) {
+        cacheKey = `ans_${language || 'en'}_${persona || 'gen'}_${prompt.trim().toLowerCase().slice(0, 200)}`;
+        const cached = apiCache.get<string>(cacheKey);
+        if (cached) {
+          res.json({ text: cached });
+          return;
+        }
       }
 
       const ai = getAiClient();
@@ -83,11 +181,20 @@ YOUR PEDAGOGICAL GOLD STANDARDS:
         }
       }
 
-      const currentParts: any[] = [{ text: prompt }];
-      if (imageBase64) {
-        const mimeMatch = imageBase64.match(/^data:(image\/\w+);base64,/);
+      const currentParts: any[] = [{ text: prompt || 'Please analyze and explain the uploaded homework image(s) step-by-step.' }];
+      
+      const allImages: string[] = [];
+      if (Array.isArray(imagesBase64) && imagesBase64.length > 0) {
+        allImages.push(...imagesBase64);
+      } else if (imageBase64) {
+        allImages.push(imageBase64);
+      }
+
+      for (const img of allImages) {
+        if (!img || typeof img !== 'string') continue;
+        const mimeMatch = img.match(/^data:(image\/\w+);base64,/);
         const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
-        const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+        const cleanBase64 = img.replace(/^data:image\/\w+;base64,/, '');
         currentParts.push({
           inlineData: {
             mimeType,
@@ -110,7 +217,12 @@ YOUR PEDAGOGICAL GOLD STANDARDS:
         }
       });
 
-      res.json({ text: response.text || "" });
+      const answerText = response.text || "";
+      if (cacheKey && answerText) {
+        apiCache.set(cacheKey, answerText, 60 * 60 * 1000); // 1 hr cache
+      }
+
+      res.json({ text: answerText });
     } catch (err: any) {
       console.error("Gemini Answer API Error:", err);
       res.status(500).json({ error: err.message || "Failed to generate answer." });
@@ -123,6 +235,13 @@ YOUR PEDAGOGICAL GOLD STANDARDS:
       const { subject, topic, language } = req.body;
       if (!subject || !topic) {
         res.status(400).json({ error: "Subject and topic are required." });
+        return;
+      }
+
+      const cacheKey = `exam_${language || 'en'}_${subject.trim().toLowerCase()}_${topic.trim().toLowerCase()}`;
+      const cached = apiCache.get<any[]>(cacheKey);
+      if (cached) {
+        res.json({ questions: cached });
         return;
       }
 
@@ -145,10 +264,70 @@ Each object in the array must strictly have these keys:
       const cleanJsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
       const questions = JSON.parse(cleanJsonStr);
 
+      if (Array.isArray(questions) && questions.length > 0) {
+        apiCache.set(cacheKey, questions, 120 * 60 * 1000); // 2 hr cache
+      }
+
       res.json({ questions });
     } catch (err: any) {
       console.error("Generate Exam Error:", err);
       res.status(500).json({ error: err.message || "Failed to generate mock exam." });
+    }
+  });
+
+  // API Route: AI Tutor Contextual Suggestion Engine
+  app.post("/api/gemini/suggestions", async (req, res) => {
+    try {
+      const { history, subject, studentContext, language } = req.body;
+      const ai = getAiClient();
+
+      const lastMsgsText = Array.isArray(history) 
+        ? history.slice(-4).map((m: any) => `${m.role === 'user' ? 'Student' : 'Tutor'}: ${m.text}`).join("\n\n")
+        : "Student starting learning session.";
+
+      const prompt = `You are the ASCEND AI TUTOR SUGGESTION ENGINE.
+Analyze the current academic chat context between a student and their AI tutor:
+
+SUBJECT: ${subject || 'General'}
+LANGUAGE: ${language === 'hi' ? 'Hindi (हिंदी)' : 'English'}
+STUDENT: ${studentContext?.name || 'Student'} (${studentContext?.className || 'Grade 10'}, Target: ${studentContext?.targetGoal || 'General'})
+RECENT CHAT:
+${lastMsgsText}
+
+TASK:
+Offer EXACTLY 3 high-impact, contextually relevant academic follow-up questions or study actions for the student to explore next.
+Categories must cover:
+1. Deep Dive / Proof / Mechanism / Formula Derivation
+2. Numerical Problem / Practice MCQ / Self-Check Test
+3. Real-World Analogy / Everyday Application / Summary Table / Common Exam Pitfalls
+
+Format your response strictly as a JSON object with a "suggestions" array containing exactly 3 items. Do NOT wrap in \`\`\`json or markdown codeblocks. Return only raw JSON.
+Each item must have:
+- "label": Short punchy badge title with 1 emoji (e.g. "🔬 Explore Derivation", "🧮 Numerical Practice", "💡 Real-World Analogy", "📝 Practice MCQ", "📊 Summary Table") (max 28 chars)
+- "prompt": The full question/instruction prompt the student will ask the tutor (1-2 sentences)
+- "subtitle": Short description of outcome (max 35 chars)
+- "category": "deep_dive" | "practice" | "concept" | "summary"
+- "badge": "+15 XP" | "High Yield" | "Exam Prep" | "Concept"`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
+
+      const text = response.text || "";
+      const cleanJsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
+      const parsed = JSON.parse(cleanJsonStr);
+
+      if (parsed && Array.isArray(parsed.suggestions)) {
+        res.json({ suggestions: parsed.suggestions.slice(0, 3) });
+      } else if (Array.isArray(parsed)) {
+        res.json({ suggestions: parsed.slice(0, 3) });
+      } else {
+        res.json({ suggestions: [] });
+      }
+    } catch (err: any) {
+      console.warn("AI Suggestion Engine Error:", err);
+      res.status(500).json({ error: err.message || "Failed to generate suggestions" });
     }
   });
 
@@ -511,8 +690,13 @@ Rules:
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, {
+      maxAge: '1y',
+      immutable: true,
+      etag: true
+    }));
     app.get('*', (_req, res) => {
+      res.setHeader('Cache-Control', 'no-cache');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
