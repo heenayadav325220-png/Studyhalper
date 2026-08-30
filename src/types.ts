@@ -160,8 +160,17 @@ export type StatBoxesLayout = '3_col_compact' | 'horizontal_bar' | 'hexagon_badg
 export type DashboardLayoutPreset = 'tutor_first' | 'toolkit_hero' | 'quiz_first' | 'compact_grid';
 export type CardBorderRadius = 'curved' | 'pill' | 'sharp' | 'hexagon';
 export type NeonIntensity = 'high' | 'medium' | 'soft' | 'off';
-export type WallpaperAmbiance = 'science_chalkboard' | 'cosmic_nebula' | 'cyber_matrix' | 'deep_obsidian';
+export type WallpaperAmbiance = 
+  | 'science_chalkboard' 
+  | 'cosmic_nebula' 
+  | 'cyber_matrix' 
+  | 'deep_obsidian' 
+  | 'earth_forest' 
+  | 'deep_ocean' 
+  | 'retro_arcade' 
+  | 'solar_system';
 export type AudioFeedback = 'cyber_synth' | 'tactile_click' | 'zen_water' | 'silent';
+export type LeaderboardTheme = 'default' | 'black' | 'cyber_neon' | 'gold_luxury' | 'emerald_matrix' | 'crimson_dark';
 
 export interface UiCustomization {
   appThemeLook: AppThemeLook;
@@ -174,4 +183,8 @@ export interface UiCustomization {
   cardBorderRadius: CardBorderRadius;
   wallpaperAmbiance: WallpaperAmbiance;
   audioFeedback: AudioFeedback;
+  leaderboardTheme?: LeaderboardTheme;
+  accentColor?: string;
+  customCss?: string;
+  customThemeName?: string;
 }

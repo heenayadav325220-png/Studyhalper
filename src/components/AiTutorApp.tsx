@@ -73,6 +73,7 @@ interface AiTutorAppProps {
   onBack: () => void;
   onAddNote?: (note: { title: string; content: string; subject: string }) => Promise<void>;
   onAddXp?: (amount: number) => void;
+  onOpenEditor?: () => void;
 }
 
 interface ChatMessage {
@@ -455,7 +456,8 @@ export const AiTutorApp = memo(function AiTutorApp({
   user,
   onBack,
   onAddNote,
-  onAddXp
+  onAddXp,
+  onOpenEditor
 }: AiTutorAppProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const saved = localStorage.getItem(`ai_tutor_chat_${user.uid}`);
@@ -2018,7 +2020,8 @@ export const AiTutorApp = memo(function AiTutorApp({
                     { id: 'homework', label: '⚡ Homework Solver', desc: 'Step-by-step complete solutions' },
                     { id: 'step', label: '📐 Step Math', desc: 'Detailed mathematical breakdown' },
                     { id: 'explain', label: '💡 Explainer', desc: 'Concepts with easy analogies' },
-                    { id: 'quiz', label: '📝 Practice Quiz', desc: 'Custom 3-question testing quiz' }
+                    { id: 'quiz', label: '📝 Practice Quiz', desc: 'Custom 3-question testing quiz' },
+                    { id: 'editor', label: '⚡ Editor (Cinematic HUD)', desc: 'Voice/text app controller & notes creator' }
                   ].map((m) => {
                     const isSelected = tutorMode === m.id;
                     return (
@@ -2026,15 +2029,29 @@ export const AiTutorApp = memo(function AiTutorApp({
                         key={m.id}
                         type="button"
                         onClick={() => {
-                          setTutorMode(m.id as any);
+                          if (m.id === 'editor') {
+                            setShowMoreMenu(false);
+                            if (onOpenEditor) onOpenEditor();
+                          } else {
+                            setTutorMode(m.id as any);
+                          }
                         }}
                         className={`p-2.5 rounded-2xl text-left border transition ${
-                          isSelected
+                          m.id === 'editor'
+                            ? 'col-span-2 bg-gradient-to-r from-cyan-950 to-indigo-950 border-cyan-500/60 text-cyan-200 shadow-[0_0_15px_rgba(6,182,212,0.25)] hover:border-cyan-400'
+                            : isSelected
                             ? 'bg-indigo-600/20 border-indigo-500 text-indigo-200'
                             : 'bg-slate-800/60 border-slate-700/60 text-slate-300 hover:bg-slate-800'
                         }`}
                       >
-                        <div className="text-xs font-bold">{m.label}</div>
+                        <div className="text-xs font-bold flex items-center justify-between">
+                          <span>{m.label}</span>
+                          {m.id === 'editor' && (
+                            <span className="text-[8px] bg-cyan-400 text-slate-950 font-black px-1.5 py-0.5 rounded-full uppercase">
+                              NEW
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[9px] text-slate-400 mt-0.5">{m.desc}</div>
                       </button>
                     );

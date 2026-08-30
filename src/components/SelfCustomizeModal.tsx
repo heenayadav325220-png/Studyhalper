@@ -44,7 +44,8 @@ export const DEFAULT_UI_CUSTOMIZATION: UiCustomization = {
   neonIntensity: 'high',
   cardBorderRadius: 'curved',
   wallpaperAmbiance: 'science_chalkboard',
-  audioFeedback: 'cyber_synth'
+  audioFeedback: 'cyber_synth',
+  leaderboardTheme: 'default'
 };
 
 interface SelfCustomizeModalProps {
@@ -369,7 +370,7 @@ export default function SelfCustomizeModal({
     }
   ];
 
-  // 8. LIVE WALLPAPER & AMBIANCE (4 MODES)
+  // 8. LIVE WALLPAPER & AMBIANCE (8 RICH MODES) WITH 100+ REALTIME MOVING LIVING OBJECTS (0% LAG)
   const wallpaperOptions: Array<{
     id: WallpaperAmbiance;
     title: string;
@@ -379,31 +380,59 @@ export default function SelfCustomizeModal({
   }> = [
     {
       id: 'science_chalkboard',
-      title: 'Science Blueprint Chalkboard',
-      badge: 'MATH & PHYSICS',
+      title: 'Science Lab & Living Scholars',
+      badge: '100+ LIVE OBJECTS',
       icon: '📐',
-      desc: 'Detailed academic chalkboard texture with physics formulas, calculus, and geometry.'
+      desc: 'Waving science professors holding chalk, jumping on Eureka, spinning Rutherford atoms with electrons, bubbling flasks, pencil rockets, and physics formulas.'
     },
     {
       id: 'cosmic_nebula',
-      title: 'Cosmic Nebula & Starfield',
-      badge: 'DEEP SPACE',
+      title: 'Cosmic Nebula & Living Astronauts',
+      badge: 'SUPERNOVA & STARS',
       icon: '🌌',
-      desc: 'Deep cosmic galaxy backdrop featuring glowing star clusters and distant stellar nebula.'
+      desc: 'Spacewalking astronauts waving hands & jetpack-boosting, fire-tail rockets, satellites with blinking beacons, live supernovas, and 4-point diffraction stars.'
+    },
+    {
+      id: 'solar_system',
+      title: 'Solar System & Planetary Orbits',
+      badge: 'ORBITAL PHYSICS',
+      icon: '🪐',
+      desc: 'Blazing sun with rotating solar corona, Earth with orbiting Moon, Saturn with golden rings, Mars, Jupiter with Great Red Spot, and Kepler orbital satellites.'
+    },
+    {
+      id: 'earth_forest',
+      title: 'Earth Nature & Living Wildlife',
+      badge: 'NATURE FLORA & FAUNA',
+      icon: '🍃',
+      desc: 'Soaring flying birds, colorful swimming Koi fish, fluttering butterflies, falling autumn maple leaves, floating dandelion seeds, and glowing fireflies.'
+    },
+    {
+      id: 'deep_ocean',
+      title: 'Deep Ocean & Living Marine Life',
+      badge: 'AQUATIC BIOSPHERE',
+      icon: '🐬',
+      desc: 'Swimming scuba divers, playful dolphins, majestic sea turtles, manta rays, glowing sea anemones, and rising oceanic bubble streams.'
     },
     {
       id: 'cyber_matrix',
-      title: 'Cyber Digital Grid',
-      badge: 'TECH GRID',
+      title: 'Cyber Matrix & Living Cyborgs',
+      badge: 'NEON CYBERPUNK',
       icon: '💻',
-      desc: 'Subtle glowing cybernetic matrix grid with high-tech coordinates and vector nodes.'
+      desc: 'Cyborgs walking and waving on neon grids, scanning quad-drones with laser cones, 3D rotating quantum CPU cubes, and falling digital matrix rain.'
+    },
+    {
+      id: 'retro_arcade',
+      title: '8-Bit Retro Arcade Universe',
+      badge: 'PIXEL NOSTALGIA',
+      icon: '👾',
+      desc: 'Pixelated retro 8-bit heroes jumping & running, flying UFO space invaders, bouncing power-up coins, spinning 8-bit stars, and arcade popups.'
     },
     {
       id: 'deep_obsidian',
-      title: 'Pure Dark Obsidian',
-      badge: 'MINIMAL',
+      title: 'Celestial Zen & Levitating Monks',
+      badge: 'MEDITATIVE TRANQUILITY',
       icon: '🖤',
-      desc: 'Solid ultra-dark minimalist canvas with zero background distractions.'
+      desc: 'Levitating Zen monks in lotus posture with breathing cycles and golden halos, bioluminescent jellyfish, flapping origami cranes, and floating celestial embers.'
     }
   ];
 

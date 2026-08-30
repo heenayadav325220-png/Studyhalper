@@ -30,7 +30,8 @@ import {
   Edit3,
   User as UserIcon,
   Settings2,
-  Terminal
+  Terminal,
+  Mic
 } from 'lucide-react';
 import InteractiveToolkit from './components/InteractiveToolkit';
 import AiTutorApp from './components/AiTutorApp';
@@ -38,6 +39,10 @@ import ImageGenerator from './components/ImageGenerator';
 import OnboardingModal from './components/OnboardingModal';
 import AuthModal from './components/AuthModal';
 import SelfCustomizeModal, { DEFAULT_UI_CUSTOMIZATION } from './components/SelfCustomizeModal';
+import { PdfBookScanner } from './components/PdfBookScanner';
+import { VoiceTutorModal } from './components/VoiceTutorModal';
+import { CinematicAiEditor } from './components/CinematicAiEditor';
+import { RealtimeMovingUniverse } from './components/RealtimeMovingUniverse';
 import { TRANSLATIONS, Language } from './services/translations';
 import { playUiSound } from './services/soundEffects';
 import { 
@@ -99,12 +104,14 @@ const DEFAULT_USER: UserProfile = {
 
 export default function App() {
   const [appLanguage, setAppLanguage] = useState<Language>('en');
-  const [activeTab, setActiveTab] = useState<'home' | 'toolkit' | 'groupChat' | 'whiteboard' | 'mockExam' | 'studyDocs' | 'petCompanion' | 'aiTutor' | 'quiz' | 'notebook' | 'planner' | 'imageGen'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'toolkit' | 'groupChat' | 'whiteboard' | 'mockExam' | 'studyDocs' | 'petCompanion' | 'aiTutor' | 'quiz' | 'notebook' | 'planner' | 'imageGen' | 'pdfScanner'>('home');
   const [initialTool, setInitialTool] = useState<string | undefined>(undefined);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
+  const [showVoiceTutorModal, setShowVoiceTutorModal] = useState(false);
+  const [showAiEditorModal, setShowAiEditorModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [playgroundViewMode, setPlaygroundViewMode] = useState<'list' | 'grid'>('list');
 
@@ -776,11 +783,15 @@ export default function App() {
   const cornerRadius = getCardRadiusClasses();
 
   return (
-    <div className={`min-h-screen text-slate-100 ${getAppFontClass()} flex flex-col selection:bg-emerald-500 selection:text-white w-full max-w-full overflow-x-hidden relative bg-[#0d1117]`}>
-      {/* FULL-PAGE LIVE WALLPAPER AMBIANCE (4 MODES) */}
+    <div id="main-app-container" className={`min-h-screen text-slate-100 ${getAppFontClass()} flex flex-col selection:bg-emerald-500 selection:text-white w-full max-w-full overflow-x-hidden relative bg-[#0d1117]`}>
+      {/* DYNAMIC LIVE CUSTOM CSS INJECTED BY AI COPILOT */}
+      <style id="ai-editor-live-styles">{uiCustomization.customCss || ''}</style>
+      
+      {/* FULL-PAGE LIVE WALLPAPER AMBIANCE (4 MODES) WITH DIRECT DOM ID TARGETING */}
       {uiCustomization.wallpaperAmbiance === 'cosmic_nebula' ? (
         <div 
-          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-95"
+          id="app-wallpaper-layer"
+          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-95 transition-all duration-500"
           style={{ 
             background: 'radial-gradient(ellipse at 50% 0%, #1e1b4b 0%, #030712 60%, #000000 100%)' 
           }}
@@ -789,7 +800,8 @@ export default function App() {
         </div>
       ) : uiCustomization.wallpaperAmbiance === 'cyber_matrix' ? (
         <div 
-          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-95"
+          id="app-wallpaper-layer"
+          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-95 transition-all duration-500"
           style={{ 
             background: 'radial-gradient(ellipse at top, #022c22 0%, #020617 80%)' 
           }}
@@ -797,16 +809,20 @@ export default function App() {
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#00ffcc0a_1px,transparent_1px),linear-gradient(to_bottom,#00ffcc0a_1px,transparent_1px)] [background-size:28px_28px] opacity-70" />
         </div>
       ) : uiCustomization.wallpaperAmbiance === 'deep_obsidian' ? (
-        <div className="fixed inset-0 pointer-events-none z-0 bg-[#030712]" />
+        <div id="app-wallpaper-layer" className="fixed inset-0 pointer-events-none z-0 bg-[#030712] transition-all duration-500" />
       ) : (
         /* science_chalkboard (default) */
         <div 
-          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-95"
+          id="app-wallpaper-layer"
+          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-95 transition-all duration-500"
           style={{ backgroundImage: `url('/science_bg.jpg')` }}
         />
       )}
       {/* AMBIENT CHALKBOARD VIGNETTE OVERLAY */}
-      <div className="fixed inset-0 pointer-events-none z-0 bg-gradient-to-b from-black/60 via-black/35 to-black/75 backdrop-brightness-95" />
+      <div id="app-vignette-layer" className="fixed inset-0 pointer-events-none z-0 bg-gradient-to-b from-black/60 via-black/35 to-black/75 backdrop-brightness-95 transition-all duration-500" />
+
+      {/* 100+ REALTIME MOVING LIVING OBJECTS & HUMAN CHARACTERS (SATELLITES, ROCKETS, WAVING ASTRONAUTS, CYBORGS, ATOMS) */}
+      <RealtimeMovingUniverse theme={uiCustomization.wallpaperAmbiance} interactive={true} />
 
       {/* MAIN CONTENT AREA - WITH pb-24 TO AVOID BOTTOM NAV OVERLAP */}
       <main className="relative z-10 flex-1 p-3 sm:p-4 md:p-5 max-w-xl mx-auto w-full space-y-4 pb-24 overflow-x-hidden">
@@ -815,7 +831,7 @@ export default function App() {
           <div className="space-y-4">
             
             {/* 1. TOP USER CARD - ULTRA-MODERN FROSTED GLASSMORPHISM WITH DYNAMIC ROTATING NEON PERIMETER STRIP & SELF CUSTOMIZE */}
-            <div className="relative">
+            <div id="top-user-card" className="relative">
               {/* CARD CASING WITH CRISP ROTATING NEON STRIP / PATTI (BORDER ONLY, NO SCATTERED SHADOWS) */}
               <div className={`relative ${neonIntensityGlow.padding} ${cornerRadius.casing} overflow-hidden transition-all duration-300 ${neonIntensityGlow.show ? 'bg-slate-900/90' : 'border border-white/20'}`}>
                 {neonIntensityGlow.show && (
@@ -859,6 +875,18 @@ export default function App() {
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
                     </div>
+
+                    {/* Cinematic AI App Editor Trigger Button */}
+                    <motion.button
+                      whileHover={{ scale: 1.08 }}
+                      whileTap={{ scale: 0.92 }}
+                      onClick={() => setShowAiEditorModal(true)}
+                      className="p-1.5 text-cyan-300 hover:text-white bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 rounded-xl transition cursor-pointer shrink-0 shadow-xs flex items-center space-x-1"
+                      title="Cinematic AI Editor / AI ऐप एडिटर"
+                    >
+                      <Terminal className="w-3.5 h-3.5 text-cyan-300" />
+                      <span className="text-[9px] font-black text-cyan-200 hidden sm:inline uppercase tracking-wider">Editor</span>
+                    </motion.button>
 
                     {/* Self Customize Gear Trigger Button */}
                     <motion.button
@@ -1098,6 +1126,99 @@ export default function App() {
                 </button>
               </div>
             )}
+
+            {/* HIGH-POWER QUICK ACTION TRIO: AI APP EDITOR, VOICE TUTOR & PDF/BOOK SCANNER */}
+            <div id="quick-actions-section" className="grid grid-cols-3 gap-2 sm:gap-2.5">
+              {/* AI APP EDITOR LAUNCHER */}
+              <motion.button
+                whileHover={{ y: -2, scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  playUiSound(uiCustomization.audioFeedback);
+                  setShowAiEditorModal(true);
+                }}
+                className="p-2.5 sm:p-3.5 rounded-2xl border-2 border-cyan-500/80 hover:border-cyan-400 bg-gradient-to-br from-[#041a2f] via-[#021020] to-[#07243c] shadow-[0_0_20px_rgba(6,182,212,0.25)] text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-all"
+              >
+                <div className="absolute -top-8 -right-8 w-20 h-20 bg-cyan-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-cyan-500/30 transition-all" />
+                <div className="flex items-center justify-between relative z-10 mb-1.5 sm:mb-2">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 group-hover:scale-110 transition-transform shrink-0">
+                    <Terminal className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-300 animate-pulse" />
+                  </div>
+                  <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 px-1.5 sm:px-2 py-0.5 rounded-full border border-cyan-400/30">
+                    COPILOT
+                  </span>
+                </div>
+                <div className="relative z-10">
+                  <h4 className="font-extrabold text-[11px] sm:text-sm text-white flex items-center gap-1">
+                    <span className="truncate">{appLanguage === 'hi' ? 'AI एडिटर' : 'AI Editor'}</span>
+                    <span className="text-cyan-400 shrink-0">⚡</span>
+                  </h4>
+                  <p className="text-[8.5px] sm:text-[9.5px] text-cyan-200/70 font-medium leading-tight mt-0.5 line-clamp-1">
+                    {appLanguage === 'hi' ? 'बोलकर UI व नोट्स बदलें' : 'Voice/Text App Control'}
+                  </p>
+                </div>
+              </motion.button>
+
+              {/* VOICE TUTOR LAUNCHER */}
+              <motion.button
+                whileHover={{ y: -2, scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  playUiSound(uiCustomization.audioFeedback);
+                  setShowVoiceTutorModal(true);
+                }}
+                className="p-2.5 sm:p-3.5 rounded-2xl border-2 border-pink-500/80 hover:border-pink-400 bg-gradient-to-br from-[#1b0a2a] via-[#12051d] to-[#24083a] shadow-[0_0_20px_rgba(236,72,153,0.25)] text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-all"
+              >
+                <div className="absolute -top-8 -right-8 w-20 h-20 bg-pink-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-pink-500/30 transition-all" />
+                <div className="flex items-center justify-between relative z-10 mb-1.5 sm:mb-2">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-pink-500/20 border border-pink-400/40 flex items-center justify-center text-pink-300 group-hover:scale-110 transition-transform shrink-0">
+                    <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-pink-300 animate-pulse" />
+                  </div>
+                  <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-wider bg-pink-500/20 text-pink-300 px-1.5 sm:px-2 py-0.5 rounded-full border border-pink-400/30">
+                    VOICE
+                  </span>
+                </div>
+                <div className="relative z-10">
+                  <h4 className="font-extrabold text-[11px] sm:text-sm text-white flex items-center gap-1">
+                    <span className="truncate">{appLanguage === 'hi' ? 'वॉयस ट्यूटर' : 'Voice Tutor'}</span>
+                    <span className="text-pink-400 shrink-0">🎙️</span>
+                  </h4>
+                  <p className="text-[8.5px] sm:text-[9.5px] text-pink-200/70 font-medium leading-tight mt-0.5 line-clamp-1">
+                    {appLanguage === 'hi' ? 'बोलकर पूछें व सुनें' : 'Live Voice Q&A'}
+                  </p>
+                </div>
+              </motion.button>
+
+              {/* PDF & BOOK SCANNER LAUNCHER */}
+              <motion.button
+                whileHover={{ y: -2, scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  playUiSound(uiCustomization.audioFeedback);
+                  setActiveTab('pdfScanner');
+                }}
+                className="p-2.5 sm:p-3.5 rounded-2xl border-2 border-purple-500/80 hover:border-purple-400 bg-gradient-to-br from-[#18092f] via-[#0f0420] to-[#250945] shadow-[0_0_20px_rgba(168,85,247,0.25)] text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-all"
+              >
+                <div className="absolute -top-8 -right-8 w-20 h-20 bg-purple-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/30 transition-all" />
+                <div className="flex items-center justify-between relative z-10 mb-1.5 sm:mb-2">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-300 group-hover:scale-110 transition-transform shrink-0">
+                    <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-300" />
+                  </div>
+                  <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 px-1.5 sm:px-2 py-0.5 rounded-full border border-purple-400/30">
+                    SCANNER
+                  </span>
+                </div>
+                <div className="relative z-10">
+                  <h4 className="font-extrabold text-[11px] sm:text-sm text-white flex items-center gap-1">
+                    <span className="truncate">{appLanguage === 'hi' ? 'PDF स्कैनर' : 'PDF Scanner'}</span>
+                    <span className="text-purple-300 shrink-0">📑</span>
+                  </h4>
+                  <p className="text-[8.5px] sm:text-[9.5px] text-purple-200/70 font-medium leading-tight mt-0.5 line-clamp-1">
+                    {appLanguage === 'hi' ? 'सारांश व क्विज़' : 'Summary & Quiz'}
+                  </p>
+                </div>
+              </motion.button>
+            </div>
 
             {/* 2. ACADEMY PLAYGROUND - WITH LISTED VIEW AS DEFAULT & VIEW SWITCHER */}
             <div className="space-y-3">
@@ -1684,6 +1805,7 @@ export default function App() {
 
               {/* ADVANCED STUDY TOOLKIT BANNER - EXACT MATCH WITH REFERENCE IMAGE */}
               <motion.div
+                id="toolkit-banner-section"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 whileHover={{ y: -2 }}
@@ -1748,6 +1870,8 @@ export default function App() {
                 {/* Quick-Launch Animated Tool Chips */}
                 <div className="mt-4 pt-3.5 border-t border-white/10 flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-none relative z-10">
                   {[
+                    { id: 'pdf_scanner', name: '📑 PDF Scan' },
+                    { id: 'voice_tutor', name: '🎙️ Voice Tutor' },
                     { id: 'calc', name: '🧮 Sci-Calc' },
                     { id: 'mindmap', name: '🌳 Mind Maps' },
                     { id: 'ocr', name: '📷 Vision OCR' },
@@ -1761,7 +1885,17 @@ export default function App() {
                       key={tool.id}
                       whileHover={{ scale: 1.05, y: -1 }}
                       whileTap={{ scale: 0.95 }}
-                      onClick={() => openToolkitWithTool(tool.id)}
+                      onClick={() => {
+                        if (tool.id === 'pdf_scanner') {
+                          playUiSound(uiCustomization.audioFeedback);
+                          setActiveTab('pdfScanner');
+                        } else if (tool.id === 'voice_tutor') {
+                          playUiSound(uiCustomization.audioFeedback);
+                          setShowVoiceTutorModal(true);
+                        } else {
+                          openToolkitWithTool(tool.id);
+                        }
+                      }}
                       className="px-3 py-1.5 rounded-2xl bg-slate-900/90 hover:bg-indigo-950/90 border border-slate-700/80 hover:border-indigo-400/60 text-[11px] font-bold text-slate-200 hover:text-white whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 shadow-sm"
                     >
                       {tool.name}
@@ -1771,7 +1905,7 @@ export default function App() {
               </motion.div>
 
             {/* 4. 5-DAY STUDY STREAK - MATCHING USER EDIT DESIGN */}
-            <div className="rounded-3xl p-4 sm:p-5 border-2 border-indigo-500/70 bg-gradient-to-b from-[#101432] via-[#0b0e26] to-[#070a1e] text-white shadow-[0_0_30px_rgba(99,102,241,0.25)] space-y-3.5 sm:space-y-4 relative overflow-hidden">
+            <div id="streak-card-section" className="rounded-3xl p-4 sm:p-5 border-2 border-indigo-500/70 bg-gradient-to-b from-[#101432] via-[#0b0e26] to-[#070a1e] text-white shadow-[0_0_30px_rgba(99,102,241,0.25)] space-y-3.5 sm:space-y-4 relative overflow-hidden">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-extrabold text-white text-xs sm:text-sm tracking-wide uppercase flex items-center space-x-1.5">
@@ -2007,116 +2141,163 @@ export default function App() {
               </div>
             </div>
 
-            {/* 8. STUDY LEADERBOARD - WHITE MARBLE & OBSIDIAN METALLIC LOOK */}
-            {/* 8. STUDY LEADERBOARD - MATTE WOODEN & PARCHMENT CLASSIC LOOK */}
-            <div className="bg-[#2d221a] p-2 sm:p-2.5 rounded-[30px] border border-[#3e3025] shadow-2xl">
-              <div className="bg-gradient-to-b from-[#f6efe1] via-[#ece2ce] to-[#e4d6bf] rounded-[22px] border-2 border-[#d5c2a3] p-4 sm:p-5 shadow-[inset_0_2px_4px_rgba(255,255,255,0.8),0_4px_12px_rgba(0,0,0,0.25)] space-y-3.5 sm:space-y-4 text-[#3d2e1f]">
-                {(() => {
-                  const leaderboardUsers = [
-                    { id: 'me', name: `${userProfile.name || 'You'} (You)`, icon: '⭐', xp: userProfile.xp || 655, level: `LEVEL ${userProfile.level || 7} • RANK CLASSMATE`, isUser: true },
-                    { id: 'bob', name: 'Bob Verma', icon: '🦊', xp: 340, level: 'LEVEL 4 • RANK CLASSMATE', isUser: false },
-                    { id: 'alice', name: 'Alice Sharma', icon: '🦄', xp: 280, level: 'LEVEL 3 • RANK CLASSMATE', isUser: false },
-                    { id: 'sarah', name: 'Sarah Patel', icon: '🦉', xp: 195, level: 'LEVEL 2 • RANK CLASSMATE', isUser: false }
-                  ].sort((a, b) => b.xp - a.xp);
+            {/* 8. STUDY LEADERBOARD - MULTI-THEME CAPABLE (MATTE WOODEN, OBSIDIAN BLACK, CYBER NEON, MATRIX EMERALD, GOLD LUXURY) */}
+            {(() => {
+              const isBlackTheme = uiCustomization.leaderboardTheme === 'black';
+              const isCyberTheme = uiCustomization.leaderboardTheme === 'cyber_neon';
+              const isEmeraldTheme = uiCustomization.leaderboardTheme === 'emerald_matrix';
+              const isGoldTheme = uiCustomization.leaderboardTheme === 'gold_luxury';
+              const isDarkVariant = isBlackTheme || isCyberTheme || isEmeraldTheme || isGoldTheme;
 
-                  return (
-                    <>
-                      <div className="flex items-center justify-between border-b border-[#ddcdb4] pb-2.5">
-                        <h3 className="font-serif font-black text-[#544026] text-xs sm:text-sm tracking-wider uppercase flex items-center space-x-2">
-                          <span className="text-base text-[#8c6b3e]">🎖️</span>
-                          <span>STUDY LEADERBOARD</span>
-                        </h3>
-                        <span className="text-[10px] font-black bg-[#3f3226] text-[#dfc285] border border-[#5a4837] px-3.5 py-1 rounded-full uppercase tracking-wider shadow-xs">
-                          CLASS RANK #1
-                        </span>
-                      </div>
+              const outerClass = isBlackTheme 
+                ? "bg-[#060609] p-2 sm:p-2.5 rounded-[30px] border-2 border-neutral-800 shadow-[0_0_40px_rgba(0,0,0,0.95)]"
+                : isCyberTheme
+                ? "bg-[#020914] p-2 sm:p-2.5 rounded-[30px] border-2 border-cyan-500/80 shadow-[0_0_30px_rgba(6,182,212,0.35)]"
+                : isEmeraldTheme
+                ? "bg-[#021408] p-2 sm:p-2.5 rounded-[30px] border-2 border-emerald-500/80 shadow-[0_0_30px_rgba(16,185,129,0.3)]"
+                : isGoldTheme
+                ? "bg-[#1f1706] p-2 sm:p-2.5 rounded-[30px] border-2 border-amber-500/80 shadow-[0_0_30px_rgba(245,158,11,0.3)]"
+                : "bg-[#2d221a] p-2 sm:p-2.5 rounded-[30px] border border-[#3e3025] shadow-2xl";
 
-                      <div className="space-y-2">
-                        {leaderboardUsers.map((item, index) => {
-                          const rankNum = index + 1;
-                          
-                          if (item.isUser) {
-                            // RANK 1 (YOU): RICH DARK WALNUT WITH CARVED BRONZE BORDER
-                            return (
-                              <div 
-                                key={item.id}
-                                className="bg-gradient-to-r from-[#2a1f18] via-[#382b22] to-[#241a14] border-2 border-[#8c6b3e] rounded-[20px] p-3 sm:p-3.5 flex items-center justify-between shadow-lg text-white relative overflow-hidden"
-                              >
-                                <div className="flex items-center space-x-3 min-w-0">
-                                  <span className="text-base select-none shrink-0">🎖️</span>
-                                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#1b3452] to-[#0d1c2e] border border-[#d6c4a6] flex items-center justify-center text-xs overflow-hidden shrink-0 shadow-xs">
-                                    <UserAvatar
-                                      avatar={userProfile.avatar}
-                                      name={userProfile.name || 'Student'}
-                                      avatarType={userProfile.avatarType}
-                                      avatarBg={userProfile.avatarBg}
-                                      size="sm"
-                                    />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <h4 className="font-serif font-black text-xs sm:text-sm text-white truncate">
-                                      {item.name}
-                                    </h4>
-                                    <p className="text-[8.5px] font-extrabold text-[#dfc285] tracking-wider uppercase truncate">
-                                      {item.level}
-                                    </p>
-                                  </div>
-                                </div>
+              const innerClass = isBlackTheme
+                ? "bg-gradient-to-b from-[#111118] via-[#09090e] to-[#030305] rounded-[22px] border border-neutral-800/90 p-4 sm:p-5 shadow-[inset_0_2px_4px_rgba(255,255,255,0.05),0_4px_16px_rgba(0,0,0,0.8)] space-y-3.5 sm:space-y-4 text-white"
+                : isCyberTheme
+                ? "bg-gradient-to-b from-[#08182b] via-[#040e1b] to-[#02070e] rounded-[22px] border border-cyan-500/40 p-4 sm:p-5 shadow-[inset_0_2px_4px_rgba(34,211,238,0.2),0_4px_16px_rgba(0,0,0,0.8)] space-y-3.5 sm:space-y-4 text-cyan-100"
+                : isEmeraldTheme
+                ? "bg-gradient-to-b from-[#062412] via-[#031509] to-[#010a04] rounded-[22px] border border-emerald-500/40 p-4 sm:p-5 shadow-[inset_0_2px_4px_rgba(16,185,129,0.2),0_4px_16px_rgba(0,0,0,0.8)] space-y-3.5 sm:space-y-4 text-emerald-100"
+                : isGoldTheme
+                ? "bg-gradient-to-b from-[#2a1e08] via-[#1a1204] to-[#0d0901] rounded-[22px] border border-amber-500/40 p-4 sm:p-5 shadow-[inset_0_2px_4px_rgba(245,158,11,0.2),0_4px_16px_rgba(0,0,0,0.8)] space-y-3.5 sm:space-y-4 text-amber-100"
+                : "bg-gradient-to-b from-[#f6efe1] via-[#ece2ce] to-[#e4d6bf] rounded-[22px] border-2 border-[#d5c2a3] p-4 sm:p-5 shadow-[inset_0_2px_4px_rgba(255,255,255,0.8),0_4px_12px_rgba(0,0,0,0.25)] space-y-3.5 sm:space-y-4 text-[#3d2e1f]";
 
-                                <div className="flex items-center space-x-3 shrink-0">
-                                  {/* Golden Wreath Coin */}
-                                  <div className="w-8 h-8 rounded-full bg-gradient-to-b from-[#8f5e38] via-[#bf8758] to-[#6d4220] border-2 border-[#d9a87d] flex items-center justify-center text-white font-serif font-black text-xs shadow-md">
-                                    ①
-                                  </div>
-                                  <span className="font-serif font-black text-base sm:text-lg text-[#f3d393] drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                                    {item.xp} XP
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          }
+              const leaderboardUsers = [
+                { id: 'me', name: `${userProfile.name || 'You'} (You)`, icon: '⭐', xp: userProfile.xp || 655, level: `LEVEL ${userProfile.level || 7} • RANK CLASSMATE`, isUser: true },
+                { id: 'bob', name: 'Bob Verma', icon: '🦊', xp: 340, level: 'LEVEL 4 • RANK CLASSMATE', isUser: false },
+                { id: 'alice', name: 'Alice Sharma', icon: '🦄', xp: 280, level: 'LEVEL 3 • RANK CLASSMATE', isUser: false },
+                { id: 'sarah', name: 'Sarah Patel', icon: '🦉', xp: 195, level: 'LEVEL 2 • RANK CLASSMATE', isUser: false }
+              ].sort((a, b) => b.xp - a.xp);
 
-                          // RANK 2 & OTHERS: MATTE PARCHMENT / WARM OAK SLATS
+              return (
+                <div id="leaderboard-section" className={outerClass}>
+                  <div className={innerClass}>
+                    <div className={`flex items-center justify-between border-b pb-2.5 ${
+                      isDarkVariant ? 'border-white/10' : 'border-[#ddcdb4]'
+                    }`}>
+                      <h3 className={`font-serif font-black text-xs sm:text-sm tracking-wider uppercase flex items-center space-x-2 ${
+                        isBlackTheme ? 'text-amber-300' : isCyberTheme ? 'text-cyan-300' : isEmeraldTheme ? 'text-emerald-300' : isGoldTheme ? 'text-amber-300' : 'text-[#544026]'
+                      }`}>
+                        <span className="text-base">🎖️</span>
+                        <span>STUDY LEADERBOARD {isBlackTheme ? '• OBSIDIAN BLACK' : isCyberTheme ? '• CYBER NEON' : ''}</span>
+                      </h3>
+                      <span className={`text-[10px] font-black px-3.5 py-1 rounded-full uppercase tracking-wider shadow-xs ${
+                        isBlackTheme 
+                          ? 'bg-neutral-900 text-amber-300 border border-amber-500/40' 
+                          : isCyberTheme
+                          ? 'bg-cyan-950 text-cyan-300 border border-cyan-500/40'
+                          : 'bg-[#3f3226] text-[#dfc285] border border-[#5a4837]'
+                      }`}>
+                        CLASS RANK #1
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {leaderboardUsers.map((item, index) => {
+                        const rankNum = index + 1;
+                        
+                        if (item.isUser) {
+                          // RANK 1 (YOU)
+                          const userCardClass = isBlackTheme
+                            ? "bg-gradient-to-r from-[#14141d] via-[#1c1c28] to-[#101017] border-2 border-amber-400 text-white shadow-[0_0_20px_rgba(251,191,36,0.25)] rounded-[20px] p-3 sm:p-3.5 flex items-center justify-between relative overflow-hidden"
+                            : isCyberTheme
+                            ? "bg-gradient-to-r from-[#071d33] via-[#0a2745] to-[#041527] border-2 border-cyan-400 text-white shadow-[0_0_20px_rgba(34,211,238,0.3)] rounded-[20px] p-3 sm:p-3.5 flex items-center justify-between relative overflow-hidden"
+                            : "bg-gradient-to-r from-[#2a1f18] via-[#382b22] to-[#241a14] border-2 border-[#8c6b3e] rounded-[20px] p-3 sm:p-3.5 flex items-center justify-between shadow-lg text-white relative overflow-hidden";
+
                           return (
-                            <div 
-                              key={item.id}
-                              className="bg-gradient-to-r from-[#fdfbf7] via-[#f7f0e4] to-[#f1e6d5] border border-[#d8c9b2] rounded-[20px] p-3 sm:p-3.5 flex items-center justify-between shadow-xs hover:border-[#bfa98b] transition"
-                            >
+                            <div key={item.id} className={userCardClass}>
                               <div className="flex items-center space-x-3 min-w-0">
-                                <span className="text-base select-none shrink-0">
-                                  {rankNum === 2 ? '🥈' : '🥉'}
-                                </span>
-                                <div className="w-8 h-8 rounded-xl bg-[#3f3933] border border-[#595249] flex items-center justify-center text-sm shrink-0 shadow-2xs text-[#dfc285]">
-                                  {item.icon}
+                                <span className="text-base select-none shrink-0">🎖️</span>
+                                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#1b3452] to-[#0d1c2e] border border-[#d6c4a6] flex items-center justify-center text-xs overflow-hidden shrink-0 shadow-xs">
+                                  <UserAvatar
+                                    avatar={userProfile.avatar}
+                                    name={userProfile.name || 'Student'}
+                                    avatarType={userProfile.avatarType}
+                                    avatarBg={userProfile.avatarBg}
+                                    size="sm"
+                                  />
                                 </div>
                                 <div className="min-w-0">
-                                  <h4 className="font-serif font-black text-xs sm:text-sm text-[#2e2319] truncate">
+                                  <h4 className="font-serif font-black text-xs sm:text-sm text-white truncate">
                                     {item.name}
                                   </h4>
-                                  <p className="text-[8.5px] font-bold text-[#7d6954] tracking-wider uppercase truncate">
+                                  <p className={`text-[8.5px] font-extrabold tracking-wider uppercase truncate ${
+                                    isBlackTheme ? 'text-amber-300' : isCyberTheme ? 'text-cyan-300' : 'text-[#dfc285]'
+                                  }`}>
                                     {item.level}
                                   </p>
                                 </div>
                               </div>
 
                               <div className="flex items-center space-x-3 shrink-0">
-                                {/* Silver/Bronze Wreath Coin */}
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-b from-[#e5e5e5] via-[#cccccc] to-[#a8a8a8] border-2 border-[#828282] flex items-center justify-center text-slate-800 font-serif font-black text-xs shadow-xs">
-                                  {rankNum === 2 ? '②' : '③'}
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-b from-[#8f5e38] via-[#bf8758] to-[#6d4220] border-2 border-[#d9a87d] flex items-center justify-center text-white font-serif font-black text-xs shadow-md">
+                                  ①
                                 </div>
-                                <span className="font-serif font-black text-base sm:text-lg text-[#7d6044] drop-shadow-xs">
+                                <span className={`font-serif font-black text-base sm:text-lg drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] ${
+                                  isBlackTheme ? 'text-amber-300' : isCyberTheme ? 'text-cyan-300' : 'text-[#f3d393]'
+                                }`}>
                                   {item.xp} XP
                                 </span>
                               </div>
                             </div>
                           );
-                        })}
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
+                        }
+
+                        // RANK 2 & OTHERS
+                        const classmateCardClass = isBlackTheme
+                          ? "bg-gradient-to-r from-[#0e0e14] via-[#12121c] to-[#0a0a0f] border border-neutral-800/90 rounded-[20px] p-3 sm:p-3.5 flex items-center justify-between text-neutral-200 hover:border-neutral-700 transition"
+                          : isCyberTheme
+                          ? "bg-gradient-to-r from-[#041224] via-[#071c35] to-[#020b18] border border-cyan-500/30 rounded-[20px] p-3 sm:p-3.5 flex items-center justify-between text-cyan-200 hover:border-cyan-400 transition"
+                          : "bg-gradient-to-r from-[#fdfbf7] via-[#f7f0e4] to-[#f1e6d5] border border-[#d8c9b2] rounded-[20px] p-3 sm:p-3.5 flex items-center justify-between shadow-xs hover:border-[#bfa98b] transition";
+
+                        return (
+                          <div key={item.id} className={classmateCardClass}>
+                            <div className="flex items-center space-x-3 min-w-0">
+                              <span className="text-base select-none shrink-0">
+                                {rankNum === 2 ? '🥈' : '🥉'}
+                              </span>
+                              <div className="w-8 h-8 rounded-xl bg-[#3f3933] border border-[#595249] flex items-center justify-center text-sm shrink-0 shadow-2xs text-[#dfc285]">
+                                {item.icon}
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className={`font-serif font-black text-xs sm:text-sm truncate ${
+                                  isDarkVariant ? 'text-white' : 'text-[#2e2319]'
+                                }`}>
+                                  {item.name}
+                                </h4>
+                                <p className={`text-[8.5px] font-bold tracking-wider uppercase truncate ${
+                                  isDarkVariant ? 'text-slate-400' : 'text-[#7d6954]'
+                                }`}>
+                                  {item.level}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-3 shrink-0">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-b from-[#e5e5e5] via-[#cccccc] to-[#a8a8a8] border-2 border-[#828282] flex items-center justify-center text-slate-800 font-serif font-black text-xs shadow-xs">
+                                {rankNum === 2 ? '②' : '③'}
+                              </div>
+                              <span className={`font-serif font-black text-base sm:text-lg drop-shadow-xs ${
+                                isDarkVariant ? 'text-slate-300' : 'text-[#7d6044]'
+                              }`}>
+                                {item.xp} XP
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* 9. ONLINE CLASSMATES - FUSION OF CLASSIC ASTRONOMY & FUTURISTIC SPACE SCI-FI TELEMETRY */}
             <div className="bg-gradient-to-b from-[#1b1510] via-[#101524] to-[#0a0f1d] p-2 sm:p-2.5 rounded-[30px] border-2 border-[#8c6b3e]/60 shadow-[0_10px_30px_rgba(0,0,0,0.8)] relative overflow-hidden">
@@ -2669,6 +2850,7 @@ export default function App() {
               });
             }}
             onAddXp={addXp}
+            onOpenEditor={() => setShowAiEditorModal(true)}
           />
         )}
 
@@ -2688,6 +2870,28 @@ export default function App() {
               });
             }}
             onAddXp={addXp}
+          />
+        )}
+
+        {/* PDF & BOOK SCANNER: CHAPTER SUMMARIES & AUTOMATIC QUIZ */}
+        {activeTab === 'pdfScanner' && (
+          <PdfBookScanner
+            user={userProfile}
+            appLanguage={appLanguage}
+            onSaveToNotebook={async (title, content, tags) => {
+              await saveStudyDocument({
+                id: 'doc_' + Date.now(),
+                ownerId: userProfile.uid,
+                title,
+                content,
+                summary: content.slice(0, 150) + '...',
+                tagsJson: JSON.stringify(tags || ['PDF Scanner']),
+                isShared: false,
+                timestamp: new Date().toISOString()
+              });
+            }}
+            onAddXp={addXp}
+            onClose={() => setActiveTab('home')}
           />
         )}
 
@@ -2716,6 +2920,8 @@ export default function App() {
 
             <div className="grid grid-cols-2 gap-2">
               {[
+                { id: 'pdfScanner', label: 'PDF Scanner', icon: FileText, color: 'text-cyan-600 bg-cyan-50' },
+                { id: 'voiceTutor', label: 'Voice Tutor', icon: Mic, color: 'text-pink-600 bg-pink-50' },
                 { id: 'imageGen', label: 'Image Gen', icon: ImageIcon, color: 'text-indigo-600 bg-indigo-50' },
                 { id: 'whiteboard', label: 'Whiteboard', icon: PenTool, color: 'text-purple-600 bg-purple-50' },
                 { id: 'mockExam', label: 'Mock Exams', icon: GraduationCap, color: 'text-amber-600 bg-amber-50' },
@@ -2728,7 +2934,11 @@ export default function App() {
                   <button
                     key={item.id}
                     onClick={() => {
-                      setActiveTab(item.id as any);
+                      if (item.id === 'voiceTutor') {
+                        setShowVoiceTutorModal(true);
+                      } else {
+                        setActiveTab(item.id as any);
+                      }
                       setShowMoreMenu(false);
                     }}
                     className={`flex items-center space-x-2 p-2 rounded-xl transition text-left border ${
@@ -2870,6 +3080,57 @@ export default function App() {
         customization={uiCustomization}
         onUpdate={handleUpdateCustomization}
         language={appLanguage}
+      />
+
+      {/* LIVE VOICE TUTOR MODAL */}
+      <VoiceTutorModal
+        isOpen={showVoiceTutorModal}
+        onClose={() => setShowVoiceTutorModal(false)}
+        user={userProfile}
+        appLanguage={appLanguage}
+        onAddXp={addXp}
+        onSaveToNotebook={async (title, content, tags) => {
+          await saveStudyDocument({
+            id: 'doc_' + Date.now(),
+            ownerId: userProfile.uid,
+            title,
+            content,
+            summary: content.slice(0, 150) + '...',
+            tagsJson: JSON.stringify(tags || ['Voice Tutor']),
+            isShared: false,
+            timestamp: new Date().toISOString()
+          });
+        }}
+      />
+
+      {/* CINEMATIC AI APP & THEME EDITOR / COPILOT HUD */}
+      <CinematicAiEditor
+        isOpen={showAiEditorModal}
+        onClose={() => setShowAiEditorModal(false)}
+        user={userProfile}
+        appLanguage={appLanguage}
+        currentTab={activeTab}
+        customization={uiCustomization}
+        onUpdateCustomization={handleUpdateCustomization}
+        onSaveToNotebook={async (title, content, tags) => {
+          await saveStudyDocument({
+            id: 'doc_' + Date.now(),
+            ownerId: userProfile.uid,
+            title,
+            content,
+            summary: content.slice(0, 150) + '...',
+            tagsJson: JSON.stringify(tags || ['AI Editor']),
+            isShared: false,
+            timestamp: new Date().toISOString()
+          });
+        }}
+        onNavigateTab={(tab, toolId) => {
+          if (tab === 'toolkit' && toolId) {
+            setInitialTool(toolId);
+          }
+          setActiveTab(tab);
+        }}
+        onAddXp={addXp}
       />
 
       {/* PWA INSTALL & OFFLINE PROMPT BANNER */}
