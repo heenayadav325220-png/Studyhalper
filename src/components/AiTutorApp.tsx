@@ -549,8 +549,11 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [flashAnimation, setFlashAnimation] = useState(false);
+  const [shutterAnimation, setShutterAnimation] = useState(false);
   const [cameraFilter, setCameraFilter] = useState<ImageFilterType>('none');
   const [filterPreviewImageIndex, setFilterPreviewImageIndex] = useState<number | null>(null);
+  const [lowContrastDetected, setLowContrastDetected] = useState(false);
+  const [showContrastToast, setShowContrastToast] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -558,6 +561,89 @@ export const AiTutorApp = memo(function AiTutorApp({
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const playShutterSound = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+
+      const now = ctx.currentTime;
+
+      // Realistic mechanical DSLR shutter click simulation
+      // Step 1: Initial crisp mirror flip & blade snap (high-transient mechanical pop)
+      const osc1 = ctx.createOscillator();
+      const oscGain1 = ctx.createGain();
+      osc1.type = 'triangle';
+      osc1.frequency.setValueAtTime(1600, now);
+      osc1.frequency.exponentialRampToValueAtTime(140, now + 0.022);
+
+      oscGain1.gain.setValueAtTime(0.35, now);
+      oscGain1.gain.exponentialRampToValueAtTime(0.001, now + 0.022);
+      osc1.connect(oscGain1);
+      oscGain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.025);
+
+      // Step 2: Mechanical noise burst (shutter friction & curtain release)
+      const bufferSize = Math.floor(ctx.sampleRate * 0.035);
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const output = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.22));
+      }
+
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const noiseFilter = ctx.createBiquadFilter();
+      noiseFilter.type = 'highpass';
+      noiseFilter.frequency.setValueAtTime(1800, now);
+
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.3, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(ctx.destination);
+      noise.start(now);
+
+      // Step 3: Secondary shutter curtain closure click (38ms later)
+      setTimeout(() => {
+        try {
+          const now2 = ctx.currentTime;
+          const osc2 = ctx.createOscillator();
+          const oscGain2 = ctx.createGain();
+          osc2.type = 'sine';
+          osc2.frequency.setValueAtTime(1100, now2);
+          osc2.frequency.exponentialRampToValueAtTime(180, now2 + 0.028);
+
+          oscGain2.gain.setValueAtTime(0.28, now2);
+          oscGain2.gain.exponentialRampToValueAtTime(0.001, now2 + 0.028);
+          osc2.connect(oscGain2);
+          oscGain2.connect(ctx.destination);
+          osc2.start(now2);
+          osc2.stop(now2 + 0.03);
+
+          const noise2 = ctx.createBufferSource();
+          noise2.buffer = buffer;
+          const noiseGain2 = ctx.createGain();
+          noiseGain2.gain.setValueAtTime(0.22, now2);
+          noiseGain2.gain.exponentialRampToValueAtTime(0.001, now2 + 0.03);
+
+          noise2.connect(noiseFilter);
+          noiseFilter.connect(noiseGain2);
+          noiseGain2.connect(ctx.destination);
+          noise2.start(now2);
+        } catch (e) {}
+      }, 38);
+    } catch (e) {
+      // Audio playback fails gracefully if muted or unsupported
+    }
+  };
 
   const startCamera = async (facing: 'environment' | 'user' = cameraFacing) => {
     setCameraError(null);
@@ -601,19 +687,93 @@ export const AiTutorApp = memo(function AiTutorApp({
     };
   }, [showCameraModal, cameraFacing]);
 
+  // Real-time edge contrast & lighting analysis on live camera frames
+  useEffect(() => {
+    if (!showCameraModal) {
+      setLowContrastDetected(false);
+      setShowContrastToast(false);
+      return;
+    }
+
+    let intervalId: any = null;
+    const sampleCanvas = document.createElement('canvas');
+    sampleCanvas.width = 64;
+    sampleCanvas.height = 48;
+    const ctx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+
+    const checkContrast = () => {
+      if (!videoRef.current || videoRef.current.readyState < 2 || !ctx) return;
+      try {
+        ctx.drawImage(videoRef.current, 0, 0, 64, 48);
+        const imgData = ctx.getImageData(0, 0, 64, 48);
+        const data = imgData.data;
+
+        let sumLuminance = 0;
+        let minLum = 255;
+        let maxLum = 0;
+        const count = data.length / 4;
+        const lumValues: number[] = [];
+
+        for (let i = 0; i < data.length; i += 4) {
+          const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          lumValues.push(lum);
+          sumLuminance += lum;
+          if (lum < minLum) minLum = lum;
+          if (lum > maxLum) maxLum = lum;
+        }
+
+        const avgLum = sumLuminance / count;
+        let variance = 0;
+        for (let i = 0; i < count; i++) {
+          variance += Math.pow(lumValues[i] - avgLum, 2);
+        }
+        const stdDev = Math.sqrt(variance / count);
+
+        // Low contrast or poorly lit document condition:
+        // Flat dynamic range or dim lighting
+        const isLow = avgLum < 60 || (maxLum - minLum < 55) || stdDev < 22;
+
+        if (isLow) {
+          setLowContrastDetected(true);
+          setShowContrastToast(true);
+        } else {
+          setLowContrastDetected(false);
+        }
+      } catch (e) {
+        // Handled gracefully if canvas read is blocked
+      }
+    };
+
+    intervalId = setInterval(checkContrast, 1800);
+    const timeoutId = setTimeout(checkContrast, 1000);
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      clearTimeout(timeoutId);
+    };
+  }, [showCameraModal]);
+
   const handleCapturePhoto = (keepOpen: boolean = false) => {
     if (!videoRef.current) return;
     const dataUrl = applyFilterToCanvas(videoRef.current, cameraFilter);
     if (dataUrl) {
       setSelectedImages((prev) => [...prev, dataUrl]);
       
-      // Trigger camera flash visual feedback
+      // Trigger camera shutter audio & visual feedback
+      playShutterSound();
+      setShutterAnimation(true);
       setFlashAnimation(true);
-      setTimeout(() => setFlashAnimation(false), 200);
 
-      if (!keepOpen) {
-        setShowCameraModal(false);
-      }
+      setTimeout(() => {
+        setFlashAnimation(false);
+      }, 200);
+
+      setTimeout(() => {
+        setShutterAnimation(false);
+        if (!keepOpen) {
+          setShowCameraModal(false);
+        }
+      }, 400);
     }
   };
 
@@ -2240,11 +2400,91 @@ export const AiTutorApp = memo(function AiTutorApp({
               </div>
 
               {/* LIVE CAMERA VIEWPORT */}
-              <div className="relative bg-slate-950 rounded-2xl overflow-hidden aspect-4/3 flex items-center justify-center border border-slate-800 shadow-inner">
-                {/* FLASH ANIMATION EFFECT */}
-                {flashAnimation && (
-                  <div className="absolute inset-0 bg-white/70 z-20 pointer-events-none animate-out fade-out duration-200" />
-                )}
+              <motion.div
+                animate={shutterAnimation ? { scale: [1, 0.98, 1] } : { scale: 1 }}
+                transition={{ duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
+                className={`relative bg-slate-950 rounded-2xl overflow-hidden aspect-4/3 flex items-center justify-center border border-slate-800 shadow-inner ${shutterAnimation ? 'ring-2 ring-cyan-400/90 shadow-[0_0_30px_rgba(6,182,212,0.25)]' : ''}`}
+              >
+                {/* MECHANICAL SHUTTER CURTAINS & IRIS BLADES CLICK ANIMATION */}
+                <AnimatePresence>
+                  {shutterAnimation && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center overflow-hidden"
+                    >
+                      {/* TOP MECHANICAL SHUTTER CURTAIN */}
+                      <motion.div
+                        initial={{ y: '-100%' }}
+                        animate={{ y: ['-100%', '0%', '0%', '-100%'] }}
+                        transition={{ duration: 0.32, times: [0, 0.35, 0.6, 1], ease: 'easeInOut' }}
+                        className="absolute top-0 left-0 right-0 h-1/2 bg-slate-950/95 border-b-2 border-cyan-400/60 shadow-2xl backdrop-blur-xs flex items-end justify-center pb-2"
+                      >
+                        <div className="w-16 h-1 bg-cyan-400/40 rounded-full" />
+                      </motion.div>
+
+                      {/* BOTTOM MECHANICAL SHUTTER CURTAIN */}
+                      <motion.div
+                        initial={{ y: '100%' }}
+                        animate={{ y: ['100%', '0%', '0%', '100%'] }}
+                        transition={{ duration: 0.32, times: [0, 0.35, 0.6, 1], ease: 'easeInOut' }}
+                        className="absolute bottom-0 left-0 right-0 h-1/2 bg-slate-950/95 border-t-2 border-cyan-400/60 shadow-2xl backdrop-blur-xs flex items-start justify-center pt-2"
+                      >
+                        <div className="w-16 h-1 bg-cyan-400/40 rounded-full" />
+                      </motion.div>
+
+                      {/* ROTATING 6-BLADE MECHANICAL IRIS APERTURE */}
+                      <motion.div
+                        initial={{ scale: 2.2, rotate: 0, opacity: 0.8 }}
+                        animate={{
+                          scale: [2.2, 0.08, 0.08, 2.2],
+                          rotate: [0, 60, 60, 120],
+                          opacity: [0.8, 1, 1, 0]
+                        }}
+                        transition={{ duration: 0.36, times: [0, 0.35, 0.6, 1], ease: [0.22, 1, 0.36, 1] }}
+                        className="relative w-56 h-56 rounded-full border-4 border-slate-800 bg-slate-950 shadow-[0_0_60px_rgba(0,0,0,0.95)] flex items-center justify-center"
+                      >
+                        <div className="absolute inset-2 rounded-full border border-indigo-400/50" />
+                        <div className="absolute inset-6 rounded-full border border-cyan-400/40 border-dashed" />
+                        <div className="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_15px_#38bdf8]" />
+                      </motion.div>
+
+                      {/* RETICLE FOCUS LOCK CONFIRMATION BADGE */}
+                      <motion.div
+                        initial={{ scale: 0.6, opacity: 0 }}
+                        animate={{
+                          scale: [0.6, 1.15, 1],
+                          opacity: [0, 1, 0]
+                        }}
+                        transition={{ duration: 0.38, times: [0, 0.45, 1] }}
+                        className="absolute flex flex-col items-center justify-center space-y-1.5 z-40"
+                      >
+                        <div className="w-16 h-16 rounded-full border-2 border-cyan-400 flex items-center justify-center shadow-[0_0_25px_rgba(6,182,212,0.8)]">
+                          <div className="w-4 h-4 rounded-full bg-cyan-400 animate-ping opacity-75" />
+                        </div>
+                        <span className="text-[10px] font-black tracking-widest uppercase text-cyan-200 bg-slate-950/90 px-2.5 py-0.5 rounded-full border border-cyan-400/50 shadow-xl backdrop-blur-md">
+                          CAPTURED
+                        </span>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* QUICK FULL-SCREEN WHITE FLASH SIMULATING REAL CAMERA SHUTTER */}
+                <AnimatePresence>
+                  {flashAnimation && (
+                    <motion.div
+                      initial={{ opacity: 1 }}
+                      animate={{ opacity: [1, 1, 0] }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.26, times: [0, 0.15, 1], ease: 'easeOut' }}
+                      className="absolute inset-0 z-50 pointer-events-none bg-white flex items-center justify-center overflow-hidden"
+                    >
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#ffffff_0%,_#f8fafc_60%,_#e0f2fe_100%)]" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {cameraError ? (
                   <div className="text-center p-6 space-y-3">
@@ -2302,9 +2542,64 @@ export const AiTutorApp = memo(function AiTutorApp({
                         {cameraFilter !== 'none' ? `Filter: ${HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.label}` : 'Align text & equations in frame'}
                       </span>
                     </div>
+
+                    {/* AI LOW-CONTRAST / LIGHTING WARNING TOAST */}
+                    <AnimatePresence>
+                      {showContrastToast && lowContrastDetected && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 16, scale: 0.94 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 12, scale: 0.94 }}
+                          transition={{ duration: 0.25, ease: 'easeOut' }}
+                          className="absolute bottom-3 left-3 right-3 z-20 flex items-center justify-between bg-slate-950/92 text-amber-200 border border-amber-500/50 rounded-xl px-3 py-2 shadow-2xl backdrop-blur-md"
+                        >
+                          <div className="flex items-center space-x-2 min-w-0">
+                            <div className="p-1.5 bg-amber-500/20 text-amber-400 rounded-lg shrink-0 animate-pulse">
+                              <Lightbulb className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <div className="flex items-center space-x-1.5">
+                                <span className="text-[11px] font-bold text-amber-200 truncate">
+                                  Low Edge Contrast
+                                </span>
+                                <span className="text-[9px] bg-amber-500/20 text-amber-300 font-semibold px-1.5 py-0.2 rounded-full border border-amber-500/30">
+                                  AI Lighting Check
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-slate-300 truncate">
+                                Improve lighting or hold closer for clear document scan
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-1 shrink-0 ml-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCameraFilter('contrast');
+                                setShowContrastToast(false);
+                              }}
+                              className="text-[10px] font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 px-2.5 py-1 rounded-lg transition shadow-xs cursor-pointer flex items-center space-x-1"
+                              title="Enhance document contrast"
+                            >
+                              <Sparkles className="w-2.5 h-2.5" />
+                              <span>Boost</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowContrastToast(false)}
+                              className="p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition cursor-pointer"
+                              aria-label="Dismiss lighting warning"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </>
                 )}
-              </div>
+              </motion.div>
 
               {/* SEQUENCE THUMBNAILS & PER-PAGE FILTER SELECTOR IN MODAL */}
               {selectedImages.length > 0 && (

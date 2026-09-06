@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, 
@@ -86,6 +86,15 @@ export default function AuthModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Sync tab state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentTab(isLoggedIn ? 'profile' : 'signin');
+      setError(null);
+      setSuccessMessage(null);
+    }
+  }, [isOpen, isLoggedIn]);
 
   if (!isOpen) return null;
 

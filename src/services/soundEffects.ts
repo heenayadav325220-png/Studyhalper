@@ -12,7 +12,9 @@ function getAudioContext(): AudioContext | null {
     }
   }
   if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume();
+    audioCtx.resume().catch(() => {
+      // Browser autoplay policy prevented instant resume; will resume on next user gesture
+    });
   }
   return audioCtx;
 }

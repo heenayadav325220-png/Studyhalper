@@ -676,8 +676,8 @@ export default function App() {
     switch (uiCustomization.fontFamilyStyle) {
       case 'serif': return 'font-serif';
       case 'mono': return 'font-mono';
-      case 'rounded': return 'font-sans tracking-wide font-medium';
-      default: return 'font-sans';
+      case 'rounded': return 'font-[Outfit,ui-sans-serif,system-ui,sans-serif] tracking-wide';
+      default: return 'font-[Plus_Jakarta_Sans,ui-sans-serif,system-ui,sans-serif]';
     }
   };
 
@@ -886,6 +886,31 @@ export default function App() {
                     >
                       <Terminal className="w-3.5 h-3.5 text-cyan-300" />
                       <span className="text-[9px] font-black text-cyan-200 hidden sm:inline uppercase tracking-wider">Editor</span>
+                    </motion.button>
+
+                    {/* Auth / Sign In / Account Button */}
+                    <motion.button
+                      whileHover={{ scale: 1.08 }}
+                      whileTap={{ scale: 0.92 }}
+                      onClick={() => setShowAuthModal(true)}
+                      className={`p-1.5 rounded-xl transition cursor-pointer shrink-0 shadow-xs flex items-center space-x-1 border ${
+                        currentUser && !currentUser.isAnonymous
+                          ? 'text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-400/40'
+                          : 'text-indigo-200 bg-indigo-600/30 hover:bg-indigo-600/50 border-indigo-400/50'
+                      }`}
+                      title={currentUser && !currentUser.isAnonymous ? 'Account Settings / खाता सेटिंग्स' : 'Sign In / लॉगिन'}
+                    >
+                      {currentUser && !currentUser.isAnonymous ? (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                          <span className="text-[9px] font-black uppercase tracking-wider">Account</span>
+                        </>
+                      ) : (
+                        <>
+                          <LogIn className="w-3.5 h-3.5 text-indigo-300" />
+                          <span className="text-[9px] font-black uppercase tracking-wider">Sign In</span>
+                        </>
+                      )}
                     </motion.button>
 
                     {/* Self Customize Gear Trigger Button */}
@@ -2927,6 +2952,7 @@ export default function App() {
                 { id: 'mockExam', label: 'Mock Exams', icon: GraduationCap, color: 'text-amber-600 bg-amber-50' },
                 { id: 'studyDocs', label: 'Notebook', icon: FileText, color: 'text-teal-600 bg-teal-50' },
                 { id: 'petCompanion', label: 'Sanctuary', icon: Heart, color: 'text-rose-600 bg-rose-50' },
+                { id: 'account', label: currentUser && !currentUser.isAnonymous ? 'My Account' : 'Sign In / Login', icon: LogIn, color: 'text-indigo-600 bg-indigo-50' },
               ].map((item) => {
                 const Icon = item.icon;
                 const isItemActive = activeTab === item.id;
@@ -2936,6 +2962,8 @@ export default function App() {
                     onClick={() => {
                       if (item.id === 'voiceTutor') {
                         setShowVoiceTutorModal(true);
+                      } else if (item.id === 'account') {
+                        setShowAuthModal(true);
                       } else {
                         setActiveTab(item.id as any);
                       }

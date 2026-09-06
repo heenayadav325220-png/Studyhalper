@@ -4,6 +4,7 @@ import App from './App';
 import './index.css';
 import { registerServiceWorker } from './services/pwaService';
 import { ThemeProvider } from './context/ThemeContext';
+import { AuthProvider } from './contexts/AuthContext';
 
 // Initialize PWA Service Worker
 registerServiceWorker();
@@ -58,7 +59,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <ThemeProvider>
-        <App />
+        <AuthProvider>
+          <App />
+        </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>
   </React.StrictMode>

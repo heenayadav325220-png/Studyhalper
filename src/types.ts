@@ -168,7 +168,8 @@ export type WallpaperAmbiance =
   | 'earth_forest' 
   | 'deep_ocean' 
   | 'retro_arcade' 
-  | 'solar_system';
+  | 'solar_system'
+  | 'celestial_zen';
 export type AudioFeedback = 'cyber_synth' | 'tactile_click' | 'zen_water' | 'silent';
 export type LeaderboardTheme = 'default' | 'black' | 'cyber_neon' | 'gold_luxury' | 'emerald_matrix' | 'crimson_dark';
 
