@@ -58,6 +58,8 @@ import {
   applyFilterToCanvas
 } from '../utils/imageEnhancement';
 import type { Subject } from '../types';
+import { playTutorSpeech } from '../services/voiceSettings';
+import { CustomVoiceModal } from './CustomVoiceModal';
 
 interface AiTutorAppProps {
   user: {
@@ -526,6 +528,7 @@ export const AiTutorApp = memo(function AiTutorApp({
 
   // Mobile More Options (Three-Dots) Menu State
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showCustomVoiceModal, setShowCustomVoiceModal] = useState(false);
 
   // Suggestion Engine State (3 dynamic academic follow-up questions or study actions)
   const [suggestions, setSuggestions] = useState<AcademicSuggestion[]>(() => {
@@ -1130,6 +1133,10 @@ export const AiTutorApp = memo(function AiTutorApp({
     }
   };
 
+  const handleDeleteMessage = (id: string) => {
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+  };
+
   const handleCopyText = (id: string, text: string | unknown) => {
     const cleanStr = typeof text === 'string' ? text : String(text || '');
     navigator.clipboard.writeText(cleanStr);
@@ -1140,14 +1147,7 @@ export const AiTutorApp = memo(function AiTutorApp({
   const handleSpeakText = (text: string | unknown) => {
     const cleanStr = typeof text === 'string' ? text : String(text || '');
     if (!cleanStr) return;
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(cleanStr.replace(/[*#_`]/g, ''));
-      utterance.rate = 1.0;
-      window.speechSynthesis.speak(utterance);
-    } else {
-      alert('Text-to-speech is not supported in this browser.');
-    }
+    playTutorSpeech(cleanStr);
   };
 
   const handleSaveToNotebook = async (msg: ChatMessage) => {
@@ -1256,6 +1256,17 @@ export const AiTutorApp = memo(function AiTutorApp({
               <span className="truncate max-w-[100px]">{user.schoolName || 'chhabra'}</span>
             </div>
           </div>
+
+          {/* CUSTOM VOICE STUDIO BUTTON */}
+          <button
+            type="button"
+            onClick={() => setShowCustomVoiceModal(true)}
+            className="p-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-200/80 rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-2xs"
+            title="Configure Tutor Custom Voice"
+          >
+            <Volume2 className="w-4 h-4 text-indigo-600" />
+            <span className="hidden sm:inline">Voice</span>
+          </button>
 
           {/* CLEAR CHAT BUTTON */}
           {messages.length > 0 && (
@@ -1480,182 +1491,223 @@ export const AiTutorApp = memo(function AiTutorApp({
             </motion.div>
           </motion.div>
         ) : (
-          /* MESSAGES LIST */
-          messages.map((msg, idx) => {
-            const isLatest = idx === messages.length - 1;
+          /* MESSAGES LIST WITH ENTRANCE AND EXIT ANIMATIONS */
+          <AnimatePresence initial={false}>
+            {messages.map((msg, idx) => {
+              const isLatest = idx === messages.length - 1;
 
-            if (msg.sender === 'user') {
+              if (msg.sender === 'user') {
+                return (
+                  <motion.div
+                    key={msg.id}
+                    layout
+                    initial={{ opacity: 0, y: 18, scale: 0.94, filter: 'blur(4px)' }}
+                    animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+                    exit={{ opacity: 0, y: -16, scale: 0.88, filter: 'blur(4px)', transition: { duration: 0.22, ease: 'easeOut' } }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 28, mass: 0.8 }}
+                    className="flex items-start justify-end space-x-2.5 group/usermsg"
+                  >
+                    <div className="flex flex-col items-end max-w-[85%] sm:max-w-[75%] space-y-1">
+                      <div className="flex items-center space-x-1.5 pr-1">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMessage(msg.id)}
+                          className="opacity-0 group-hover/usermsg:opacity-100 transition text-slate-400 hover:text-rose-500 p-0.5 rounded cursor-pointer"
+                          title="Remove message"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          {msg.timestamp}
+                        </span>
+                      </div>
+                      <div className="bg-[#e9f5be] border border-[#d9f99d] text-slate-900 rounded-2xl rounded-tr-xs p-3.5 shadow-2xs space-y-2">
+                        {msg.images && msg.images.length > 0 ? (
+                          <div className={`grid gap-2 ${msg.images.length === 1 ? 'grid-cols-1 max-w-xs' : 'grid-cols-2 max-w-sm'}`}>
+                            {msg.images.map((img, i) => (
+                              <img key={i} src={img} alt={`Attached ${i + 1}`} className="w-full max-h-48 object-contain rounded-xl border border-slate-300" />
+                            ))}
+                          </div>
+                        ) : msg.image ? (
+                          <img src={msg.image} alt="Attached homework" className="w-full max-h-56 object-contain rounded-xl border border-slate-300" />
+                        ) : null}
+                        <p className="text-xs sm:text-sm text-slate-900 whitespace-pre-wrap leading-relaxed font-medium">
+                          {msg.text}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* USER PROFILE AVATAR */}
+                    <div className="w-8 h-8 rounded-full border border-slate-300 shadow-2xs overflow-hidden bg-slate-200 flex items-center justify-center shrink-0 mt-4">
+                      {user.avatar ? (
+                        <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <UserIcon className="w-4 h-4 text-slate-600" />
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              }
+
+              // AI TUTOR MESSAGE
               return (
                 <motion.div
                   key={msg.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex items-start justify-end space-x-2.5"
+                  layout
+                  initial={{ opacity: 0, y: 18, scale: 0.94, filter: 'blur(4px)' }}
+                  animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+                  exit={{ opacity: 0, y: -16, scale: 0.88, filter: 'blur(4px)', transition: { duration: 0.22, ease: 'easeOut' } }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 28, mass: 0.8 }}
+                  className="flex items-start space-x-2.5 justify-start group/aimsg"
                 >
-                  <div className="flex flex-col items-end max-w-[85%] sm:max-w-[75%] space-y-1">
-                    <span className="text-[11px] text-slate-400 font-medium pr-1">
-                      {msg.timestamp}
-                    </span>
-                    <div className="bg-[#e9f5be] border border-[#d9f99d] text-slate-900 rounded-2xl rounded-tr-xs p-3.5 shadow-2xs space-y-2">
-                      {msg.images && msg.images.length > 0 ? (
-                        <div className={`grid gap-2 ${msg.images.length === 1 ? 'grid-cols-1 max-w-xs' : 'grid-cols-2 max-w-sm'}`}>
-                          {msg.images.map((img, i) => (
-                            <img key={i} src={img} alt={`Attached ${i + 1}`} className="w-full max-h-48 object-contain rounded-xl border border-slate-300" />
-                          ))}
-                        </div>
-                      ) : msg.image ? (
-                        <img src={msg.image} alt="Attached homework" className="w-full max-h-56 object-contain rounded-xl border border-slate-300" />
-                      ) : null}
-                      <p className="text-xs sm:text-sm text-slate-900 whitespace-pre-wrap leading-relaxed font-medium">
-                        {msg.text}
-                      </p>
-                    </div>
+                  {/* BOT AVATAR CIRCLE */}
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-blue-100 border border-blue-300 flex items-center justify-center text-blue-600 shadow-2xs shrink-0 mt-4">
+                    <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
                   </div>
 
-                  {/* USER PROFILE AVATAR */}
-                  <div className="w-8 h-8 rounded-full border border-slate-300 shadow-2xs overflow-hidden bg-slate-200 flex items-center justify-center shrink-0 mt-4">
-                    {user.avatar ? (
-                      <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <UserIcon className="w-4 h-4 text-slate-600" />
-                    )}
+                  <div className="flex flex-col items-start max-w-[90%] sm:max-w-[82%] space-y-1.5 w-full">
+                    <div className="flex items-center space-x-2 pl-1 text-xs">
+                      <span className="font-bold text-slate-900">Al_Tutor</span>
+                      <span className="text-slate-400 font-medium">{msg.timestamp}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMessage(msg.id)}
+                        className="opacity-0 group-hover/aimsg:opacity-100 transition text-slate-400 hover:text-rose-500 p-0.5 rounded cursor-pointer ml-1"
+                        title="Remove message"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+
+                    {/* AI RESPONSE BUBBLE */}
+                    <div className="bg-[#e0f2fe] border border-[#bae6fd] text-slate-900 rounded-2xl rounded-tl-xs p-4 shadow-2xs space-y-3 w-full">
+                      <StaggeredRevealMarkdown text={msg.text} isLatest={isLatest} />
+
+                      {/* VIBRANT ACTION PILL ROW (EXACTLY MATCHING IMAGE 2) */}
+                      <div className="pt-2 border-t border-sky-200/80 flex flex-wrap items-center gap-1.5">
+                        {/* Copy */}
+                        <button
+                          type="button"
+                          onClick={() => handleCopyText(msg.id, msg.text)}
+                          className="bg-[#86efac]/60 hover:bg-[#86efac] border border-[#4ade80] text-[#166534] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
+                        >
+                          {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-[#166534]" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
+                        </button>
+
+                        {/* Listen */}
+                        <button
+                          type="button"
+                          onClick={() => handleSpeakText(msg.text)}
+                          className="bg-[#fca5a5]/60 hover:bg-[#fca5a5] border border-[#f87171] text-[#991b1b] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
+                        >
+                          <Volume2 className="w-3.5 h-3.5" />
+                          <span>Listen</span>
+                        </button>
+
+                        {/* Save Note */}
+                        {onAddNote && (
+                          <button
+                            type="button"
+                            onClick={() => handleSaveToNotebook(msg)}
+                            className="bg-[#fed7aa] hover:bg-[#fdba74] border border-[#fb923c] text-[#9a3412] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
+                          >
+                            <Bookmark className="w-3.5 h-3.5" />
+                            <span>{savedNoteId === msg.id ? 'Saved! ✓' : 'Save Note'}</span>
+                          </button>
+                        )}
+
+                        {/* Delete single message */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMessage(msg.id)}
+                          className="bg-rose-100 hover:bg-rose-200 border border-rose-200 text-rose-700 text-xs font-bold px-2.5 py-1.5 rounded-xl flex items-center space-x-1 transition shadow-2xs cursor-pointer active:scale-95"
+                          title="Remove message from thread"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Delete</span>
+                        </button>
+
+                        {/* Static badge: Ascend AI Tutor v2.5 */}
+                        <span className="bg-[#fef08a] border border-[#facc15] text-[#854d0e] text-xs font-bold px-3 py-1.5 rounded-xl shadow-2xs select-none">
+                          Ascend AI Tutor v2.5
+                        </span>
+
+                        {/* Explain Simpler */}
+                        <button
+                          type="button"
+                          onClick={() => handleSendMessage("Can you explain this concept in simpler terms with a super easy everyday analogy?")}
+                          className="bg-[#bae6fd] hover:bg-[#7dd3fc] border border-[#38bdf8] text-[#075985] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
+                        >
+                          <Lightbulb className="w-3.5 h-3.5" />
+                          <span>Explain Simpler</span>
+                        </button>
+
+                        {/* Practice Question */}
+                        <button
+                          type="button"
+                          onClick={() => handleSendMessage("Give me 1 practice question based on this topic so I can test my understanding.")}
+                          className="bg-[#fbcfe8] hover:bg-[#f472b6] border border-[#f472b6] text-[#9d174d] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
+                        >
+                          <HelpCircle className="w-3.5 h-3.5" />
+                          <span>Practice Question</span>
+                        </button>
+
+                        {/* JEE Main / Hinglish */}
+                        <button
+                          type="button"
+                          onClick={() => handleSendMessage("Please explain this in easy Hinglish with important key points for JEE Main / Board exams.")}
+                          className="bg-[#ddd6fe] hover:bg-[#c4b5fd] border border-[#a78bfa] text-[#5b21b6] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
+                        >
+                          <Languages className="w-3.5 h-3.5" />
+                          <span>JEE Main / Hinglish</span>
+                        </button>
+
+                        {/* Summary Table */}
+                        <button
+                          type="button"
+                          onClick={() => handleSendMessage("Summarize the key concepts, formulas, and takeaways in a clean structured table.")}
+                          className="bg-[#a5f3fc] hover:bg-[#67e8f9] border border-[#22d3ee] text-[#155e75] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
+                        >
+                          <Table className="w-3.5 h-3.5" />
+                          <span>Summary Table</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </motion.div>
               );
-            }
-
-            // AI TUTOR MESSAGE
-            return (
-              <motion.div
-                key={msg.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-start space-x-2.5 justify-start"
-              >
-                {/* BOT AVATAR CIRCLE */}
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-blue-100 border border-blue-300 flex items-center justify-center text-blue-600 shadow-2xs shrink-0 mt-4">
-                  <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-                </div>
-
-                <div className="flex flex-col items-start max-w-[90%] sm:max-w-[82%] space-y-1.5 w-full">
-                  <div className="flex items-center space-x-2 pl-1 text-xs">
-                    <span className="font-bold text-slate-900">Al_Tutor</span>
-                    <span className="text-slate-400 font-medium">{msg.timestamp}</span>
-                  </div>
-
-                  {/* AI RESPONSE BUBBLE */}
-                  <div className="bg-[#e0f2fe] border border-[#bae6fd] text-slate-900 rounded-2xl rounded-tl-xs p-4 shadow-2xs space-y-3 w-full">
-                    <StaggeredRevealMarkdown text={msg.text} isLatest={isLatest} />
-
-                    {/* VIBRANT ACTION PILL ROW (EXACTLY MATCHING IMAGE 2) */}
-                    <div className="pt-2 border-t border-sky-200/80 flex flex-wrap items-center gap-1.5">
-                      {/* Copy */}
-                      <button
-                        type="button"
-                        onClick={() => handleCopyText(msg.id, msg.text)}
-                        className="bg-[#86efac]/60 hover:bg-[#86efac] border border-[#4ade80] text-[#166534] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
-                      >
-                        {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-[#166534]" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
-                      </button>
-
-                      {/* Listen */}
-                      <button
-                        type="button"
-                        onClick={() => handleSpeakText(msg.text)}
-                        className="bg-[#fca5a5]/60 hover:bg-[#fca5a5] border border-[#f87171] text-[#991b1b] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
-                      >
-                        <Volume2 className="w-3.5 h-3.5" />
-                        <span>Listen</span>
-                      </button>
-
-                      {/* Save Note */}
-                      {onAddNote && (
-                        <button
-                          type="button"
-                          onClick={() => handleSaveToNotebook(msg)}
-                          className="bg-[#fed7aa] hover:bg-[#fdba74] border border-[#fb923c] text-[#9a3412] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
-                        >
-                          <Bookmark className="w-3.5 h-3.5" />
-                          <span>{savedNoteId === msg.id ? 'Saved! ✓' : 'Save Note'}</span>
-                        </button>
-                      )}
-
-                      {/* Static badge: Ascend AI Tutor v2.5 */}
-                      <span className="bg-[#fef08a] border border-[#facc15] text-[#854d0e] text-xs font-bold px-3 py-1.5 rounded-xl shadow-2xs select-none">
-                        Ascend AI Tutor v2.5
-                      </span>
-
-                      {/* Explain Simpler */}
-                      <button
-                        type="button"
-                        onClick={() => handleSendMessage("Can you explain this concept in simpler terms with a super easy everyday analogy?")}
-                        className="bg-[#bae6fd] hover:bg-[#7dd3fc] border border-[#38bdf8] text-[#075985] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
-                      >
-                        <Lightbulb className="w-3.5 h-3.5" />
-                        <span>Explain Simpler</span>
-                      </button>
-
-                      {/* Practice Question */}
-                      <button
-                        type="button"
-                        onClick={() => handleSendMessage("Give me 1 practice question based on this topic so I can test my understanding.")}
-                        className="bg-[#fbcfe8] hover:bg-[#f472b6] border border-[#f472b6] text-[#9d174d] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
-                      >
-                        <HelpCircle className="w-3.5 h-3.5" />
-                        <span>Practice Question</span>
-                      </button>
-
-                      {/* JEE Main / Hinglish */}
-                      <button
-                        type="button"
-                        onClick={() => handleSendMessage("Please explain this in easy Hinglish with important key points for JEE Main / Board exams.")}
-                        className="bg-[#ddd6fe] hover:bg-[#c4b5fd] border border-[#a78bfa] text-[#5b21b6] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
-                      >
-                        <Languages className="w-3.5 h-3.5" />
-                        <span>JEE Main / Hinglish</span>
-                      </button>
-
-                      {/* Summary Table */}
-                      <button
-                        type="button"
-                        onClick={() => handleSendMessage("Summarize the key concepts, formulas, and takeaways in a clean structured table.")}
-                        className="bg-[#a5f3fc] hover:bg-[#67e8f9] border border-[#22d3ee] text-[#155e75] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition shadow-2xs cursor-pointer active:scale-95"
-                      >
-                        <Table className="w-3.5 h-3.5" />
-                        <span>Summary Table</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })
+            })}
+          </AnimatePresence>
         )}
 
         {/* LOADING INDICATOR */}
-        {isLoading && (
-          <motion.div 
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="flex items-start space-x-2.5"
-          >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-blue-100 border border-blue-300 flex items-center justify-center text-blue-600 shadow-2xs shrink-0 mt-2">
-              <Bot className="w-4 h-4 text-blue-600 animate-spin" />
-            </div>
-            <div className="bg-[#e0f2fe] border border-[#bae6fd] rounded-2xl rounded-tl-xs p-3.5 shadow-2xs space-y-1.5 max-w-sm">
-              <div className="flex items-center space-x-2 text-blue-700 text-xs font-bold">
-                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                <span>Ascend AI Tutor is thinking...</span>
+        <AnimatePresence>
+          {isLoading && (
+            <motion.div 
+              key="tutor-loading-bubble"
+              initial={{ opacity: 0, y: 14, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.9, transition: { duration: 0.2 } }}
+              transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+              className="flex items-start space-x-2.5"
+            >
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-blue-100 border border-blue-300 flex items-center justify-center text-blue-600 shadow-2xs shrink-0 mt-2">
+                <Bot className="w-4 h-4 text-blue-600 animate-spin" />
               </div>
-              <div className="space-y-1 pt-1">
-                <div className="h-2 bg-blue-200/80 rounded-full w-3/4 animate-pulse" />
-                <div className="h-2 bg-blue-200/60 rounded-full w-1/2 animate-pulse" />
+              <div className="bg-[#e0f2fe] border border-[#bae6fd] rounded-2xl rounded-tl-xs p-3.5 shadow-2xs space-y-1.5 max-w-sm">
+                <div className="flex items-center space-x-2 text-blue-700 text-xs font-bold">
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                  <span>Ascend AI Tutor is thinking...</span>
+                </div>
+                <div className="space-y-1 pt-1">
+                  <div className="h-2 bg-blue-200/80 rounded-full w-3/4 animate-pulse" />
+                  <div className="h-2 bg-blue-200/60 rounded-full w-1/2 animate-pulse" />
+                </div>
               </div>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div ref={messagesEndRef} />
       </div>
@@ -2723,6 +2775,13 @@ export const AiTutorApp = memo(function AiTutorApp({
         )}
       </AnimatePresence>
     </footer>
+
+    {/* PERSISTENT CUSTOM VOICE STUDIO MODAL */}
+    <CustomVoiceModal
+      isOpen={showCustomVoiceModal}
+      onClose={() => setShowCustomVoiceModal(false)}
+      appLanguage="en"
+    />
   </div>
 );
 });

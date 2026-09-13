@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Terminal,
   Mic,
@@ -539,77 +539,86 @@ export const CinematicAiEditor: React.FC<CinematicAiEditorProps> = ({
 
         {/* 2. CHAT & COMMAND HISTORY LOG */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 font-sans relative z-10 scrollbar-thin scrollbar-thumb-cyan-900 scrollbar-track-transparent">
-          {messages.map((msg) => (
-            <motion.div
-              key={msg.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
-            >
-              <div className="flex items-center space-x-2 mb-1 px-1">
-                <span className="text-[10px] font-mono font-bold text-cyan-400/80 uppercase">
-                  {msg.sender === 'user' ? `👤 ${user.name || 'Student'}` : '🤖 CORE AI EDITOR'}
-                </span>
-                <span className="text-[9px] font-mono text-slate-500">{msg.timestamp}</span>
-              </div>
-
-              <div
-                className={`max-w-[92%] sm:max-w-[82%] p-4 rounded-2xl shadow-lg border relative ${
-                  msg.sender === 'user'
-                    ? 'bg-gradient-to-r from-cyan-950 to-indigo-950 border-cyan-500/50 text-white shadow-[0_0_15px_rgba(6,182,212,0.2)]'
-                    : 'bg-[#0b1326] border-indigo-500/40 text-slate-100 shadow-[0_0_20px_rgba(99,102,241,0.15)]'
-                }`}
+          <AnimatePresence initial={false}>
+            {messages.map((msg) => (
+              <motion.div
+                key={msg.id}
+                layout
+                initial={{ opacity: 0, y: 16, scale: 0.94, filter: 'blur(3px)' }}
+                animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, y: -12, scale: 0.9, filter: 'blur(3px)', transition: { duration: 0.2, ease: 'easeOut' } }}
+                transition={{ type: 'spring', stiffness: 420, damping: 28, mass: 0.8 }}
+                className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
               >
-                <div className="prose prose-invert prose-sm max-w-none text-xs sm:text-sm leading-relaxed">
-                  <ReactMarkdown>{msg.text}</ReactMarkdown>
+                <div className="flex items-center space-x-2 mb-1 px-1">
+                  <span className="text-[10px] font-mono font-bold text-cyan-400/80 uppercase">
+                    {msg.sender === 'user' ? `👤 ${user.name || 'Student'}` : '🤖 CORE AI EDITOR'}
+                  </span>
+                  <span className="text-[9px] font-mono text-slate-500">{msg.timestamp}</span>
                 </div>
 
-                {/* ACTION EXECUTION BADGES */}
-                {msg.actionsExecuted && msg.actionsExecuted.length > 0 && (
-                  <div className="mt-3 pt-2.5 border-t border-white/10 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[9px] font-mono uppercase tracking-widest text-cyan-400 font-extrabold flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-cyan-400" />
-                        <span>ACTIONS EXECUTED LIVE:</span>
-                      </span>
-                      <button
-                        onClick={onClose}
-                        className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] font-mono flex items-center gap-1 shadow-[0_0_12px_rgba(16,185,129,0.4)] cursor-pointer transition active:scale-95"
-                      >
-                        <span>👁️</span>
-                        <span>{appLanguage === 'hi' ? 'ऐप देखें (View App)' : 'View Live App'}</span>
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {msg.actionsExecuted.map((act, i) => (
-                        <div
-                          key={i}
-                          className="px-2.5 py-1 rounded-lg bg-cyan-950/80 border border-cyan-400/40 text-[10.5px] font-mono text-cyan-200 flex items-center gap-1.5 shadow-xs"
-                        >
-                          <span>{act.icon || '⚡'}</span>
-                          <span className="font-semibold">{act.details}</span>
-                        </div>
-                      ))}
-                    </div>
+                <div
+                  className={`max-w-[92%] sm:max-w-[82%] p-4 rounded-2xl shadow-lg border relative ${
+                    msg.sender === 'user'
+                      ? 'bg-gradient-to-r from-cyan-950 to-indigo-950 border-cyan-500/50 text-white shadow-[0_0_15px_rgba(6,182,212,0.2)]'
+                      : 'bg-[#0b1326] border-indigo-500/40 text-slate-100 shadow-[0_0_20px_rgba(99,102,241,0.15)]'
+                  }`}
+                >
+                  <div className="prose prose-invert prose-sm max-w-none text-xs sm:text-sm leading-relaxed">
+                    <ReactMarkdown>{msg.text}</ReactMarkdown>
                   </div>
-                )}
-              </div>
-            </motion.div>
-          ))}
+
+                  {/* ACTION EXECUTION BADGES */}
+                  {msg.actionsExecuted && msg.actionsExecuted.length > 0 && (
+                    <div className="mt-3 pt-2.5 border-t border-white/10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-mono uppercase tracking-widest text-cyan-400 font-extrabold flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-cyan-400" />
+                          <span>ACTIONS EXECUTED LIVE:</span>
+                        </span>
+                        <button
+                          onClick={onClose}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] font-mono flex items-center gap-1 shadow-[0_0_12px_rgba(16,185,129,0.4)] cursor-pointer transition active:scale-95"
+                        >
+                          <span>👁️</span>
+                          <span>{appLanguage === 'hi' ? 'ऐप देखें (View App)' : 'View Live App'}</span>
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {msg.actionsExecuted.map((act, i) => (
+                          <div
+                            key={i}
+                            className="px-2.5 py-1 rounded-lg bg-cyan-950/80 border border-cyan-400/40 text-[10.5px] font-mono text-cyan-200 flex items-center gap-1.5 shadow-xs"
+                          >
+                            <span>{act.icon || '⚡'}</span>
+                            <span className="font-semibold">{act.details}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
 
           {/* LOADING STATE */}
-          {isLoading && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex items-center space-x-3 p-3 bg-cyan-950/40 border border-cyan-500/30 rounded-2xl w-fit"
-            >
-              <div className="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs font-mono text-cyan-300 animate-pulse">
-                {appLanguage === 'hi' ? 'निर्देश निष्पादित किया जा रहा है...' : 'Analyzing & executing command across app...'}
-              </span>
-            </motion.div>
-          )}
+          <AnimatePresence>
+            {isLoading && (
+              <motion.div
+                key="cinematic-loading"
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.9, transition: { duration: 0.18 } }}
+                className="flex items-center space-x-3 p-3 bg-cyan-950/40 border border-cyan-500/30 rounded-2xl w-fit"
+              >
+                <div className="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs font-mono text-cyan-300 animate-pulse">
+                  {appLanguage === 'hi' ? 'निर्देश निष्पादित किया जा रहा है...' : 'Analyzing & executing command across app...'}
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div ref={messagesEndRef} />
         </div>

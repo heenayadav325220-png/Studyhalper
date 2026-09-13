@@ -151,8 +151,8 @@ export function getFriendlyAuthErrorMessage(errorCodeOrMessage: string, lang: 'e
   }
   if (code.includes('unauthorized-domain')) {
     return lang === 'hi' 
-      ? 'Vercel डोमेन Firebase Auth में अधिकृत (Authorized) नहीं है। Firebase Console > Authentication > Settings > Authorized domains में अपना vercel.app डोमेन जोड़ें।' 
-      : 'This Vercel domain is not authorized in Firebase. Add your vercel.app domain in Firebase Console > Authentication > Settings > Authorized domains.';
+      ? 'Google Login ke liye domain authorized hona zaroori hai. Tab tak aap Email & Password se bina kisi restriction ke 100% login kar sakte hain!' 
+      : 'Google Sign-In requires an authorized domain. You can use Email & Password sign-in which works 100% on any domain without restrictions!';
   }
   if (code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) {
     return lang === 'hi' 
@@ -178,13 +178,23 @@ export function getFriendlyAuthErrorMessage(errorCodeOrMessage: string, lang: 'e
 }
 
 /**
- * Sign in with Google Popup
+ * Helper to prevent async network operations from hanging indefinitely
  */
-export async function signInWithGoogle(): Promise<FirebaseUser> {
+export function withTimeout<T>(promise: Promise<T>, ms: number = 3500, fallbackMessage: string = 'Operation timed out'): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(fallbackMessage)), ms))
+  ]);
+}
+
+/**
+ * Sign in with Google Popup (with safe timeout)
+ */
+export async function signInWithGoogle(timeoutMs: number = 4000): Promise<FirebaseUser> {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  const result = await signInWithPopup(auth, provider);
-  return result.user;
+  const popupPromise = signInWithPopup(auth, provider).then(res => res.user);
+  return withTimeout(popupPromise, timeoutMs, 'Google sign-in timed out or popup was restricted.');
 }
 
 /**

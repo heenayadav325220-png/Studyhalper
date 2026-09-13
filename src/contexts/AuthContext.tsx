@@ -10,6 +10,7 @@ import {
   sendUserPasswordReset,
   updateProfile as firebaseUpdateProfile,
   getFriendlyAuthErrorMessage,
+  withTimeout,
   doc,
   getDoc,
   setDoc,
@@ -85,7 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     try {
-      const snap = await getDoc(userDocRef);
+      const snap = await withTimeout(getDoc(userDocRef), 2000, 'getDoc timeout');
       if (snap.exists()) {
         const data = snap.data() as Partial<UserProfile>;
         profile = {
@@ -99,13 +100,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           lastActive: new Date().toISOString()
         };
 
-        // Update lastActive timestamp in Firestore
-        await updateDoc(userDocRef, {
+        // Non-blocking update lastActive timestamp in Firestore
+        updateDoc(userDocRef, {
           lastActive: new Date().toISOString()
         }).catch(() => {});
       } else {
         // Create initial user document complying with firestore.rules (isValidUser)
-        await setDoc(userDocRef, {
+        setDoc(userDocRef, {
           uid: profile.uid,
           name: profile.name,
           email: profile.email || '',
@@ -120,7 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isOnboarded: profile.isOnboarded || false,
           authProvider: profile.authProvider,
           createdAt: serverTimestamp()
-        });
+        }).catch(() => {});
       }
     } catch (err) {
       console.warn('Firestore profile fetch warning (using local fallback):', err);
@@ -160,7 +161,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     setAuthError(null);
     try {
-      const cred = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+      const cred = await withTimeout(
+        signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password),
+        2500,
+        'Auth request timed out'
+      );
       await fetchOrInitUserProfile(cred.user);
       return cred.user;
     } catch (err: any) {
@@ -183,7 +188,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const cleanEmail = email.trim().toLowerCase();
       const cleanName = name.trim() || 'Student';
-      const cred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+      const cred = await withTimeout(
+        createUserWithEmailAndPassword(auth, cleanEmail, password),
+        2500,
+        'Signup request timed out'
+      );
       
       // Update Firebase Auth user display name
       try {
@@ -208,7 +217,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         lastActive: new Date().toISOString()
       };
 
-      await setDoc(userDocRef, {
+      setDoc(userDocRef, {
         uid: newProfile.uid,
         name: newProfile.name,
         email: newProfile.email,
@@ -246,7 +255,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     setAuthError(null);
     try {
-      const user = await firebaseSignInWithGoogle();
+      const user = await firebaseSignInWithGoogle(3000);
       await fetchOrInitUserProfile(user);
       return user;
     } catch (err: any) {

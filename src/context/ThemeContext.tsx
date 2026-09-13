@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext } from 'react';
 
 export type Theme = 'light' | 'dark';
 
@@ -18,25 +18,44 @@ const defaultThemeContext: ThemeContextType = {
 
 const ThemeContext = createContext<ThemeContextType>(defaultThemeContext);
 
-export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<Theme>(() => {
+interface ThemeProviderProps {
+  children: React.ReactNode;
+}
+
+interface ThemeProviderState {
+  theme: Theme;
+}
+
+export class ThemeProvider extends React.Component<ThemeProviderProps, ThemeProviderState> {
+  constructor(props: ThemeProviderProps) {
+    super(props);
+    let initialTheme: Theme = 'light';
     try {
       if (typeof window !== 'undefined') {
         const savedTheme = localStorage.getItem('ascend_theme') as Theme | null;
         if (savedTheme === 'light' || savedTheme === 'dark') {
-          return savedTheme;
-        }
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-          return 'dark';
+          initialTheme = savedTheme;
+        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          initialTheme = 'dark';
         }
       }
     } catch (e) {
       console.error('Error reading theme from localStorage', e);
     }
-    return 'light';
-  });
+    this.state = { theme: initialTheme };
+  }
 
-  useEffect(() => {
+  componentDidMount() {
+    this.applyTheme(this.state.theme);
+  }
+
+  componentDidUpdate(_prevProps: ThemeProviderProps, prevState: ThemeProviderState) {
+    if (prevState.theme !== this.state.theme) {
+      this.applyTheme(this.state.theme);
+    }
+  }
+
+  applyTheme = (theme: Theme) => {
     if (typeof document === 'undefined') return;
     const root = document.documentElement;
     if (theme === 'dark') {
@@ -51,28 +70,28 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (e) {
       console.error('Error saving theme to localStorage', e);
     }
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
+  toggleTheme = () => {
+    this.setState((prev) => ({
+      theme: prev.theme === 'dark' ? 'light' : 'dark',
+    }));
   };
 
-  const value = useMemo(
-    () => ({
-      theme,
-      toggleTheme,
-      setTheme,
-      isDark: theme === 'dark',
-    }),
-    [theme]
-  );
+  setTheme = (newTheme: Theme) => {
+    this.setState({ theme: newTheme });
+  };
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
-};
+  render() {
+    const value: ThemeContextType = {
+      theme: this.state.theme,
+      toggleTheme: this.toggleTheme,
+      setTheme: this.setTheme,
+      isDark: this.state.theme === 'dark',
+    };
+    return <ThemeContext.Provider value={value}>{this.props.children}</ThemeContext.Provider>;
+  }
+}
 
 export const useTheme = (): ThemeContextType => {
   const context = useContext(ThemeContext);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Mic,
   Volume2,
@@ -9,10 +9,13 @@ import {
   BookmarkPlus,
   Send,
   RotateCcw,
-  Check
+  Check,
+  Sliders
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { UserProfile } from '../types';
+import { playTutorSpeech } from '../services/voiceSettings';
+import { CustomVoiceModal } from './CustomVoiceModal';
 
 interface VoiceTutorModalProps {
   isOpen: boolean;
@@ -84,6 +87,7 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
   ]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [savedDocId, setSavedDocId] = useState<string | null>(null);
+  const [showCustomVoiceModal, setShowCustomVoiceModal] = useState<boolean>(false);
 
   const recognitionRef = useRef<any>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
@@ -170,22 +174,20 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
     }
   };
 
-  // Speak AI response with Text-to-Speech
+  // Speak AI response with Text-to-Speech using persistent custom voice settings
   const speakText = (text: string) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    if (typeof window === 'undefined') return;
 
-    window.speechSynthesis.cancel();
-    const clean = text.replace(/[#*`_~]/g, '').trim();
-    const utterance = new SpeechSynthesisUtterance(clean);
-    utterance.rate = speechRate;
-    utterance.pitch = 1.0;
-    utterance.lang = voiceLang === 'hi' ? 'hi-IN' : 'en-US';
-
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    window.speechSynthesis.speak(utterance);
+    playTutorSpeech(
+      text,
+      {
+        lang: voiceLang === 'hi' ? 'hi-IN' : 'en-US',
+        rate: speechRate
+      },
+      () => setIsSpeaking(true),
+      () => setIsSpeaking(false),
+      () => setIsSpeaking(false)
+    );
   };
 
   const stopSpeaking = () => {
@@ -301,6 +303,16 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5">
+            {/* Custom Voice Studio Button */}
+            <button
+              onClick={() => setShowCustomVoiceModal(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 transition cursor-pointer"
+              title={appLanguage === 'hi' ? 'कस्टम आवाज़, सुर और गति सेट करें' : 'Set Custom Voice & Persona'}
+            >
+              <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="hidden sm:inline">{appLanguage === 'hi' ? 'कस्टम आवाज़' : 'Custom Voice'}</span>
+            </button>
+
             {/* Speed toggle */}
             <button
               onClick={() => setSpeechRate((r) => (r === 1.0 ? 1.2 : r === 1.2 ? 0.9 : 1.0))}
@@ -420,78 +432,99 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
 
         {/* CHAT TRANSCRIPT & CONVERSATION HISTORY */}
         <div ref={chatScrollRef} className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-3 min-h-[160px] max-h-[300px]">
-          {messages.map((msg) => {
-            const isStudent = msg.sender === 'student';
-            return (
-              <div
-                key={msg.id}
-                className={`flex flex-col ${isStudent ? 'items-end' : 'items-start'} space-y-1`}
-              >
-                <div
-                  className={`max-w-[88%] p-3 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-sm ${
-                    isStudent
-                      ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-br-xs'
-                      : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-xs'
-                  }`}
+          <AnimatePresence initial={false}>
+            {messages.map((msg) => {
+              const isStudent = msg.sender === 'student';
+              return (
+                <motion.div
+                  key={msg.id}
+                  layout
+                  initial={{ opacity: 0, y: 16, scale: 0.94, filter: 'blur(3px)' }}
+                  animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+                  exit={{ opacity: 0, y: -12, scale: 0.9, filter: 'blur(3px)', transition: { duration: 0.2, ease: 'easeOut' } }}
+                  transition={{ type: 'spring', stiffness: 420, damping: 28, mass: 0.8 }}
+                  className={`flex flex-col ${isStudent ? 'items-end' : 'items-start'} space-y-1`}
                 >
-                  {!isStudent && (
-                    <div className="flex items-center justify-between border-b border-white/10 pb-1.5 mb-1.5">
-                      <span className="text-[10px] font-black text-indigo-300 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-amber-400" />
-                        <span>ASCEND Voice Tutor</span>
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => speakText(msg.speechText || msg.text)}
-                          className="p-1 hover:bg-white/10 rounded-md text-slate-400 hover:text-white transition cursor-pointer"
-                          title="Replay Audio"
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                        </button>
-                        {onSaveToNotebook && (
+                  <div
+                    className={`max-w-[88%] p-3 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-sm ${
+                      isStudent
+                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-br-xs'
+                        : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-xs'
+                    }`}
+                  >
+                    {!isStudent && (
+                      <div className="flex items-center justify-between border-b border-white/10 pb-1.5 mb-1.5">
+                        <span className="text-[10px] font-black text-indigo-300 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-amber-400" />
+                          <span>ASCEND Voice Tutor</span>
+                        </span>
+                        <div className="flex items-center gap-1">
                           <button
-                            onClick={() => handleSaveToNotebook(msg)}
-                            className={`p-1 hover:bg-white/10 rounded-md transition cursor-pointer ${
-                              savedDocId === msg.id ? 'text-emerald-400' : 'text-slate-400 hover:text-white'
-                            }`}
-                            title="Save to Notebook"
+                            onClick={() => speakText(msg.speechText || msg.text)}
+                            className="p-1 hover:bg-white/10 rounded-md text-slate-400 hover:text-white transition cursor-pointer"
+                            title="Replay Audio"
                           >
-                            {savedDocId === msg.id ? (
-                              <Check className="w-3 h-3 text-emerald-400" />
-                            ) : (
-                              <BookmarkPlus className="w-3 h-3" />
-                            )}
+                            <RotateCcw className="w-3 h-3" />
                           </button>
-                        )}
+                          {onSaveToNotebook && (
+                            <button
+                              onClick={() => handleSaveToNotebook(msg)}
+                              className={`p-1 hover:bg-white/10 rounded-md transition cursor-pointer ${
+                                savedDocId === msg.id ? 'text-emerald-400' : 'text-slate-400 hover:text-white'
+                              }`}
+                              title="Save to Notebook"
+                            >
+                              {savedDocId === msg.id ? (
+                                <Check className="w-3 h-3 text-emerald-400" />
+                              ) : (
+                                <BookmarkPlus className="w-3 h-3" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  <div className="prose prose-invert max-w-none text-xs sm:text-sm">
-                    <ReactMarkdown>{msg.text}</ReactMarkdown>
+                    <div className="prose prose-invert max-w-none text-xs sm:text-sm">
+                      <ReactMarkdown>{msg.text}</ReactMarkdown>
+                    </div>
                   </div>
-                </div>
-                <span className="text-[9px] text-slate-500 px-1">{msg.timestamp}</span>
-              </div>
-            );
-          })}
+                  <span className="text-[9px] text-slate-500 px-1">{msg.timestamp}</span>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
 
           {/* LIVE TRANSCRIPT BUBBLE WHILE SPEAKING */}
-          {transcript && isListening && (
-            <div className="flex flex-col items-end space-y-1 animate-pulse">
-              <div className="max-w-[88%] p-3 rounded-2xl text-xs bg-indigo-900/60 border border-indigo-400 text-indigo-100 rounded-br-xs italic">
-                "{transcript}"
-              </div>
-              <span className="text-[9px] text-indigo-400">Transcribing live...</span>
-            </div>
-          )}
+          <AnimatePresence>
+            {transcript && isListening && (
+              <motion.div 
+                key="voice-live-transcript"
+                initial={{ opacity: 0, y: 12, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.9, transition: { duration: 0.18 } }}
+                className="flex flex-col items-end space-y-1 animate-pulse"
+              >
+                <div className="max-w-[88%] p-3 rounded-2xl text-xs bg-indigo-900/60 border border-indigo-400 text-indigo-100 rounded-br-xs italic">
+                  "{transcript}"
+                </div>
+                <span className="text-[9px] text-indigo-400">Transcribing live...</span>
+              </motion.div>
+            )}
 
-          {isLoading && (
-            <div className="flex items-center space-x-2 text-xs text-indigo-300 p-2">
-              <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" />
-              <span>{appLanguage === 'hi' ? 'वॉयस ट्यूटर सोच रहा है...' : 'Voice Tutor is preparing explanation...'}</span>
-            </div>
-          )}
+            {isLoading && (
+              <motion.div 
+                key="voice-loading"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, transition: { duration: 0.15 } }}
+                className="flex items-center space-x-2 text-xs text-indigo-300 p-2"
+              >
+                <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" />
+                <span>{appLanguage === 'hi' ? 'वॉयस ट्यूटर सोच रहा है...' : 'Voice Tutor is preparing explanation...'}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* QUICK SUGGESTIONS CAROUSEL */}
@@ -547,6 +580,13 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Persistent Custom Voice Modal */}
+      <CustomVoiceModal
+        isOpen={showCustomVoiceModal}
+        onClose={() => setShowCustomVoiceModal(false)}
+        appLanguage={appLanguage}
+      />
     </div>
   );
 };

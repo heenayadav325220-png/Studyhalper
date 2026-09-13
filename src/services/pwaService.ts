@@ -3,46 +3,53 @@
  */
 
 export function registerServiceWorker() {
-  if (typeof window !== 'undefined' && 'serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker
-        .register('/sw.js')
-        .then((registration) => {
-          console.log('[PWA] ServiceWorker registered with scope: ', registration.scope);
-
-          registration.onupdatefound = () => {
-            const installingWorker = registration.installing;
-            if (installingWorker == null) {
-              return;
-            }
-            installingWorker.onstatechange = () => {
-              if (installingWorker.state === 'installed') {
-                if (navigator.serviceWorker.controller) {
-                  console.log('[PWA] New content is available; will refresh on next visit.');
-                } else {
-                  console.log('[PWA] Content is cached for offline use.');
-                }
-              }
-            };
-          };
-        })
-        .catch((error) => {
-          console.warn('[PWA] ServiceWorker registration error: ', error);
-        });
-    });
-  } else if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-    // In dev mode, register as well for testing
-    window.addEventListener('load', () => {
-      navigator.serviceWorker
-        .register('/sw.js')
-        .then((reg) => {
-          console.log('[PWA Dev] SW registered:', reg.scope);
-        })
-        .catch((err) => {
-          console.warn('[PWA Dev] SW registration notice:', err);
-        });
-    });
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+    return;
   }
+
+  // In development, never allow service worker caching to interfere with Vite dev server modules
+  if (process.env.NODE_ENV !== 'production') {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const reg of registrations) {
+        reg.unregister();
+      }
+    });
+    if ('caches' in window) {
+      caches.keys().then((keys) => {
+        for (const key of keys) {
+          caches.delete(key);
+        }
+      });
+    }
+    return;
+  }
+
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((registration) => {
+        console.log('[PWA] ServiceWorker registered with scope: ', registration.scope);
+
+        registration.onupdatefound = () => {
+          const installingWorker = registration.installing;
+          if (installingWorker == null) {
+            return;
+          }
+          installingWorker.onstatechange = () => {
+            if (installingWorker.state === 'installed') {
+              if (navigator.serviceWorker.controller) {
+                console.log('[PWA] New content is available; will refresh on next visit.');
+              } else {
+                console.log('[PWA] Content is cached for offline use.');
+              }
+            }
+          };
+        };
+      })
+      .catch((error) => {
+        console.warn('[PWA] ServiceWorker registration error: ', error);
+      });
+  });
 }
 
 export function isStandaloneMode(): boolean {

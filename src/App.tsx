@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, 
   MessageSquare, 
@@ -158,6 +158,11 @@ export default function App() {
     }
     return DEFAULT_USER;
   });
+
+  const isUserLoggedIn = !!(
+    (currentUser && !currentUser.isAnonymous) ||
+    (userProfile?.email && userProfile.email.trim().length > 0 && userProfile.authProvider && userProfile.authProvider !== 'guest')
+  );
 
   // Listen to Firebase Auth State changes
   useEffect(() => {
@@ -826,6 +831,15 @@ export default function App() {
 
       {/* MAIN CONTENT AREA - WITH pb-24 TO AVOID BOTTOM NAV OVERLAP */}
       <main className="relative z-10 flex-1 p-3 sm:p-4 md:p-5 max-w-xl mx-auto w-full space-y-4 pb-24 overflow-x-hidden">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full space-y-4"
+          >
         {/* DASHBOARD TAB */}
         {activeTab === 'home' && (
           <div className="space-y-4">
@@ -894,13 +908,13 @@ export default function App() {
                       whileTap={{ scale: 0.92 }}
                       onClick={() => setShowAuthModal(true)}
                       className={`p-1.5 rounded-xl transition cursor-pointer shrink-0 shadow-xs flex items-center space-x-1 border ${
-                        currentUser && !currentUser.isAnonymous
+                        isUserLoggedIn
                           ? 'text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-400/40'
                           : 'text-indigo-200 bg-indigo-600/30 hover:bg-indigo-600/50 border-indigo-400/50'
                       }`}
-                      title={currentUser && !currentUser.isAnonymous ? 'Account Settings / खाता सेटिंग्स' : 'Sign In / लॉगिन'}
+                      title={isUserLoggedIn ? 'Account Settings / खाता सेटिंग्स' : 'Sign In / लॉगिन'}
                     >
-                      {currentUser && !currentUser.isAnonymous ? (
+                      {isUserLoggedIn ? (
                         <>
                           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                           <span className="text-[9px] font-black uppercase tracking-wider">Account</span>
@@ -1129,7 +1143,7 @@ export default function App() {
           </div>
 
             {/* CLOUD AUTH & SYNC BANNER (WHEN NOT FULLY AUTHENTICATED) */}
-            {(!currentUser || currentUser.isAnonymous) && (
+            {!isUserLoggedIn && (
               <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 rounded-2xl p-3.5 sm:p-4 text-white flex items-center justify-between gap-3 shadow-md border border-indigo-800/60">
                 <div className="space-y-0.5 min-w-0">
                   <p className="text-xs font-black flex items-center gap-1.5 text-indigo-200">
@@ -2631,21 +2645,31 @@ export default function App() {
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 scrollbar-hide">
-                {roomMessages.map((msg) => {
-                  const isMe = msg.senderId === userProfile.uid;
-                  return (
-                    <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                      <span className="text-[9px] text-slate-400 px-1 mb-0.5">{msg.senderName}</span>
-                      <div className={`p-2.5 rounded-xl max-w-[85%] text-xs ${
-                        isMe
-                          ? 'bg-indigo-600 text-white rounded-tr-none'
-                          : 'bg-slate-100 text-slate-800 border border-slate-200 rounded-tl-none'
-                      }`}>
-                        {msg.text}
-                      </div>
-                    </div>
-                  );
-                })}
+                <AnimatePresence initial={false}>
+                  {roomMessages.map((msg) => {
+                    const isMe = msg.senderId === userProfile.uid;
+                    return (
+                      <motion.div 
+                        key={msg.id}
+                        layout
+                        initial={{ opacity: 0, y: 16, scale: 0.94, filter: 'blur(3px)' }}
+                        animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+                        exit={{ opacity: 0, y: -12, scale: 0.9, filter: 'blur(3px)', transition: { duration: 0.2, ease: 'easeOut' } }}
+                        transition={{ type: 'spring', stiffness: 420, damping: 28, mass: 0.8 }}
+                        className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
+                      >
+                        <span className="text-[9px] text-slate-400 px-1 mb-0.5">{msg.senderName}</span>
+                        <div className={`p-2.5 rounded-xl max-w-[85%] text-xs shadow-2xs ${
+                          isMe
+                            ? 'bg-indigo-600 text-white rounded-tr-none'
+                            : 'bg-slate-100 text-slate-800 border border-slate-200 rounded-tl-none'
+                        }`}>
+                          {msg.text}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
 
                 {roomMessages.length === 0 && (
                   <div className="text-center py-16 text-slate-400 text-xs italic">
@@ -2919,90 +2943,104 @@ export default function App() {
             onClose={() => setActiveTab('home')}
           />
         )}
-
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {/* FLOATING MORE MENU OVERLAY */}
-      {showMoreMenu && (
-        <>
-          <div 
-            className="fixed inset-0 bg-slate-900/30 backdrop-blur-xs z-40 transition-opacity"
-            onClick={() => setShowMoreMenu(false)}
-          />
-          <div className="fixed bottom-14 right-2 sm:right-6 z-50 w-72 bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-2xl shadow-2xl p-3.5 space-y-2.5 animate-in slide-in-from-bottom-3 duration-200">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <span className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
-                <LayoutGrid className="w-3.5 h-3.5 text-indigo-600" />
-                <span>More Features</span>
-              </span>
-              <button 
-                onClick={() => setShowMoreMenu(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
+      <AnimatePresence>
+        {showMoreMenu && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40"
+              onClick={() => setShowMoreMenu(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.92, y: 14 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 14 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+              className="fixed bottom-14 right-2 sm:right-6 z-50 w-72 bg-slate-900/95 backdrop-blur-xl border border-slate-800 rounded-2xl shadow-2xl p-3.5 space-y-2.5"
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <span className="text-xs font-bold text-slate-200 flex items-center space-x-1.5">
+                  <LayoutGrid className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>More Features</span>
+                </span>
+                <button 
+                  onClick={() => setShowMoreMenu(false)}
+                  className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: 'pdfScanner', label: 'PDF Scanner', icon: FileText, color: 'text-cyan-600 bg-cyan-50' },
-                { id: 'voiceTutor', label: 'Voice Tutor', icon: Mic, color: 'text-pink-600 bg-pink-50' },
-                { id: 'imageGen', label: 'Image Gen', icon: ImageIcon, color: 'text-indigo-600 bg-indigo-50' },
-                { id: 'whiteboard', label: 'Whiteboard', icon: PenTool, color: 'text-purple-600 bg-purple-50' },
-                { id: 'mockExam', label: 'Mock Exams', icon: GraduationCap, color: 'text-amber-600 bg-amber-50' },
-                { id: 'studyDocs', label: 'Notebook', icon: FileText, color: 'text-teal-600 bg-teal-50' },
-                { id: 'petCompanion', label: 'Sanctuary', icon: Heart, color: 'text-rose-600 bg-rose-50' },
-                { id: 'account', label: currentUser && !currentUser.isAnonymous ? 'My Account' : 'Sign In / Login', icon: LogIn, color: 'text-indigo-600 bg-indigo-50' },
-              ].map((item) => {
-                const Icon = item.icon;
-                const isItemActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      if (item.id === 'voiceTutor') {
-                        setShowVoiceTutorModal(true);
-                      } else if (item.id === 'account') {
-                        setShowAuthModal(true);
-                      } else {
-                        setActiveTab(item.id as any);
-                      }
-                      setShowMoreMenu(false);
-                    }}
-                    className={`flex items-center space-x-2 p-2 rounded-xl transition text-left border ${
-                      isItemActive
-                        ? 'bg-indigo-50/80 border-indigo-200 text-indigo-700 font-bold shadow-xs'
-                        : 'bg-slate-50/60 border-slate-100 hover:bg-slate-100/80 text-slate-700 font-medium'
-                    }`}
-                  >
-                    <div className={`p-1.5 rounded-lg ${item.color}`}>
-                      <Icon className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="text-[11px] font-semibold tracking-tight">{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'pdfScanner', label: 'PDF Scanner', icon: FileText, color: 'text-cyan-400 bg-cyan-950/60 border-cyan-800/40' },
+                  { id: 'voiceTutor', label: 'Voice Tutor', icon: Mic, color: 'text-pink-400 bg-pink-950/60 border-pink-800/40' },
+                  { id: 'imageGen', label: 'Image Gen', icon: ImageIcon, color: 'text-indigo-400 bg-indigo-950/60 border-indigo-800/40' },
+                  { id: 'whiteboard', label: 'Whiteboard', icon: PenTool, color: 'text-purple-400 bg-purple-950/60 border-purple-800/40' },
+                  { id: 'mockExam', label: 'Mock Exams', icon: GraduationCap, color: 'text-amber-400 bg-amber-950/60 border-amber-800/40' },
+                  { id: 'studyDocs', label: 'Notebook', icon: FileText, color: 'text-teal-400 bg-teal-950/60 border-teal-800/40' },
+                  { id: 'petCompanion', label: 'Sanctuary', icon: Heart, color: 'text-rose-400 bg-rose-950/60 border-rose-800/40' },
+                  { id: 'account', label: currentUser && !currentUser.isAnonymous ? 'My Account' : 'Sign In / Login', icon: LogIn, color: 'text-indigo-400 bg-indigo-950/60 border-indigo-800/40' },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isItemActive = activeTab === item.id;
+                  return (
+                    <motion.button
+                      key={item.id}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        if (item.id === 'voiceTutor') {
+                          setShowVoiceTutorModal(true);
+                        } else if (item.id === 'account') {
+                          setShowAuthModal(true);
+                        } else {
+                          setActiveTab(item.id as any);
+                        }
+                        setShowMoreMenu(false);
+                      }}
+                      className={`flex items-center space-x-2 p-2 rounded-xl transition text-left border cursor-pointer ${
+                        isItemActive
+                          ? 'bg-indigo-600/20 border-indigo-500/60 text-indigo-300 font-bold shadow-xs'
+                          : 'bg-slate-800/40 border-slate-700/60 hover:bg-slate-800 text-slate-300 font-medium'
+                      }`}
+                    >
+                      <div className={`p-1.5 rounded-lg border ${item.color}`}>
+                        <Icon className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="text-[11px] font-semibold tracking-tight truncate">{item.label}</span>
+                    </motion.button>
+                  );
+                })}
+              </div>
 
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2 text-[11px]">
-              <button
-                onClick={() => {
-                  toggleLanguage();
-                }}
-                className="py-1.5 px-2 bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold flex items-center justify-center space-x-1.5 transition"
-              >
-                <Globe className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                <span>Lang: {appLanguage.toUpperCase()}</span>
-              </button>
+              <div className="pt-2 border-t border-slate-800 grid grid-cols-2 gap-2 text-[11px]">
+                <button
+                  onClick={() => {
+                    toggleLanguage();
+                  }}
+                  className="py-1.5 px-2 bg-slate-800 hover:bg-slate-750 text-slate-200 rounded-xl font-bold flex items-center justify-center space-x-1.5 transition cursor-pointer"
+                >
+                  <Globe className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Lang: {appLanguage.toUpperCase()}</span>
+                </button>
 
-              <ThemeToggle variant="pill" className="w-full justify-center" />
-            </div>
-          </div>
-        </>
-      )}
+                <ThemeToggle variant="pill" className="w-full justify-center" />
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* COMPACT & SLIM BOTTOM STICKY NAVIGATION BAR */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#0f141d]/95 backdrop-blur-lg border-t border-slate-800 px-4 py-1 flex items-center justify-around shadow-[0_-4px_20px_rgba(0,0,0,0.6)] h-12 transition-colors duration-200">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#0f141d]/95 backdrop-blur-lg border-t border-slate-800/90 px-4 py-1 flex items-center justify-around shadow-[0_-4px_20px_rgba(0,0,0,0.6)] h-12 transition-colors duration-200">
         {[
           { id: 'home', label: 'Home', icon: BookOpen },
           { id: 'aiTutor', label: 'AI Tutor', icon: BrainCircuit, badge: 'PRO' },
@@ -3012,22 +3050,30 @@ export default function App() {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
-            <button
+            <motion.button
               key={tab.id}
+              whileTap={{ scale: 0.90 }}
               onClick={() => {
                 playUiSound(uiCustomization.audioFeedback);
                 setShowMoreMenu(false);
                 if (tab.id === 'toolkit') setInitialTool(undefined);
                 setActiveTab(tab.id as any);
               }}
-              className={`relative flex flex-col items-center justify-center py-0.5 px-3 rounded-lg transition-all cursor-pointer ${
+              className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer select-none ${
                 isActive
-                  ? 'text-emerald-400 font-black drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]'
+                  ? 'text-emerald-400 font-black'
                   : 'text-slate-400 hover:text-white font-medium'
               }`}
             >
+              {isActive && (
+                <motion.div
+                  layoutId="bottomNavIndicator"
+                  className="absolute inset-0 bg-emerald-500/15 border border-emerald-500/30 rounded-xl -z-10 shadow-[0_0_12px_rgba(52,211,153,0.25)]"
+                  transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                />
+              )}
               <div className="relative">
-                <Icon className={`w-4 h-4 transition-transform ${isActive ? 'scale-110 text-emerald-400' : 'text-slate-400'}`} />
+                <Icon className={`w-4 h-4 transition-transform ${isActive ? 'scale-110 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'text-slate-400'}`} />
                 {tab.badge && (
                   <span className="absolute -top-1.5 -right-3.5 px-1.5 py-0.5 bg-gradient-to-r from-emerald-600 to-indigo-600 text-white text-[7.5px] font-black rounded-full leading-none shadow-[0_0_8px_rgba(16,185,129,0.5)] border border-emerald-400/40 z-10 tracking-tight">
                     {tab.badge}
@@ -3035,27 +3081,35 @@ export default function App() {
                 )}
               </div>
               <span className="text-[9.5px] tracking-tight mt-0.5">{tab.label}</span>
-            </button>
+            </motion.button>
           );
         })}
 
         {/* MORE BUTTON */}
-        <button
+        <motion.button
+          whileTap={{ scale: 0.90 }}
           onClick={() => setShowMoreMenu(!showMoreMenu)}
-          className={`relative flex flex-col items-center justify-center py-0.5 px-3 rounded-lg transition-all cursor-pointer ${
+          className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer select-none ${
             showMoreMenu || ['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab)
-              ? 'text-emerald-400 font-black drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]'
+              ? 'text-emerald-400 font-black'
               : 'text-slate-400 hover:text-white font-medium'
           }`}
         >
+          {(showMoreMenu || ['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab)) && (
+            <motion.div
+              layoutId="bottomNavIndicator"
+              className="absolute inset-0 bg-emerald-500/15 border border-emerald-500/30 rounded-xl -z-10 shadow-[0_0_12px_rgba(52,211,153,0.25)]"
+              transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+            />
+          )}
           <div className="relative">
-            <LayoutGrid className={`w-4 h-4 transition-transform ${showMoreMenu ? 'scale-110 text-indigo-600' : 'text-slate-500'}`} />
+            <LayoutGrid className={`w-4 h-4 transition-transform ${showMoreMenu ? 'scale-110 text-emerald-400' : 'text-slate-400'}`} />
             {['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab) && (
-              <span className="absolute -top-0.5 -right-1 w-2 h-2 bg-indigo-600 rounded-full ring-2 ring-white" />
+              <span className="absolute -top-0.5 -right-1 w-2 h-2 bg-emerald-400 rounded-full ring-2 ring-slate-900" />
             )}
           </div>
           <span className="text-[9.5px] tracking-tight mt-0.5">More</span>
-        </button>
+        </motion.button>
       </nav>
 
       {/* ONBOARDING & PROFILE EDIT MODAL */}

@@ -6,6 +6,7 @@ import { GoogleGenAI } from "@google/genai";
 import { requireAuth, AuthRequest } from "./src/middleware/auth.ts";
 import { getOrCreateUser, getUserProfile, updateUserStats } from "./src/db/users.ts";
 import { getUserNotes, createNote, deleteNote, logStudySession, logMockExam } from "./src/db/notes.ts";
+import { securityHeaders, rateLimitAi, rateLimitGeneral, sanitizeInputs } from "./src/middleware/security.ts";
 
 const PORT = 3000;
 
@@ -139,6 +140,9 @@ async function startServer() {
   const app = express();
   app.disable('x-powered-by');
 
+  // Enterprise Security Headers (MIME sniffing, XSS, framing, referrer protection)
+  app.use(securityHeaders);
+
   // GZIP / Deflate Compression for high-bandwidth efficiency (saves up to 80% wire transfer)
   app.use(compression({
     filter: (req, res) => {
@@ -151,6 +155,10 @@ async function startServer() {
   // JSON Body Parser with safe memory limits
   app.use(express.json({ limit: '10mb' }));
 
+  // Global Payload Sanitization & General Rate Limiting for all /api endpoints
+  app.use("/api", sanitizeInputs);
+  app.use("/api", rateLimitGeneral);
+
   // Health and System Diagnostics Endpoint
   app.get("/api/health", (_req, res) => {
     res.json({ 
@@ -162,7 +170,7 @@ async function startServer() {
   });
 
   // API Route: World-class AI Tutor Answer / Explanation
-  app.post("/api/gemini/answer", async (req, res) => {
+  app.post("/api/gemini/answer", rateLimitAi, async (req, res) => {
     try {
       const { prompt, imageBase64, imagesBase64, studentContext, language, persona, history } = req.body;
       if (!prompt && !imageBase64 && (!imagesBase64 || imagesBase64.length === 0)) {
@@ -282,7 +290,7 @@ Here is a structured explanation of the concept:
   });
 
   // API Route: Generate AI Mock Exam
-  app.post("/api/generate-exam", async (req, res) => {
+  app.post("/api/generate-exam", rateLimitAi, async (req, res) => {
     try {
       const { subject, topic, language } = req.body;
       if (!subject || !topic) {
@@ -347,7 +355,7 @@ Each object in the array must strictly have these keys:
   });
 
   // API Route: AI Tutor Contextual Suggestion Engine
-  app.post("/api/gemini/suggestions", async (req, res) => {
+  app.post("/api/gemini/suggestions", rateLimitAi, async (req, res) => {
     try {
       const { history, subject, studentContext, language } = req.body;
       const cacheKey = `sugg_${subject || 'gen'}_${language || 'en'}`;
@@ -431,7 +439,7 @@ Each item must have:
   });
 
   // API Route: PDF / Book Scanner - Comprehensive Chapter Summarizer & Quiz Generator
-  app.post("/api/pdf-scan-analyze", async (req, res) => {
+  app.post("/api/pdf-scan-analyze", rateLimitAi, async (req, res) => {
     try {
       const { pdfBase64, imageBase64, imagesBase64, textContent, fileName, language } = req.body;
 
@@ -570,7 +578,7 @@ JSON SCHEMA:
   });
 
   // API Route: Voice Tutor Conversational Engine
-  app.post("/api/voice-tutor", async (req, res) => {
+  app.post("/api/voice-tutor", rateLimitAi, async (req, res) => {
     const { userSpokenText, history, studentContext, language } = req.body || {};
     try {
       if (!userSpokenText) {
@@ -631,7 +639,7 @@ YOUR VOICE SPEECH GUIDELINES:
   });
 
   // API Route: Cinematic AI Editor & App Redesign Superpower Engine
-  app.post("/api/ai-editor-command", async (req, res) => {
+  app.post("/api/ai-editor-command", rateLimitAi, async (req, res) => {
     const { userPrompt, history, currentCustomization, currentTab, language } = req.body || {};
     try {
       if (!userPrompt) {
@@ -1075,7 +1083,7 @@ You MUST output ONLY valid JSON matching this schema:
   });
 
   // API Route: Analyze and Summarize notes with key study insights
-  app.post("/api/summarize-notes", async (req, res) => {
+  app.post("/api/summarize-notes", rateLimitAi, async (req, res) => {
     try {
       const { content, language } = req.body;
       if (!content) {
@@ -1109,7 +1117,7 @@ ${content}`;
   });
 
   // API Route: Academic AI Tutor Chat
-  app.post("/api/tutor-chat", async (req, res) => {
+  app.post("/api/tutor-chat", rateLimitAi, async (req, res) => {
     try {
       const { messages, language } = req.body;
       if (!messages || !Array.isArray(messages)) {
@@ -1145,7 +1153,7 @@ Keep your tone encouraging and educational. Use clear formatting, lists, and mar
   });
 
   // API Route: Enhance image prompt for ultra-realistic and aesthetic outputs
-  app.post("/api/enhance-image-prompt", async (req, res) => {
+  app.post("/api/enhance-image-prompt", rateLimitAi, async (req, res) => {
     try {
       const { prompt, style } = req.body;
       if (!prompt) {
@@ -1174,7 +1182,7 @@ Rules:
   });
 
   // API Route: Real Image Generator Engine (Gemini 3.1 Flash Image + Imagen 3 + Flux HD Pipeline)
-  app.post("/api/generate-image", async (req, res) => {
+  app.post("/api/generate-image", rateLimitAi, async (req, res) => {
     try {
       const { prompt, size, aspectRatio, style, negativePrompt, seed } = req.body;
       if (!prompt || typeof prompt !== 'string') {

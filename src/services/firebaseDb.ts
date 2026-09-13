@@ -42,12 +42,13 @@ export function subscribeUserProfile(userId: string, callback: (profile: UserPro
 }
 
 export async function updateUserProfile(userId: string, profile: Partial<UserProfile>): Promise<void> {
-  // Always persist to localStorage for seamless fallback
+  // Always persist to localStorage for seamless, instant fallback
   try {
     const local = localStorage.getItem(`user_profile_${userId}`);
     const parsed = local ? JSON.parse(local) : {};
     const updated = { ...parsed, ...profile, lastActive: new Date().toISOString() };
     localStorage.setItem(`user_profile_${userId}`, JSON.stringify(updated));
+    localStorage.setItem('ascend_user_profile', JSON.stringify(updated));
   } catch (e) {
     console.warn("Failed to write user profile to localStorage:", e);
   }
@@ -57,9 +58,12 @@ export async function updateUserProfile(userId: string, profile: Partial<UserPro
   }
   try {
     const userRef = doc(db, "users", userId);
-    await setDoc(userRef, { ...profile, lastActive: new Date().toISOString() }, { merge: true });
+    // Strict 2-second timeout so Firestore write never hangs the application
+    const writePromise = setDoc(userRef, { ...profile, lastActive: new Date().toISOString() }, { merge: true });
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore write timeout')), 2000));
+    await Promise.race([writePromise, timeoutPromise]);
   } catch (err) {
-    console.warn("Firestore updateUserProfile warning:", err);
+    console.warn("Firestore updateUserProfile non-blocking note:", err);
   }
 }
 

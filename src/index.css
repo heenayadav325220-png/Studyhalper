@@ -8,6 +8,16 @@
   --font-rounded: "Outfit", ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Global Professional Feel: zero tap highlight, smooth font rasterization */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  scroll-behavior: smooth;
+  touch-action: manipulation;
+}
+
 html.dark body {
   background-color: #020617;
   color: #f1f5f9;
@@ -25,6 +35,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.2s ease, color 0.2s ease;
+  overscroll-behavior-y: none;
 }
 
 #root {
@@ -36,26 +47,59 @@ body {
   flex-direction: column;
 }
 
-/* Custom visual scrollbars matching the clean theme */
+/* Tactile Spring Press Physics on Interactive Elements */
+button, 
+[role="button"], 
+.interactive-tap, 
+.tap-bounce {
+  user-select: none;
+  touch-action: manipulation;
+  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), 
+              opacity 0.16s ease, 
+              box-shadow 0.16s cubic-bezier(0.16, 1, 0.3, 1),
+              filter 0.16s ease;
+}
+
+button:active:not(:disabled), 
+[role="button"]:active:not(:disabled), 
+.interactive-tap:active, 
+.tap-bounce:active {
+  transform: scale(0.972);
+}
+
+/* Professional Input Focus: Soft Indigo Sheen without Jarring Outlines */
+input:focus-visible, 
+textarea:focus-visible, 
+select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.35);
+}
+
+/* Sleek Floating Pill Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: rgba(148, 163, 184, 0.3);
   border-radius: 9999px;
+  transition: background-color 0.2s ease;
 }
 html.dark ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: rgba(100, 116, 139, 0.35);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: rgba(99, 102, 241, 0.6);
 }
-html.dark ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+
+/* Hardware accelerated smooth GPU layer */
+.gpu-layer {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 
 @keyframes spinSlow {
@@ -75,21 +119,6 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   animation: spinSlow 10s linear infinite reverse;
 }
 
-/* Hardware accelerated smooth GPU layer */
-.gpu-layer {
-  transform: translateZ(0);
-  will-change: transform, opacity;
-  backface-visibility: hidden;
-}
-
-/* Micro-interaction tap compression */
-.tap-bounce {
-  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s ease;
-}
-.tap-bounce:active {
-  transform: scale(0.97);
-}
-
 /* Subtle glow badge pulse */
 @keyframes subtlePulse {
   0%, 100% { opacity: 0.95; transform: scale(1); }
@@ -98,4 +127,11 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 
 .animate-subtle-pulse {
   animation: subtlePulse 3s ease-in-out infinite;
+}
+
+/* Glassmorphism cross-browser backface blur support */
+.backdrop-blur-md,
+.backdrop-blur-lg,
+.backdrop-blur-xl {
+  -webkit-backdrop-filter: blur(16px);
 }

@@ -47,8 +47,19 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // If request is for an API route or cloud endpoints, bypass cache
-  if (url.pathname.startsWith('/api/') || url.hostname.includes('googleapis.com') || url.hostname.includes('firebase')) {
+  // Bypass cache completely for API, Google APIs, Firebase, and all Vite development files
+  if (
+    url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/src/') ||
+    url.pathname.startsWith('/@') ||
+    url.pathname.startsWith('/node_modules/') ||
+    url.pathname.endsWith('.tsx') ||
+    url.pathname.endsWith('.ts') ||
+    url.searchParams.has('v') ||
+    url.searchParams.has('t') ||
+    url.hostname.includes('googleapis.com') ||
+    url.hostname.includes('firebase')
+  ) {
     return;
   }
 

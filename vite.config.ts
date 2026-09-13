@@ -8,9 +8,6 @@ export default defineConfig({
   resolve: {
     dedupe: ['react', 'react-dom']
   },
-  optimizeDeps: {
-    include: ['react', 'react-dom', 'motion', 'lucide-react', 'react-markdown']
-  },
   server: {
     port: 3000,
     host: '0.0.0.0',
