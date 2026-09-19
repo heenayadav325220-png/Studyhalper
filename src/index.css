@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0.600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -8,24 +8,10 @@
   --font-rounded: "Outfit", ui-sans-serif, system-ui, sans-serif;
 }
 
-* {
-  -webkit-tap-highlight-color: transparent;
-  box-sizing: border-box;
-}
-
-html {
-  scroll-behavior: smooth;
-  touch-action: pan-y pinch-zoom;
-  overflow-y: auto;
-}
-
-html.dark body {
-  background-color: #020617;
-  color: #f1f5f9;
-}
-
-html,
-body {
+* { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+html { scroll-behavior: smooth; touch-action: pan-y pinch-zoom; overflow-y: auto; }
+html.dark body { background-color: #020617; color: #f1f5f9; }
+html, body {
   margin: 0;
   min-height: 100%;
   width: 100%;
@@ -41,7 +27,6 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
   overscroll-behavior-y: auto;
 }
-
 #root {
   min-height: 100vh;
   min-height: 100dvh;
@@ -54,154 +39,95 @@ body {
   overscroll-behavior-y: auto;
   -webkit-overflow-scrolling: touch;
 }
+#main-app-container { min-height: 100vh; min-height: 100dvh; height: auto; overflow: visible !important; }
+#main-app-container > main { min-height: 0; overflow-x: hidden; overflow-y: visible; touch-action: pan-y pinch-zoom; }
 
-#main-app-container {
-  min-height: 100vh;
-  min-height: 100dvh;
-  height: auto;
-  overflow: visible !important;
-}
-
-#main-app-container > main {
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: visible;
-  touch-action: pan-y pinch-zoom;
-}
-
-button,
-[role="button"],
-.interactive-tap,
-.tap-bounce {
+button, [role="button"], .interactive-tap, .tap-bounce {
   user-select: none;
   touch-action: manipulation;
   transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.16s ease, box-shadow 0.16s cubic-bezier(0.16, 1, 0.3, 1), filter 0.16s ease;
 }
-
-button:active:not(:disabled),
-[role="button"]:active:not(:disabled),
-.interactive-tap:active,
-.tap-bounce:active {
-  transform: scale(0.972);
-}
-
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.35);
-}
-
+button:active:not(:disabled), [role="button"]:active:not(:disabled), .interactive-tap:active, .tap-bounce:active { transform: scale(0.972); }
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.35); }
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); border-radius: 9999px; }
 html.dark ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.35); }
 ::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.6); }
-
-.gpu-layer {
-  transform: translateZ(0);
-  will-change: transform, opacity;
-  backface-visibility: hidden;
-}
-
+.gpu-layer { transform: translateZ(0); will-change: transform, opacity; backface-visibility: hidden; }
 @keyframes spinSlow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .animate-spin-slow { animation: spinSlow 6s linear infinite; }
 .animate-spin-reverse-slow { animation: spinSlow 10s linear infinite reverse; }
-
-@keyframes subtlePulse {
-  0%, 100% { opacity: 0.95; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.02); }
-}
+@keyframes subtlePulse { 0%, 100% { opacity: 0.95; transform: scale(1); } 50% { opacity: 1; transform: scale(1.02); } }
 .animate-subtle-pulse { animation: subtlePulse 3s ease-in-out infinite; }
+.backdrop-blur-md, .backdrop-blur-lg, .backdrop-blur-xl { -webkit-backdrop-filter: blur(16px); }
 
-.backdrop-blur-md,
-.backdrop-blur-lg,
-.backdrop-blur-xl { -webkit-backdrop-filter: blur(16px); }
-
-/* Premium AI Tutor presentation layer. These selectors intentionally style the
-   existing structure so chat logic, actions, APIs and state remain unchanged. */
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] {
-  background: #f8fafc !important;
-  color: #172033;
-}
-
+/* AI Tutor shell */
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] { background: #f8fafc !important; color: #172033; }
 #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > header {
   min-height: 56px;
   padding: 10px clamp(14px, 3vw, 32px);
   border-color: #e7eaf0;
   box-shadow: 0 1px 10px rgba(15, 23, 42, 0.04);
 }
-
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > header > div:last-child > div {
-  display: none;
-}
-
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > header h1 {
-  letter-spacing: -0.025em;
-  font-size: 13px;
-}
-
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > header > div:last-child > div { display: none; }
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > header h1 { letter-spacing: -0.025em; font-size: 13px; }
 #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto {
-  width: 100%;
-  max-width: 880px;
-  margin-inline: auto;
-  padding: 28px clamp(16px, 4vw, 48px) 180px;
-  scroll-padding-bottom: 180px;
-  overscroll-behavior-y: contain;
-  scrollbar-gutter: stable;
+  width: 100%; max-width: 880px; margin-inline: auto; padding: 28px clamp(16px, 4vw, 48px) 180px; scroll-padding-bottom: 180px; overscroll-behavior-y: contain; scrollbar-gutter: stable;
 }
 
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto .bg-white.border.border-slate-200.text-slate-900.rounded-2xl {
-  border-color: transparent;
-  box-shadow: none;
-  background: transparent;
+/* Content-first AI messages: remove the card/bubble treatment while retaining
+   readable markdown and subtle, secondary controls. */
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto > div > div.flex.items-start.space-x-2\.5.justify-start > div > div.bg-white.border.border-slate-200.text-slate-900.rounded-2xl {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  color: #172033;
 }
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto > div > div.flex.items-start.space-x-2\.5.justify-start > div > div.bg-white.border.border-slate-200.text-slate-900.rounded-2xl > .markdown-body {
+  max-width: 72ch;
+  font-size: clamp(0.9rem, 1.2vw, 1rem);
+  line-height: 1.78;
+  color: #263247;
+}
+#main-app-container .markdown-body h1,
+#main-app-container .markdown-body h2,
+#main-app-container .markdown-body h3,
+#main-app-container .markdown-body h4 { color: #172033; font-weight: 750; letter-spacing: -0.02em; margin: 1.25em 0 0.45em; }
+#main-app-container .markdown-body h1 { font-size: 1.35rem; }
+#main-app-container .markdown-body h2 { font-size: 1.18rem; }
+#main-app-container .markdown-body h3 { font-size: 1.05rem; }
+#main-app-container .markdown-body ul,
+#main-app-container .markdown-body ol { padding-left: 1.35rem; margin: 0.8rem 0; }
+#main-app-container .markdown-body li { padding-left: 0.25rem; margin: 0.35rem 0; }
+#main-app-container .markdown-body blockquote { border-left: 3px solid #c7d2fe; color: #526079; padding-left: 1rem; margin: 1rem 0; }
+#main-app-container .markdown-body table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 1rem 0; }
+#main-app-container .markdown-body th,
+#main-app-container .markdown-body td { border: 1px solid #e2e8f0; padding: 0.5rem 0.7rem; text-align: left; }
+#main-app-container .markdown-body th { background: #f1f5f9; font-weight: 700; }
+#main-app-container .markdown-body pre { margin: 1rem 0; max-width: 100%; overflow-x: auto; border-radius: 10px; }
+#main-app-container .markdown-body .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.35rem 0; }
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto > div > div.flex.items-start.space-x-2\.5.justify-start { margin-bottom: 2.75rem; }
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto > div > div.flex.items-start.space-x-2\.5.justify-start .pt-2.border-t {
+  border-top: 0 !important;
+  padding-top: 0.7rem;
+  margin-top: 0.35rem;
+  opacity: 0.72;
+}
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto .bg-white.border.border-slate-200.text-slate-900.rounded-2xl { border-color: transparent; box-shadow: none; background: transparent; }
 
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer {
-  position: relative;
-  z-index: 20;
-  border-top: 1px solid #e7eaf0;
-  background: rgba(248, 250, 252, 0.94);
-  padding: 10px clamp(14px, 3vw, 32px) max(12px, env(safe-area-inset-bottom));
-  box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.06);
-}
-
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer > div {
-  max-width: 880px;
-}
-
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer .flex.items-center.bg-white.border {
-  border-color: #dfe4ec;
-  border-radius: 18px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-  padding: 5px;
-}
-
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer .flex.items-center.bg-white.border:focus-within {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12), 0 8px 24px rgba(15, 23, 42, 0.08);
-}
-
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer .flex.items-center.overflow-x-auto {
-  padding: 2px 0 5px;
-  scrollbar-width: none;
-}
+/* Composer and suggestions */
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer { position: relative; z-index: 20; border-top: 1px solid #e7eaf0; background: rgba(248, 250, 252, 0.94); padding: 10px clamp(14px, 3vw, 32px) max(12px, env(safe-area-inset-bottom)); box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.06); }
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer > div { max-width: 880px; }
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer .flex.items-center.bg-white.border { border-color: #dfe4ec; border-radius: 18px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08); padding: 5px; }
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer .flex.items-center.bg-white.border:focus-within { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12), 0 8px 24px rgba(15, 23, 42, 0.08); }
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer .flex.items-center.overflow-x-auto { padding: 2px 0 5px; scrollbar-width: none; }
 #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer .flex.items-center.overflow-x-auto::-webkit-scrollbar { display: none; }
 
-@media (min-width: 768px) {
-  #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > header {
-    padding-inline: clamp(24px, 5vw, 64px);
-  }
-}
-
+@media (min-width: 768px) { #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > header { padding-inline: clamp(24px, 5vw, 64px); } }
 @media (max-width: 767px) {
-  #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto {
-    padding-top: 18px;
-    padding-bottom: 196px;
-    scroll-padding-bottom: 196px;
-  }
-
-  #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer {
-    padding-top: 8px;
-  }
+  #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto { padding-top: 18px; padding-bottom: 196px; scroll-padding-bottom: 196px; }
+  #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer { padding-top: 8px; }
 }
