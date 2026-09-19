@@ -55,8 +55,6 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-/* The app shell owns the page scroll. This prevents fixed overlays and flex sizing
-   from accidentally making the document itself non-scrollable. */
 #main-app-container {
   min-height: 100vh;
   min-height: 100dvh;
@@ -77,10 +75,7 @@ button,
 .tap-bounce {
   user-select: none;
   touch-action: manipulation;
-  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1),
-              opacity 0.16s ease,
-              box-shadow 0.16s cubic-bezier(0.16, 1, 0.3, 1),
-              filter 0.16s ease;
+  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.16s ease, box-shadow 0.16s cubic-bezier(0.16, 1, 0.3, 1), filter 0.16s ease;
 }
 
 button:active:not(:disabled),
@@ -97,24 +92,11 @@ select:focus-visible {
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.35);
 }
 
-::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.3);
-  border-radius: 9999px;
-  transition: background-color 0.2s ease;
-}
-html.dark ::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.35);
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.6);
-}
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); border-radius: 9999px; }
+html.dark ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.35); }
+::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.6); }
 
 .gpu-layer {
   transform: translateZ(0);
@@ -122,11 +104,7 @@ html.dark ::-webkit-scrollbar-thumb {
   backface-visibility: hidden;
 }
 
-@keyframes spinSlow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
+@keyframes spinSlow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .animate-spin-slow { animation: spinSlow 6s linear infinite; }
 .animate-spin-reverse-slow { animation: spinSlow 10s linear infinite reverse; }
 
@@ -134,11 +112,96 @@ html.dark ::-webkit-scrollbar-thumb {
   0%, 100% { opacity: 0.95; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.02); }
 }
-
 .animate-subtle-pulse { animation: subtlePulse 3s ease-in-out infinite; }
 
 .backdrop-blur-md,
 .backdrop-blur-lg,
-.backdrop-blur-xl {
-  -webkit-backdrop-filter: blur(16px);
+.backdrop-blur-xl { -webkit-backdrop-filter: blur(16px); }
+
+/* Premium AI Tutor presentation layer. These selectors intentionally style the
+   existing structure so chat logic, actions, APIs and state remain unchanged. */
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] {
+  background: #f8fafc !important;
+  color: #172033;
+}
+
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > header {
+  min-height: 56px;
+  padding: 10px clamp(14px, 3vw, 32px);
+  border-color: #e7eaf0;
+  box-shadow: 0 1px 10px rgba(15, 23, 42, 0.04);
+}
+
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > header > div:last-child > div {
+  display: none;
+}
+
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > header h1 {
+  letter-spacing: -0.025em;
+  font-size: 13px;
+}
+
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto {
+  width: 100%;
+  max-width: 880px;
+  margin-inline: auto;
+  padding: 28px clamp(16px, 4vw, 48px) 180px;
+  scroll-padding-bottom: 180px;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto .bg-white.border.border-slate-200.text-slate-900.rounded-2xl {
+  border-color: transparent;
+  box-shadow: none;
+  background: transparent;
+}
+
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer {
+  position: relative;
+  z-index: 20;
+  border-top: 1px solid #e7eaf0;
+  background: rgba(248, 250, 252, 0.94);
+  padding: 10px clamp(14px, 3vw, 32px) max(12px, env(safe-area-inset-bottom));
+  box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.06);
+}
+
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer > div {
+  max-width: 880px;
+}
+
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer .flex.items-center.bg-white.border {
+  border-color: #dfe4ec;
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  padding: 5px;
+}
+
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer .flex.items-center.bg-white.border:focus-within {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12), 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer .flex.items-center.overflow-x-auto {
+  padding: 2px 0 5px;
+  scrollbar-width: none;
+}
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer .flex.items-center.overflow-x-auto::-webkit-scrollbar { display: none; }
+
+@media (min-width: 768px) {
+  #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > header {
+    padding-inline: clamp(24px, 5vw, 64px);
+  }
+}
+
+@media (max-width: 767px) {
+  #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto {
+    padding-top: 18px;
+    padding-bottom: 196px;
+    scroll-padding-bottom: 196px;
+  }
+
+  #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer {
+    padding-top: 8px;
+  }
 }
