@@ -1,16 +1,16 @@
 import { useState, useRef, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  ArrowLeft, 
-  Send, 
-  Trash2, 
-  Volume2, 
-  Copy, 
-  Check, 
+import {
+  ArrowLeft,
+  Send,
+  Trash2,
+  Volume2,
+  Copy,
+  Check,
   BrainCircuit,
-  Loader2, 
-  Mic, 
-  Bot, 
+  Loader2,
+  Mic,
+  Bot,
   User as UserIcon,
   Calculator,
   Compass,
@@ -46,10 +46,10 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { getStudyAnswer } from '../services/geminiService';
 import { exportConversationToPdf } from '../utils/pdfExport';
-import { 
-  AcademicSuggestion, 
-  generateContextualSuggestions, 
-  getAiTutorSuggestions 
+import {
+  AcademicSuggestion,
+  generateContextualSuggestions,
+  getAiTutorSuggestions
 } from '../services/suggestionEngine';
 import {
   ImageFilterType,
@@ -196,7 +196,6 @@ function getSubjectTheme(subject?: string): SubjectTheme {
   if (subject && SUBJECT_THEMES[subject]) {
     return SUBJECT_THEMES[subject];
   }
-  // Default Indigo / Slate theme
   return {
     border: 'border-indigo-500/50 hover:border-indigo-400/70',
     glow: 'shadow-indigo-950/40 shadow-lg',
@@ -279,10 +278,43 @@ const QUICK_PROMPTS = [
   { icon: FileCode2, label: "English Essay", prompt: "Help me write an outline for an argumentative essay on AI in Education." }
 ];
 
-/**
- * Normalizes LaTeX delimiter syntax commonly output by AI models
- * e.g., converts \(...\) to $...$ and \[...\] to $$...$$
- */
+const getStoredValue = (key: string, fallback = ''): string => {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    return window.localStorage.getItem(key) ?? fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const setStoredValue = (key: string, value: string | null) => {
+  if (typeof window === 'undefined') return;
+  try {
+    if (value === null) {
+      window.localStorage.removeItem(key);
+    } else {
+      window.localStorage.setItem(key, value);
+    }
+  } catch {
+    // Ignore storage failures gracefully in restricted browser contexts.
+  }
+};
+
+const getAppLanguage = (language: string): 'en' | 'hi' => {
+  const normalized = language.toLowerCase();
+  return normalized === 'hindi' || normalized === 'hinglish' || normalized === 'hi' ? 'hi' : 'en';
+};
+
+const safeClipboardWrite = async (value: string) => {
+  if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return false;
+  try {
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 function preprocessLaTeX(content: string): string {
   if (!content) return '';
   return content
@@ -290,32 +322,21 @@ function preprocessLaTeX(content: string): string {
     .replace(/\\\(([\s\S]*?)\\\)/g, (_match, math) => `$${math.trim()}$`);
 }
 
-/**
- * Helper to split markdown text into logical blocks (paragraphs, code blocks, math equations, lists)
- */
 function parseMarkdownBlocks(text: string): string[] {
   if (!text) return [];
   const normalized = text.trim();
-  
-  // Split on double newlines or standalone math blocks while preserving delimiters
   const rawBlocks = normalized.split(/\n\s*\n+/);
   const blocks: string[] = [];
-  
+
   for (const block of rawBlocks) {
     const trimmed = block.trim();
     if (!trimmed) continue;
-    
-    // If a block contains distinct math formulas $$...$$, preserve them
     blocks.push(trimmed);
   }
-  
+
   return blocks.length > 0 ? blocks : [text];
 }
 
-/**
- * StaggeredRevealMarkdown renders AI response with a smooth staggered reveal animation,
- * revealing blocks of content (paragraphs, formulas, code snippets) one by one for optimal readability.
- */
 const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
   text,
   isLatest,
@@ -342,7 +363,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
         }
         return prev + 1;
       });
-    }, 280); // Stagger interval of 280ms per logical paragraph/formula block
+    }, 280);
 
     return () => clearInterval(interval);
   }, [text, isLatest, blocks.length]);
@@ -355,14 +376,14 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
           setVisibleCount(blocks.length);
         }
       }}
-      title={!isAllRevealed ? "Click to reveal full answer immediately" : undefined}
+      title={!isAllRevealed ? 'Click to reveal full answer immediately' : undefined}
     >
       {blocks.slice(0, visibleCount).map((block, index) => (
         <motion.div
           key={index}
           initial={{ opacity: 0, y: 6, scale: 0.99 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.25, ease: "easeOut" }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
           className="space-y-1.5"
         >
           <ReactMarkdown
@@ -388,9 +409,9 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
                         <span className="uppercase font-bold text-cyan-400">{lang}</span>
                         <button
                           type="button"
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            navigator.clipboard.writeText(codeString);
+                            await safeClipboardWrite(codeString);
                           }}
                           className="hover:text-white transition font-sans text-[10px] bg-slate-700 hover:bg-slate-600 px-2 py-0.5 rounded-md text-slate-200"
                         >
@@ -448,7 +469,7 @@ const DEFAULT_SAVED_FORMULAS: SavedFormula[] = [
   { id: 'f1', name: 'Quadratic Formula', latex: 'x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}' },
   { id: 'f2', name: 'Pythagorean Theorem', latex: 'a^2 + b^2 = c^2' },
   { id: 'f3', name: 'Mass-Energy Equivalence', latex: 'E = mc^2' },
-  { id: 'f4', name: 'Euler\'s Identity', latex: 'e^{i\\pi} + 1 = 0' },
+  { id: 'f4', name: "Euler's Identity", latex: 'e^{i\\pi} + 1 = 0' },
   { id: 'f5', name: 'Area of Circle', latex: 'A = \\pi r^2' },
   { id: 'f6', name: 'Kinetic Energy', latex: 'K = \\frac{1}{2}mv^2' },
 ];
@@ -461,7 +482,7 @@ export const AiTutorApp = memo(function AiTutorApp({
   onOpenEditor
 }: AiTutorAppProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    const saved = localStorage.getItem(`ai_tutor_chat_${user.uid}`);
+    const saved = getStoredValue(`ai_tutor_chat_${user.uid}`);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -469,7 +490,7 @@ export const AiTutorApp = memo(function AiTutorApp({
           return parsed;
         }
       } catch (e) {
-        console.error("Error parsing saved tutor chat", e);
+        console.error('Error parsing saved tutor chat', e);
       }
     }
     const studentName = user.name || 'Student';
@@ -487,21 +508,9 @@ export const AiTutorApp = memo(function AiTutorApp({
     ];
   });
 
-  const [inputQuery, setInputQuery] = useState(() => {
-    try {
-      return localStorage.getItem(`ai_tutor_input_draft_${user.uid}`) || '';
-    } catch {
-      return '';
-    }
-  });
+  const [inputQuery, setInputQuery] = useState(() => getStoredValue(`ai_tutor_input_draft_${user.uid}`));
   const [selectedSubject, setSelectedSubject] = useState<Subject>('Science');
-  const [selectedLanguage, setSelectedLanguage] = useState<string>(() => {
-    try {
-      return localStorage.getItem(`ai_tutor_language_${user.uid}`) || 'Hinglish';
-    } catch {
-      return 'Hinglish';
-    }
-  });
+  const [selectedLanguage, setSelectedLanguage] = useState<string>(() => getStoredValue(`ai_tutor_language_${user.uid}`, 'Hinglish'));
   const [tutorMode, setTutorMode] = useState<'homework' | 'explain' | 'step' | 'quiz'>('homework');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -511,14 +520,15 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [showMathPalette, setShowMathPalette] = useState(false);
   const [activeMathCategory, setActiveMathCategory] = useState<'All' | 'Greek' | 'Algebra' | 'Operators' | 'Calculus'>('All');
 
-  // Saved Formulas State
+  const appLanguage = getAppLanguage(selectedLanguage);
+
   const [savedFormulas, setSavedFormulas] = useState<SavedFormula[]>(() => {
-    const saved = localStorage.getItem(`saved_formulas_${user.uid}`);
+    const saved = getStoredValue(`saved_formulas_${user.uid}`);
     if (saved) {
       try {
         return JSON.parse(saved);
       } catch (e) {
-        console.error("Error parsing saved formulas", e);
+        console.error('Error parsing saved formulas', e);
       }
     }
     return DEFAULT_SAVED_FORMULAS;
@@ -529,15 +539,12 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [showAddFormulaForm, setShowAddFormulaForm] = useState(false);
   const [copiedFormulaId, setCopiedFormulaId] = useState<string | null>(null);
 
-  // PDF Export State
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [pdfExportSuccess, setPdfExportSuccess] = useState(false);
 
-  // Mobile More Options (Three-Dots) Menu State
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showCustomVoiceModal, setShowCustomVoiceModal] = useState(false);
 
-  // Suggestion Engine State (3 dynamic academic follow-up questions or study actions)
   const [suggestions, setSuggestions] = useState<AcademicSuggestion[]>(() => {
     return generateContextualSuggestions({
       messages,
@@ -553,7 +560,6 @@ export const AiTutorApp = memo(function AiTutorApp({
   });
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
 
-  // Camera & Multiple Image Attachment State
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
@@ -572,8 +578,6 @@ export const AiTutorApp = memo(function AiTutorApp({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // KEYBOARD-AWARE VIEWPORT: tracks the real visible height so the input dock
-  // never gets pushed under the on-screen keyboard or the phone's gesture bar.
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
 
   useEffect(() => {
@@ -601,9 +605,6 @@ export const AiTutorApp = memo(function AiTutorApp({
       }
 
       const now = ctx.currentTime;
-
-      // Realistic mechanical DSLR shutter click simulation
-      // Step 1: Initial crisp mirror flip & blade snap (high-transient mechanical pop)
       const osc1 = ctx.createOscillator();
       const oscGain1 = ctx.createGain();
       osc1.type = 'triangle';
@@ -617,7 +618,6 @@ export const AiTutorApp = memo(function AiTutorApp({
       osc1.start(now);
       osc1.stop(now + 0.025);
 
-      // Step 2: Mechanical noise burst (shutter friction & curtain release)
       const bufferSize = Math.floor(ctx.sampleRate * 0.035);
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const output = buffer.getChannelData(0);
@@ -640,7 +640,6 @@ export const AiTutorApp = memo(function AiTutorApp({
       noiseGain.connect(ctx.destination);
       noise.start(now);
 
-      // Step 3: Secondary shutter curtain closure click (38ms later)
       setTimeout(() => {
         try {
           const now2 = ctx.currentTime;
@@ -690,8 +689,8 @@ export const AiTutorApp = memo(function AiTutorApp({
         videoRef.current.srcObject = stream;
       }
     } catch (err: any) {
-      console.error("Camera access error:", err);
-      setCameraError("Could not access camera. Please check camera permissions or select a photo from your device.");
+      console.error('Camera access error:', err);
+      setCameraError('Could not access camera. Please check camera permissions or select a photo from your device.');
     }
   };
 
@@ -716,7 +715,6 @@ export const AiTutorApp = memo(function AiTutorApp({
     };
   }, [showCameraModal, cameraFacing]);
 
-  // Real-time edge contrast & lighting analysis on live camera frames
   useEffect(() => {
     if (!showCameraModal) {
       setLowContrastDetected(false);
@@ -758,8 +756,6 @@ export const AiTutorApp = memo(function AiTutorApp({
         }
         const stdDev = Math.sqrt(variance / count);
 
-        // Low contrast or poorly lit document condition:
-        // Flat dynamic range or dim lighting
         const isLow = avgLum < 60 || (maxLum - minLum < 55) || stdDev < 22;
 
         if (isLow) {
@@ -787,8 +783,6 @@ export const AiTutorApp = memo(function AiTutorApp({
     const dataUrl = applyFilterToCanvas(videoRef.current, cameraFilter);
     if (dataUrl) {
       setSelectedImages((prev) => [...prev, dataUrl]);
-      
-      // Trigger camera shutter audio & visual feedback
       playShutterSound();
       setShutterAnimation(true);
       setFlashAnimation(true);
@@ -833,8 +827,7 @@ export const AiTutorApp = memo(function AiTutorApp({
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
-          const rawData = event.target!.result as string;
-          // If a filter is actively selected (other than 'none'), apply it to the uploaded image for convenience
+          const rawData = event.target.result as string;
           if (cameraFilter !== 'none') {
             const img = new Image();
             img.onload = () => {
@@ -851,7 +844,6 @@ export const AiTutorApp = memo(function AiTutorApp({
     });
 
     setShowCameraModal(false);
-    // Reset file input so same file can be re-selected if needed
     e.target.value = '';
   };
 
@@ -904,7 +896,6 @@ export const AiTutorApp = memo(function AiTutorApp({
     }, 0);
   };
 
-  // Safe JSON stringify helper to avoid circular structures
   const safeJsonStringify = (obj: any): string => {
     try {
       const cache = new Set();
@@ -920,16 +911,14 @@ export const AiTutorApp = memo(function AiTutorApp({
     }
   };
 
-  // Save chat to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(`ai_tutor_chat_${user.uid}`, safeJsonStringify(messages));
     } catch (e) {
-      console.error("Error writing chat history to storage", e);
+      console.error('Error writing chat history to storage', e);
     }
   }, [messages, user.uid]);
 
-  // Save input draft to localStorage
   useEffect(() => {
     try {
       const draftKey = `ai_tutor_input_draft_${user.uid}`;
@@ -939,16 +928,15 @@ export const AiTutorApp = memo(function AiTutorApp({
         localStorage.removeItem(draftKey);
       }
     } catch (e) {
-      console.error("Error writing input draft to storage", e);
+      console.error('Error writing input draft to storage', e);
     }
   }, [inputQuery, user.uid]);
 
-  // Save formulas to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(`saved_formulas_${user.uid}`, JSON.stringify(savedFormulas));
     } catch (e) {
-      console.error("Error writing saved formulas to storage", e);
+      console.error('Error writing saved formulas to storage', e);
     }
   }, [savedFormulas, user.uid]);
 
@@ -970,10 +958,12 @@ export const AiTutorApp = memo(function AiTutorApp({
     setSavedFormulas((prev) => prev.filter((f) => f.id !== id));
   };
 
-  const handleCopyFormula = (id: string, latex: string) => {
-    navigator.clipboard.writeText(latex);
-    setCopiedFormulaId(id);
-    setTimeout(() => setCopiedFormulaId(null), 2000);
+  const handleCopyFormula = async (id: string, latex: string) => {
+    const copied = await safeClipboardWrite(latex);
+    if (copied) {
+      setCopiedFormulaId(id);
+      setTimeout(() => setCopiedFormulaId(null), 2000);
+    }
   };
 
   const handleInsertFormula = (latex: string) => {
@@ -981,16 +971,13 @@ export const AiTutorApp = memo(function AiTutorApp({
     insertSymbol(formatted);
   };
 
-  // Auto scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  // Contextual Suggestion Engine: Dynamically generate 3 academic follow-ups or study actions
   useEffect(() => {
     let isCancelled = false;
 
-    // 1. Instant zero-latency heuristic computation
     const immediateSuggestions = generateContextualSuggestions({
       messages,
       subject: selectedSubject,
@@ -1004,7 +991,6 @@ export const AiTutorApp = memo(function AiTutorApp({
     });
     setSuggestions(immediateSuggestions);
 
-    // 2. Async enhancement via backend AI model if active conversation
     if (messages.length > 1) {
       setIsGeneratingSuggestions(true);
       getAiTutorSuggestions({
@@ -1060,7 +1046,7 @@ export const AiTutorApp = memo(function AiTutorApp({
     const imagesToSend = [...selectedImages];
     const queryText = typeof customText === 'string' ? customText : inputQuery;
     const cleanQuery = typeof queryText === 'string' ? queryText.trim() : '';
-    const effectiveQuery = cleanQuery || (imagesToSend.length > 0 ? `Please solve and explain the homework problem(s) shown in the ${imagesToSend.length > 1 ? `${imagesToSend.length} attached pages` : 'attached image'} step-by-step with full LaTeX formatting and intermediate calculations.` : "");
+    const effectiveQuery = cleanQuery || (imagesToSend.length > 0 ? `Please solve and explain the homework problem(s) shown in the ${imagesToSend.length > 1 ? `${imagesToSend.length} attached pages` : 'attached page'}.` : '');
 
     if (!effectiveQuery || isLoading) return;
 
@@ -1079,15 +1065,12 @@ export const AiTutorApp = memo(function AiTutorApp({
     setMessages((prev) => [...prev, userMsg]);
     if (typeof customText !== 'string') {
       setInputQuery('');
-      try {
-        localStorage.removeItem(`ai_tutor_input_draft_${user.uid}`);
-      } catch (e) {}
+      setStoredValue(`ai_tutor_input_draft_${user.uid}`, null);
     }
     setSelectedImages([]);
     setIsLoading(true);
 
     try {
-      // Formulate prompt context based on student details, subject and mode
       const studentInfo = `[Student: ${user.name || 'Student'} | School: ${user.schoolName || 'School'} | Class: ${user.className || 'Class'} | Goal: ${user.targetGoal || 'General'}]`;
       let promptContext = `${studentInfo} [Subject: ${selectedSubject} | Mode: ${tutorMode}] ${effectiveQuery}`;
       if (tutorMode === 'step') {
@@ -1133,29 +1116,29 @@ export const AiTutorApp = memo(function AiTutorApp({
         messages,
         user,
         subject: selectedSubject,
-        tutorMode: tutorMode === 'homework' 
-          ? 'Homework Solver' 
-          : tutorMode === 'step' 
-          ? 'Step-by-Step Math' 
-          : tutorMode === 'explain' 
-          ? 'Concept Explainer' 
+        tutorMode: tutorMode === 'homework'
+          ? 'Homework Solver'
+          : tutorMode === 'step'
+          ? 'Step-by-Step Math'
+          : tutorMode === 'explain'
+          ? 'Concept Explainer'
           : 'Practice Quiz'
       });
       setPdfExportSuccess(true);
       if (onAddXp) onAddXp(15);
       setTimeout(() => setPdfExportSuccess(false), 3500);
     } catch (error) {
-      console.error("PDF Export error:", error);
-      alert("Failed to export PDF study guide. Please ensure there are conversation messages.");
+      console.error('PDF Export error:', error);
+      alert('Failed to export PDF study guide. Please ensure there are conversation messages.');
     } finally {
       setIsExportingPdf(false);
     }
   };
 
   const handleClearChat = () => {
-    if (window.confirm("Clear all AI Tutor conversation history?")) {
+    if (window.confirm('Clear all AI Tutor conversation history?')) {
       setMessages([]);
-      localStorage.removeItem(`ai_tutor_chat_${user.uid}`);
+      setStoredValue(`ai_tutor_chat_${user.uid}`, null);
     }
   };
 
@@ -1163,11 +1146,13 @@ export const AiTutorApp = memo(function AiTutorApp({
     setMessages((prev) => prev.filter((m) => m.id !== id));
   };
 
-  const handleCopyText = (id: string, text: string | unknown) => {
+  const handleCopyText = async (id: string, text: string | unknown) => {
     const cleanStr = typeof text === 'string' ? text : String(text || '');
-    navigator.clipboard.writeText(cleanStr);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+    const copied = await safeClipboardWrite(cleanStr);
+    if (copied) {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
   };
 
   const handleSpeakText = (text: string | unknown) => {
@@ -1192,7 +1177,7 @@ export const AiTutorApp = memo(function AiTutorApp({
   const handleVoiceInputToggle = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("Voice input is not supported in this browser. Try Chrome or Edge!");
+      alert('Voice input is not supported in this browser. Try Chrome or Edge!');
       return;
     }
 
@@ -1228,7 +1213,6 @@ export const AiTutorApp = memo(function AiTutorApp({
       className="fixed inset-0 z-50 bg-[#f8fafc] text-slate-900 flex flex-col font-sans overflow-hidden transition-[height] duration-150 ease-out"
       style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
     >
-      {/* APP TOP HEADER - MATCHING EXACT DESIGN IN IMAGE */}
       <header className="bg-white/95 backdrop-blur-sm border-b border-slate-200 px-3 sm:px-5 py-2.5 sm:py-3 flex items-center justify-between shrink-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)] z-10">
         <div className="flex items-center space-x-2.5 sm:space-x-3">
           <button
@@ -1241,8 +1225,7 @@ export const AiTutorApp = memo(function AiTutorApp({
           </button>
 
           <div className="flex items-center space-x-2.5">
-            {/* LOGO ICON BOX (Navy square with teal A) */}
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#0f172a] to-[#1e293b] shadow-sm flex items-center justify-center text-cyan-400 font-bold text-lg tracking-wider shrink-0 select-none ring-1 ring-slate-900/5">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#0f172a] to-[#1e293b] shadow-sm flex items-center justify-center text-cyan-400 font-bold text-lg tracking-wider">
               A
             </div>
 
@@ -1252,8 +1235,6 @@ export const AiTutorApp = memo(function AiTutorApp({
                   ASCEND AI TUTOR
                 </h1>
                 <span className="text-slate-400 font-bold text-xs">v2.5</span>
-                
-                {/* ONLINE STATUS BADGE */}
                 <div className="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-[10px] px-2 py-0.5 rounded-full flex items-center space-x-1 shadow-2xs">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   <span>Online</span>
@@ -1266,9 +1247,7 @@ export const AiTutorApp = memo(function AiTutorApp({
           </div>
         </div>
 
-        {/* HEADER RIGHT PROFILE PILLS & CONTROLS */}
         <div className="flex items-center space-x-2">
-          {/* PROFILE CONTEXT PILLS (3 PASTEL CAPSULES MATCHING IMAGE) */}
           <div className="hidden md:flex items-center space-x-1.5">
             <div className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-1 rounded-full flex items-center space-x-1.5">
               <UserIcon className="w-3.5 h-3.5 text-slate-500" />
@@ -1286,18 +1265,16 @@ export const AiTutorApp = memo(function AiTutorApp({
             </div>
           </div>
 
-          {/* CUSTOM VOICE STUDIO BUTTON */}
           <button
             type="button"
             onClick={() => setShowCustomVoiceModal(true)}
-            className="p-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-200/80 rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-2xs"
+            className="p-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-200/80 rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-[0_0_0_1px_rgba(99,102,241,0.05)]"
             title="Configure Tutor Custom Voice"
           >
             <Volume2 className="w-4 h-4 text-indigo-600" />
             <span className="hidden sm:inline">Voice</span>
           </button>
 
-          {/* CLEAR CHAT BUTTON */}
           {messages.length > 0 && (
             <button
               onClick={handleClearChat}
@@ -1308,7 +1285,6 @@ export const AiTutorApp = memo(function AiTutorApp({
             </button>
           )}
 
-          {/* THREE-DOTS MENU BUTTON */}
           <button
             type="button"
             onClick={() => setShowMoreMenu(true)}
@@ -1320,7 +1296,6 @@ export const AiTutorApp = memo(function AiTutorApp({
         </div>
       </header>
 
-      {/* TOAST SUCCESS BANNER FOR PDF EXPORT */}
       {pdfExportSuccess && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -1338,9 +1313,7 @@ export const AiTutorApp = memo(function AiTutorApp({
         </motion.div>
       )}
 
-      {/* MINIMAL MODE + SUBJECT TOOLBAR — single neutral palette, one accent color for active state */}
       <div className="bg-white border-b border-slate-200/80 px-3 sm:px-5 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
-        {/* Subject Selector — neutral, not competing for attention */}
         <div className="relative shrink-0">
           <select
             value={selectedSubject}
@@ -1354,16 +1327,13 @@ export const AiTutorApp = memo(function AiTutorApp({
           <FlaskConical className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>
 
-        {/* Language Selector — tutor now actually replies in whichever language is picked here */}
         <div className="relative shrink-0">
           <select
             value={selectedLanguage}
             onChange={(e) => {
               const val = e.target.value;
               setSelectedLanguage(val);
-              try {
-                localStorage.setItem(`ai_tutor_language_${user.uid}`, val);
-              } catch (err) {}
+              setStoredValue(`ai_tutor_language_${user.uid}`, val);
             }}
             className="appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs pl-8 pr-4 py-1.5 rounded-lg cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-blue-500/30"
           >
@@ -1372,14 +1342,13 @@ export const AiTutorApp = memo(function AiTutorApp({
             <option value="English">English</option>
             <option value="Marathi">मराठी (Marathi)</option>
             <option value="Tamil">தமிழ் (Tamil)</option>
-            <option value="Bengali">বাংলা (Bengali)</option>
+            <option value="Bengali">বাংলा (Bengali)</option>
           </select>
           <Languages className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>
 
         <div className="w-px h-5 bg-slate-200 shrink-0" />
 
-        {/* Mode Segmented Control — one accent color (blue) marks the active mode only */}
         <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5 shrink-0">
           {[
             { id: 'homework' as const, label: 'Homework', icon: Zap },
@@ -1409,42 +1378,38 @@ export const AiTutorApp = memo(function AiTutorApp({
 
         <div className="w-px h-5 bg-slate-200 shrink-0" />
 
-        {/* JEE / Exam insights — quiet outline chip, not a rainbow color */}
         <button
           type="button"
           onClick={() => handleSendMessage(`Give me key high-yield exam insights, formula tricks, and JEE Main / Board questions for ${selectedSubject}.`)}
-          className="border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 font-semibold text-xs px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95"
+          className="border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 font-semibold text-xs px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer"
         >
           <Sparkles className="w-3.5 h-3.5" />
           <span>Exam Insights</span>
         </button>
 
-        {/* Export PDF — single action, no duplicate */}
         <button
           type="button"
           onClick={handleExportPdf}
           disabled={messages.length === 0 || isExportingPdf}
-          className="ml-auto border border-slate-200 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40 text-slate-600 font-semibold text-xs px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95"
+          className="ml-auto border border-slate-200 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40 text-slate-600 font-semibold text-xs px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer"
         >
           {isExportingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
           <span className="hidden sm:inline">Export PDF</span>
         </button>
       </div>
 
-      {/* CHAT MESSAGES BODY */}
       <div className="flex-1 overflow-y-auto overscroll-contain scroll-smooth p-3 sm:p-5 space-y-4 max-w-4xl mx-auto w-full">
         {messages.length === 0 ? (
-          /* EMPTY STATE HERO */
           <motion.div 
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, ease: "easeOut" }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
             className="h-full flex flex-col items-center justify-center text-center space-y-5 py-8 px-4"
           >
             <motion.div 
               initial={{ scale: 0.8, rotate: -6 }}
               animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: "spring", stiffness: 260, damping: 20 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 20 }}
               className="relative"
             >
               <div className="w-18 h-18 rounded-3xl bg-gradient-to-br from-[#0f172a] to-[#1e293b] flex items-center justify-center text-cyan-400 font-bold text-2xl shadow-lg shadow-slate-900/20 ring-1 ring-slate-900/5">
@@ -1469,7 +1434,6 @@ export const AiTutorApp = memo(function AiTutorApp({
               </p>
             </motion.div>
 
-            {/* QUICK STARTER PROMPTS */}
             <motion.div 
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1488,7 +1452,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                       whileHover={{ y: -2 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => handleSendMessage(qp.prompt)}
-                      className="p-3 bg-white hover:bg-slate-50/80 border border-slate-200 hover:border-blue-300 rounded-2xl transition-all duration-200 text-left group flex items-start space-x-2.5 shadow-sm hover:shadow-md cursor-pointer"
+                      className="p-3 bg-white hover:bg-slate-50/80 border border-slate-200 hover:border-blue-300 rounded-2xl transition-all duration-200 text-left group flex items-start space-x-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
                     >
                       <div className="p-2 rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-200 shrink-0">
                         <Icon className="w-4 h-4" />
@@ -1508,7 +1472,6 @@ export const AiTutorApp = memo(function AiTutorApp({
             </motion.div>
           </motion.div>
         ) : (
-          /* MESSAGES LIST WITH ENTRANCE AND EXIT ANIMATIONS */
           <AnimatePresence initial={false}>
             {messages.map((msg, idx) => {
               const isLatest = idx === messages.length - 1;
@@ -1554,7 +1517,6 @@ export const AiTutorApp = memo(function AiTutorApp({
                       </div>
                     </div>
 
-                    {/* USER PROFILE AVATAR */}
                     <div className="w-8 h-8 rounded-full ring-2 ring-white shadow-sm overflow-hidden bg-slate-200 flex items-center justify-center shrink-0 mt-4">
                       {user.avatar ? (
                         <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
@@ -1566,7 +1528,6 @@ export const AiTutorApp = memo(function AiTutorApp({
                 );
               }
 
-              // AI TUTOR MESSAGE
               return (
                 <motion.div
                   key={msg.id}
@@ -1658,7 +1619,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                         <div className="flex flex-wrap items-center gap-1.5 mt-1.5 pt-1.5 border-t border-slate-100 w-full">
                           <button
                             type="button"
-                            onClick={() => handleSendMessage("Can you explain this concept in simpler terms with a super easy everyday analogy?")}
+                            onClick={() => handleSendMessage('Can you explain this concept in simpler terms with a super easy everyday analogy?')}
                             className="border border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 text-slate-600 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
                           >
                             <Lightbulb className="w-3.5 h-3.5" />
@@ -1667,7 +1628,7 @@ export const AiTutorApp = memo(function AiTutorApp({
 
                           <button
                             type="button"
-                            onClick={() => handleSendMessage("Give me 1 practice question based on this topic so I can test my understanding.")}
+                            onClick={() => handleSendMessage('Give me 1 practice question based on this topic so I can test my understanding.')}
                             className="border border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 text-slate-600 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
                           >
                             <HelpCircle className="w-3.5 h-3.5" />
@@ -1676,7 +1637,7 @@ export const AiTutorApp = memo(function AiTutorApp({
 
                           <button
                             type="button"
-                            onClick={() => handleSendMessage("Please explain this in easy Hinglish with important key points for JEE Main / Board exams.")}
+                            onClick={() => handleSendMessage('Please explain this in easy Hinglish with important key points for JEE Main / Board exams.')}
                             className="border border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 text-slate-600 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
                           >
                             <Languages className="w-3.5 h-3.5" />
@@ -1685,7 +1646,7 @@ export const AiTutorApp = memo(function AiTutorApp({
 
                           <button
                             type="button"
-                            onClick={() => handleSendMessage("Summarize the key concepts, formulas, and takeaways in a clean structured table.")}
+                            onClick={() => handleSendMessage('Summarize the key concepts, formulas, and takeaways in a clean structured table.')}
                             className="border border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 text-slate-600 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
                           >
                             <Table className="w-3.5 h-3.5" />
@@ -1701,7 +1662,6 @@ export const AiTutorApp = memo(function AiTutorApp({
           </AnimatePresence>
         )}
 
-        {/* LOADING INDICATOR */}
         <AnimatePresence>
           {isLoading && (
             <motion.div 
@@ -1732,20 +1692,18 @@ export const AiTutorApp = memo(function AiTutorApp({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* BOTTOM INPUT DOCK */}
       <footer
         className="bg-white/95 backdrop-blur-sm border-t border-slate-200 p-2.5 sm:p-4 shrink-0 relative shadow-[0_-4px_16px_-8px_rgba(15,23,42,0.08)]"
         style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom))' }}
       >
         <div className="max-w-4xl mx-auto space-y-2">
-          {/* SAVED FORMULAS SLIDE-UP PANEL */}
           <AnimatePresence>
             {showSavedFormulasPanel && (
               <motion.div 
                 initial={{ opacity: 0, y: 12, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 12, scale: 0.95 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
                 className="absolute bottom-full mb-2 left-3 right-3 sm:left-auto sm:right-4 sm:w-96 bg-white border border-amber-300 rounded-2xl p-3 shadow-xl z-30 space-y-2.5"
               >
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -1775,117 +1733,113 @@ export const AiTutorApp = memo(function AiTutorApp({
                   </div>
                 </div>
 
-              {/* ADD FORMULA FORM */}
-              {showAddFormulaForm && (
-                <form onSubmit={handleAddFormula} className="bg-slate-50 border border-amber-200 p-2.5 rounded-xl space-y-2">
-                  <input
-                    type="text"
-                    placeholder="Formula Name (e.g. Newton's 2nd Law)"
-                    value={newFormulaName}
-                    onChange={(e) => setNewFormulaName(e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-amber-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="LaTeX Code (e.g. F = ma or \int x^2 dx)"
-                    value={newFormulaLatex}
-                    onChange={(e) => setNewFormulaLatex(e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs text-amber-700 font-mono placeholder:text-slate-400 focus:outline-none focus:border-amber-500"
-                  />
+                {showAddFormulaForm && (
+                  <form onSubmit={handleAddFormula} className="bg-slate-50 border border-amber-200 p-2.5 rounded-xl space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Formula Name (e.g. Newton's 2nd Law)"
+                      value={newFormulaName}
+                      onChange={(e) => setNewFormulaName(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-amber-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="LaTeX Code (e.g. F = ma or \\int x^2 dx)"
+                      value={newFormulaLatex}
+                      onChange={(e) => setNewFormulaLatex(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs text-amber-700 font-mono placeholder:text-slate-400 focus:outline-none focus:border-amber-500"
+                    />
 
-                  {/* PREVIEW */}
-                  {newFormulaLatex.trim() && (
-                    <div className="p-1.5 bg-white border border-slate-200 rounded-lg text-center overflow-x-auto text-xs text-slate-900">
-                      <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                        {`$${newFormulaLatex.trim()}$`}
-                      </ReactMarkdown>
+                    {newFormulaLatex.trim() && (
+                      <div className="p-1.5 bg-white border border-slate-200 rounded-lg text-center overflow-x-auto text-xs text-slate-900">
+                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                          {`$${newFormulaLatex.trim()}$`}
+                        </ReactMarkdown>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-end space-x-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowAddFormulaForm(false)}
+                        className="px-2 py-1 text-[10px] text-slate-500 hover:text-slate-700 rounded-md font-medium cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={!newFormulaLatex.trim()}
+                        className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-bold text-[10px] rounded-lg transition cursor-pointer"
+                      >
+                        Save Formula
+                      </button>
                     </div>
-                  )}
+                  </form>
+                )}
 
-                  <div className="flex items-center justify-end space-x-1.5 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setShowAddFormulaForm(false)}
-                      className="px-2 py-1 text-[10px] text-slate-500 hover:text-slate-700 rounded-md font-medium cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={!newFormulaLatex.trim()}
-                      className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-bold text-[10px] rounded-lg transition cursor-pointer"
-                    >
-                      Save Formula
-                    </button>
-                  </div>
-                </form>
-              )}
+                <div className="space-y-1.5 max-h-52 overflow-y-auto no-scrollbar pr-0.5">
+                  {savedFormulas.length === 0 ? (
+                    <div className="text-center py-6 text-slate-400 text-xs font-medium">
+                      No saved formulas yet. Click "+ Add Custom" or save math snippets!
+                    </div>
+                  ) : (
+                    savedFormulas.map((f) => (
+                      <div
+                        key={f.id}
+                        className="group bg-slate-50 hover:bg-slate-100 border border-slate-200 p-2 rounded-xl transition flex items-center justify-between space-x-2"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[10px] font-bold text-slate-500 truncate">{f.name}</div>
+                          <div className="text-xs text-slate-900 overflow-x-auto py-0.5 no-scrollbar font-mono">
+                            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                              {`$${f.latex}$`}
+                            </ReactMarkdown>
+                          </div>
+                        </div>
 
-              {/* FORMULAS LIST */}
-              <div className="space-y-1.5 max-h-52 overflow-y-auto no-scrollbar pr-0.5">
-                {savedFormulas.length === 0 ? (
-                  <div className="text-center py-6 text-slate-400 text-xs font-medium">
-                    No saved formulas yet. Click "+ Add Custom" or save math snippets!
-                  </div>
-                ) : (
-                  savedFormulas.map((f) => (
-                    <div
-                      key={f.id}
-                      className="group bg-slate-50 hover:bg-slate-100 border border-slate-200 p-2 rounded-xl transition flex items-center justify-between space-x-2"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[10px] font-bold text-slate-500 truncate">{f.name}</div>
-                        <div className="text-xs text-slate-900 overflow-x-auto py-0.5 no-scrollbar font-mono">
-                          <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                            {`$${f.latex}$`}
-                          </ReactMarkdown>
+                        <div className="flex items-center space-x-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleInsertFormula(f.latex)}
+                            className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-[10px] font-bold transition cursor-pointer"
+                            title="Insert into chat input"
+                          >
+                            Insert
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleCopyFormula(f.id, f.latex)}
+                            className="p-1 bg-white hover:bg-slate-200 text-slate-600 rounded-lg transition border border-slate-200 cursor-pointer"
+                            title="Copy LaTeX"
+                          >
+                            {copiedFormulaId === f.id ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteFormula(f.id)}
+                            className="p-1 bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition border border-slate-200 cursor-pointer"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
                         </div>
                       </div>
+                    ))
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-                      <div className="flex items-center space-x-1 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => handleInsertFormula(f.latex)}
-                          className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-[10px] font-bold transition cursor-pointer"
-                          title="Insert into chat input"
-                        >
-                          Insert
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleCopyFormula(f.id, f.latex)}
-                          className="p-1 bg-white hover:bg-slate-200 text-slate-600 rounded-lg transition border border-slate-200 cursor-pointer"
-                          title="Copy LaTeX"
-                        >
-                          {copiedFormulaId === f.id ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteFormula(f.id)}
-                          className="p-1 bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition border border-slate-200 cursor-pointer"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-          {/* MATH & LATEX SYMBOLS POPUP PALETTE */}
           <AnimatePresence>
             {showMathPalette && (
               <motion.div 
                 initial={{ opacity: 0, y: 12, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 12, scale: 0.95 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
                 className="absolute bottom-full mb-2 left-3 right-3 sm:left-auto sm:right-4 sm:w-96 bg-white border border-slate-200 rounded-2xl p-3 shadow-xl z-30 space-y-2.5"
               >
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -1902,7 +1856,6 @@ export const AiTutorApp = memo(function AiTutorApp({
                   </button>
                 </div>
 
-                {/* CATEGORY TABS */}
                 <div className="flex items-center space-x-1 overflow-x-auto no-scrollbar text-[10px]">
                   {(['All', 'Greek', 'Algebra', 'Operators', 'Calculus'] as const).map((cat) => (
                     <button
@@ -1920,7 +1873,6 @@ export const AiTutorApp = memo(function AiTutorApp({
                   ))}
                 </div>
 
-                {/* SYMBOLS GRID */}
                 <div className="grid grid-cols-6 gap-1.5 max-h-40 overflow-y-auto no-scrollbar p-0.5">
                   {MATH_SYMBOLS.filter(
                     (s) => activeMathCategory === 'All' || s.category === activeMathCategory
@@ -1929,7 +1881,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                       key={idx}
                       type="button"
                       onClick={() => insertSymbol(sym.value)}
-                      className="p-2 bg-slate-50 hover:bg-blue-600 hover:text-white text-slate-800 border border-slate-200 rounded-xl text-xs font-semibold transition flex items-center justify-center shadow-2xs active:scale-95 cursor-pointer"
+                      className="p-2 bg-slate-50 hover:bg-blue-600 hover:text-white text-slate-800 border border-slate-200 rounded-xl text-xs font-semibold transition flex items-center justify-center cursor-pointer"
                       title={sym.value}
                     >
                       {sym.label}
@@ -1940,7 +1892,6 @@ export const AiTutorApp = memo(function AiTutorApp({
             )}
           </AnimatePresence>
 
-          {/* ATTACHED IMAGES PREVIEW CAROUSEL / STRIP */}
           <AnimatePresence>
             {selectedImages.length > 0 && (
               <motion.div 
@@ -1974,7 +1925,6 @@ export const AiTutorApp = memo(function AiTutorApp({
                   </div>
                 </div>
 
-                {/* THUMBNAIL STRIP */}
                 <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1">
                   {selectedImages.map((img, idx) => (
                     <motion.div 
@@ -2006,7 +1956,6 @@ export const AiTutorApp = memo(function AiTutorApp({
             )}
           </AnimatePresence>
 
-          {/* QUICK DYNAMIC ACADEMIC SUGGESTIONS */}
           {suggestions.length > 0 && (
             <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar pb-0.5 text-[11px]">
               <button
@@ -2024,7 +1973,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                   key={sugg.id || idx}
                   type="button"
                   onClick={() => handleSendMessage(sugg.prompt)}
-                  className="px-2.5 py-1 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-300 rounded-full font-medium whitespace-nowrap transition flex items-center space-x-1 shrink-0 cursor-pointer text-[10px] sm:text-[11px] shadow-2xs"
+                  className="px-2.5 py-1 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-300 rounded-full font-medium whitespace-nowrap transition cursor-pointer"
                   title={sugg.prompt}
                 >
                   <span>{sugg.label}</span>
@@ -2033,8 +1982,7 @@ export const AiTutorApp = memo(function AiTutorApp({
             </div>
           )}
 
-          {/* MAIN CHAT INPUT BAR */}
-          <div className="relative flex items-center bg-white border border-slate-200 focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/10 rounded-2xl p-1.5 transition-all duration-200 shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
+          <div className="relative flex items-center bg-white border border-slate-200 focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/10 rounded-2xl p-1.5 transition-all duration-200">
             <button
               type="button"
               onClick={handleVoiceInputToggle}
@@ -2043,12 +1991,11 @@ export const AiTutorApp = memo(function AiTutorApp({
                   ? 'bg-rose-600 text-white animate-bounce' 
                   : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/60'
               }`}
-              title={isListening ? "Listening... Click to stop" : "Voice Input"}
+              title={isListening ? 'Listening... Click to stop' : 'Voice Input'}
             >
               <Mic className="w-4 h-4" />
             </button>
 
-            {/* CAMERA INTEGRATION BUTTON */}
             <button
               type="button"
               onClick={() => setShowCameraModal(true)}
@@ -2069,7 +2016,6 @@ export const AiTutorApp = memo(function AiTutorApp({
               </div>
             </button>
 
-            {/* DESKTOP MATH SYMBOLS BUTTON */}
             <button
               type="button"
               onClick={() => {
@@ -2086,7 +2032,6 @@ export const AiTutorApp = memo(function AiTutorApp({
               <span>f(x)</span>
             </button>
 
-            {/* DESKTOP FORMULAS BUTTON */}
             <button
               type="button"
               onClick={() => {
@@ -2117,7 +2062,7 @@ export const AiTutorApp = memo(function AiTutorApp({
               }}
               placeholder={
                 isListening 
-                  ? "Listening to your voice..." 
+                  ? 'Listening to your voice...' 
                   : selectedImages.length > 0 
                   ? `${selectedImages.length} page(s) attached! Press Send...` 
                   : `Ask AI Tutor about ${selectedSubject}...`
@@ -2130,9 +2075,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                 type="button"
                 onClick={() => {
                   setInputQuery('');
-                  try {
-                    localStorage.removeItem(`ai_tutor_input_draft_${user.uid}`);
-                  } catch (e) {}
+                  setStoredValue(`ai_tutor_input_draft_${user.uid}`, null);
                   textareaRef.current?.focus();
                 }}
                 className="p-2 sm:p-2.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-xl transition flex items-center justify-center shrink-0 mr-1 cursor-pointer"
@@ -2146,7 +2089,7 @@ export const AiTutorApp = memo(function AiTutorApp({
               type="button"
               onClick={() => handleSendMessage()}
               disabled={(!inputQuery.trim() && selectedImages.length === 0) || isLoading}
-              className="p-2.5 sm:p-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600 text-white font-bold rounded-xl shadow-xs transition-all duration-150 flex items-center justify-center shrink-0 cursor-pointer active:scale-90"
+              className="p-2.5 sm:p-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600 text-white font-bold rounded-xl shadow-xs transition-all duration-150 flex items-center justify-center cursor-pointer"
               title="Send Message"
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -2167,646 +2110,618 @@ export const AiTutorApp = memo(function AiTutorApp({
           </div>
         </div>
 
-      {/* HIDDEN FILE INPUT FOR CAMERA/IMAGE FALLBACK - SUPPORTS MULTIPLE */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        accept="image/*"
-        multiple
-        capture="environment"
-        onChange={handleFileUpload}
-        className="hidden"
-      />
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept="image/*"
+          multiple
+          capture="environment"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
 
-      {/* THREE-DOTS (MORE OPTIONS & TOOLS) MODAL / BOTTOM SHEET */}
-      <AnimatePresence>
-        {showMoreMenu && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-            onClick={() => setShowMoreMenu(false)}
-          >
+        <AnimatePresence>
+          {showMoreMenu && (
             <motion.div 
-              initial={{ y: "100%", opacity: 0.5 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: "100%", opacity: 0 }}
-              transition={{ type: "spring", damping: 28, stiffness: 300 }}
-              className="w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto no-scrollbar"
-              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+              onClick={() => setShowMoreMenu(false)}
             >
-              {/* SHEET HEADER */}
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 rounded-xl bg-indigo-600/20 text-indigo-400">
-                    <SlidersHorizontal className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs sm:text-sm font-black text-white tracking-wide uppercase">AI Tutor Tools & Settings</h3>
-                    <p className="text-[10px] text-slate-400">Switch mode, subject, or open math tools</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowMoreMenu(false)}
-                  className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* SUBJECT SELECTION */}
-              <div className="space-y-2">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-                  Select Subject
-                </span>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {SUBJECT_LIST.map((sub) => {
-                    const theme = getSubjectTheme(sub);
-                    const isSelected = selectedSubject === sub;
-                    return (
-                      <button
-                        key={sub}
-                        type="button"
-                        onClick={() => {
-                          setSelectedSubject(sub);
-                        }}
-                        className={`p-2 rounded-xl text-xs font-bold transition flex items-center justify-center border text-center ${
-                          isSelected
-                            ? `${theme.badgeBg} ${theme.badgeText} ${theme.badgeBorder} shadow-sm ring-1 ring-indigo-400/30`
-                            : 'bg-slate-800/80 text-slate-300 border-slate-700/60 hover:bg-slate-800'
-                        }`}
-                      >
-                        {sub}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* TUTOR MODE SELECTION */}
-              <div className="space-y-2">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-                  Tutor Mode
-                </span>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { id: 'homework', label: '⚡ Homework Solver', desc: 'Step-by-step complete solutions' },
-                    { id: 'step', label: '📐 Step Math', desc: 'Detailed mathematical breakdown' },
-                    { id: 'explain', label: '💡 Explainer', desc: 'Concepts with easy analogies' },
-                    { id: 'quiz', label: '📝 Practice Quiz', desc: 'Custom 3-question testing quiz' },
-                    { id: 'editor', label: '⚡ Editor (Cinematic HUD)', desc: 'Voice/text app controller & notes creator' }
-                  ].map((m) => {
-                    const isSelected = tutorMode === m.id;
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => {
-                          if (m.id === 'editor') {
-                            setShowMoreMenu(false);
-                            if (onOpenEditor) onOpenEditor();
-                          } else {
-                            setTutorMode(m.id as any);
-                          }
-                        }}
-                        className={`p-2.5 rounded-2xl text-left border transition ${
-                          m.id === 'editor'
-                            ? 'col-span-2 bg-gradient-to-r from-cyan-950 to-indigo-950 border-cyan-500/60 text-cyan-200 shadow-[0_0_15px_rgba(6,182,212,0.25)] hover:border-cyan-400'
-                            : isSelected
-                            ? 'bg-indigo-600/20 border-indigo-500 text-indigo-200'
-                            : 'bg-slate-800/60 border-slate-700/60 text-slate-300 hover:bg-slate-800'
-                        }`}
-                      >
-                        <div className="text-xs font-bold flex items-center justify-between">
-                          <span>{m.label}</span>
-                          {m.id === 'editor' && (
-                            <span className="text-[8px] bg-cyan-400 text-slate-950 font-black px-1.5 py-0.5 rounded-full uppercase">
-                              NEW
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[9px] text-slate-400 mt-0.5">{m.desc}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* MATH & SCIENCE TOOLS */}
-              <div className="space-y-2">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-                  Math & Formula Tools
-                </span>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowMoreMenu(false);
-                      setShowMathPalette(true);
-                      setShowSavedFormulasPanel(false);
-                    }}
-                    className="p-3 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-2xl transition text-left flex items-center space-x-2.5"
-                  >
+              <motion.div 
+                initial={{ y: '100%', opacity: 0.5 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: '100%', opacity: 0 }}
+                transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                className="w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto no-scrollbar"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <div className="flex items-center space-x-2">
                     <div className="p-2 rounded-xl bg-indigo-600/20 text-indigo-400">
-                      <Variable className="w-4 h-4" />
+                      <SlidersHorizontal className="w-4 h-4" />
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-slate-200 block">LaTeX Palette</span>
-                      <span className="text-[9px] text-slate-400">Insert math symbols</span>
+                      <h3 className="text-xs sm:text-sm font-black text-white tracking-wide uppercase">AI Tutor Tools & Settings</h3>
+                      <p className="text-[10px] text-slate-400">Switch mode, subject, or open math tools</p>
                     </div>
-                  </button>
-
+                  </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowMoreMenu(false);
-                      setShowSavedFormulasPanel(true);
-                      setShowMathPalette(false);
-                    }}
-                    className="p-3 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-2xl transition text-left flex items-center space-x-2.5"
+                    onClick={() => setShowMoreMenu(false)}
+                    className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
                   >
-                    <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
-                      <Bookmark className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-slate-200 block">Saved Formulas</span>
-                      <span className="text-[9px] text-slate-400">Quick formula book</span>
-                    </div>
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
-              </div>
 
-              {/* CHAT ACTIONS */}
-              <div className="space-y-2 pt-1 border-t border-slate-800">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-                  Actions
-                </span>
-                <div className="flex items-center space-x-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowMoreMenu(false);
-                      handleExportPdf();
-                    }}
-                    disabled={messages.length === 0 || isExportingPdf}
-                    className="flex-1 p-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2"
-                  >
-                    {isExportingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-                    <span>Export Study PDF</span>
-                  </button>
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                    Select Subject
+                  </span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {SUBJECT_LIST.map((sub) => {
+                      const theme = getSubjectTheme(sub);
+                      const isSelected = selectedSubject === sub;
+                      return (
+                        <button
+                          key={sub}
+                          type="button"
+                          onClick={() => {
+                            setSelectedSubject(sub);
+                          }}
+                          className={`p-2 rounded-xl text-xs font-bold transition flex items-center justify-center border text-center ${
+                            isSelected
+                              ? `${theme.badgeBg} ${theme.badgeText} ${theme.badgeBorder} shadow-sm ring-1 ring-indigo-400/30`
+                              : 'bg-slate-800/80 text-slate-300 border-slate-700/60 hover:bg-slate-800'
+                          }`}
+                        >
+                          {sub}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-                  {messages.length > 0 && (
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                    Tutor Mode
+                  </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'homework', label: '⚡ Homework Solver', desc: 'Step-by-step complete solutions' },
+                      { id: 'step', label: '📐 Step Math', desc: 'Detailed mathematical breakdown' },
+                      { id: 'explain', label: '💡 Explainer', desc: 'Concepts with easy analogies' },
+                      { id: 'quiz', label: '📝 Practice Quiz', desc: 'Custom 3-question testing quiz' },
+                      { id: 'editor', label: '⚡ Editor (Cinematic HUD)', desc: 'Voice/text app controller & notes creator' }
+                    ].map((m) => {
+                      const isSelected = tutorMode === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => {
+                            if (m.id === 'editor') {
+                              setShowMoreMenu(false);
+                              if (onOpenEditor) onOpenEditor();
+                            } else {
+                              setTutorMode(m.id as any);
+                            }
+                          }}
+                          className={`p-2.5 rounded-2xl text-left border transition ${
+                            m.id === 'editor'
+                              ? 'col-span-2 bg-gradient-to-r from-cyan-950 to-indigo-950 border-cyan-500/60 text-cyan-200 shadow-[0_0_15px_rgba(6,182,212,0.25)] hover:border-cyan-400'
+                              : isSelected
+                              ? 'bg-indigo-600/20 border-indigo-500 text-indigo-200'
+                              : 'bg-slate-800/60 border-slate-700/60 text-slate-300 hover:bg-slate-800'
+                          }`}
+                        >
+                          <div className="text-xs font-bold flex items-center justify-between">
+                            <span>{m.label}</span>
+                            {m.id === 'editor' && (
+                              <span className="text-[8px] bg-cyan-400 text-slate-950 font-black px-1.5 py-0.5 rounded-full uppercase">
+                                NEW
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[9px] text-slate-400 mt-0.5">{m.desc}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                    Math & Formula Tools
+                  </span>
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => {
                         setShowMoreMenu(false);
-                        handleClearChat();
+                        setShowMathPalette(true);
+                        setShowSavedFormulasPanel(false);
                       }}
-                      className="p-2.5 bg-slate-800 hover:bg-rose-950/80 text-rose-400 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5"
+                      className="p-3 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-2xl transition text-left flex items-center space-x-2.5"
                     >
-                      <Trash2 className="w-4 h-4" />
-                      <span>Clear</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* STUDENT CONTEXT CARD */}
-              <div className="bg-slate-950/80 border border-slate-800/80 p-3 rounded-2xl text-[11px] text-slate-300 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-white">👤 {user.name}</span>
-                  {user.className && <span className="text-indigo-400 font-mono text-[10px]">{user.className}</span>}
-                </div>
-                {user.schoolName && <div className="text-slate-400 text-[10px] truncate">🏫 {user.schoolName}</div>}
-                {user.targetGoal && <div className="text-amber-300 text-[10px]">🎯 Goal: {user.targetGoal}</div>}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* CAMERA CAPTURE MODAL OVERLAY - WITH MULTI-PAGE SEQUENCE SUPPORT */}
-      <AnimatePresence>
-        {showCameraModal && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4"
-          >
-            <motion.div 
-              initial={{ scale: 0.92, opacity: 0, y: 16 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.92, opacity: 0, y: 16 }}
-              transition={{ type: "spring", damping: 25, stiffness: 350 }}
-              className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col space-y-3 p-4"
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 bg-indigo-600/20 text-indigo-400 rounded-xl">
-                    <Camera className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-black text-white tracking-wide uppercase">
-                      Capture Homework Pages {selectedImages.length > 0 && `(${selectedImages.length} captured)`}
-                    </h3>
-                    <p className="text-[10px] text-slate-400">Position page in the frame. Snap multiple pages in sequence!</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowCameraModal(false)}
-                  className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* IMAGE ENHANCEMENT FILTERS MENU */}
-              <div className="space-y-1.5 bg-slate-950/70 p-2.5 rounded-2xl border border-slate-800/80">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-1.5 text-[11px] font-bold text-slate-300">
-                    <Sliders className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Readability Filters</span>
-                  </div>
-                  <span className="text-[9px] font-semibold text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
-                    {HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.label || 'Normal'}
-                  </span>
-                </div>
-
-                {/* FILTER PRESETS HORIZONTAL SCROLLER */}
-                <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-0.5">
-                  {HOMEWORK_IMAGE_FILTERS.map((f) => {
-                    const isSelected = cameraFilter === f.id;
-                    return (
-                      <button
-                        key={f.id}
-                        type="button"
-                        onClick={() => setCameraFilter(f.id)}
-                        className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center space-x-1.5 shrink-0 border cursor-pointer ${
-                          isSelected
-                            ? 'bg-indigo-600 text-white border-indigo-400 shadow-sm shadow-indigo-600/30'
-                            : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800 hover:border-slate-700'
-                        }`}
-                      >
-                        <span className="text-xs">{f.emoji}</span>
-                        <span className="whitespace-nowrap">{f.shortLabel}</span>
-                        {f.badge && (
-                          <span className={`text-[8px] uppercase tracking-wider px-1 py-0.2 rounded font-black ${
-                            isSelected ? 'bg-white/20 text-white' : 'bg-indigo-500/20 text-indigo-300'
-                          }`}>
-                            {f.badge}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* CURRENT FILTER DESCRIPTION HINT */}
-                <div className="text-[10px] text-slate-400 flex items-center space-x-1 pt-0.5">
-                  <span className="text-indigo-400 font-semibold shrink-0">Preview:</span>
-                  <span className="truncate">
-                    {HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.description}
-                  </span>
-                </div>
-              </div>
-
-              {/* LIVE CAMERA VIEWPORT */}
-              <motion.div
-                animate={shutterAnimation ? { scale: [1, 0.98, 1] } : { scale: 1 }}
-                transition={{ duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
-                className={`relative bg-slate-950 rounded-2xl overflow-hidden aspect-4/3 flex items-center justify-center border border-slate-800 shadow-inner ${shutterAnimation ? 'ring-2 ring-cyan-400/90 shadow-[0_0_30px_rgba(6,182,212,0.25)]' : ''}`}
-              >
-                {/* MECHANICAL SHUTTER CURTAINS & IRIS BLADES CLICK ANIMATION */}
-                <AnimatePresence>
-                  {shutterAnimation && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center overflow-hidden"
-                    >
-                      {/* TOP MECHANICAL SHUTTER CURTAIN */}
-                      <motion.div
-                        initial={{ y: '-100%' }}
-                        animate={{ y: ['-100%', '0%', '0%', '-100%'] }}
-                        transition={{ duration: 0.32, times: [0, 0.35, 0.6, 1], ease: 'easeInOut' }}
-                        className="absolute top-0 left-0 right-0 h-1/2 bg-slate-950/95 border-b-2 border-cyan-400/60 shadow-2xl backdrop-blur-xs flex items-end justify-center pb-2"
-                      >
-                        <div className="w-16 h-1 bg-cyan-400/40 rounded-full" />
-                      </motion.div>
-
-                      {/* BOTTOM MECHANICAL SHUTTER CURTAIN */}
-                      <motion.div
-                        initial={{ y: '100%' }}
-                        animate={{ y: ['100%', '0%', '0%', '100%'] }}
-                        transition={{ duration: 0.32, times: [0, 0.35, 0.6, 1], ease: 'easeInOut' }}
-                        className="absolute bottom-0 left-0 right-0 h-1/2 bg-slate-950/95 border-t-2 border-cyan-400/60 shadow-2xl backdrop-blur-xs flex items-start justify-center pt-2"
-                      >
-                        <div className="w-16 h-1 bg-cyan-400/40 rounded-full" />
-                      </motion.div>
-
-                      {/* ROTATING 6-BLADE MECHANICAL IRIS APERTURE */}
-                      <motion.div
-                        initial={{ scale: 2.2, rotate: 0, opacity: 0.8 }}
-                        animate={{
-                          scale: [2.2, 0.08, 0.08, 2.2],
-                          rotate: [0, 60, 60, 120],
-                          opacity: [0.8, 1, 1, 0]
-                        }}
-                        transition={{ duration: 0.36, times: [0, 0.35, 0.6, 1], ease: [0.22, 1, 0.36, 1] }}
-                        className="relative w-56 h-56 rounded-full border-4 border-slate-800 bg-slate-950 shadow-[0_0_60px_rgba(0,0,0,0.95)] flex items-center justify-center"
-                      >
-                        <div className="absolute inset-2 rounded-full border border-indigo-400/50" />
-                        <div className="absolute inset-6 rounded-full border border-cyan-400/40 border-dashed" />
-                        <div className="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_15px_#38bdf8]" />
-                      </motion.div>
-
-                      {/* RETICLE FOCUS LOCK CONFIRMATION BADGE */}
-                      <motion.div
-                        initial={{ scale: 0.6, opacity: 0 }}
-                        animate={{
-                          scale: [0.6, 1.15, 1],
-                          opacity: [0, 1, 0]
-                        }}
-                        transition={{ duration: 0.38, times: [0, 0.45, 1] }}
-                        className="absolute flex flex-col items-center justify-center space-y-1.5 z-40"
-                      >
-                        <div className="w-16 h-16 rounded-full border-2 border-cyan-400 flex items-center justify-center shadow-[0_0_25px_rgba(6,182,212,0.8)]">
-                          <div className="w-4 h-4 rounded-full bg-cyan-400 animate-ping opacity-75" />
-                        </div>
-                        <span className="text-[10px] font-black tracking-widest uppercase text-cyan-200 bg-slate-950/90 px-2.5 py-0.5 rounded-full border border-cyan-400/50 shadow-xl backdrop-blur-md">
-                          CAPTURED
-                        </span>
-                      </motion.div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* QUICK FULL-SCREEN WHITE FLASH SIMULATING REAL CAMERA SHUTTER */}
-                <AnimatePresence>
-                  {flashAnimation && (
-                    <motion.div
-                      initial={{ opacity: 1 }}
-                      animate={{ opacity: [1, 1, 0] }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.26, times: [0, 0.15, 1], ease: 'easeOut' }}
-                      className="absolute inset-0 z-50 pointer-events-none bg-white flex items-center justify-center overflow-hidden"
-                    >
-                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#ffffff_0%,_#f8fafc_60%,_#e0f2fe_100%)]" />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {cameraError ? (
-                  <div className="text-center p-6 space-y-3">
-                    <div className="p-3 bg-rose-500/10 text-rose-400 rounded-full w-fit mx-auto border border-rose-500/20">
-                      <Camera className="w-8 h-8" />
-                    </div>
-                    <p className="text-xs text-rose-300 font-medium max-w-xs mx-auto">{cameraError}</p>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 mx-auto shadow-md cursor-pointer"
-                    >
-                      <Upload className="w-4 h-4" />
-                      <span>Choose Images from Device</span>
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      style={{
-                        filter: HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.cssFilter || 'none'
-                      }}
-                      className="w-full h-full object-cover transition-[filter] duration-200"
-                    />
-
-                    {/* TOP QUICK FILTER BADGE & CYCLER */}
-                    <div className="absolute top-3 right-3 z-10">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const filterIds: ImageFilterType[] = ['none', 'document', 'grayscale', 'contrast', 'brighten'];
-                          const currentIdx = filterIds.indexOf(cameraFilter);
-                          const nextIdx = (currentIdx + 1) % filterIds.length;
-                          setCameraFilter(filterIds[nextIdx]);
-                        }}
-                        className="bg-slate-950/80 hover:bg-slate-900 text-slate-200 text-[10px] font-bold px-2.5 py-1 rounded-full border border-indigo-500/30 backdrop-blur-md flex items-center space-x-1 shadow-md transition cursor-pointer"
-                        title="Tap to cycle readability filters"
-                      >
-                        <span>{HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.emoji}</span>
-                        <span>{HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.shortLabel}</span>
-                        <RefreshCw className="w-2.5 h-2.5 text-indigo-400 ml-0.5" />
-                      </button>
-                    </div>
-
-                    {/* VIEWPORT SCANNING GUIDELINE */}
-                    <div className="absolute inset-5 border-2 border-dashed border-indigo-400/60 rounded-2xl pointer-events-none flex flex-col items-center justify-between p-3">
-                      <span className="bg-slate-950/80 text-indigo-300 text-[10px] font-bold px-2.5 py-1 rounded-full border border-indigo-500/30 backdrop-blur-xs">
-                        Page {selectedImages.length + 1}
-                      </span>
-                      <span className="text-[10px] text-slate-300 bg-slate-950/80 px-2.5 py-1 rounded-full border border-slate-700/60 backdrop-blur-xs">
-                        {cameraFilter !== 'none' ? `Filter: ${HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.label}` : 'Align text & equations in frame'}
-                      </span>
-                    </div>
-
-                    {/* AI LOW-CONTRAST / LIGHTING WARNING TOAST */}
-                    <AnimatePresence>
-                      {showContrastToast && lowContrastDetected && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 16, scale: 0.94 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 12, scale: 0.94 }}
-                          transition={{ duration: 0.25, ease: 'easeOut' }}
-                          className="absolute bottom-3 left-3 right-3 z-20 flex items-center justify-between bg-slate-950/92 text-amber-200 border border-amber-500/50 rounded-xl px-3 py-2 shadow-2xl backdrop-blur-md"
-                        >
-                          <div className="flex items-center space-x-2 min-w-0">
-                            <div className="p-1.5 bg-amber-500/20 text-amber-400 rounded-lg shrink-0 animate-pulse">
-                              <Lightbulb className="w-3.5 h-3.5" />
-                            </div>
-                            <div className="flex flex-col min-w-0">
-                              <div className="flex items-center space-x-1.5">
-                                <span className="text-[11px] font-bold text-amber-200 truncate">
-                                  Low Edge Contrast
-                                </span>
-                                <span className="text-[9px] bg-amber-500/20 text-amber-300 font-semibold px-1.5 py-0.2 rounded-full border border-amber-500/30">
-                                  AI Lighting Check
-                                </span>
-                              </div>
-                              <span className="text-[10px] text-slate-300 truncate">
-                                Improve lighting or hold closer for clear document scan
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center space-x-1 shrink-0 ml-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setCameraFilter('contrast');
-                                setShowContrastToast(false);
-                              }}
-                              className="text-[10px] font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 px-2.5 py-1 rounded-lg transition shadow-xs cursor-pointer flex items-center space-x-1"
-                              title="Enhance document contrast"
-                            >
-                              <Sparkles className="w-2.5 h-2.5" />
-                              <span>Boost</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setShowContrastToast(false)}
-                              className="p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition cursor-pointer"
-                              aria-label="Dismiss lighting warning"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </>
-                )}
-              </motion.div>
-
-              {/* SEQUENCE THUMBNAILS & PER-PAGE FILTER SELECTOR IN MODAL */}
-              {selectedImages.length > 0 && (
-                <div className="space-y-1.5 bg-slate-950/60 p-2 rounded-xl border border-slate-800">
-                  <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
-                    <span className="font-bold">Captured Pages ({selectedImages.length}):</span>
-                    <span className="text-[9px] text-indigo-300">Tap page to apply filter</span>
-                  </div>
-                  <div className="flex items-center space-x-2 overflow-x-auto py-0.5">
-                    {selectedImages.map((img, idx) => (
-                      <div key={idx} className="relative shrink-0 group">
-                        <button
-                          type="button"
-                          onClick={() => setFilterPreviewImageIndex(filterPreviewImageIndex === idx ? null : idx)}
-                          className="focus:outline-none cursor-pointer"
-                        >
-                          <img 
-                            src={img} 
-                            alt={`Page ${idx + 1}`} 
-                            className={`w-12 h-12 rounded-lg object-cover border transition ${
-                              filterPreviewImageIndex === idx 
-                                ? 'border-indigo-400 ring-2 ring-indigo-500/50 scale-105' 
-                                : 'border-indigo-500/40 hover:border-indigo-400'
-                            }`} 
-                          />
-                        </button>
-                        <span className="absolute bottom-0.5 left-0.5 bg-slate-950/90 text-white text-[8px] font-bold px-1 rounded pointer-events-none">
-                          P{idx + 1}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (filterPreviewImageIndex === idx) setFilterPreviewImageIndex(null);
-                            handleRemoveImage(idx);
-                          }}
-                          className="absolute -top-1 -right-1 bg-rose-600 hover:bg-rose-500 text-white rounded-full p-0.5 shadow transition cursor-pointer"
-                          title="Remove image"
-                        >
-                          <X className="w-2.5 h-2.5" />
-                        </button>
+                      <div className="p-2 rounded-xl bg-indigo-600/20 text-indigo-400">
+                        <Variable className="w-4 h-4" />
                       </div>
-                    ))}
-                  </div>
-
-                  {/* QUICK FILTER CHANGER FOR SELECTED THUMBNAIL */}
-                  {filterPreviewImageIndex !== null && selectedImages[filterPreviewImageIndex] && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className="pt-1.5 border-t border-slate-800 flex items-center space-x-1.5 overflow-x-auto no-scrollbar"
-                    >
-                      <span className="text-[9px] text-slate-400 font-bold shrink-0">Enhance P{filterPreviewImageIndex + 1}:</span>
-                      {HOMEWORK_IMAGE_FILTERS.map((f) => (
-                        <button
-                          key={f.id}
-                          type="button"
-                          onClick={() => handleApplyFilterToCaptured(filterPreviewImageIndex!, f.id)}
-                          className="px-2 py-0.5 bg-slate-900 hover:bg-indigo-900/60 text-slate-300 hover:text-indigo-200 border border-slate-800 hover:border-indigo-500/50 rounded-lg text-[9px] font-semibold whitespace-nowrap transition cursor-pointer"
-                        >
-                          {f.emoji} {f.shortLabel}
-                        </button>
-                      ))}
-                    </motion.div>
-                  )}
-                </div>
-              )}
-
-              {/* CAMERA ACTION CONTROLS */}
-              <div className="flex items-center justify-between pt-1 gap-2">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition flex items-center space-x-1.5 border border-slate-700/60 shrink-0 cursor-pointer"
-                >
-                  <Upload className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Upload</span>
-                </button>
-
-                {!cameraError && (
-                  <div className="flex items-center space-x-2 flex-1 justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setCameraFacing(prev => prev === 'environment' ? 'user' : 'environment')}
-                      className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition border border-slate-700/60 cursor-pointer"
-                      title="Flip Camera"
-                    >
-                      <RefreshCw className="w-4 h-4" />
+                      <div>
+                        <span className="text-xs font-bold text-slate-200 block">LaTeX Palette</span>
+                        <span className="text-[9px] text-slate-400">Insert math symbols</span>
+                      </div>
                     </button>
 
-                    {/* SNAP & ADD NEXT PAGE (KEEP CAMERA OPEN) */}
-                    <button
-                      type="button"
-                      onClick={() => handleCapturePhoto(true)}
-                      className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-indigo-300 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border border-indigo-500/40 active:scale-95 cursor-pointer"
-                      title="Capture this page with active filter and snap next page"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Snap & Add Next</span>
-                    </button>
-
-                    {/* SNAP & FINISH */}
                     <button
                       type="button"
                       onClick={() => {
-                        if (selectedImages.length > 0) {
-                          setShowCameraModal(false);
-                        } else {
-                          handleCapturePhoto(false);
-                        }
+                        setShowMoreMenu(false);
+                        setShowSavedFormulasPanel(true);
+                        setShowMathPalette(false);
                       }}
-                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black transition flex items-center space-x-1.5 shadow-lg shadow-indigo-600/30 active:scale-95 cursor-pointer"
+                      className="p-3 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-2xl transition text-left flex items-center space-x-2.5"
                     >
-                      <Check className="w-4 h-4" />
-                      <span>{selectedImages.length > 0 ? `Done (${selectedImages.length})` : 'Capture'}</span>
+                      <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+                        <Bookmark className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-slate-200 block">Saved Formulas</span>
+                        <span className="text-[9px] text-slate-400">Quick formula book</span>
+                      </div>
                     </button>
                   </div>
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </footer>
+                </div>
 
-    {/* PERSISTENT CUSTOM VOICE STUDIO MODAL */}
-    <CustomVoiceModal
-      isOpen={showCustomVoiceModal}
-      onClose={() => setShowCustomVoiceModal(false)}
-      appLanguage="en"
-    />
-  </div>
-);
+                <div className="space-y-2 pt-1 border-t border-slate-800">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                    Actions
+                  </span>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowMoreMenu(false);
+                        handleExportPdf();
+                      }}
+                      disabled={messages.length === 0 || isExportingPdf}
+                      className="flex-1 p-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2"
+                    >
+                      {isExportingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                      <span>Export Study PDF</span>
+                    </button>
+
+                    {messages.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMoreMenu(false);
+                          handleClearChat();
+                        }}
+                        className="p-2.5 bg-slate-800 hover:bg-rose-950/80 text-rose-400 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Clear</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/80 border border-slate-800/80 p-3 rounded-2xl text-[11px] text-slate-300 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white">👤 {user.name}</span>
+                    {user.className && <span className="text-indigo-400 font-mono text-[10px]">{user.className}</span>}
+                  </div>
+                  {user.schoolName && <div className="text-slate-400 text-[10px] truncate">🏫 {user.schoolName}</div>}
+                  {user.targetGoal && <div className="text-amber-300 text-[10px]">🎯 Goal: {user.targetGoal}</div>}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showCameraModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4"
+            >
+              <motion.div 
+                initial={{ scale: 0.92, opacity: 0, y: 16 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.92, opacity: 0, y: 16 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col space-y-3 p-4"
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-2 bg-indigo-600/20 text-indigo-400 rounded-xl">
+                      <Camera className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-black text-white tracking-wide uppercase">
+                        Capture Homework Pages {selectedImages.length > 0 && `(${selectedImages.length} captured)`}
+                      </h3>
+                      <p className="text-[10px] text-slate-400">Position page in the frame. Snap multiple pages in sequence!</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCameraModal(false)}
+                    className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-1.5 bg-slate-950/70 p-2.5 rounded-2xl border border-slate-800/80">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-1.5 text-[11px] font-bold text-slate-300">
+                      <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Readability Filters</span>
+                    </div>
+                    <span className="text-[9px] font-semibold text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                      {HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.label || 'Normal'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-0.5">
+                    {HOMEWORK_IMAGE_FILTERS.map((f) => {
+                      const isSelected = cameraFilter === f.id;
+                      return (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => setCameraFilter(f.id)}
+                          className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center space-x-1.5 shrink-0 border cursor-pointer ${
+                            isSelected
+                              ? 'bg-indigo-600 text-white border-indigo-400 shadow-sm shadow-indigo-600/30'
+                              : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          <span className="text-xs">{f.emoji}</span>
+                          <span className="whitespace-nowrap">{f.shortLabel}</span>
+                          {f.badge && (
+                            <span className={`text-[8px] uppercase tracking-wider px-1 py-0.2 rounded font-black ${
+                              isSelected ? 'bg-white/20 text-white' : 'bg-indigo-500/20 text-indigo-300'
+                            }`}>
+                              {f.badge}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="text-[10px] text-slate-400 flex items-center space-x-1 pt-0.5">
+                    <span className="text-indigo-400 font-semibold shrink-0">Preview:</span>
+                    <span className="truncate">
+                      {HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.description}
+                    </span>
+                  </div>
+                </div>
+
+                <motion.div
+                  animate={shutterAnimation ? { scale: [1, 0.98, 1] } : { scale: 1 }}
+                  transition={{ duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
+                  className={`relative bg-slate-950 rounded-2xl overflow-hidden aspect-4/3 flex items-center justify-center border border-slate-800 shadow-inner ${shutterAnimation ? 'ring-2 ring-cyan-400/60' : ''}`}
+                >
+                  <AnimatePresence>
+                    {shutterAnimation && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center overflow-hidden"
+                      >
+                        <motion.div
+                          initial={{ y: '-100%' }}
+                          animate={{ y: ['-100%', '0%', '0%', '-100%'] }}
+                          transition={{ duration: 0.32, times: [0, 0.35, 0.6, 1], ease: 'easeInOut' }}
+                          className="absolute top-0 left-0 right-0 h-1/2 bg-slate-950/95 border-b-2 border-cyan-400/60 shadow-2xl backdrop-blur-xs flex items-end justify-center pb-2"
+                        >
+                          <div className="w-16 h-1 bg-cyan-400/40 rounded-full" />
+                        </motion.div>
+
+                        <motion.div
+                          initial={{ y: '100%' }}
+                          animate={{ y: ['100%', '0%', '0%', '100%'] }}
+                          transition={{ duration: 0.32, times: [0, 0.35, 0.6, 1], ease: 'easeInOut' }}
+                          className="absolute bottom-0 left-0 right-0 h-1/2 bg-slate-950/95 border-t-2 border-cyan-400/60 shadow-2xl backdrop-blur-xs flex items-start justify-center pt-2"
+                        >
+                          <div className="w-16 h-1 bg-cyan-400/40 rounded-full" />
+                        </motion.div>
+
+                        <motion.div
+                          initial={{ scale: 2.2, rotate: 0, opacity: 0.8 }}
+                          animate={{
+                            scale: [2.2, 0.08, 0.08, 2.2],
+                            rotate: [0, 60, 60, 120],
+                            opacity: [0.8, 1, 1, 0]
+                          }}
+                          transition={{ duration: 0.36, times: [0, 0.35, 0.6, 1], ease: [0.22, 1, 0.36, 1] }}
+                          className="relative w-56 h-56 rounded-full border-4 border-slate-800 bg-slate-950 shadow-[0_0_60px_rgba(0,0,0,0.95)] flex items-center justify-center"
+                        >
+                          <div className="absolute inset-2 rounded-full border border-indigo-400/50" />
+                          <div className="absolute inset-6 rounded-full border border-cyan-400/40 border-dashed" />
+                          <div className="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_15px_#38bdf8]" />
+                        </motion.div>
+
+                        <motion.div
+                          initial={{ scale: 0.6, opacity: 0 }}
+                          animate={{
+                            scale: [0.6, 1.15, 1],
+                            opacity: [0, 1, 0]
+                          }}
+                          transition={{ duration: 0.38, times: [0, 0.45, 1] }}
+                          className="absolute flex flex-col items-center justify-center space-y-1.5 z-40"
+                        >
+                          <div className="w-16 h-16 rounded-full border-2 border-cyan-400 flex items-center justify-center shadow-[0_0_25px_rgba(6,182,212,0.8)]">
+                            <div className="w-4 h-4 rounded-full bg-cyan-400 animate-ping opacity-75" />
+                          </div>
+                          <span className="text-[10px] font-black tracking-widest uppercase text-cyan-200 bg-slate-950/90 px-2.5 py-0.5 rounded-full border border-cyan-400/50 shadow-xl backdrop-blur-md">
+                            CAPTURED
+                          </span>
+                        </motion.div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <AnimatePresence>
+                    {flashAnimation && (
+                      <motion.div
+                        initial={{ opacity: 1 }}
+                        animate={{ opacity: [1, 1, 0] }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.26, times: [0, 0.15, 1], ease: 'easeOut' }}
+                        className="absolute inset-0 z-50 pointer-events-none bg-white flex items-center justify-center overflow-hidden"
+                      >
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#ffffff_0%,_#f8fafc_60%,_#e0f2fe_100%)]" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {cameraError ? (
+                    <div className="text-center p-6 space-y-3">
+                      <div className="p-3 bg-rose-500/10 text-rose-400 rounded-full w-fit mx-auto border border-rose-500/20">
+                        <Camera className="w-8 h-8" />
+                      </div>
+                      <p className="text-xs text-rose-300 font-medium max-w-xs mx-auto">{cameraError}</p>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 mx-auto shadow-md cursor-pointer"
+                      >
+                        <Upload className="w-4 h-4" />
+                        <span>Choose Images from Device</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        style={{
+                          filter: HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.cssFilter || 'none'
+                        }}
+                        className="w-full h-full object-cover transition-[filter] duration-200"
+                      />
+
+                      <div className="absolute top-3 right-3 z-10">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const filterIds: ImageFilterType[] = ['none', 'document', 'grayscale', 'contrast', 'brighten'];
+                            const currentIdx = filterIds.indexOf(cameraFilter);
+                            const nextIdx = (currentIdx + 1) % filterIds.length;
+                            setCameraFilter(filterIds[nextIdx]);
+                          }}
+                          className="bg-slate-950/80 hover:bg-slate-900 text-slate-200 text-[10px] font-bold px-2.5 py-1 rounded-full border border-indigo-500/30 backdrop-blur-md flex items-center space-x-1.5 cursor-pointer"
+                          title="Tap to cycle readability filters"
+                        >
+                          <span>{HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.emoji}</span>
+                          <span>{HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.shortLabel}</span>
+                          <RefreshCw className="w-2.5 h-2.5 text-indigo-400 ml-0.5" />
+                        </button>
+                      </div>
+
+                      <div className="absolute inset-5 border-2 border-dashed border-indigo-400/60 rounded-2xl pointer-events-none flex flex-col items-center justify-between p-3">
+                        <span className="bg-slate-950/80 text-indigo-300 text-[10px] font-bold px-2.5 py-1 rounded-full border border-indigo-500/30 backdrop-blur-xs">
+                          Page {selectedImages.length + 1}
+                        </span>
+                        <span className="text-[10px] text-slate-300 bg-slate-950/80 px-2.5 py-1 rounded-full border border-slate-700/60 backdrop-blur-xs">
+                          {cameraFilter !== 'none' ? `Filter: ${HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.label}` : 'Align text & equations in frame'}
+                        </span>
+                      </div>
+
+                      <AnimatePresence>
+                        {showContrastToast && lowContrastDetected && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 16, scale: 0.94 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 12, scale: 0.94 }}
+                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            className="absolute bottom-3 left-3 right-3 z-20 flex items-center justify-between bg-slate-950/92 text-amber-200 border border-amber-500/50 rounded-xl px-3 py-2 shadow-2xl backdrop-blur-md"
+                          >
+                            <div className="flex items-center space-x-2 min-w-0">
+                              <div className="p-1.5 bg-amber-500/20 text-amber-400 rounded-lg shrink-0 animate-pulse">
+                                <Lightbulb className="w-3.5 h-3.5" />
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <div className="flex items-center space-x-1.5">
+                                  <span className="text-[11px] font-bold text-amber-200 truncate">
+                                    Low Edge Contrast
+                                  </span>
+                                  <span className="text-[9px] bg-amber-500/20 text-amber-300 font-semibold px-1.5 py-0.2 rounded-full border border-amber-500/30">
+                                    AI Lighting Check
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-slate-300 truncate">
+                                  Improve lighting or hold closer for clear document scan
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-1 shrink-0 ml-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCameraFilter('contrast');
+                                  setShowContrastToast(false);
+                                }}
+                                className="text-[10px] font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 px-2.5 py-1 rounded-lg transition shadow-xs cursor-pointer flex items-center space-x-1"
+                                title="Enhance document contrast"
+                              >
+                                <Sparkles className="w-2.5 h-2.5" />
+                                <span>Boost</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setShowContrastToast(false)}
+                                className="p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition cursor-pointer"
+                                aria-label="Dismiss lighting warning"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </>
+                  )}
+                </motion.div>
+
+                {selectedImages.length > 0 && (
+                  <div className="space-y-1.5 bg-slate-950/60 p-2 rounded-xl border border-slate-800">
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
+                      <span className="font-bold">Captured Pages ({selectedImages.length}):</span>
+                      <span className="text-[9px] text-indigo-300">Tap page to apply filter</span>
+                    </div>
+                    <div className="flex items-center space-x-2 overflow-x-auto py-0.5">
+                      {selectedImages.map((img, idx) => (
+                        <div key={idx} className="relative shrink-0 group">
+                          <button
+                            type="button"
+                            onClick={() => setFilterPreviewImageIndex(filterPreviewImageIndex === idx ? null : idx)}
+                            className="focus:outline-none cursor-pointer"
+                          >
+                            <img 
+                              src={img} 
+                              alt={`Page ${idx + 1}`} 
+                              className={`w-12 h-12 rounded-lg object-cover border transition ${
+                                filterPreviewImageIndex === idx 
+                                  ? 'border-indigo-400 ring-2 ring-indigo-500/50 scale-105' 
+                                  : 'border-indigo-500/40 hover:border-indigo-400'
+                              }`} 
+                            />
+                          </button>
+                          <span className="absolute bottom-0.5 left-0.5 bg-slate-950/90 text-white text-[8px] font-bold px-1 rounded pointer-events-none">
+                            P{idx + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (filterPreviewImageIndex === idx) setFilterPreviewImageIndex(null);
+                              handleRemoveImage(idx);
+                            }}
+                            className="absolute -top-1 -right-1 bg-rose-600 hover:bg-rose-500 text-white rounded-full p-0.5 shadow transition cursor-pointer"
+                            title="Remove image"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {filterPreviewImageIndex !== null && selectedImages[filterPreviewImageIndex] && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="pt-1.5 border-t border-slate-800 flex items-center space-x-1.5 overflow-x-auto no-scrollbar"
+                      >
+                        <span className="text-[9px] text-slate-400 font-bold shrink-0">Enhance P{filterPreviewImageIndex + 1}:</span>
+                        {HOMEWORK_IMAGE_FILTERS.map((f) => (
+                          <button
+                            key={f.id}
+                            type="button"
+                            onClick={() => handleApplyFilterToCaptured(filterPreviewImageIndex!, f.id)}
+                            className="px-2 py-0.5 bg-slate-900 hover:bg-indigo-900/60 text-slate-300 hover:text-indigo-200 border border-slate-800 hover:border-indigo-500/50 rounded-lg text-[9px] font-semibold whitespace-nowrap transition cursor-pointer"
+                          >
+                            {f.emoji} {f.shortLabel}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-1 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition flex items-center space-x-1.5 border border-slate-700/60 shrink-0 cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Upload</span>
+                  </button>
+
+                  {!cameraError && (
+                    <div className="flex items-center space-x-2 flex-1 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setCameraFacing(prev => prev === 'environment' ? 'user' : 'environment')}
+                        className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition border border-slate-700/60 cursor-pointer"
+                        title="Flip Camera"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCapturePhoto(true)}
+                        className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-indigo-300 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border border-indigo-500/40 active:scale-95 cursor-pointer"
+                        title="Capture this page with active filter and snap next page"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Snap & Add Next</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedImages.length > 0) {
+                            setShowCameraModal(false);
+                          } else {
+                            handleCapturePhoto(false);
+                          }
+                        }}
+                        className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black transition flex items-center space-x-1.5 shadow-lg shadow-indigo-600/30 active:scale-95 cursor-pointer"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>{selectedImages.length > 0 ? `Done (${selectedImages.length})` : 'Capture'}</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </footer>
+
+      <CustomVoiceModal
+        isOpen={showCustomVoiceModal}
+        onClose={() => setShowCustomVoiceModal(false)}
+        appLanguage={appLanguage}
+      />
+    </div>
+  );
 });
 
 export default AiTutorApp;
