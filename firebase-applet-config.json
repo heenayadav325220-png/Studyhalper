@@ -1,12 +1,11 @@
 {
-  "projectId": "planar-surfer-plkqp",
-  "appId": "1:45675025134:web:56f8bbbc7780f37dff19ff",
-  "apiKey": "AIzaSyDabGlcgDJHqvvPGGuecGnogqHztNvS-Kc",
-  "authDomain": "planar-surfer-plkqp.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-remixstudybuddya-041806f4-3ae7-4c23-ad72-bf4baedde267",
-  "storageBucket": "planar-surfer-plkqp.firebasestorage.app",
-  "messagingSenderId": "45675025134",
+  "projectId": "gen-lang-client-0177488262",
+  "appId": "1:286792536631:web:0a35add594db1fe90d65b2",
+  "apiKey": "AIzaSyCPJQpjJ7AAYtOxZ7zq8kk0340PE508Du4",
+  "authDomain": "gen-lang-client-0177488262.firebaseapp.com",
+  "storageBucket": "gen-lang-client-0177488262.firebasestorage.app",
+  "messagingSenderId": "286792536631",
   "measurementId": "",
-  "oAuthClientId": "45675025134-7cr0ru7ro016h181rviraekn2h599bv1.apps.googleusercontent.com",
+  "oAuthClientId": "286792536631-kjqlpfpfkks68a146dbrs01e9kd9eee8.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }

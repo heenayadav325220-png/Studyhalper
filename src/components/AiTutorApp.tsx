@@ -47,6 +47,7 @@ import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const CodeHighlighter = SyntaxHighlighter as any;
 import { getStudyAnswer } from '../services/geminiService';
+import { createGoogleDoc, authorizeGoogleService, getSavedToken } from '../services/googleWorkspace';
 import { exportConversationToPdf } from '../utils/pdfExport';
 import {
   AcademicSuggestion,
@@ -77,6 +78,8 @@ interface AiTutorAppProps {
   onAddNote?: (note: { title: string; content: string; subject: string }) => Promise<void>;
   onAddXp?: (amount: number) => void;
   onOpenEditor?: () => void;
+  attachedWorkspaceFiles?: Array<{ id: string; name: string; content: string; type: "drive" | "classroom" | "sheets" }>;
+  onRemoveAttachedWorkspaceFile?: (id: string) => void;
 }
 
 interface ChatMessage {
@@ -481,7 +484,9 @@ export const AiTutorApp = memo(function AiTutorApp({
   onBack,
   onAddNote,
   onAddXp,
-  onOpenEditor
+  onOpenEditor,
+  attachedWorkspaceFiles = [],
+  onRemoveAttachedWorkspaceFile
 }: AiTutorAppProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const saved = getStoredValue(`ai_tutor_chat_${user.uid}`);
@@ -543,6 +548,8 @@ export const AiTutorApp = memo(function AiTutorApp({
 
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [pdfExportSuccess, setPdfExportSuccess] = useState(false);
+  const [isExportingDocId, setIsExportingDocId] = useState<string | null>(null);
+  const [docExportSuccessId, setDocExportSuccessId] = useState<string | null>(null);
 
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showCustomVoiceModal, setShowCustomVoiceModal] = useState(false);
@@ -1074,13 +1081,21 @@ export const AiTutorApp = memo(function AiTutorApp({
 
     try {
       const studentInfo = `[Student: ${user.name || 'Student'} | School: ${user.schoolName || 'School'} | Class: ${user.className || 'Class'} | Goal: ${user.targetGoal || 'General'}]`;
-      let promptContext = `${studentInfo} [Subject: ${selectedSubject} | Mode: ${tutorMode}] ${effectiveQuery}`;
+      
+      let workspaceContext = "";
+      if (attachedWorkspaceFiles && attachedWorkspaceFiles.length > 0) {
+        workspaceContext = attachedWorkspaceFiles.map(file => {
+          return `[Attached Workspace Document: "${file.name}" | Source: ${file.type}]\n${file.content}\n`;
+        }).join("\n---\n") + "\n[Use the above attached document context to address the prompt below accurately.]\n\n";
+      }
+
+      let promptContext = `${workspaceContext}${studentInfo} [Subject: ${selectedSubject} | Mode: ${tutorMode}] ${effectiveQuery}`;
       if (tutorMode === 'step') {
-        promptContext = `${studentInfo} Provide a strict step-by-step solution for ${user.className || 'student level'}: ${effectiveQuery}`;
+        promptContext = `${workspaceContext}${studentInfo} Provide a strict step-by-step solution for ${user.className || 'student level'}: ${effectiveQuery}`;
       } else if (tutorMode === 'explain') {
-        promptContext = `${studentInfo} Explain clearly with analogies suitable for ${user.className || 'student level'}: ${effectiveQuery}`;
+        promptContext = `${workspaceContext}${studentInfo} Explain clearly with analogies suitable for ${user.className || 'student level'}: ${effectiveQuery}`;
       } else if (tutorMode === 'quiz') {
-        promptContext = `${studentInfo} Generate a 3-question practice quiz suitable for ${user.className || 'student level'}: ${effectiveQuery}`;
+        promptContext = `${workspaceContext}${studentInfo} Generate a 3-question practice quiz suitable for ${user.className || 'student level'}: ${effectiveQuery}`;
       }
 
       const answer = await getStudyAnswer(promptContext, imagesToSend.length > 0 ? imagesToSend : undefined, undefined, selectedLanguage);
@@ -1095,6 +1110,14 @@ export const AiTutorApp = memo(function AiTutorApp({
       };
 
       setMessages((prev) => [...prev, aiMsg]);
+      
+      // Clear attached workspace files after successful send
+      if (attachedWorkspaceFiles.length > 0 && onRemoveAttachedWorkspaceFile) {
+        attachedWorkspaceFiles.forEach(file => {
+          onRemoveAttachedWorkspaceFile(file.id);
+        });
+      }
+
       if (onAddXp) onAddXp(15);
     } catch (err) {
       console.error(err);
@@ -1134,6 +1157,47 @@ export const AiTutorApp = memo(function AiTutorApp({
       alert('Failed to export PDF study guide. Please ensure there are conversation messages.');
     } finally {
       setIsExportingPdf(false);
+    }
+  };
+
+  const handleExportToGoogleDoc = async (msg: ChatMessage) => {
+    if (isExportingDocId) return;
+    setIsExportingDocId(msg.id);
+    
+    const performExport = async (accessToken: string) => {
+      try {
+        const title = `Ascend AI Tutor Note - ${(msg.subject || selectedSubject).toUpperCase()} (${new Date().toLocaleDateString()})`;
+        const docId = await createGoogleDoc(accessToken, title, msg.text);
+        setDocExportSuccessId(msg.id);
+        if (onAddXp) onAddXp(20);
+        
+        // Open the document in a new tab if successful so they see their work instantly!
+        const openUrl = `https://docs.google.com/document/d/${docId}/edit`;
+        window.open(openUrl, '_blank');
+
+        setTimeout(() => setDocExportSuccessId(null), 4000);
+      } catch (err: any) {
+        console.error("Failed to create Google Doc:", err);
+        alert(`Failed to export to Google Docs: ${err?.message || err}`);
+      } finally {
+        setIsExportingDocId(null);
+      }
+    };
+
+    const token = getSavedToken("docs");
+    if (token) {
+      await performExport(token);
+    } else {
+      authorizeGoogleService(
+        "docs",
+        async (newToken) => {
+          await performExport(newToken);
+        },
+        (error) => {
+          setIsExportingDocId(null);
+          alert(`Google Docs connection failed: ${error}. Please authorize Google Workspace services in the Workspace Hub page.`);
+        }
+      );
     }
   };
 
@@ -1654,6 +1718,23 @@ export const AiTutorApp = memo(function AiTutorApp({
                             <Table className="w-3.5 h-3.5" />
                             <span>Summary Table</span>
                           </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleExportToGoogleDoc(msg)}
+                            disabled={isExportingDocId === msg.id}
+                            className="border border-emerald-200 hover:border-emerald-300 bg-emerald-50 text-emerald-700 text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 disabled:opacity-50"
+                            title="Export this tutoring answer to a live Google Document"
+                          >
+                            {isExportingDocId === msg.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                            ) : docExportSuccessId === msg.id ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <FileDown className="w-3.5 h-3.5 text-emerald-600" />
+                            )}
+                            <span>{docExportSuccessId === msg.id ? 'Exported!' : isExportingDocId === msg.id ? 'Exporting...' : 'Export to Docs'}</span>
+                          </button>
                         </div>
                       )}
                     </div>
@@ -1980,6 +2061,30 @@ export const AiTutorApp = memo(function AiTutorApp({
                 >
                   <span>{sugg.label}</span>
                 </button>
+              ))}
+            </div>
+          )}
+
+          {attachedWorkspaceFiles && attachedWorkspaceFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2 px-1">
+              {attachedWorkspaceFiles.map((file) => (
+                <div 
+                  key={file.id} 
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-slate-800 text-indigo-300 border border-slate-700 text-[10px] font-bold shadow-xs select-none"
+                >
+                  <span>
+                    {file.type === "drive" ? "📁" : file.type === "classroom" ? "🎓" : "📊"}
+                  </span>
+                  <span className="truncate max-w-[120px]">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => onRemoveAttachedWorkspaceFile?.(file.id)}
+                    className="p-0.5 hover:bg-slate-700 rounded-full transition text-slate-400 hover:text-slate-200"
+                    title="Remove attachment"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
               ))}
             </div>
           )}

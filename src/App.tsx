@@ -42,6 +42,7 @@ import SelfCustomizeModal, { DEFAULT_UI_CUSTOMIZATION } from './components/SelfC
 import { PdfBookScanner } from './components/PdfBookScanner';
 import { VoiceTutorModal } from './components/VoiceTutorModal';
 import { CinematicAiEditor } from './components/CinematicAiEditor';
+import IntegrationsHub from './components/IntegrationsHub';
 import { RealtimeMovingUniverse } from './components/RealtimeMovingUniverse';
 import { TRANSLATIONS, Language } from './services/translations';
 import { playUiSound } from './services/soundEffects';
@@ -104,7 +105,8 @@ const DEFAULT_USER: UserProfile = {
 
 export default function App() {
   const [appLanguage, setAppLanguage] = useState<Language>('en');
-  const [activeTab, setActiveTab] = useState<'home' | 'toolkit' | 'groupChat' | 'whiteboard' | 'mockExam' | 'studyDocs' | 'petCompanion' | 'aiTutor' | 'quiz' | 'notebook' | 'planner' | 'imageGen' | 'pdfScanner'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'toolkit' | 'groupChat' | 'whiteboard' | 'mockExam' | 'studyDocs' | 'petCompanion' | 'aiTutor' | 'quiz' | 'notebook' | 'planner' | 'imageGen' | 'pdfScanner' | 'googleWorkspace'>('home');
+  const [attachedWorkspaceFiles, setAttachedWorkspaceFiles] = useState<Array<{ id: string; name: string; content: string; type: "drive" | "classroom" | "sheets" }>>([]);
   const [initialTool, setInitialTool] = useState<string | undefined>(undefined);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
@@ -1579,6 +1581,42 @@ export default function App() {
                       <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
                   </motion.button>
+
+                  {/* LIST ITEM 5: GOOGLE WORKSPACE */}
+                  <motion.button
+                    whileHover={{ x: 3, scale: 1.006 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      playUiSound(uiCustomization.audioFeedback);
+                      setActiveTab('googleWorkspace');
+                    }}
+                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-indigo-500/80 hover:border-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.22)] bg-gradient-to-r from-slate-950 via-[#0e162d] to-[#121c3b] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
+                  >
+                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-indigo-500/30 transition-all" />
+
+                    <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
+                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-indigo-500/20 border border-indigo-400/50 flex items-center justify-center text-indigo-300 group-hover:scale-110 transition-transform shrink-0 shadow-inner">
+                        <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-300" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-black text-sm sm:text-base text-white flex items-center gap-1.5 truncate">
+                            <span>Google Workspace Hub</span>
+                            <span className="text-indigo-400">💼</span>
+                          </h4>
+                          <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-2 py-0.5 rounded-full border border-white/20 backdrop-blur-md shrink-0">
+                            WORKSPACE
+                          </span>
+                        </div>
+                        <p className="text-[10px] sm:text-[11.5px] text-indigo-100/80 font-medium mt-0.5 truncate font-sans">
+                          Sync with Google Drive, Docs, Classroom, Calendar & Sheets
+                        </p>
+                      </div>
+                    </div>
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-indigo-300 group-hover:translate-x-1 transition-all shrink-0 ml-2 shadow-xs">
+                      <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </div>
+                  </motion.button>
                 </div>
               ) : (
                 /* GRID VIEW (ALTERNATIVE VIEW) */
@@ -1835,6 +1873,46 @@ export default function App() {
                       </h4>
                       <p className="text-[9px] sm:text-[11px] text-amber-100/70 font-medium leading-tight mt-0.5 line-clamp-1 sm:line-clamp-none">
                         Formula sheets & visual notes
+                      </p>
+                    </div>
+                  </motion.button>
+
+                  {/* CARD 5: GOOGLE WORKSPACE - INDIGO NEON GLOW */}
+                  <motion.button
+                    whileHover={{ y: -2, scale: 1.01 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      playUiSound(uiCustomization.audioFeedback);
+                      setActiveTab('googleWorkspace');
+                    }}
+                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-indigo-500/80 hover:border-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.22)] bg-gradient-to-br from-slate-950 via-[#0e162d] to-[#121c3b] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300 col-span-2 sm:col-span-1"
+                  >
+                    <div className="absolute inset-0 pointer-events-none opacity-20 flex items-center justify-center">
+                      <svg className="w-40 h-40" viewBox="0 0 100 100" fill="none" stroke="#6366f1" strokeWidth="0.75">
+                        <polygon points="50 5, 90 25, 90 75, 50 95, 10 75, 10 25" />
+                        <line x1="50" y1="5" x2="50" y2="95" />
+                        <line x1="10" y1="25" x2="90" y2="75" />
+                        <line x1="90" y1="25" x2="10" y2="75" />
+                      </svg>
+                    </div>
+                    <div className="absolute -top-12 -right-12 w-28 h-28 bg-indigo-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-indigo-500/30 transition-all" />
+
+                    <div className="flex justify-between items-start relative z-10">
+                      <div className="text-indigo-300 group-hover:scale-110 transition-transform">
+                        <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-300" />
+                      </div>
+                      <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 backdrop-blur-md">
+                        WORKSPACE
+                      </span>
+                    </div>
+
+                    <div className="relative z-10">
+                      <h4 className="font-black text-xs sm:text-base text-white flex items-center gap-1 tracking-tight">
+                        <span>Workspace Hub</span>
+                        <span className="text-indigo-400">💼</span>
+                      </h4>
+                      <p className="text-[9px] sm:text-[11px] text-indigo-100/70 font-medium leading-tight mt-0.5 line-clamp-1 sm:line-clamp-none">
+                        Sync Drive, Docs, Calendar
                       </p>
                     </div>
                   </motion.button>
@@ -2900,6 +2978,10 @@ export default function App() {
             }}
             onAddXp={addXp}
             onOpenEditor={() => setShowAiEditorModal(true)}
+            attachedWorkspaceFiles={attachedWorkspaceFiles}
+            onRemoveAttachedWorkspaceFile={(id) => {
+              setAttachedWorkspaceFiles(prev => prev.filter(f => f.id !== id));
+            }}
           />
         )}
 
@@ -2941,6 +3023,24 @@ export default function App() {
             }}
             onAddXp={addXp}
             onClose={() => setActiveTab('home')}
+          />
+        )}
+
+        {/* GOOGLE PRODUCTIVITY WORKSPACE INTEGRATIONS HUB */}
+        {activeTab === 'googleWorkspace' && (
+          <IntegrationsHub
+            appLanguage={appLanguage}
+            audioFeedbackEnabled={uiCustomization.audioFeedback !== 'silent'}
+            attachedFiles={attachedWorkspaceFiles}
+            onAttachFile={(file) => {
+              setAttachedWorkspaceFiles(prev => {
+                if (prev.some(f => f.id === file.id)) return prev;
+                return [...prev, file];
+              });
+            }}
+            onRemoveAttachedFile={(id) => {
+              setAttachedWorkspaceFiles(prev => prev.filter(f => f.id !== id));
+            }}
           />
         )}
           </motion.div>
