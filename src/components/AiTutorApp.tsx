@@ -44,6 +44,8 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+
+const CodeHighlighter = SyntaxHighlighter as any;
 import { getStudyAnswer } from '../services/geminiService';
 import { exportConversationToPdf } from '../utils/pdfExport';
 import {
@@ -418,7 +420,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
                           Copy Code
                         </button>
                       </div>
-                      <SyntaxHighlighter
+                      <CodeHighlighter
                         style={oneDark}
                         language={lang === 'code' ? 'text' : lang}
                         PreTag="div"
@@ -426,7 +428,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
                         {...props}
                       >
                         {codeString}
-                      </SyntaxHighlighter>
+                      </CodeHighlighter>
                     </div>
                   );
                 }

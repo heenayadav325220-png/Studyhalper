@@ -150,7 +150,7 @@ async function startServer() {
       return compression.filter(req, res);
     },
     level: 6
-  }));
+  }) as any);
 
   // JSON Body Parser with safe memory limits
   app.use(express.json({ limit: '10mb' }));

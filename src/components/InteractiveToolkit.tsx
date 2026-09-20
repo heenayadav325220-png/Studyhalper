@@ -52,6 +52,8 @@ import rehypeKatex from 'rehype-katex';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
+const CodeHighlighter = SyntaxHighlighter as any;
+
 import {
   generateNotes,
   summarizeNotes,
@@ -1816,7 +1818,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                                               Copy Code
                                             </button>
                                           </div>
-                                          <SyntaxHighlighter
+                                          <CodeHighlighter
                                             style={oneDark}
                                             language={lang === 'code' ? 'text' : lang}
                                             PreTag="div"
@@ -1824,7 +1826,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                                             {...props}
                                           >
                                             {codeString}
-                                          </SyntaxHighlighter>
+                                          </CodeHighlighter>
                                         </div>
                                       );
                                     }
