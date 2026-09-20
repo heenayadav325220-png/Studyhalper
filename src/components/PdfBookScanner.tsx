@@ -20,7 +20,7 @@ import { UserProfile } from '../types';
 
 interface PdfBookScannerProps {
   user?: UserProfile;
-  appLanguage: 'en' | 'hi';
+  appLanguage: string;
   onSaveToNotebook?: (title: string, content: string, tags?: string[]) => Promise<void>;
   onAddXp?: (amount: number) => void;
   onClose?: () => void;

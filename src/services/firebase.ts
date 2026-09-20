@@ -121,26 +121,27 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 /**
  * Maps Firebase Auth error codes to user-friendly messages in English and Hindi
  */
-export function getFriendlyAuthErrorMessage(errorCodeOrMessage: string, lang: 'en' | 'hi' = 'en'): string {
+export function getFriendlyAuthErrorMessage(errorCodeOrMessage: string, lang: string = 'en'): string {
   const code = (errorCodeOrMessage || '').toLowerCase();
+  const isHindiMode = lang === 'hi' || lang === 'hinglish' || lang === 'marathi' || lang === 'tamil' || lang === 'bengali';
   
   if (code.includes('operation-not-allowed')) {
-    return lang === 'hi'
+    return isHindiMode
       ? 'ईमेल/पासवर्ड प्रमाणीकरण सक्रिय हो रहा है...'
       : 'Email/Password sign-in method is being configured. Using secure local session sync.';
   }
   if (code.includes('user-not-found') || code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('invalid-login-credentials')) {
-    return lang === 'hi' 
+    return isHindiMode 
       ? 'गलत ईमेल या पासवर्ड। कृपया पुनः जांचें।' 
       : 'Invalid email or password. Please verify your credentials.';
   }
   if (code.includes('email-already-in-use')) {
-    return lang === 'hi' 
+    return isHindiMode 
       ? 'यह ईमेल पहले से पंजीकृत है। कृपया लॉग इन करें।' 
       : 'This email is already registered. Please sign in instead.';
   }
   if (code.includes('weak-password')) {
-    return lang === 'hi' 
+    return isHindiMode 
       ? 'पासवर्ड कम से कम 6 अक्षरों का होना चाहिए।' 
       : 'Password is too weak. Please use at least 6 characters.';
   }

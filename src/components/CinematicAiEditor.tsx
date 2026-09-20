@@ -21,7 +21,7 @@ interface CinematicAiEditorProps {
   isOpen: boolean;
   onClose: () => void;
   user: UserProfile;
-  appLanguage: 'en' | 'hi';
+  appLanguage: string;
   currentTab: string;
   customization: UiCustomization;
   onUpdateCustomization: (updated: UiCustomization) => void;

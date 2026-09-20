@@ -31,7 +31,9 @@ import {
   User as UserIcon,
   Settings2,
   Terminal,
-  Mic
+  Mic,
+  Search,
+  Notebook
 } from 'lucide-react';
 import InteractiveToolkit from './components/InteractiveToolkit';
 import AiTutorApp from './components/AiTutorApp';
@@ -41,7 +43,7 @@ import AuthModal from './components/AuthModal';
 import SelfCustomizeModal, { DEFAULT_UI_CUSTOMIZATION } from './components/SelfCustomizeModal';
 import { PdfBookScanner } from './components/PdfBookScanner';
 import { VoiceTutorModal } from './components/VoiceTutorModal';
-import { CinematicAiEditor } from './components/CinematicAiEditor';
+
 import IntegrationsHub from './components/IntegrationsHub';
 import { RealtimeMovingUniverse } from './components/RealtimeMovingUniverse';
 import { TRANSLATIONS, Language } from './services/translations';
@@ -70,6 +72,7 @@ import AvatarSelectorModal, { AvatarSelectionData } from './components/AvatarSel
 import ThemeToggle from './components/ThemeToggle';
 import QuizSection from './components/QuizSection';
 import PWAInstallBanner from './components/PWAInstallBanner';
+import { BadgeCelebrationModal } from './components/BadgeCelebrationModal';
 import type { 
   UserProfile, 
   RoomChatMessage, 
@@ -81,6 +84,87 @@ import type {
 } from './types';
 
 const SUBJECTS: Subject[] = ['Mathematics', 'Science', 'Biology', 'Physics', 'Chemistry', 'English'];
+
+export interface BadgeDefinition {
+  id: string;
+  name: string;
+  nameHindi: string;
+  icon: string;
+  desc: string;
+  descHindi: string;
+  target: number;
+  getActual: (profile: UserProfile, docsCount: number, examsCount: number, pomoCount: number) => number;
+  displayUnit: string;
+}
+
+export const BADGES_CONFIG: BadgeDefinition[] = [
+  {
+    id: 'quick_starter',
+    name: 'Quick Starter',
+    nameHindi: 'त्वरित शुरुआत',
+    icon: '🚀',
+    desc: 'Reach 150+ XP in your study journey.',
+    descHindi: 'पढ़ाई की यात्रा में 150+ XP हासिल करें।',
+    target: 150,
+    getActual: (profile, _d, _e, _p) => profile.xp || 0,
+    displayUnit: 'XP'
+  },
+  {
+    id: 'consistent_scholar',
+    name: 'Consistent Scholar',
+    nameHindi: 'सदाबहार छात्र',
+    icon: '🔥',
+    desc: 'Maintain a study streak of 5+ days.',
+    descHindi: '5 या अधिक दिनों की पढ़ाई की निरंतरता बनाए रखें।',
+    target: 5,
+    getActual: (profile, _d, _e, _p) => profile.streak || 0,
+    displayUnit: 'Days'
+  },
+  {
+    id: 'quiz_champion',
+    name: 'Quiz Champion',
+    nameHindi: 'क्विज चैंपियन',
+    icon: '🧠',
+    desc: 'Complete 2+ Practice Quizzes or Mock Exams.',
+    descHindi: '2 या अधिक अभ्यास क्विज या मॉक परीक्षाएं पूरी करें।',
+    target: 2,
+    getActual: (_p, _d, examsCount, _pm) => examsCount,
+    displayUnit: 'Quizzes'
+  },
+  {
+    id: 'avid_researcher',
+    name: 'Avid Researcher',
+    nameHindi: 'उत्सुक शोधकर्ता',
+    icon: '📚',
+    desc: 'Create 3+ study notes or documents.',
+    descHindi: '3 या अधिक स्टडी नोट्स या दस्तावेज़ बनाएं।',
+    target: 3,
+    getActual: (_p, docsCount, _e, _pm) => docsCount,
+    displayUnit: 'Notes'
+  },
+  {
+    id: 'focus_warrior',
+    name: 'Focus Warrior',
+    nameHindi: 'एकाग्रता योद्धा',
+    icon: '⏱️',
+    desc: 'Complete at least 1 Focus Session.',
+    descHindi: 'कम से कम 1 एकाग्रता (Pomodoro) सत्र पूरा करें।',
+    target: 1,
+    getActual: (_p, _d, _e, pomoCount) => pomoCount,
+    displayUnit: 'Session'
+  },
+  {
+    id: 'legendary_companion',
+    name: 'Legendary Companion',
+    nameHindi: 'महान साथी',
+    icon: '🦁',
+    desc: 'Raise your study pet to Level 3 or higher.',
+    descHindi: 'अपने स्टडी पेट को लेवल 3 या उससे ऊपर ले जाएं।',
+    target: 3,
+    getActual: (profile, _d, _e, _p) => profile.petLevel || 1,
+    displayUnit: 'Lvl'
+  }
+];
 
 const DEFAULT_USER: UserProfile = {
   uid: 'user_local_student',
@@ -113,7 +197,6 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [showVoiceTutorModal, setShowVoiceTutorModal] = useState(false);
-  const [showAiEditorModal, setShowAiEditorModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [playgroundViewMode, setPlaygroundViewMode] = useState<'list' | 'grid'>('list');
 
@@ -160,6 +243,9 @@ export default function App() {
     }
     return DEFAULT_USER;
   });
+
+  // --- DYNAMIC BADGES CELEBRATION STATE & EVALUATION ENGINE ---
+  const [unlockedBadgeCelebration, setUnlockedBadgeCelebration] = useState<any | null>(null);
 
   const isUserLoggedIn = !!(
     (currentUser && !currentUser.isAnonymous) ||
@@ -370,11 +456,6 @@ export default function App() {
     return TRANSLATIONS[key]?.[appLanguage] || TRANSLATIONS[key]?.en || key;
   };
 
-  const toggleLanguage = () => {
-    const nextLang: Language = appLanguage === 'en' ? 'hi' : 'en';
-    setAppLanguage(nextLang);
-    updateUserProfile(userProfile.uid, { language: nextLang });
-  };
 
   // Helper to add XP and update level / pet level
   const addXp = (amount: number) => {
@@ -390,6 +471,12 @@ export default function App() {
       localStorage.setItem('user_profile_data', JSON.stringify(updated));
       localStorage.setItem(`user_profile_${prev.uid}`, JSON.stringify(updated));
       updateUserProfile(prev.uid, { xp: newXp, level: newLevel });
+      
+      // Safe delayed trigger to let state finalize
+      setTimeout(() => {
+        runBadgeEvaluation(updated);
+      }, 150);
+
       return updated;
     });
   };
@@ -441,8 +528,17 @@ export default function App() {
       }, 1000);
     } else if (timerSeconds === 0 && isTimerRunning) {
       setIsTimerRunning(false);
+      
+      // Increment completed sessions count
+      const curCount = parseInt(localStorage.getItem('ascend_pomodoro_completed_count') || '0', 10);
+      localStorage.setItem('ascend_pomodoro_completed_count', (curCount + 1).toString());
+      
       addXp(50);
       alert('Focus Study Session Complete! Great job! +50 XP Earned!');
+      
+      setTimeout(() => {
+        runBadgeEvaluation();
+      }, 300);
     }
     return () => clearInterval(interval);
   }, [isTimerRunning, timerSeconds]);
@@ -637,9 +733,66 @@ export default function App() {
 
   // --- STUDY DOCS STATE ---
   const [studyDocs, setStudyDocs] = useState<StudyDocument[]>([]);
+
+  const runBadgeEvaluation = (profileObj?: UserProfile) => {
+    const currentProfile = profileObj || userProfile;
+    if (!currentProfile) return;
+
+    const pomoCountStr = localStorage.getItem('ascend_pomodoro_completed_count') || '0';
+    const pomoCount = parseInt(pomoCountStr, 10);
+    const docsCount = studyDocs.length;
+    const examsCount = mockExams.filter(e => e.completed).length;
+
+    let celebrated: string[] = [];
+    try {
+      const saved = localStorage.getItem('ascend_celebrated_badges');
+      if (saved) {
+        celebrated = JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error("Error parsing celebrated badges", e);
+    }
+
+    for (const badge of BADGES_CONFIG) {
+      if (!celebrated.includes(badge.id)) {
+        const actual = badge.getActual(currentProfile, docsCount, examsCount, pomoCount);
+        if (actual >= badge.target) {
+          // Add to celebrated immediately to lock it
+          celebrated.push(badge.id);
+          localStorage.setItem('ascend_celebrated_badges', JSON.stringify(celebrated));
+          
+          // Trigger celebration modal popup
+          setUnlockedBadgeCelebration(badge);
+
+          // Add award points with a silent booster to avoid re-triggering loop
+          setUserProfile((prev) => {
+            const finalXp = (prev.xp || 0) + 100;
+            const finalLevel = Math.floor(finalXp / 100) + 1;
+            const finalProfile: UserProfile = { ...prev, xp: finalXp, level: finalLevel };
+            localStorage.setItem('ascend_user_profile', JSON.stringify(finalProfile));
+            localStorage.setItem('user_profile_data', JSON.stringify(finalProfile));
+            updateUserProfile(prev.uid, { xp: finalXp, level: finalLevel });
+            return finalProfile;
+          });
+          break; // celebrate one badge at a time
+        }
+      }
+    }
+  };
+
+  // Automatically evaluate badges after sync settles or state counts change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      runBadgeEvaluation();
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [studyDocs.length, mockExams.length, userProfile.petLevel, userProfile.streak]);
+
   const [isAddingDoc, setIsAddingDoc] = useState(false);
   const [newDocTitle, setNewDocTitle] = useState('');
   const [newDocContent, setNewDocContent] = useState('');
+  const [noteSearchQuery, setNoteSearchQuery] = useState('');
+  const [editingDocId, setEditingDocId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = subscribeToStudyDocuments(userProfile.uid, (docs) => {
@@ -650,8 +803,9 @@ export default function App() {
 
   const handleSaveDoc = async () => {
     if (!newDocTitle.trim()) return;
+    const docId = editingDocId || 'doc_' + Date.now();
     const docData: StudyDocument = {
-      id: 'doc_' + Date.now(),
+      id: docId,
       ownerId: userProfile.uid,
       title: newDocTitle,
       content: newDocContent,
@@ -662,6 +816,7 @@ export default function App() {
     };
     await saveStudyDocument(docData);
     setIsAddingDoc(false);
+    setEditingDocId(null);
     setNewDocTitle('');
     setNewDocContent('');
     addXp(15);
@@ -832,7 +987,7 @@ export default function App() {
       <RealtimeMovingUniverse theme={uiCustomization.wallpaperAmbiance} interactive={true} />
 
       {/* MAIN CONTENT AREA - WITH pb-24 TO AVOID BOTTOM NAV OVERLAP */}
-      <main className="relative z-10 flex-1 p-3 sm:p-4 md:p-5 max-w-xl mx-auto w-full space-y-4 pb-24 overflow-x-hidden">
+      <main className={`relative z-10 flex-1 p-3 sm:p-4 md:p-5 mx-auto w-full pb-24 overflow-x-hidden transition-all duration-300 ${activeTab === 'studyDocs' ? 'max-w-7xl' : 'max-w-xl space-y-4'}`}>
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -892,17 +1047,7 @@ export default function App() {
                       </button>
                     </div>
 
-                    {/* Cinematic AI App Editor Trigger Button */}
-                    <motion.button
-                      whileHover={{ scale: 1.08 }}
-                      whileTap={{ scale: 0.92 }}
-                      onClick={() => setShowAiEditorModal(true)}
-                      className="p-1.5 text-cyan-300 hover:text-white bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 rounded-xl transition cursor-pointer shrink-0 shadow-xs flex items-center space-x-1"
-                      title="Cinematic AI Editor / AI ऐप एडिटर"
-                    >
-                      <Terminal className="w-3.5 h-3.5 text-cyan-300" />
-                      <span className="text-[9px] font-black text-cyan-200 hidden sm:inline uppercase tracking-wider">Editor</span>
-                    </motion.button>
+
 
                     {/* Auth / Sign In / Account Button */}
                     <motion.button
@@ -1168,38 +1313,8 @@ export default function App() {
               </div>
             )}
 
-            {/* HIGH-POWER QUICK ACTION TRIO: AI APP EDITOR, VOICE TUTOR & PDF/BOOK SCANNER */}
-            <div id="quick-actions-section" className="grid grid-cols-3 gap-2 sm:gap-2.5">
-              {/* AI APP EDITOR LAUNCHER */}
-              <motion.button
-                whileHover={{ y: -2, scale: 1.01 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => {
-                  playUiSound(uiCustomization.audioFeedback);
-                  setShowAiEditorModal(true);
-                }}
-                className="p-2.5 sm:p-3.5 rounded-2xl border-2 border-cyan-500/80 hover:border-cyan-400 bg-gradient-to-br from-[#041a2f] via-[#021020] to-[#07243c] shadow-[0_0_20px_rgba(6,182,212,0.25)] text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-all"
-              >
-                <div className="absolute -top-8 -right-8 w-20 h-20 bg-cyan-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-cyan-500/30 transition-all" />
-                <div className="flex items-center justify-between relative z-10 mb-1.5 sm:mb-2">
-                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 group-hover:scale-110 transition-transform shrink-0">
-                    <Terminal className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-300 animate-pulse" />
-                  </div>
-                  <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 px-1.5 sm:px-2 py-0.5 rounded-full border border-cyan-400/30">
-                    COPILOT
-                  </span>
-                </div>
-                <div className="relative z-10">
-                  <h4 className="font-extrabold text-[11px] sm:text-sm text-white flex items-center gap-1">
-                    <span className="truncate">{appLanguage === 'hi' ? 'AI एडिटर' : 'AI Editor'}</span>
-                    <span className="text-cyan-400 shrink-0">⚡</span>
-                  </h4>
-                  <p className="text-[8.5px] sm:text-[9.5px] text-cyan-200/70 font-medium leading-tight mt-0.5 line-clamp-1">
-                    {appLanguage === 'hi' ? 'बोलकर UI व नोट्स बदलें' : 'Voice/Text App Control'}
-                  </p>
-                </div>
-              </motion.button>
-
+            {/* HIGH-POWER QUICK ACTION DUO: VOICE TUTOR & PDF/BOOK SCANNER */}
+            <div id="quick-actions-section" className="grid grid-cols-2 gap-2 sm:gap-2.5">
               {/* VOICE TUTOR LAUNCHER */}
               <motion.button
                 whileHover={{ y: -2, scale: 1.01 }}
@@ -2221,42 +2336,109 @@ export default function App() {
             </div>
 
             {/* 7. ACADEMIC BADGES - COMPACT MATTE PARCHMENT & BRONZE AESTHETIC */}
-            <div className="bg-[#2d221a] p-1.5 rounded-2xl border border-[#3e3025] shadow-xl">
-              <div className="bg-gradient-to-b from-[#f6efe1] via-[#ece2ce] to-[#e4d6bf] rounded-xl border border-[#d5c2a3] p-3 shadow-[inset_0_1px_3px_rgba(255,255,255,0.8),0_2px_8px_rgba(0,0,0,0.2)] space-y-2 relative overflow-hidden text-[#3d2e1f]">
-                <div className="flex items-center justify-between border-b border-[#ddcdb4] pb-1.5">
-                  <h3 className="font-serif font-black text-[#544026] text-xs tracking-wider uppercase flex items-center space-x-1.5">
-                    <span className="text-sm text-[#8c6b3e]">🎖️</span>
-                    <span>ACADEMIC BADGES</span>
-                  </h3>
-                  <span className="text-[9px] font-black bg-[#3f3226] text-[#dfc285] border border-[#5a4837] px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
-                    1 EARNED
-                  </span>
-                </div>
+            {(() => {
+              const pomoCount = parseInt(localStorage.getItem('ascend_pomodoro_completed_count') || '0', 10);
+              const docsCount = studyDocs.length;
+              const examsCount = mockExams.filter(e => e.completed).length;
 
-                <div className="flex items-center space-x-2.5 overflow-x-auto pb-0.5 scrollbar-none">
-                  {/* BADGE 1: QUICK START (EARNED - GOLDEN GLOW) */}
-                  <div className="bg-gradient-to-b from-[#fffef9] to-[#f5edd9] border border-[#cca25a] shadow-[0_0_10px_rgba(204,162,90,0.35)] rounded-xl p-2 text-center flex flex-col items-center justify-between w-20 h-22 shrink-0 relative overflow-hidden cursor-pointer hover:scale-105 transition-transform">
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-b from-[#fef0c7] to-[#fde047]/40 flex items-center justify-center text-base shadow-inner">
-                      🚀
+              // Calculate how many badges are earned
+              const earnedCount = BADGES_CONFIG.filter(badge => {
+                const actual = badge.getActual(userProfile, docsCount, examsCount, pomoCount);
+                return actual >= badge.target;
+              }).length;
+
+              return (
+                <div className="bg-[#2d221a] p-1.5 rounded-2xl border border-[#3e3025] shadow-xl">
+                  <div className="bg-gradient-to-b from-[#f6efe1] via-[#ece2ce] to-[#e4d6bf] rounded-xl border border-[#d5c2a3] p-3 shadow-[inset_0_1px_3px_rgba(255,255,255,0.8),0_2px_8px_rgba(0,0,0,0.2)] space-y-2.5 relative overflow-hidden text-[#3d2e1f]">
+                    
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-[#ddcdb4] pb-1.5">
+                      <h3 className="font-serif font-black text-[#544026] text-xs tracking-wider uppercase flex items-center space-x-1.5">
+                        <span className="text-sm text-[#8c6b3e]">🎖️</span>
+                        <span>{appLanguage === 'hi' ? 'शैक्षणिक पदक' : 'ACADEMIC BADGES'}</span>
+                      </h3>
+                      <span className="text-[9px] font-black bg-[#3f3226] text-[#dfc285] border border-[#5a4837] px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
+                        {earnedCount} / {BADGES_CONFIG.length} {appLanguage === 'hi' ? 'अर्जित' : 'EARNED'}
+                      </span>
                     </div>
-                    <div>
-                      <div className="font-black text-[10.5px] text-[#2a2016] leading-tight">Quick Start</div>
-                      <div className="text-[7.5px] font-bold text-[#8c7b69] mt-0.5">01/07/2028</div>
+
+                    {/* Horizontal badges scroll container */}
+                    <div className="flex items-center space-x-3 overflow-x-auto pb-1 scrollbar-none">
+                      {BADGES_CONFIG.map((badge) => {
+                        const actual = badge.getActual(userProfile, docsCount, examsCount, pomoCount);
+                        const isEarned = actual >= badge.target;
+                        const percentage = Math.min(100, Math.round((actual / badge.target) * 100));
+
+                        return (
+                          <div
+                            key={badge.id}
+                            className={`relative flex flex-col items-center justify-between w-24 h-28 shrink-0 rounded-2xl p-2 text-center transition-all duration-300 group ${
+                              isEarned
+                                ? "bg-gradient-to-b from-[#fffef5] to-[#f5edd2] border-2 border-[#cca25a] shadow-[0_4px_10px_rgba(204,162,90,0.25)] hover:scale-105"
+                                : "bg-[#ece2ce]/50 border border-[#c9b99e] opacity-75 hover:opacity-100 hover:bg-[#ece2ce]/80"
+                            }`}
+                          >
+                            {/* Seal Badge Header or Lock icon */}
+                            {isEarned ? (
+                              <div className="absolute top-1 right-1 bg-[#cca25a] text-white p-0.5 rounded-full text-[8px] font-black shadow-xs">
+                                ✓
+                              </div>
+                            ) : (
+                              <div className="absolute top-1 right-1 text-[#8c7b69] text-[9px]">
+                                🔒
+                              </div>
+                            )}
+
+                            {/* Badge Icon */}
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-lg shadow-inner ${
+                              isEarned 
+                                ? "bg-gradient-to-b from-[#fef3c7] to-[#fde047]/50" 
+                                : "bg-slate-200/50 grayscale opacity-60"
+                            }`}>
+                              {badge.icon}
+                            </div>
+
+                            {/* Title & Info */}
+                            <div className="w-full">
+                              <div className="font-serif font-black text-[10px] text-[#2a2016] leading-tight truncate">
+                                {appLanguage === 'hi' ? badge.nameHindi : badge.name}
+                              </div>
+                              
+                              {/* Requirement description / Progress bar */}
+                              {isEarned ? (
+                                <div className="text-[7.5px] font-black text-emerald-700 tracking-wide mt-0.5 uppercase bg-emerald-100/60 px-1 rounded-sm py-0.5">
+                                  {appLanguage === 'hi' ? 'अनलॉक' : 'UNLOCKED'}
+                                </div>
+                              ) : (
+                                <div className="space-y-0.5 mt-1">
+                                  {/* Micro progress bar */}
+                                  <div className="w-full h-1 bg-black/10 rounded-full overflow-hidden">
+                                    <div 
+                                      className="h-full bg-[#cca25a] rounded-full transition-all duration-500"
+                                      style={{ width: `${percentage}%` }}
+                                    />
+                                  </div>
+                                  <div className="text-[7.5px] font-bold text-[#8c7b69]">
+                                    {actual} / {badge.target} {badge.displayUnit}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Floating Requirement Tooltip on hover */}
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block w-36 bg-[#2a1d12] text-amber-100 text-[8px] font-medium leading-tight p-1.5 rounded-lg border border-amber-800 shadow-lg z-30 pointer-events-none">
+                              <p className="font-bold text-amber-300">{appLanguage === 'hi' ? badge.nameHindi : badge.name}</p>
+                              <p className="mt-0.5">{appLanguage === 'hi' ? badge.descHindi : badge.desc}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  </div>
 
-                  {/* BADGE 2: BRONZE METALLIC EMPTY FRAME */}
-                  <div className="border border-[#b08762] bg-[#e4d6bf]/40 rounded-xl w-20 h-22 shrink-0 flex items-center justify-center shadow-xs">
-                  </div>
-
-                  {/* BADGE 3: MORE / STUDY ON (DASHED BORDER) */}
-                  <div className="border border-dashed border-[#c2b5a3] bg-[#eae2d3]/50 rounded-xl w-20 h-22 shrink-0 flex flex-col items-center justify-center text-center space-y-0.5">
-                    <span className="text-[10px] font-black text-[#6e5f4e]">+ more</span>
-                    <span className="text-[7px] font-black text-[#9e8f7c] tracking-widest uppercase">STUDY ON</span>
                   </div>
                 </div>
-              </div>
-            </div>
+              );
+            })()}
 
             {/* 8. STUDY LEADERBOARD - MULTI-THEME CAPABLE (MATTE WOODEN, OBSIDIAN BLACK, CYBER NEON, MATRIX EMERALD, GOLD LUXURY) */}
             {(() => {
@@ -2655,7 +2837,6 @@ export default function App() {
                 </button>
               </div>
             </div>
-
           </div>
         )}
 
@@ -2837,84 +3018,271 @@ export default function App() {
 
         {/* STUDY DOCS / NOTEBOOK TAB */}
         {activeTab === 'studyDocs' && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-xs text-slate-900 flex items-center space-x-1.5">
-                  <FileText className="w-4 h-4 text-indigo-600" />
-                  <span>Notebook</span>
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+            className="space-y-6 w-full"
+          >
+            {/* FULL WIDTH HEADER & CONTROLS */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/85 backdrop-blur-md border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs">
+              <div className="space-y-1">
+                <h3 className="font-extrabold text-slate-900 text-sm tracking-wide uppercase flex items-center space-x-2">
+                  <Notebook className="w-5 h-5 text-indigo-600 animate-pulse" />
+                  <span>Interactive Sticky Notes</span>
                 </h3>
-                <p className="text-[10px] text-slate-500">Formula sheets, key facts & study notes</p>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Double click a sticky note to edit or click '+' to stick a new memo.
+                </p>
               </div>
 
-              <button
-                onClick={() => setIsAddingDoc(true)}
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs flex items-center space-x-1"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>New Note</span>
-              </button>
+              {/* SEARCH & ADD CONTAINER */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                {/* Modern search bar */}
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                    <Search className="w-3.5 h-3.5 text-slate-400" />
+                  </span>
+                  <input
+                    type="text"
+                    value={noteSearchQuery}
+                    onChange={(e) => setNoteSearchQuery(e.target.value)}
+                    placeholder="Search sticky notes..."
+                    className="w-full sm:w-60 pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all"
+                  />
+                  {noteSearchQuery && (
+                    <button
+                      onClick={() => setNoteSearchQuery('')}
+                      className="absolute inset-y-0 right-2.5 flex items-center text-slate-400 hover:text-slate-600 transition"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Add note button */}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    setEditingDocId(null);
+                    setNewDocTitle('');
+                    setNewDocContent('');
+                    setIsAddingDoc(true);
+                  }}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center justify-center space-x-1.5 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>New Sticky Note</span>
+                </motion.button>
+              </div>
             </div>
 
-            {isAddingDoc && (
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-                <input
-                  type="text"
-                  placeholder="Note Title..."
-                  value={newDocTitle}
-                  onChange={(e) => setNewDocTitle(e.target.value)}
-                  className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900"
-                />
-                <textarea
-                  placeholder="Write your study notes here..."
-                  rows={3}
-                  value={newDocContent}
-                  onChange={(e) => setNewDocContent(e.target.value)}
-                  className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 resize-none"
-                />
-                <div className="flex justify-end space-x-2">
-                  <button
-                    onClick={() => setIsAddingDoc(false)}
-                    className="px-3 py-1.5 bg-slate-200 text-slate-700 rounded-xl text-xs"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSaveDoc}
-                    className="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-bold"
-                  >
-                    Save Note
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* UPGRADED GRID FOR LARGE WORKSPACE */}
+            <motion.div 
+              variants={{
+                hidden: { opacity: 0 },
+                show: {
+                  opacity: 1,
+                  transition: {
+                    staggerChildren: 0.05
+                  }
+                }
+              }}
+              initial="hidden"
+              animate="show"
+              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 pt-2"
+            >
+              <AnimatePresence mode="popLayout">
+                {studyDocs
+                  .filter((doc) => {
+                    const q = noteSearchQuery.toLowerCase();
+                    return doc.title.toLowerCase().includes(q) || doc.content.toLowerCase().includes(q);
+                  })
+                  .map((doc, idx) => {
+                    const colorPalettes = [
+                      { bg: 'bg-[#fffbeb]', border: 'border-amber-200/90', text: 'text-amber-950', secondary: 'text-amber-900/80', tape: 'bg-amber-400/25' },
+                      { bg: 'bg-[#f0fdfa]', border: 'border-teal-200/90', text: 'text-teal-950', secondary: 'text-teal-900/80', tape: 'bg-teal-400/25' },
+                      { bg: 'bg-[#fdf2f8]', border: 'border-pink-200/90', text: 'text-pink-950', secondary: 'text-pink-900/80', tape: 'bg-pink-400/25' },
+                      { bg: 'bg-[#f0f9ff]', border: 'border-sky-200/90', text: 'text-sky-950', secondary: 'text-sky-900/80', tape: 'bg-sky-400/25' },
+                      { bg: 'bg-[#faf5ff]', border: 'border-purple-200/90', text: 'text-purple-950', secondary: 'text-purple-900/80', tape: 'bg-purple-400/25' }
+                    ];
+                    const palette = colorPalettes[idx % colorPalettes.length];
+                    const rotations = [-1.5, 1, -0.8, 1.6, -1.2, 1.2];
+                    const rotation = rotations[idx % rotations.length];
 
-            <div className="grid md:grid-cols-2 gap-3">
-              {studyDocs.map((doc) => (
-                <div key={doc.id} className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5 relative group hover:border-indigo-300 transition">
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-bold text-slate-900 text-xs">{doc.title}</h4>
-                    <button
-                      onClick={() => handleDeleteDoc(doc.id)}
-                      className="text-slate-400 hover:text-rose-600 p-1"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-slate-600 whitespace-pre-wrap line-clamp-3">{doc.content}</p>
-                  <div className="pt-1 text-[9px] text-indigo-600 font-bold">
-                    {new Date(doc.timestamp).toLocaleString()}
-                  </div>
-                </div>
-              ))}
+                    return (
+                      <motion.div
+                        key={doc.id}
+                        variants={{
+                          hidden: { opacity: 0, scale: 0.85, rotate: rotation * 1.5, y: 15 },
+                          show: { 
+                            opacity: 1, 
+                            scale: 1, 
+                            rotate: rotation, 
+                            y: 0,
+                            transition: { type: 'spring', stiffness: 260, damping: 22 }
+                          }
+                        }}
+                        exit={{ opacity: 0, scale: 0.82, rotate: 0, y: -10, transition: { duration: 0.2 } }}
+                        whileHover={{ 
+                          scale: 1.03, 
+                          rotate: 0,
+                          zIndex: 10,
+                          boxShadow: '0 12px 24px -6px rgba(0, 0, 0, 0.08), 0 8px 12px -4px rgba(0, 0, 0, 0.05)'
+                        }}
+                        onDoubleClick={() => {
+                          setEditingDocId(doc.id);
+                          setNewDocTitle(doc.title);
+                          setNewDocContent(doc.content);
+                          setIsAddingDoc(true);
+                        }}
+                        className={`p-5 rounded-xl border relative flex flex-col justify-between h-[195px] group cursor-pointer shadow-[0_4px_14px_rgba(0,0,0,0.02)] ${palette.bg} ${palette.border}`}
+                      >
+                        {/* Washi Tape Ribbon Accent */}
+                        <div className={`w-14 h-4.5 absolute -top-2 left-1/2 -translate-x-1/2 rounded-xs border border-white/20 shadow-2xs backdrop-blur-[0.5px] rotate-1 ${palette.tape}`} />
+
+                        <div className="space-y-2 overflow-hidden flex-1 flex flex-col">
+                          <div className="flex justify-between items-start gap-2">
+                            <h4 className={`font-black text-[12px] tracking-tight uppercase line-clamp-1 ${palette.text}`}>
+                              {doc.title}
+                            </h4>
+                            <div className="flex items-center space-x-1 shrink-0 opacity-40 group-hover:opacity-100 transition duration-200">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingDocId(doc.id);
+                                  setNewDocTitle(doc.title);
+                                  setNewDocContent(doc.content);
+                                  setIsAddingDoc(true);
+                                }}
+                                className="text-slate-600 hover:text-indigo-600 p-1 rounded hover:bg-black/5 transition"
+                                title="Edit note"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteDoc(doc.id);
+                                }}
+                                className="text-slate-600 hover:text-rose-600 p-1 rounded hover:bg-black/5 transition"
+                                title="Delete note"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                          
+                          <p className={`text-[11px] leading-relaxed whitespace-pre-wrap line-clamp-5 font-semibold flex-1 ${palette.secondary}`}>
+                            {doc.content}
+                          </p>
+                        </div>
+
+                        <div className={`pt-2 mt-2 border-t border-black/5 text-[9px] font-black flex justify-between items-center ${palette.secondary}`}>
+                          <span>📝 DOUBLE CLICK TO EDIT</span>
+                          <span>{new Date(doc.timestamp).toLocaleDateString()}</span>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+              </AnimatePresence>
 
               {studyDocs.length === 0 && (
-                <div className="col-span-2 text-center py-10 text-slate-400 text-xs italic">
-                  No study notes saved yet. Click 'New Note' to start!
+                <div className="col-span-full bg-white/70 backdrop-blur-md border border-slate-200 rounded-2xl py-16 text-center space-y-3.5">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 border border-slate-200 flex items-center justify-center mx-auto text-xl font-bold">
+                    📌
+                  </div>
+                  <div className="max-w-xs mx-auto">
+                    <h4 className="font-bold text-slate-800 text-xs">No Sticky Notes yet</h4>
+                    <p className="text-[10.5px] text-slate-400 font-medium mt-1">
+                      Stick formulas, revision summaries, and ideas directly to your main notebook workspace!
+                    </p>
+                  </div>
                 </div>
               )}
-            </div>
-          </div>
+            </motion.div>
+
+            {/* DEDICATED CENTERED PREMIUM POPUP MODAL */}
+            <AnimatePresence>
+              {isAddingDoc && (
+                <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-[100] flex items-center justify-center p-4">
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                    transition={{ type: 'spring', stiffness: 320, damping: 24 }}
+                    className="w-full max-w-md bg-white border border-slate-200 rounded-3xl shadow-2xl p-5 sm:p-6 space-y-4.5 relative"
+                  >
+                    {/* Close button */}
+                    <button 
+                      onClick={() => {
+                        setIsAddingDoc(false);
+                        setEditingDocId(null);
+                        setNewDocTitle('');
+                        setNewDocContent('');
+                      }}
+                      className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-50 transition cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+
+                    <div className="flex items-center space-x-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 text-sm font-bold">
+                        📌
+                      </div>
+                      <h3 className="text-xs font-black text-slate-900 uppercase tracking-tight">
+                        {editingDocId ? 'Edit Sticky Note' : 'Add New Memo'}
+                      </h3>
+                    </div>
+
+                    <div className="space-y-3.5">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Title or Topic</label>
+                        <input
+                          type="text"
+                          placeholder="Title or Topic..."
+                          value={newDocTitle}
+                          onChange={(e) => setNewDocTitle(e.target.value)}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-xl text-xs text-slate-900 font-semibold focus:outline-none transition-all duration-300"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Details / Revision Notes</label>
+                        <textarea
+                          placeholder="Write details, key equations, or revision ideas..."
+                          rows={6}
+                          value={newDocContent}
+                          onChange={(e) => setNewDocContent(e.target.value)}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-xl text-xs text-slate-900 font-semibold resize-none focus:outline-none transition-all duration-300"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end space-x-2.5 pt-2 border-t border-slate-100">
+                      <button
+                        onClick={() => {
+                          setIsAddingDoc(false);
+                          setEditingDocId(null);
+                          setNewDocTitle('');
+                          setNewDocContent('');
+                        }}
+                        className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveDoc}
+                        className="px-4.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
+                      >
+                        {editingDocId ? 'Save Note' : 'Stick Note'}
+                      </button>
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
+          </motion.div>
         )}
 
         {/* PET COMPANION TAB */}
@@ -2977,10 +3345,14 @@ export default function App() {
               });
             }}
             onAddXp={addXp}
-            onOpenEditor={() => setShowAiEditorModal(true)}
             attachedWorkspaceFiles={attachedWorkspaceFiles}
             onRemoveAttachedWorkspaceFile={(id) => {
               setAttachedWorkspaceFiles(prev => prev.filter(f => f.id !== id));
+            }}
+            globalAppLanguage={appLanguage}
+            onLanguageChange={(lang: any) => {
+              setAppLanguage(lang);
+              updateUserProfile(userProfile.uid, { language: lang });
             }}
           />
         )}
@@ -3122,15 +3494,25 @@ export default function App() {
               </div>
 
               <div className="pt-2 border-t border-slate-800 grid grid-cols-2 gap-2 text-[11px]">
-                <button
-                  onClick={() => {
-                    toggleLanguage();
-                  }}
-                  className="py-1.5 px-2 bg-slate-800 hover:bg-slate-750 text-slate-200 rounded-xl font-bold flex items-center justify-center space-x-1.5 transition cursor-pointer"
-                >
-                  <Globe className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Lang: {appLanguage.toUpperCase()}</span>
-                </button>
+                <div className="relative py-1 px-2 bg-slate-800 hover:bg-slate-750 text-slate-200 rounded-xl font-bold flex items-center justify-center space-x-1 transition">
+                  <Globe className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                  <select
+                    value={appLanguage}
+                    onChange={(e) => {
+                      const selected = e.target.value as Language;
+                      setAppLanguage(selected);
+                      updateUserProfile(userProfile.uid, { language: selected });
+                    }}
+                    className="bg-transparent text-slate-200 font-bold text-[11px] focus:outline-none cursor-pointer w-full"
+                  >
+                    <option value="en" className="bg-slate-900 text-white">English</option>
+                    <option value="hi" className="bg-slate-900 text-white">हिंदी (Hindi)</option>
+                    <option value="hinglish" className="bg-slate-900 text-white">Hinglish</option>
+                    <option value="marathi" className="bg-slate-900 text-white">मराठी (Marathi)</option>
+                    <option value="tamil" className="bg-slate-900 text-white">தமிழ் (Tamil)</option>
+                    <option value="bengali" className="bg-slate-900 text-white">বাংলা (Bengali)</option>
+                  </select>
+                </div>
 
                 <ThemeToggle variant="pill" className="w-full justify-center" />
               </div>
@@ -3142,10 +3524,10 @@ export default function App() {
       {/* COMPACT & SLIM BOTTOM STICKY NAVIGATION BAR */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#0f141d]/95 backdrop-blur-lg border-t border-slate-800/90 px-4 py-1 flex items-center justify-around shadow-[0_-4px_20px_rgba(0,0,0,0.6)] h-12 transition-colors duration-200">
         {[
-          { id: 'home', label: 'Home', icon: BookOpen },
-          { id: 'aiTutor', label: 'AI Tutor', icon: BrainCircuit, badge: 'PRO' },
-          { id: 'toolkit', label: 'Tools', icon: Sparkles },
-          { id: 'groupChat', label: 'Rooms', icon: MessageSquare },
+          { id: 'home', icon: BookOpen },
+          { id: 'aiTutor', icon: BrainCircuit, badge: 'PRO' },
+          { id: 'toolkit', icon: Sparkles },
+          { id: 'groupChat', icon: MessageSquare },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -3180,7 +3562,7 @@ export default function App() {
                   </span>
                 )}
               </div>
-              <span className="text-[9.5px] tracking-tight mt-0.5">{tab.label}</span>
+              <span className="text-[9.5px] tracking-tight mt-0.5">{t(tab.id as any)}</span>
             </motion.button>
           );
         })}
@@ -3285,34 +3667,14 @@ export default function App() {
         }}
       />
 
-      {/* CINEMATIC AI APP & THEME EDITOR / COPILOT HUD */}
-      <CinematicAiEditor
-        isOpen={showAiEditorModal}
-        onClose={() => setShowAiEditorModal(false)}
-        user={userProfile}
-        appLanguage={appLanguage}
-        currentTab={activeTab}
-        customization={uiCustomization}
-        onUpdateCustomization={handleUpdateCustomization}
-        onSaveToNotebook={async (title, content, tags) => {
-          await saveStudyDocument({
-            id: 'doc_' + Date.now(),
-            ownerId: userProfile.uid,
-            title,
-            content,
-            summary: content.slice(0, 150) + '...',
-            tagsJson: JSON.stringify(tags || ['AI Editor']),
-            isShared: false,
-            timestamp: new Date().toISOString()
-          });
-        }}
-        onNavigateTab={(tab, toolId) => {
-          if (tab === 'toolkit' && toolId) {
-            setInitialTool(toolId);
-          }
-          setActiveTab(tab);
-        }}
-        onAddXp={addXp}
+
+
+      {/* BADGE CELEBRATION MODAL OVERLAY */}
+      <BadgeCelebrationModal
+        badge={unlockedBadgeCelebration}
+        userName={userProfile.name || (appLanguage === 'hi' ? 'छात्र' : 'Student')}
+        language={appLanguage}
+        onClose={() => setUnlockedBadgeCelebration(null)}
       />
 
       {/* PWA INSTALL & OFFLINE PROMPT BANNER */}

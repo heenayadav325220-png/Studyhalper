@@ -34,7 +34,7 @@ import {
 import { playUiSound } from "../services/soundEffects";
 
 interface IntegrationsHubProps {
-  appLanguage: "en" | "hi";
+  appLanguage: string;
   audioFeedbackEnabled?: boolean;
   onAttachFile?: (file: { id: string; name: string; content: string; type: "drive" | "classroom" | "sheets" }) => void;
   attachedFiles?: Array<{ id: string; name: string; type: "drive" | "classroom" | "sheets" }>;
@@ -138,7 +138,7 @@ export default function IntegrationsHub({
       attachmentReady: "सामग्री तैयार है!",
       close: "बंद करें"
     }
-  }[appLanguage];
+  }[appLanguage === 'hi' ? 'hi' : 'en'];
 
   const handleConnect = (service: string) => {
     if (audioFeedbackEnabled) playUiSound("cyber_synth");

@@ -21,7 +21,7 @@ interface VoiceTutorModalProps {
   isOpen: boolean;
   onClose: () => void;
   user: UserProfile;
-  appLanguage: 'en' | 'hi';
+  appLanguage: string;
   onAddXp?: (amount: number) => void;
   onSaveToNotebook?: (title: string, content: string, tags?: string[]) => Promise<void>;
 }

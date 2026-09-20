@@ -278,8 +278,11 @@ function handleApiError(error: any): string {
   const errMsg = error?.message || String(error);
   const status = error?.status || error?.statusCode || error?.code;
 
-  if (errMsg.includes("API_KEY_INVALID") || errMsg.includes("invalid api key") || status === 400 && errMsg.includes("key")) {
+  if (errMsg.includes("API_KEY_INVALID") || errMsg.includes("invalid api key") || (status === 400 && errMsg.includes("key"))) {
     return "Invalid API Key: Please verify that your VITE_GEMINI_API_KEY is correct in your settings.";
+  }
+  if (errMsg.includes("leaked") || errMsg.includes("PERMISSION_DENIED") || status === 403) {
+    return "API Key Error: Your Gemini API key was reported as leaked or unauthorized. Please configure a new Gemini API key in Settings.";
   }
   if (status === 429 || errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("Rate limit")) {
     setAiQuotaExceeded(true, "Rate Limit Exceeded on Gemini client API.");

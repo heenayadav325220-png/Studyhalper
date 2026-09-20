@@ -22,7 +22,7 @@ import {
 interface CustomVoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  appLanguage: 'en' | 'hi';
+  appLanguage: string;
 }
 
 interface VoicePreset {

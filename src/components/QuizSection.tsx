@@ -34,7 +34,7 @@ interface QuizSectionProps {
   onSaveMockExam?: (exam: MockExam) => Promise<void>;
   savedExams?: MockExam[];
   onClose?: () => void;
-  language?: 'en' | 'hi';
+  language?: string;
 }
 
 interface QuizQuestion {

@@ -607,15 +607,15 @@ export default function SelfCustomizeModal({
 
           <div>
             <div className="flex items-center space-x-2.5">
-              <h1 className="font-serif font-black text-base sm:text-xl text-amber-100 tracking-tight flex items-center gap-1.5">
+              <h1 className="font-serif font-black text-sm sm:text-xl text-amber-100 tracking-tight flex items-center gap-1.5">
                 <span>Self Customize Studio</span>
                 <span className="text-amber-400 text-sm">🪵</span>
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-amber-950/90 text-amber-300 border border-amber-600/50 text-[10px] sm:text-[11px] font-black uppercase tracking-wider shadow-inner font-sans">
+              <span className="hidden sm:inline px-2.5 py-0.5 rounded-full bg-amber-950/90 text-amber-300 border border-amber-600/50 text-[10px] sm:text-[11px] font-black uppercase tracking-wider shadow-inner font-sans">
                 Full-Page Studio
               </span>
             </div>
-            <p className="text-[11px] sm:text-xs text-amber-200/70 font-medium truncate max-w-xs sm:max-w-md">
+            <p className="text-[11px] sm:text-xs text-amber-200/70 font-medium truncate max-w-xs sm:max-w-md hidden sm:block">
               {language === 'hi' ? 'अपनी पसंद का थीम, फॉन्ट, लाइटिंग, आवाज़ और डैशबोर्ड लेआउट कस्टमाइज़ करें' : 'Personalize UI themes, tutor styles, neon perimeter aura, typography & sound haptics.'}
             </p>
           </div>
@@ -625,11 +625,11 @@ export default function SelfCustomizeModal({
         <div className="flex items-center space-x-2 sm:space-x-3">
           <button
             onClick={handleReset}
-            className="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold text-amber-300/80 hover:text-amber-100 bg-[#2b1b11] hover:bg-[#3d2719] border border-amber-700/50 transition cursor-pointer flex items-center space-x-1.5 shadow-sm"
+            className="hidden md:flex px-3 sm:px-4 py-2 rounded-xl text-xs font-bold text-amber-300/80 hover:text-amber-100 bg-[#2b1b11] hover:bg-[#3d2719] border border-amber-700/50 transition cursor-pointer items-center space-x-1.5 shadow-sm"
             title="Reset to default settings"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Reset Defaults</span>
+            <span>Reset Defaults</span>
           </button>
 
           <button
@@ -637,7 +637,7 @@ export default function SelfCustomizeModal({
               playUiSound(tempConfig.audioFeedback);
               onClose();
             }}
-            className="px-4 sm:px-6 py-2 rounded-xl text-xs sm:text-sm font-black text-slate-950 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 border border-amber-200 shadow-[0_0_20px_rgba(245,158,11,0.45)] transition cursor-pointer flex items-center space-x-2 active:scale-95 font-sans"
+            className="hidden md:flex px-4 sm:px-6 py-2 rounded-xl text-xs sm:text-sm font-black text-slate-950 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 border border-amber-200 shadow-[0_0_20px_rgba(245,158,11,0.45)] transition cursor-pointer items-center space-x-2 active:scale-95 font-sans"
           >
             <Check className="w-4 h-4 stroke-[3]" />
             <span>Save & Close</span>
@@ -1268,6 +1268,28 @@ export default function SelfCustomizeModal({
           </AnimatePresence>
 
         </main>
+      </div>
+
+      {/* MOBILE STICKY ACTIONS BAR */}
+      <div className="relative z-20 shrink-0 md:hidden px-4 py-3 bg-[#1e140d] border-t-2 border-amber-800/60 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] flex items-center justify-between gap-3">
+        <button
+          onClick={handleReset}
+          className="flex-1 py-3 px-4 rounded-xl text-xs font-bold text-amber-300 bg-[#2b1b11] hover:bg-[#3d2719] border border-amber-700/50 flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95 animate-pulse"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          <span>Reset Defaults</span>
+        </button>
+
+        <button
+          onClick={() => {
+            playUiSound(tempConfig.audioFeedback);
+            onClose();
+          }}
+          className="flex-[1.5] py-3 px-4 rounded-xl text-xs font-black text-slate-950 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 border border-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.35)] flex items-center justify-center space-x-2 cursor-pointer active:scale-95 font-sans"
+        >
+          <Check className="w-4 h-4 stroke-[3]" />
+          <span>Save & Close</span>
+        </button>
       </div>
 
     </div>

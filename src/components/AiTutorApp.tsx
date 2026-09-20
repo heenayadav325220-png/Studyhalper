@@ -36,7 +36,9 @@ import {
   Table,
   Languages,
   Zap,
-  HelpCircle
+  HelpCircle,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -77,9 +79,10 @@ interface AiTutorAppProps {
   onBack: () => void;
   onAddNote?: (note: { title: string; content: string; subject: string }) => Promise<void>;
   onAddXp?: (amount: number) => void;
-  onOpenEditor?: () => void;
   attachedWorkspaceFiles?: Array<{ id: string; name: string; content: string; type: "drive" | "classroom" | "sheets" }>;
   onRemoveAttachedWorkspaceFile?: (id: string) => void;
+  globalAppLanguage?: string;
+  onLanguageChange?: (lang: any) => void;
 }
 
 interface ChatMessage {
@@ -484,9 +487,10 @@ export const AiTutorApp = memo(function AiTutorApp({
   onBack,
   onAddNote,
   onAddXp,
-  onOpenEditor,
   attachedWorkspaceFiles = [],
-  onRemoveAttachedWorkspaceFile
+  onRemoveAttachedWorkspaceFile,
+  globalAppLanguage,
+  onLanguageChange
 }: AiTutorAppProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const saved = getStoredValue(`ai_tutor_chat_${user.uid}`);
@@ -528,6 +532,23 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [activeMathCategory, setActiveMathCategory] = useState<'All' | 'Greek' | 'Algebra' | 'Operators' | 'Calculus'>('All');
 
   const appLanguage = getAppLanguage(selectedLanguage);
+
+  useEffect(() => {
+    if (globalAppLanguage) {
+      const mapped: Record<string, string> = {
+        'en': 'English',
+        'hi': 'Hindi',
+        'hinglish': 'Hinglish',
+        'marathi': 'Marathi',
+        'tamil': 'Tamil',
+        'bengali': 'Bengali'
+      };
+      const matchingVal = mapped[globalAppLanguage];
+      if (matchingVal && matchingVal !== selectedLanguage) {
+        setSelectedLanguage(matchingVal);
+      }
+    }
+  }, [globalAppLanguage]);
 
   const [savedFormulas, setSavedFormulas] = useState<SavedFormula[]>(() => {
     const saved = getStoredValue(`saved_formulas_${user.uid}`);
@@ -588,6 +609,52 @@ export const AiTutorApp = memo(function AiTutorApp({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+
+  // Auto-hiding header system (slides up automatically in 2.5s, pull/click arrow down to restore)
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const [isHeaderHoveredOrInteracting, setIsHeaderHoveredOrInteracting] = useState(false);
+  const autoHideTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const touchStartYRef = useRef<number>(0);
+  const mouseStartYRef = useRef<number | null>(null);
+
+  const resetAutoHideTimer = () => {
+    if (autoHideTimerRef.current) {
+      clearTimeout(autoHideTimerRef.current);
+      autoHideTimerRef.current = null;
+    }
+    if (!isHeaderHoveredOrInteracting && isHeaderVisible) {
+      autoHideTimerRef.current = setTimeout(() => {
+        setIsHeaderVisible(false);
+      }, 2500);
+    }
+  };
+
+  const showHeader = () => {
+    setIsHeaderVisible(true);
+    resetAutoHideTimer();
+  };
+
+  const hideHeader = () => {
+    if (autoHideTimerRef.current) {
+      clearTimeout(autoHideTimerRef.current);
+      autoHideTimerRef.current = null;
+    }
+    setIsHeaderVisible(false);
+  };
+
+  useEffect(() => {
+    if (isHeaderVisible && !isHeaderHoveredOrInteracting) {
+      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+      autoHideTimerRef.current = setTimeout(() => {
+        setIsHeaderVisible(false);
+      }, 2500);
+    } else if (autoHideTimerRef.current) {
+      clearTimeout(autoHideTimerRef.current);
+    }
+    return () => {
+      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+    };
+  }, [isHeaderVisible, isHeaderHoveredOrInteracting]);
 
   useEffect(() => {
     const vv = window.visualViewport;
@@ -1278,191 +1345,320 @@ export const AiTutorApp = memo(function AiTutorApp({
     <div
       className="fixed inset-0 z-50 bg-[#f8fafc] text-slate-900 flex flex-col font-sans overflow-hidden transition-[height] duration-150 ease-out"
       style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
+      onTouchStart={(e) => {
+        if (!isHeaderVisible && e.touches[0].clientY < 60) {
+          touchStartYRef.current = e.touches[0].clientY;
+        }
+      }}
+      onTouchMove={(e) => {
+        if (!isHeaderVisible && touchStartYRef.current > 0) {
+          if (e.touches[0].clientY - touchStartYRef.current > 15) {
+            showHeader();
+            touchStartYRef.current = 0;
+          }
+        }
+      }}
     >
-      <header className="bg-white/95 backdrop-blur-sm border-b border-slate-200 px-3 sm:px-5 py-2.5 sm:py-3 flex items-center justify-between shrink-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)] z-10">
-        <div className="flex items-center space-x-2.5 sm:space-x-3">
-          <button
-            onClick={onBack}
-            className="p-1.5 sm:p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center space-x-1 border border-slate-200 group cursor-pointer"
-            title="Back to Ascend Study"
-          >
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform text-slate-700" />
-            <span className="text-xs font-bold text-slate-700 hidden sm:inline">Back</span>
-          </button>
-
-          <div className="flex items-center space-x-2.5">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#0f172a] to-[#1e293b] shadow-sm flex items-center justify-center text-cyan-400 font-bold text-lg tracking-wider">
-              A
-            </div>
-
-            <div>
-              <div className="flex items-center space-x-2 flex-wrap">
-                <h1 className="text-xs sm:text-sm font-bold tracking-tight text-slate-900">
-                  ASCEND AI TUTOR
-                </h1>
-                <span className="text-slate-400 font-bold text-xs">v2.5</span>
-                <div className="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-[10px] px-2 py-0.5 rounded-full flex items-center space-x-1 shadow-2xs">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Online</span>
-                </div>
-              </div>
-              <p className="text-[10px] text-slate-500 font-medium flex items-center space-x-1 mt-0.5">
-                <span>Powered by Gemini AI</span>
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <div className="hidden md:flex items-center space-x-1.5">
-            <div className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-1 rounded-full flex items-center space-x-1.5">
-              <UserIcon className="w-3.5 h-3.5 text-slate-500" />
-              <span className="truncate max-w-[110px]">{user.name || 'full Yadav'}</span>
-            </div>
-
-            <div className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-1 rounded-full flex items-center space-x-1.5">
-              <GraduationCap className="w-3.5 h-3.5 text-slate-500" />
-              <span className="truncate max-w-[130px]">{user.className || 'Class 11th (PCB)'}</span>
-            </div>
-
-            <div className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-1 rounded-full flex items-center space-x-1.5">
-              <UserIcon className="w-3.5 h-3.5 text-slate-500" />
-              <span className="truncate max-w-[100px]">{user.schoolName || 'chhabra'}</span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowCustomVoiceModal(true)}
-            className="p-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-200/80 rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-[0_0_0_1px_rgba(99,102,241,0.05)]"
-            title="Configure Tutor Custom Voice"
-          >
-            <Volume2 className="w-4 h-4 text-indigo-600" />
-            <span className="hidden sm:inline">Voice</span>
-          </button>
-
-          {messages.length > 0 && (
+      {/* COLLAPSIBLE HEADER CONTAINER WITH AUTO-HIDE (2.5 SECONDS) */}
+      <motion.div
+        initial={false}
+        animate={{
+          height: isHeaderVisible ? 'auto' : 0,
+          opacity: isHeaderVisible ? 1 : 0
+        }}
+        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+        className="relative z-30 shrink-0 overflow-hidden bg-white shadow-xs"
+        onMouseEnter={() => {
+          setIsHeaderHoveredOrInteracting(true);
+        }}
+        onMouseLeave={() => {
+          setIsHeaderHoveredOrInteracting(false);
+        }}
+        onTouchStart={() => {
+          setIsHeaderHoveredOrInteracting(true);
+          resetAutoHideTimer();
+        }}
+        onFocusCapture={() => {
+          setIsHeaderHoveredOrInteracting(true);
+        }}
+        onBlurCapture={() => {
+          setIsHeaderHoveredOrInteracting(false);
+        }}
+      >
+        <header className="bg-white/95 backdrop-blur-sm border-b border-slate-200 px-3 sm:px-5 py-2.5 sm:py-3 flex items-center justify-between shrink-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)] z-10">
+          <div className="flex items-center space-x-2.5 sm:space-x-3">
             <button
-              onClick={handleClearChat}
-              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
-              title="Clear Conversation"
+              onClick={onBack}
+              className="p-1.5 sm:p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center space-x-1 border border-slate-200 group cursor-pointer"
+              title="Back to Ascend Study"
             >
-              <Trash2 className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform text-slate-700" />
+              <span className="text-xs font-bold text-slate-700 hidden sm:inline">Back</span>
             </button>
-          )}
+
+            <div className="flex items-center space-x-2.5">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#0f172a] to-[#1e293b] shadow-sm flex items-center justify-center text-cyan-400 font-bold text-lg tracking-wider">
+                A
+              </div>
+
+              <div>
+                <div className="flex items-center space-x-2 flex-wrap">
+                  <h1 className="text-xs sm:text-sm font-bold tracking-tight text-slate-900">
+                    ASCEND AI TUTOR
+                  </h1>
+                  <span className="text-slate-400 font-bold text-xs">v2.5</span>
+                  <div className="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-[10px] px-2 py-0.5 rounded-full flex items-center space-x-1 shadow-2xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Online</span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-500 font-medium flex items-center space-x-1 mt-0.5">
+                  <span>Powered by Gemini AI</span>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <div className="hidden md:flex items-center space-x-1.5">
+              <div className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-1 rounded-full flex items-center space-x-1.5">
+                <UserIcon className="w-3.5 h-3.5 text-slate-500" />
+                <span className="truncate max-w-[110px]">{user.name || 'full Yadav'}</span>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-1 rounded-full flex items-center space-x-1.5">
+                <GraduationCap className="w-3.5 h-3.5 text-slate-500" />
+                <span className="truncate max-w-[130px]">{user.className || 'Class 11th (PCB)'}</span>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-1 rounded-full flex items-center space-x-1.5">
+                <UserIcon className="w-3.5 h-3.5 text-slate-500" />
+                <span className="truncate max-w-[100px]">{user.schoolName || 'chhabra'}</span>
+              </div>
+            </div>
+
+            {/* Direct Mic Speech-to-Text Button */}
+            <button
+              type="button"
+              onClick={handleVoiceInputToggle}
+              className={`p-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-bold ${
+                isListening
+                  ? 'bg-rose-500 text-white animate-pulse shadow-md border border-rose-600'
+                  : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-100 border border-slate-200'
+              }`}
+              title={isListening ? 'Listening... Click to stop' : 'Microphone Voice Input'}
+            >
+              <Mic className="w-4 h-4" />
+              <span className="hidden sm:inline">{isListening ? 'Listening...' : 'Mic'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowCustomVoiceModal(true)}
+              className="p-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-200/80 rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-[0_0_0_1px_rgba(99,102,241,0.05)]"
+              title="Configure Tutor Custom Voice"
+            >
+              <Volume2 className="w-4 h-4 text-indigo-600" />
+              <span className="hidden sm:inline">Voice</span>
+            </button>
+
+            {messages.length > 0 && (
+              <button
+                onClick={handleClearChat}
+                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
+                title="Clear Conversation"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowMoreMenu(true)}
+              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition flex items-center justify-center relative shadow-2xs cursor-pointer active:scale-95"
+              title="Tools, Modes, Subject & Settings"
+            >
+              <MoreVertical className="w-4 h-4 text-slate-700" />
+            </button>
+          </div>
+        </header>
+
+        {pdfExportSuccess && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-emerald-600 text-white px-4 py-2 text-xs font-bold flex items-center justify-between shadow-md z-20"
+          >
+            <div className="flex items-center space-x-2">
+              <Check className="w-4 h-4 text-white" />
+              <span>Formatted PDF study guide successfully downloaded! Saved for offline study.</span>
+            </div>
+            <span className="bg-emerald-800 text-emerald-100 text-[10px] px-2 py-0.5 rounded-full font-mono">
+              +15 XP Earned
+            </span>
+          </motion.div>
+        )}
+
+        <div className="bg-white border-b border-slate-200/80 px-3 sm:px-5 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
+          <div className="relative shrink-0">
+            <select
+              value={selectedSubject}
+              onChange={(e) => setSelectedSubject(e.target.value as Subject)}
+              className="appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs pl-8 pr-4 py-1.5 rounded-lg cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            >
+              {SUBJECT_LIST.map((sub) => (
+                <option key={sub} value={sub} className="text-slate-900 bg-white">{sub}</option>
+              ))}
+            </select>
+            <FlaskConical className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          <div className="relative shrink-0">
+            <select
+              value={selectedLanguage}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedLanguage(val);
+                setStoredValue(`ai_tutor_language_${user.uid}`, val);
+                if (onLanguageChange) {
+                  const reverseMap: Record<string, string> = {
+                    'English': 'en',
+                    'Hindi': 'hi',
+                    'Hinglish': 'hinglish',
+                    'Marathi': 'marathi',
+                    'Tamil': 'tamil',
+                    'Bengali': 'bengali'
+                  };
+                  const code = reverseMap[val];
+                  if (code) onLanguageChange(code);
+                }
+              }}
+              className="appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs pl-8 pr-4 py-1.5 rounded-lg cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            >
+              <option value="Hinglish">Hinglish</option>
+              <option value="Hindi">हिंदी (Hindi)</option>
+              <option value="English">English</option>
+              <option value="Marathi">मराठी (Marathi)</option>
+              <option value="Tamil">தமிழ் (Tamil)</option>
+              <option value="Bengali">বাংলा (Bengali)</option>
+            </select>
+            <Languages className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          <div className="w-px h-5 bg-slate-200 shrink-0" />
+
+          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5 shrink-0">
+            {[
+              { id: 'homework' as const, label: 'Homework', icon: Zap },
+              { id: 'step' as const, label: 'Step-by-Step', icon: TrendingUp },
+              { id: 'explain' as const, label: 'Explain', icon: Lightbulb },
+              { id: 'quiz' as const, label: 'Quiz', icon: ClipboardList },
+            ].map((mode) => {
+              const Icon = mode.icon;
+              const active = tutorMode === mode.id;
+              return (
+                <button
+                  key={mode.id}
+                  type="button"
+                  onClick={() => setTutorMode(mode.id)}
+                  className={`px-2.5 py-1.5 rounded-md font-semibold text-xs flex items-center space-x-1.5 transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95 ${
+                    active
+                      ? 'bg-slate-900 text-white shadow-2xs'
+                      : 'text-slate-600 hover:bg-slate-200/60'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{mode.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="w-px h-5 bg-slate-200 shrink-0" />
 
           <button
             type="button"
-            onClick={() => setShowMoreMenu(true)}
-            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition flex items-center justify-center relative shadow-2xs cursor-pointer active:scale-95"
-            title="Tools, Modes, Subject & Settings"
+            onClick={() => handleSendMessage(`Give me key high-yield exam insights, formula tricks, and JEE Main / Board questions for ${selectedSubject}.`)}
+            className="border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 font-semibold text-xs px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer"
           >
-            <MoreVertical className="w-4 h-4 text-slate-700" />
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Exam Insights</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            disabled={messages.length === 0 || isExportingPdf}
+            className="ml-auto border border-slate-200 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40 text-slate-600 font-semibold text-xs px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer"
+          >
+            {isExportingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">Export PDF</span>
           </button>
         </div>
-      </header>
 
-      {pdfExportSuccess && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="bg-emerald-600 text-white px-4 py-2 text-xs font-bold flex items-center justify-between shadow-md z-20"
-        >
-          <div className="flex items-center space-x-2">
-            <Check className="w-4 h-4 text-white" />
-            <span>Formatted PDF study guide successfully downloaded! Saved for offline study.</span>
-          </div>
-          <span className="bg-emerald-800 text-emerald-100 text-[10px] px-2 py-0.5 rounded-full font-mono">
-            +15 XP Earned
-          </span>
-        </motion.div>
-      )}
-
-      <div className="bg-white border-b border-slate-200/80 px-3 sm:px-5 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
-        <div className="relative shrink-0">
-          <select
-            value={selectedSubject}
-            onChange={(e) => setSelectedSubject(e.target.value as Subject)}
-            className="appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs pl-8 pr-4 py-1.5 rounded-lg cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+        {/* Small bottom pull-up button */}
+        <div className="flex justify-center -mt-0.5 pb-1 bg-white border-b border-slate-200/80">
+          <button
+            type="button"
+            onClick={hideHeader}
+            className="px-3 py-0.5 text-[10px] font-medium text-slate-400 hover:text-slate-700 flex items-center gap-1 cursor-pointer transition rounded-full hover:bg-slate-100 active:scale-95"
+            title="Click to hide header (auto-hides in ~2.5s)"
           >
-            {SUBJECT_LIST.map((sub) => (
-              <option key={sub} value={sub} className="text-slate-900 bg-white">{sub}</option>
-            ))}
-          </select>
-          <FlaskConical className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <span>{appLanguage === 'hi' ? 'ऊपर छुपाएं' : 'Hide Header'}</span>
+            <ChevronUp className="w-3 h-3" />
+          </button>
         </div>
+      </motion.div>
 
-        <div className="relative shrink-0">
-          <select
-            value={selectedLanguage}
-            onChange={(e) => {
-              const val = e.target.value;
-              setSelectedLanguage(val);
-              setStoredValue(`ai_tutor_language_${user.uid}`, val);
-            }}
-            className="appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs pl-8 pr-4 py-1.5 rounded-lg cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+      {/* FLOATING DOWN-ARROW PULL HANDLE WHEN HEADER IS HIDDEN */}
+      <AnimatePresence>
+        {!isHeaderVisible && (
+          <motion.div
+            initial={{ y: -30, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -30, opacity: 0 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            className="fixed top-0 left-1/2 -translate-x-1/2 z-40"
           >
-            <option value="Hinglish">Hinglish</option>
-            <option value="Hindi">हिंदी (Hindi)</option>
-            <option value="English">English</option>
-            <option value="Marathi">मराठी (Marathi)</option>
-            <option value="Tamil">தமிழ் (Tamil)</option>
-            <option value="Bengali">বাংলा (Bengali)</option>
-          </select>
-          <Languages className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
-
-        <div className="w-px h-5 bg-slate-200 shrink-0" />
-
-        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5 shrink-0">
-          {[
-            { id: 'homework' as const, label: 'Homework', icon: Zap },
-            { id: 'step' as const, label: 'Step-by-Step', icon: TrendingUp },
-            { id: 'explain' as const, label: 'Explain', icon: Lightbulb },
-            { id: 'quiz' as const, label: 'Quiz', icon: ClipboardList },
-          ].map((mode) => {
-            const Icon = mode.icon;
-            const active = tutorMode === mode.id;
-            return (
-              <button
-                key={mode.id}
-                type="button"
-                onClick={() => setTutorMode(mode.id)}
-                className={`px-2.5 py-1.5 rounded-md font-semibold text-xs flex items-center space-x-1.5 transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95 ${
-                  active
-                    ? 'bg-slate-900 text-white shadow-2xs'
-                    : 'text-slate-600 hover:bg-slate-200/60'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{mode.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="w-px h-5 bg-slate-200 shrink-0" />
-
-        <button
-          type="button"
-          onClick={() => handleSendMessage(`Give me key high-yield exam insights, formula tricks, and JEE Main / Board questions for ${selectedSubject}.`)}
-          className="border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 font-semibold text-xs px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Exam Insights</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={handleExportPdf}
-          disabled={messages.length === 0 || isExportingPdf}
-          className="ml-auto border border-slate-200 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40 text-slate-600 font-semibold text-xs px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer"
-        >
-          {isExportingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
-          <span className="hidden sm:inline">Export PDF</span>
-        </button>
-      </div>
+            <button
+              type="button"
+              onClick={showHeader}
+              onTouchStart={(e) => {
+                touchStartYRef.current = e.touches[0].clientY;
+              }}
+              onTouchMove={(e) => {
+                const deltaY = e.touches[0].clientY - touchStartYRef.current;
+                if (deltaY > 12) {
+                  showHeader();
+                }
+              }}
+              onMouseDown={(e) => {
+                mouseStartYRef.current = e.clientY;
+              }}
+              onMouseMove={(e) => {
+                if (mouseStartYRef.current !== null && e.clientY - mouseStartYRef.current > 12) {
+                  showHeader();
+                  mouseStartYRef.current = null;
+                }
+              }}
+              onMouseUp={() => {
+                mouseStartYRef.current = null;
+              }}
+              className="group px-4 py-1.5 bg-white/95 hover:bg-white text-slate-800 border-x border-b border-slate-200/90 rounded-b-2xl shadow-[0_4px_16px_rgba(15,23,42,0.12)] flex items-center gap-2 cursor-pointer transition-all active:scale-95 select-none"
+              title={appLanguage === 'hi' ? 'नीचे खींचें या क्लिक करें' : 'Slide or click to open AI Tutor header'}
+            >
+              <span className="text-[11px] font-bold text-slate-700 group-hover:text-indigo-600 transition-colors flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                <span>{appLanguage === 'hi' ? 'एआई ट्यूटर हेडर' : 'AI Tutor'}</span>
+              </span>
+              <div className="w-5 h-5 rounded-full bg-indigo-50 group-hover:bg-indigo-100 text-indigo-600 flex items-center justify-center transition-transform group-hover:translate-y-0.5">
+                <ChevronDown className="w-3.5 h-3.5 animate-bounce" />
+              </div>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="flex-1 overflow-y-auto overscroll-contain scroll-smooth p-3 sm:p-5 space-y-4 max-w-4xl mx-auto w-full">
         {messages.length === 0 ? (
@@ -2300,8 +2496,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                       { id: 'homework', label: '⚡ Homework Solver', desc: 'Step-by-step complete solutions' },
                       { id: 'step', label: '📐 Step Math', desc: 'Detailed mathematical breakdown' },
                       { id: 'explain', label: '💡 Explainer', desc: 'Concepts with easy analogies' },
-                      { id: 'quiz', label: '📝 Practice Quiz', desc: 'Custom 3-question testing quiz' },
-                      { id: 'editor', label: '⚡ Editor (Cinematic HUD)', desc: 'Voice/text app controller & notes creator' }
+                      { id: 'quiz', label: '📝 Practice Quiz', desc: 'Custom 3-question testing quiz' }
                     ].map((m) => {
                       const isSelected = tutorMode === m.id;
                       return (
@@ -2309,28 +2504,16 @@ export const AiTutorApp = memo(function AiTutorApp({
                           key={m.id}
                           type="button"
                           onClick={() => {
-                            if (m.id === 'editor') {
-                              setShowMoreMenu(false);
-                              if (onOpenEditor) onOpenEditor();
-                            } else {
-                              setTutorMode(m.id as any);
-                            }
+                            setTutorMode(m.id as any);
                           }}
                           className={`p-2.5 rounded-2xl text-left border transition ${
-                            m.id === 'editor'
-                              ? 'col-span-2 bg-gradient-to-r from-cyan-950 to-indigo-950 border-cyan-500/60 text-cyan-200 shadow-[0_0_15px_rgba(6,182,212,0.25)] hover:border-cyan-400'
-                              : isSelected
+                            isSelected
                               ? 'bg-indigo-600/20 border-indigo-500 text-indigo-200'
                               : 'bg-slate-800/60 border-slate-700/60 text-slate-300 hover:bg-slate-800'
                           }`}
                         >
                           <div className="text-xs font-bold flex items-center justify-between">
                             <span>{m.label}</span>
-                            {m.id === 'editor' && (
-                              <span className="text-[8px] bg-cyan-400 text-slate-950 font-black px-1.5 py-0.5 rounded-full uppercase">
-                                NEW
-                              </span>
-                            )}
                           </div>
                           <div className="text-[9px] text-slate-400 mt-0.5">{m.desc}</div>
                         </button>

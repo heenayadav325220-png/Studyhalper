@@ -91,7 +91,7 @@ export interface UserProfile {
   petLevel: number;
   petXp: number;
   petName: string;
-  language: 'en' | 'hi';
+  language: 'en' | 'hi' | 'hinglish' | 'marathi' | 'tamil' | 'bengali';
   lastActive: string;
   schoolName?: string;
   className?: string;

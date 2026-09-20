@@ -5,9 +5,15 @@ import './index.css';
 import { registerServiceWorker } from './services/pwaService';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
+import { initConsoleGuard, initMemoryPurge, initIntegrityMonitor } from './utils/securityShield';
 
 // Initialize PWA Service Worker
 registerServiceWorker();
+
+// Initialize High-Grade Security Shield Protections
+initConsoleGuard();
+initMemoryPurge();
+initIntegrityMonitor();
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
