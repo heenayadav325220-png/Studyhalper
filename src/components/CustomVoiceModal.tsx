@@ -9,14 +9,19 @@ import {
   Radio, 
   Info, 
   X,
-  UserCheck
+  UserCheck,
+  Sparkles,
+  RotateCcw
 } from 'lucide-react';
 import { 
   CustomVoiceConfig, 
   getCustomVoiceConfig, 
   saveCustomVoiceConfig, 
   getBrowserVoices, 
-  playTutorSpeech 
+  playTutorSpeech,
+  findBestQualityVoice,
+  scoreVoiceQuality,
+  DEFAULT_VOICE_CONFIG
 } from '../services/voiceSettings';
 
 interface CustomVoiceModalProps {
@@ -39,33 +44,33 @@ interface VoicePreset {
 const VOICE_PRESETS: VoicePreset[] = [
   {
     id: 'friendly',
-    nameEn: 'Friendly Study Buddy',
-    nameHi: 'दोस्ताना स्टडी बडी',
-    descEn: 'Warm, relatable, and conversational peer tone',
-    descHi: 'मित्रवत, सरल और अपनत्व भरा अंदाज',
+    nameEn: 'Friendly Study Buddy (Best)',
+    nameHi: 'दोस्ताना स्टडी बडी (एक नंबर)',
+    descEn: 'Acoustically tuned warm, articulate, and natural cadence',
+    descHi: 'एकदम साफ़, मधुर और अपनत्व भरा नेचुरल अंदाज़',
     icon: '🤝',
-    pitch: 1.05,
-    rate: 1.0
+    pitch: 1.02,
+    rate: 0.96
   },
   {
     id: 'mentor',
     nameEn: 'Wise Mentor / Guru',
     nameHi: 'शांत गुरु / सीनियर मेंटॉर',
     descEn: 'Deep, steady, authoritative, and patient cadence',
-    descHi: 'गंभीर, स्थिर और धैर्यवान आवाज',
+    descHi: 'गंभीर, स्थिर और धैर्यवान स्पष्ट आवाज',
     icon: '🎓',
-    pitch: 0.85,
-    rate: 0.95
+    pitch: 0.90,
+    rate: 0.94
   },
   {
     id: 'energetic',
     nameEn: 'Energetic Exam Coach',
     nameHi: 'जोशीला एग्ज़ाम कोच',
-    descEn: 'Fast-paced, inspiring, and high-energy motivation',
-    descHi: 'तेज, प्रेरणादायक और उत्साह से भरपूर',
+    descEn: 'Inspiring, upbeat motivation with clear enunciation',
+    descHi: 'तेज, प्रेरणादायक और उत्साह से भरपूर स्पष्ट आवाज',
     icon: '⚡',
-    pitch: 1.15,
-    rate: 1.1
+    pitch: 1.08,
+    rate: 1.05
   },
   {
     id: 'calm',
@@ -74,7 +79,7 @@ const VOICE_PRESETS: VoicePreset[] = [
     descEn: 'Gentle, soothing rhythm for stress-free revision',
     descHi: 'तनाव-मुक्त पढ़ाई के लिए धीमा और मधुर स्वर',
     icon: '🧘',
-    pitch: 0.95,
+    pitch: 0.98,
     rate: 0.88
   }
 ];
@@ -91,28 +96,33 @@ export const CustomVoiceModal: React.FC<CustomVoiceModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setConfig(getCustomVoiceConfig());
+      const active = getCustomVoiceConfig();
+      setConfig(active);
       getBrowserVoices().then((voices) => {
-        setAvailableVoices(voices);
-        // If no voice selected, auto-select a good Hindi or English voice
-        const current = getCustomVoiceConfig();
-        if (!current.voiceURI && voices.length > 0) {
-          const preferred = voices.find(
-            (v) => v.lang.startsWith('hi') || v.name.toLowerCase().includes('india') || v.lang.startsWith('en-IN')
-          ) || voices.find((v) => v.lang.startsWith('en')) || voices[0];
+        // Sort voices by quality score so the best neural/natural voices appear first
+        const isHi = appLanguage === 'hi';
+        const sorted = [...voices].sort((a, b) => scoreVoiceQuality(b, isHi) - scoreVoiceQuality(a, isHi));
+        setAvailableVoices(sorted);
 
-          if (preferred) {
-            setConfig((prev) => ({
-              ...prev,
-              voiceURI: preferred.voiceURI,
-              voiceName: preferred.name,
-              lang: preferred.lang
-            }));
+        // If no voice selected, automatically select the best studio quality voice
+        if (!active.voiceURI && sorted.length > 0) {
+          const best = findBestQualityVoice(sorted, undefined, isHi ? 'hi' : 'en');
+          if (best) {
+            const upgradedConfig: CustomVoiceConfig = {
+              ...active,
+              voiceURI: best.voiceURI,
+              voiceName: best.name,
+              lang: best.lang,
+              pitch: 1.02,
+              rate: 0.96
+            };
+            setConfig(upgradedConfig);
+            saveCustomVoiceConfig(upgradedConfig);
           }
         }
       });
     }
-  }, [isOpen]);
+  }, [isOpen, appLanguage]);
 
   if (!isOpen) return null;
 
@@ -138,6 +148,25 @@ export const CustomVoiceModal: React.FC<CustomVoiceModalProps> = ({
     }
   };
 
+  const handleResetToStudioDefault = () => {
+    const isHi = appLanguage === 'hi';
+    const best = findBestQualityVoice(availableVoices, undefined, isHi ? 'hi' : 'en');
+    const studioDefault: CustomVoiceConfig = {
+      ...DEFAULT_VOICE_CONFIG,
+      voiceURI: best ? best.voiceURI : '',
+      voiceName: best ? best.name : 'Studio Quality AI Voice',
+      lang: best ? best.lang : (isHi ? 'hi-IN' : 'en-US'),
+      pitch: 1.02,
+      rate: 0.96,
+      volume: 1.0,
+      persona: 'friendly'
+    };
+    setConfig(studioDefault);
+    saveCustomVoiceConfig(studioDefault);
+    setSavedFeedback(true);
+    setTimeout(() => setSavedFeedback(false), 2000);
+  };
+
   const handleTestSpeech = () => {
     if (isPlayingTest) {
       window.speechSynthesis?.cancel();
@@ -147,8 +176,8 @@ export const CustomVoiceModal: React.FC<CustomVoiceModalProps> = ({
 
     const testText =
       appLanguage === 'hi'
-        ? `नमस्ते! यह आपकी चुनी हुई ट्यूटर आवाज़ है। अब से मैं हमेशा इसी अंदाज़ और आवाज़ में आपको पढ़ाऊँगा!`
-        : `Hello! This is your custom AI tutor voice. From now on, I will always explain concepts in this tone and voice!`;
+        ? `नमस्ते! यह आपकी बेहतरीन स्टूडियो ट्यूटर आवाज़ है। अब से हर कॉन्सेप्ट को मैं हमेशा इसी एक नंबर अंदाज़, साफ़ उच्चारण और सही गति में समझाऊँगा!`
+        : `Hello! This is your studio-quality AI tutor voice. From now on, every lesson and concept will be explained in this crystal-clear tone and perfect pacing!`;
 
     setIsPlayingTest(true);
     playTutorSpeech(
@@ -169,6 +198,8 @@ export const CustomVoiceModal: React.FC<CustomVoiceModalProps> = ({
     }, 800);
   };
 
+  const topVoiceURI = availableVoices[0]?.voiceURI;
+
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
@@ -181,20 +212,21 @@ export const CustomVoiceModal: React.FC<CustomVoiceModalProps> = ({
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/50">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/30 to-purple-500/20 text-indigo-400 flex items-center justify-center font-bold shadow-inner">
                 <Volume2 className="w-5 h-5" />
               </div>
               <div>
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  {appLanguage === 'hi' ? 'ट्यूटर कस्टम वॉयस स्टूडियो' : 'Tutor Custom Voice Studio'}
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                    Always On
+                  {appLanguage === 'hi' ? 'स्टूडियो वॉयस ट्यूनर' : 'Tutor Studio Voice'}
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-emerald-400" />
+                    HD Quality
                   </span>
                 </h3>
                 <p className="text-xs text-slate-400">
                   {appLanguage === 'hi'
-                    ? 'अपनी पसंदीदा आवाज़, पिच और बोलने की गति हमेशा के लिए सेट करें'
-                    : 'Configure and lock your tutor’s persistent voice, pitch, and speed'}
+                    ? 'परफेक्ट पिच (1.02x) और सही स्पीड (0.96x) के साथ एक नंबर आवाज़'
+                    : 'Acoustically tuned pitch (1.02x) & speed (0.96x) for effortless learning'}
                 </p>
               </div>
             </div>
@@ -208,6 +240,30 @@ export const CustomVoiceModal: React.FC<CustomVoiceModalProps> = ({
 
           {/* Body */}
           <div className="p-6 space-y-6 overflow-y-auto">
+            {/* Quick Best Default Banner */}
+            <div className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-950/60 to-purple-950/40 border border-indigo-500/30 rounded-xl">
+              <div className="flex items-center gap-2.5">
+                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                <div className="text-xs">
+                  <p className="font-semibold text-white">
+                    {appLanguage === 'hi' ? 'डिफॉल्ट बेहतरीन आवाज़ सक्रिय' : 'Studio Quality Preset Active'}
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    {appLanguage === 'hi' ? 'पिच: 1.02x • स्पीड: 0.96x (क्लियर उच्चारण)' : 'Pitch: 1.02x • Speed: 0.96x (crystal clear cadence)'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleResetToStudioDefault}
+                title="Reset to recommended studio default"
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-400/40 text-indigo-200 text-xs font-medium rounded-lg transition active:scale-95 cursor-pointer"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>{appLanguage === 'hi' ? 'डिफॉल्ट करें' : 'Reset Default'}</span>
+              </button>
+            </div>
+
             {/* Presets */}
             <div>
               <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-2.5">
@@ -223,7 +279,7 @@ export const CustomVoiceModal: React.FC<CustomVoiceModalProps> = ({
                       onClick={() => handlePresetSelect(p)}
                       className={`p-3 rounded-xl border text-left transition-all ${
                         isSelected
-                          ? 'bg-indigo-600/20 border-indigo-500 ring-1 ring-indigo-500/40 text-white'
+                          ? 'bg-indigo-600/20 border-indigo-500 ring-1 ring-indigo-500/40 text-white shadow-sm'
                           : 'bg-slate-800/40 border-slate-700/60 hover:bg-slate-800 text-slate-300'
                       }`}
                     >
@@ -248,23 +304,27 @@ export const CustomVoiceModal: React.FC<CustomVoiceModalProps> = ({
                 <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   {appLanguage === 'hi' ? '2. डिवाइस वॉयस चुनें (Voice Engine)' : '2. System Voice Engine'}
                 </label>
-                <span className="text-[11px] text-indigo-400 font-mono">
-                  {availableVoices.length} {appLanguage === 'hi' ? 'आवाज़ें उपलब्ध' : 'voices detected'}
+                <span className="text-[11px] text-emerald-400 font-mono flex items-center gap-1">
+                  <Check className="w-3 h-3" />
+                  {availableVoices.length} {appLanguage === 'hi' ? 'आवाज़ें जांची गईं' : 'voices detected'}
                 </span>
               </div>
               <select
                 value={config.voiceURI}
                 onChange={handleVoiceChange}
-                className="w-full px-3 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                className="w-full px-3 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors"
               >
                 {availableVoices.length === 0 && (
                   <option value="">{appLanguage === 'hi' ? 'सिस्टम डिफॉल्ट आवाज़' : 'System Default Voice'}</option>
                 )}
-                {availableVoices.map((v, idx) => (
-                  <option key={`${v.voiceURI || v.name}_${v.lang}_${idx}`} value={v.voiceURI}>
-                    {v.name} ({v.lang})
-                  </option>
-                ))}
+                {availableVoices.map((v, idx) => {
+                  const isTop = v.voiceURI === topVoiceURI;
+                  return (
+                    <option key={`${v.voiceURI || v.name}_${v.lang}_${idx}`} value={v.voiceURI}>
+                      {isTop ? '⭐ [STUDIO BEST] ' : ''}{v.name} ({v.lang})
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -283,14 +343,14 @@ export const CustomVoiceModal: React.FC<CustomVoiceModalProps> = ({
                   type="range"
                   min="0.6"
                   max="1.4"
-                  step="0.05"
+                  step="0.01"
                   value={config.pitch}
                   onChange={(e) => setConfig((prev) => ({ ...prev, pitch: parseFloat(e.target.value) }))}
                   className="w-full accent-indigo-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
                 />
                 <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-                  <span>{appLanguage === 'hi' ? 'गंभीर / भारी' : 'Deep / Low'}</span>
-                  <span>{appLanguage === 'hi' ? 'सामान्य' : 'Normal'}</span>
+                  <span>{appLanguage === 'hi' ? 'भारी / गंभीर' : 'Deep / Low'}</span>
+                  <span className="text-indigo-400 font-medium">{appLanguage === 'hi' ? 'परफेक्ट (1.02x)' : 'Sweet Spot (1.02x)'}</span>
                   <span>{appLanguage === 'hi' ? 'पतली / तीखी' : 'Sharp / High'}</span>
                 </div>
               </div>
@@ -308,14 +368,14 @@ export const CustomVoiceModal: React.FC<CustomVoiceModalProps> = ({
                   type="range"
                   min="0.75"
                   max="1.35"
-                  step="0.05"
+                  step="0.01"
                   value={config.rate}
                   onChange={(e) => setConfig((prev) => ({ ...prev, rate: parseFloat(e.target.value) }))}
                   className="w-full accent-amber-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
                 />
                 <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-                  <span>{appLanguage === 'hi' ? 'आराम से (0.75x)' : 'Slow (0.75x)'}</span>
-                  <span>{appLanguage === 'hi' ? 'सामान्य (1.0x)' : 'Normal (1.0x)'}</span>
+                  <span>{appLanguage === 'hi' ? 'धीमा (0.75x)' : 'Slow (0.75x)'}</span>
+                  <span className="text-amber-400 font-medium">{appLanguage === 'hi' ? 'आदर्श (0.96x)' : 'Ideal Study (0.96x)'}</span>
                   <span>{appLanguage === 'hi' ? 'तेज (1.35x)' : 'Fast (1.35x)'}</span>
                 </div>
               </div>
@@ -345,11 +405,11 @@ export const CustomVoiceModal: React.FC<CustomVoiceModalProps> = ({
               <p className="leading-relaxed text-[11px] text-slate-400">
                 {appLanguage === 'hi' ? (
                   <>
-                    <strong className="text-slate-200">स्थायी कस्टम आवाज़:</strong> यहाँ सेव की गई आवाज़ और स्पीड हमेशा AI Tutor और Live Voice Tutor दोनों में अपने आप लागू रहेगी। (अगर आपको अपनी खुद की रिकॉर्ड की हुई आवाज़ हूबहू क्लोन करनी है, तो ElevenLabs AI Voice Clone API के ज़रिये भी कनेक्ट किया जा सकता है!)
+                    <strong className="text-slate-200">स्थायी एक नंबर आवाज़:</strong> यह आवाज़ और स्पीड हमेशा AI Tutor, Live Voice Tutor और सभी टूल्स में अपने आप लागू रहेगी। आपको इसे बार-बार बदलने की ज़रूरत नहीं पड़ेगी!
                   </>
                 ) : (
                   <>
-                    <strong className="text-slate-200">Persistent Custom Voice:</strong> Saved voice, pitch, and speed will automatically apply across all AI Tutor & Live Voice sessions. (For exact personal audio cloning, an ElevenLabs Voice Clone API can also be integrated!)
+                    <strong className="text-slate-200">Persistent Studio Voice:</strong> Saved voice, pitch, and speed will automatically apply across all AI Tutor & Live Voice sessions. No reconfiguration needed!
                   </>
                 )}
               </p>
@@ -391,7 +451,7 @@ export const CustomVoiceModal: React.FC<CustomVoiceModalProps> = ({
               <button
                 type="button"
                 onClick={handleSave}
-                className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/25 transition-all"
+                className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
               >
                 {savedFeedback ? (
                   <>
@@ -412,3 +472,4 @@ export const CustomVoiceModal: React.FC<CustomVoiceModalProps> = ({
     </AnimatePresence>
   );
 };
+

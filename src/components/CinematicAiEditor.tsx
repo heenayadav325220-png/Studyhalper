@@ -18,6 +18,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import { UiCustomization, UserProfile } from '../types';
 import { playUiSound } from '../services/soundEffects';
+import { playTutorSpeech } from '../services/voiceSettings';
 
 interface CinematicAiEditorProps {
   isOpen: boolean;
@@ -158,24 +159,17 @@ export const CinematicAiEditor: React.FC<CinematicAiEditorProps> = ({
     };
   }, [appLanguage]);
 
-  // Voice TTS Engine
+  // Voice TTS Engine (Studio Grade)
   const speakText = (text: string) => {
     if (!voicePlaybackEnabled || !('speechSynthesis' in window)) return;
     try {
-      window.speechSynthesis.cancel();
-      const clean = text.replace(/[*#`_~[\]()]/g, ' ').replace(/\s+/g, ' ').trim();
-      if (!clean) return;
-
-      const utterance = new SpeechSynthesisUtterance(clean.slice(0, 300));
-      utterance.rate = speechRate;
-      utterance.pitch = 1.0;
-      utterance.lang = appLanguage === 'hi' ? 'hi-IN' : 'en-US';
-
-      utterance.onstart = () => setIsSpeakingNow(true);
-      utterance.onend = () => setIsSpeakingNow(false);
-      utterance.onerror = () => setIsSpeakingNow(false);
-
-      window.speechSynthesis.speak(utterance);
+      playTutorSpeech(
+        text,
+        { rate: speechRate },
+        () => setIsSpeakingNow(true),
+        () => setIsSpeakingNow(false),
+        () => setIsSpeakingNow(false)
+      );
     } catch (e) {
       console.warn("TTS speak error:", e);
       setIsSpeakingNow(false);
