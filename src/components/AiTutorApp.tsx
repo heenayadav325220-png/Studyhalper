@@ -25,6 +25,7 @@ import {
   FileDown,
   Images,
   MoreVertical,
+  MoreHorizontal,
   SlidersHorizontal,
   Sparkles,
   Sliders,
@@ -83,6 +84,8 @@ interface AiTutorAppProps {
   onRemoveAttachedWorkspaceFile?: (id: string) => void;
   globalAppLanguage?: string;
   onLanguageChange?: (lang: any) => void;
+  isBottomNavVisible?: boolean;
+  onShowBottomNav?: () => void;
 }
 
 interface ChatMessage {
@@ -490,7 +493,9 @@ export const AiTutorApp = memo(function AiTutorApp({
   attachedWorkspaceFiles = [],
   onRemoveAttachedWorkspaceFile,
   globalAppLanguage,
-  onLanguageChange
+  onLanguageChange,
+  isBottomNavVisible = true,
+  onShowBottomNav
 }: AiTutorAppProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const saved = getStoredValue(`ai_tutor_chat_${user.uid}`);
@@ -530,6 +535,22 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [isListening, setIsListening] = useState(false);
   const [showMathPalette, setShowMathPalette] = useState(false);
   const [activeMathCategory, setActiveMathCategory] = useState<'All' | 'Greek' | 'Algebra' | 'Operators' | 'Calculus'>('All');
+  const [showQuickActionsMenu, setShowQuickActionsMenu] = useState(false);
+  const quickActionsMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (quickActionsMenuRef.current && !quickActionsMenuRef.current.contains(event.target as Node)) {
+        setShowQuickActionsMenu(false);
+      }
+    }
+    if (showQuickActionsMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showQuickActionsMenu]);
 
   const appLanguage = getAppLanguage(selectedLanguage);
 
@@ -615,6 +636,7 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [isHeaderHoveredOrInteracting, setIsHeaderHoveredOrInteracting] = useState(false);
   const autoHideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartYRef = useRef<number>(0);
+  const bottomTouchStartYRef = useRef<number>(0);
   const mouseStartYRef = useRef<number | null>(null);
 
   const resetAutoHideTimer = () => {
@@ -1349,12 +1371,21 @@ export const AiTutorApp = memo(function AiTutorApp({
         if (!isHeaderVisible && e.touches[0].clientY < 60) {
           touchStartYRef.current = e.touches[0].clientY;
         }
+        if (!isBottomNavVisible && e.touches[0].clientY > window.innerHeight - 80) {
+          bottomTouchStartYRef.current = e.touches[0].clientY;
+        }
       }}
       onTouchMove={(e) => {
         if (!isHeaderVisible && touchStartYRef.current > 0) {
           if (e.touches[0].clientY - touchStartYRef.current > 15) {
             showHeader();
             touchStartYRef.current = 0;
+          }
+        }
+        if (!isBottomNavVisible && bottomTouchStartYRef.current > 0) {
+          if (bottomTouchStartYRef.current - e.touches[0].clientY > 15) {
+            onShowBottomNav?.();
+            bottomTouchStartYRef.current = 0;
           }
         }
       }}
@@ -1972,10 +2003,14 @@ export const AiTutorApp = memo(function AiTutorApp({
       </div>
 
       <footer
-        className="bg-white/95 backdrop-blur-sm border-t border-slate-200 p-2.5 sm:p-4 shrink-0 relative shadow-[0_-4px_16px_-8px_rgba(15,23,42,0.08)]"
-        style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom))' }}
+        className="bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-2 sm:px-3 py-1 sm:py-1.5 shrink-0 relative shadow-[0_-4px_20px_-4px_rgba(15,23,42,0.08)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        style={{
+          paddingBottom: isBottomNavVisible
+            ? 'calc(48px + 8px + env(safe-area-inset-bottom, 0px))'
+            : 'calc(6px + env(safe-area-inset-bottom, 0px))'
+        }}
       >
-        <div className="max-w-4xl mx-auto space-y-2">
+        <div className="max-w-4xl mx-auto space-y-1">
           <AnimatePresence>
             {showSavedFormulasPanel && (
               <motion.div 
@@ -2235,38 +2270,12 @@ export const AiTutorApp = memo(function AiTutorApp({
             )}
           </AnimatePresence>
 
-          {suggestions.length > 0 && (
-            <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar pb-0.5 text-[11px]">
-              <button
-                type="button"
-                onClick={handleRefreshSuggestions}
-                disabled={isGeneratingSuggestions}
-                className="flex items-center space-x-1 shrink-0 text-slate-500 hover:text-blue-600 px-1.5 py-1 rounded-md text-[10px] font-bold cursor-pointer transition"
-                title="Refresh suggested study prompts"
-              >
-                <Sparkles className={`w-3 h-3 text-blue-600 ${isGeneratingSuggestions ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">Suggestions</span>
-              </button>
-              {suggestions.map((sugg, idx) => (
-                <button
-                  key={sugg.id || idx}
-                  type="button"
-                  onClick={() => handleSendMessage(sugg.prompt)}
-                  className="px-2.5 py-1 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-300 rounded-full font-medium whitespace-nowrap transition cursor-pointer"
-                  title={sugg.prompt}
-                >
-                  <span>{sugg.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
           {attachedWorkspaceFiles && attachedWorkspaceFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-2 px-1">
+            <div className="flex flex-wrap gap-2 mb-1 px-1">
               {attachedWorkspaceFiles.map((file) => (
                 <div 
                   key={file.id} 
-                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-slate-800 text-indigo-300 border border-slate-700 text-[10px] font-bold shadow-xs select-none"
+                  className="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-800 text-indigo-300 border border-slate-700 text-[10px] font-bold shadow-xs select-none"
                 >
                   <span>
                     {file.type === "drive" ? "📁" : file.type === "classroom" ? "🎓" : "📊"}
@@ -2285,24 +2294,121 @@ export const AiTutorApp = memo(function AiTutorApp({
             </div>
           )}
 
-          <div className="relative flex items-center bg-white border border-slate-200 focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/10 rounded-2xl p-1.5 transition-all duration-200">
+          <div className="relative flex items-center bg-white border border-slate-300/80 hover:border-slate-400 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15 rounded-2xl p-1 transition-all duration-200 shadow-sm">
+            {/* MIC BUTTON */}
             <button
               type="button"
               onClick={handleVoiceInputToggle}
-              className={`p-2 sm:p-2.5 rounded-xl transition cursor-pointer ${
+              className={`p-1.5 sm:p-2 rounded-xl transition cursor-pointer shrink-0 ${
                 isListening 
                   ? 'bg-rose-600 text-white animate-bounce' 
-                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/60'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
               }`}
               title={isListening ? 'Listening... Click to stop' : 'Voice Input'}
             >
               <Mic className="w-4 h-4" />
             </button>
 
+            {/* THREE-DOTS QUICK ACTIONS MENU (Next to Mic) */}
+            <div ref={quickActionsMenuRef} className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowQuickActionsMenu(!showQuickActionsMenu)}
+                className={`p-1.5 sm:p-2 rounded-xl transition cursor-pointer flex items-center justify-center ${
+                  showQuickActionsMenu 
+                    ? 'bg-blue-600 text-white shadow-xs' 
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                }`}
+                title={appLanguage === 'hi' ? 'त्वरित अध्ययन सुझाव' : 'Quick Actions & Study Prompts'}
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+
+              <AnimatePresence>
+                {showQuickActionsMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 6 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute bottom-full left-0 mb-2 w-72 sm:w-80 bg-white/98 backdrop-blur-lg border border-slate-200 rounded-2xl p-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.18)] z-50 text-slate-800 space-y-2"
+                  >
+                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                      <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-800">
+                        <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                        <span>{appLanguage === 'hi' ? 'त्वरित सुझाव' : 'Quick Study Actions'}</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <button
+                          type="button"
+                          onClick={handleRefreshSuggestions}
+                          disabled={isGeneratingSuggestions}
+                          className="p-1 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition"
+                          title="Refresh prompts"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isGeneratingSuggestions ? 'animate-spin' : ''}`} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowQuickActionsMenu(false)}
+                          className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
+                          title="Close"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="max-h-56 overflow-y-auto space-y-1 pr-0.5 no-scrollbar">
+                      {suggestions.map((sugg, idx) => (
+                        <button
+                          key={sugg.id || idx}
+                          type="button"
+                          onClick={() => {
+                            handleSendMessage(sugg.prompt);
+                            setShowQuickActionsMenu(false);
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200/60 hover:border-blue-200 rounded-xl text-xs font-medium transition cursor-pointer flex items-center justify-between group"
+                        >
+                          <span className="truncate mr-1.5">{sugg.label}</span>
+                          <Send className="w-3 h-3 text-slate-400 group-hover:text-blue-600 opacity-0 group-hover:opacity-100 transition shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center space-x-1.5 pt-1 border-t border-slate-100 text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMathPalette(!showMathPalette);
+                          setShowQuickActionsMenu(false);
+                        }}
+                        className="flex-1 py-1 px-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-mono font-bold text-center transition"
+                      >
+                        f(x) Math Symbols
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSavedFormulasPanel(!showSavedFormulasPanel);
+                          setShowQuickActionsMenu(false);
+                        }}
+                        className="flex-1 py-1 px-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-center transition flex items-center justify-center space-x-1"
+                      >
+                        <Bookmark className="w-3 h-3 fill-current" />
+                        <span>Formulas</span>
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* CAMERA BUTTON */}
             <button
               type="button"
               onClick={() => setShowCameraModal(true)}
-              className={`p-2 sm:p-2.5 rounded-xl transition flex items-center justify-center shrink-0 cursor-pointer ${
+              className={`p-1.5 sm:p-2 rounded-xl transition flex items-center justify-center shrink-0 cursor-pointer ${
                 selectedImages.length > 0 
                   ? 'bg-emerald-600 text-white shadow-xs' 
                   : 'text-blue-600 hover:bg-blue-50'
@@ -2319,39 +2425,7 @@ export const AiTutorApp = memo(function AiTutorApp({
               </div>
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setShowMathPalette(!showMathPalette);
-                if (showSavedFormulasPanel) setShowSavedFormulasPanel(false);
-              }}
-              className={`hidden sm:flex p-2 rounded-xl transition font-mono text-[11px] font-black items-center justify-center shrink-0 cursor-pointer ${
-                showMathPalette 
-                  ? 'bg-blue-600 text-white' 
-                  : 'text-blue-600 hover:bg-blue-50'
-              }`}
-              title="Insert Math Symbols & LaTeX"
-            >
-              <span>f(x)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setShowSavedFormulasPanel(!showSavedFormulasPanel);
-                if (showMathPalette) setShowMathPalette(false);
-              }}
-              className={`hidden sm:flex p-2 rounded-xl transition text-[11px] font-bold items-center space-x-1 shrink-0 cursor-pointer ${
-                showSavedFormulasPanel 
-                  ? 'bg-amber-500 text-white font-extrabold shadow-xs' 
-                  : 'text-amber-700 hover:bg-amber-50'
-              }`}
-              title="Saved Formulas & Equations"
-            >
-              <Bookmark className="w-3.5 h-3.5 fill-current" />
-              <span className="text-[10px]">Formulas</span>
-            </button>
-
+            {/* INPUT TEXTAREA */}
             <textarea
               ref={textareaRef}
               rows={1}
@@ -2370,9 +2444,10 @@ export const AiTutorApp = memo(function AiTutorApp({
                   ? `${selectedImages.length} page(s) attached! Press Send...` 
                   : `Ask AI Tutor about ${selectedSubject}...`
               }
-              className="flex-1 bg-transparent border-0 px-2.5 sm:px-3 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none resize-none max-h-24 py-2 font-medium"
+              className="flex-1 bg-transparent border-0 px-2 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none resize-none max-h-24 py-1.5 font-medium min-h-[34px]"
             />
 
+            {/* CLEAR INPUT BUTTON */}
             {inputQuery.length > 0 && (
               <button
                 type="button"
@@ -2381,35 +2456,35 @@ export const AiTutorApp = memo(function AiTutorApp({
                   setStoredValue(`ai_tutor_input_draft_${user.uid}`, null);
                   textareaRef.current?.focus();
                 }}
-                className="p-2 sm:p-2.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-xl transition flex items-center justify-center shrink-0 mr-1 cursor-pointer"
+                className="p-1 sm:p-1.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-lg transition flex items-center justify-center shrink-0 mr-1 cursor-pointer"
                 title="Clear Input"
               >
-                <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
 
+            {/* RESTORE ARROW INSIDE INPUT BOX (When bottom nav is auto-hidden) */}
+            {!isBottomNavVisible && onShowBottomNav && (
+              <button
+                type="button"
+                onClick={onShowBottomNav}
+                className="p-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 transition flex items-center justify-center cursor-pointer shrink-0 mr-1"
+                title={appLanguage === 'hi' ? 'नेविगेशन बार दिखाएं' : 'Show Navigation Bar'}
+              >
+                <ChevronUp className="w-3.5 h-3.5 text-emerald-600 animate-bounce" />
+              </button>
+            )}
+
+            {/* SEND BUTTON */}
             <button
               type="button"
               onClick={() => handleSendMessage()}
               disabled={(!inputQuery.trim() && selectedImages.length === 0) || isLoading}
-              className="p-2.5 sm:p-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600 text-white font-bold rounded-xl shadow-xs transition-all duration-150 flex items-center justify-center cursor-pointer"
+              className="p-2 sm:p-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600 text-white font-bold rounded-xl shadow-xs transition-all duration-150 flex items-center justify-center cursor-pointer shrink-0"
               title="Send Message"
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>
-          </div>
-
-          <div className="flex items-center justify-between text-[10px] text-slate-400 px-1 font-medium">
-            <div className="flex items-center space-x-2">
-              <span>Subject: <strong className="text-slate-700">{selectedSubject}</strong></span>
-              {inputQuery.trim().length > 0 && (
-                <span className="text-[9px] text-emerald-700 font-semibold flex items-center space-x-1 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Draft saved</span>
-                </span>
-              )}
-            </div>
-            <span className="hidden sm:inline">Shift + Enter for new line • Enter to send</span>
           </div>
         </div>
 
