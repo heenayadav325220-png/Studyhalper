@@ -1432,15 +1432,30 @@ export const AiTutorApp = memo(function AiTutorApp({
   };
 
   const handleSaveToNotebook = async (msg: ChatMessage) => {
-    if (onAddNote) {
-      await onAddNote({
-        title: `AI Tutor Note - ${msg.subject || selectedSubject}`,
-        content: msg.text,
-        subject: msg.subject || selectedSubject
-      });
+    try {
+      if (onAddNote) {
+        await onAddNote({
+          title: `AI Tutor Note - ${msg.subject || selectedSubject}`,
+          content: msg.text,
+          subject: msg.subject || selectedSubject
+        });
+      } else {
+        const raw = localStorage.getItem('study_notebook_notes') || '[]';
+        const parsed = JSON.parse(raw);
+        parsed.unshift({
+          id: 'note_' + Date.now(),
+          title: `AI Tutor Note - ${msg.subject || selectedSubject}`,
+          content: msg.text,
+          subject: msg.subject || selectedSubject,
+          timestamp: new Date().toISOString()
+        });
+        localStorage.setItem('study_notebook_notes', JSON.stringify(parsed));
+      }
       setSavedNoteId(msg.id);
       if (onAddXp) onAddXp(10);
       setTimeout(() => setSavedNoteId(null), 2500);
+    } catch (e) {
+      console.error('Error saving note:', e);
     }
   };
 
@@ -1883,6 +1898,112 @@ export const AiTutorApp = memo(function AiTutorApp({
                           {msg.text}
                         </p>
                       </div>
+
+                      {/* Always Visible Action Suite for User Message */}
+                      <div className="w-full pt-1.5 flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center space-x-1 flex-wrap gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(msg.id, msg.text)}
+                            title="Copy text"
+                            className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                          >
+                            {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
+                            <span className="hidden xs:inline">{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSpeakText(msg.text)}
+                            title="Listen"
+                            className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                          >
+                            <Volume2 className="w-3.5 h-3.5 text-slate-500" />
+                            <span className="hidden xs:inline">Listen</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSaveToNotebook(msg)}
+                            title="Save to notebook"
+                            className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                          >
+                            <Bookmark className="w-3.5 h-3.5 text-slate-500" />
+                            <span className="hidden xs:inline">{savedNoteId === msg.id ? 'Saved ✓' : 'Save Note'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleExportToGoogleDoc(msg)}
+                            disabled={isExportingDocId === msg.id}
+                            className="text-emerald-700 hover:text-emerald-900 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200/80 text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs disabled:opacity-50"
+                            title="Export to Google Document"
+                          >
+                            {isExportingDocId === msg.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                            ) : docExportSuccessId === msg.id ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <FileDown className="w-3.5 h-3.5 text-emerald-600" />
+                            )}
+                            <span className="hidden sm:inline">{docExportSuccessId === msg.id ? 'Exported!' : isExportingDocId === msg.id ? 'Exporting...' : 'Export to Docs'}</span>
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setExpandedActionsId(expandedActionsId === msg.id ? null : msg.id)}
+                          title="More study tools"
+                          className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 ${
+                            expandedActionsId === msg.id
+                              ? 'bg-indigo-100 text-indigo-800'
+                              : 'text-indigo-600 hover:bg-indigo-50 border border-indigo-200/60'
+                          }`}
+                        >
+                          <SlidersHorizontal className="w-3.5 h-3.5" />
+                          <span>{expandedActionsId === msg.id ? 'Hide Tools' : 'Study Tools'}</span>
+                        </button>
+                      </div>
+
+                      {expandedActionsId === msg.id && (
+                        <div className="bg-slate-50/90 border border-slate-200 px-3 py-2 flex flex-wrap items-center gap-1.5 rounded-xl mt-1 w-full justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleSendMessage(`Can you explain "${msg.text}" in simpler terms with an everyday analogy?`)}
+                            className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                          >
+                            <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                            <span>Explain Simpler</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSendMessage(`Give me 1 practice question based on "${msg.text}" to test my understanding.`)}
+                            className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                          >
+                            <HelpCircle className="w-3.5 h-3.5 text-indigo-500" />
+                            <span>Practice Question</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSendMessage(`Please explain "${msg.text}" in easy Hinglish with important key points for JEE Main / Board exams.`)}
+                            className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                          >
+                            <Languages className="w-3.5 h-3.5 text-purple-500" />
+                            <span>JEE Main / Hinglish</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSendMessage(`Summarize "${msg.text}" and its key concepts, formulas, and takeaways in a clean structured table.`)}
+                            className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                          >
+                            <Table className="w-3.5 h-3.5 text-teal-500" />
+                            <span>Summary Table</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="w-8 h-8 rounded-full ring-2 ring-indigo-500/30 shadow-sm overflow-hidden bg-slate-800 flex items-center justify-center shrink-0 mt-4">
@@ -1978,17 +2099,15 @@ export const AiTutorApp = memo(function AiTutorApp({
                           <span className="hidden xs:inline">Listen</span>
                         </button>
 
-                        {onAddNote && (
-                          <button
-                            type="button"
-                            onClick={() => handleSaveToNotebook(msg)}
-                            title="Save to notebook"
-                            className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
-                          >
-                            <Bookmark className="w-3.5 h-3.5 text-slate-500" />
-                            <span className="hidden xs:inline">{savedNoteId === msg.id ? 'Saved ✓' : 'Save Note'}</span>
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleSaveToNotebook(msg)}
+                          title="Save to notebook"
+                          className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                        >
+                          <Bookmark className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="hidden xs:inline">{savedNoteId === msg.id ? 'Saved ✓' : 'Save Note'}</span>
+                        </button>
 
                         <button
                           type="button"

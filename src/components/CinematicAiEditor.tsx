@@ -11,7 +11,9 @@ import {
   ArrowUpRight,
   Code2,
   RotateCcw,
-  Check
+  Check,
+  Copy,
+  Bookmark
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { UiCustomization, UserProfile } from '../types';
@@ -75,6 +77,26 @@ export const CinematicAiEditor: React.FC<CinematicAiEditorProps> = ({
   const [voicePlaybackEnabled, setVoicePlaybackEnabled] = useState(true);
   const [speechRate, setSpeechRate] = useState(1.0);
   const [isSpeakingNow, setIsSpeakingNow] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyText = async (id: string, text: string) => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const [showCssInspector, setShowCssInspector] = useState(false);
   const [liveCssDraft, setLiveCssDraft] = useState(customization.customCss || '');
@@ -597,6 +619,62 @@ export const CinematicAiEditor: React.FC<CinematicAiEditorProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {/* Action Buttons Suite */}
+                  <div className="mt-2.5 pt-2 border-t border-white/10 flex items-center justify-between flex-wrap gap-1.5">
+                    <div className="flex items-center space-x-1.5 flex-wrap gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyText(msg.id, msg.text)}
+                        title="Copy text"
+                        className="bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium px-2 py-1 rounded-lg flex items-center space-x-1 transition cursor-pointer active:scale-95"
+                      >
+                        {copiedId === msg.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-slate-400" />}
+                        <span className="hidden xs:inline">{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => speakText(msg.text)}
+                        title="Listen"
+                        className="bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium px-2 py-1 rounded-lg flex items-center space-x-1 transition cursor-pointer active:scale-95"
+                      >
+                        <Volume2 className="w-3 h-3 text-slate-400" />
+                        <span className="hidden xs:inline">Listen</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            if (onSaveToNotebook) {
+                              await onSaveToNotebook(`⚡ AI Copilot: ${msg.text.slice(0, 35)}...`, msg.text, ['AI Editor', 'Copilot']);
+                            } else {
+                              const raw = localStorage.getItem('study_notebook_notes') || '[]';
+                              const parsed = JSON.parse(raw);
+                              parsed.unshift({
+                                id: 'note_' + Date.now(),
+                                title: `⚡ AI Copilot: ${msg.text.slice(0, 35)}...`,
+                                content: msg.text,
+                                subject: 'AI Copilot',
+                                timestamp: new Date().toISOString()
+                              });
+                              localStorage.setItem('study_notebook_notes', JSON.stringify(parsed));
+                            }
+                            setCopiedId('saved_' + msg.id);
+                            setTimeout(() => setCopiedId(null), 2000);
+                          } catch (e) {
+                            console.error(e);
+                          }
+                        }}
+                        title="Save to notebook"
+                        className="bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium px-2 py-1 rounded-lg flex items-center space-x-1 transition cursor-pointer active:scale-95"
+                      >
+                        <Bookmark className="w-3 h-3 text-slate-400" />
+                        <span className="hidden xs:inline">{copiedId === 'saved_' + msg.id ? 'Saved ✓' : 'Save Note'}</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             ))}
