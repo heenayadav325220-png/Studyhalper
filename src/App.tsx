@@ -532,11 +532,71 @@ export default function App() {
   const [streakCompletedDays, setStreakCompletedDays] = useState<boolean[]>([false, false, false, false, false]);
   const [day1GoalCompleted, setDay1GoalCompleted] = useState(false);
 
+  // --- CHIMPU SANCTUARY (PET) STATE DECLARATION ---
+  const [petHappiness, setPetHappiness] = useState(85);
+  const [petEnergy, setPetEnergy] = useState(80);
+
+  // --- REAL AUTO-MESSAGING & OS NOTIFICATION SYSTEM ---
+  const requestNotificationPermission = async () => {
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        sendRealNotification('Remix Study Buddy 🔔', 'Awesome! System notifications are now active. Task completions and Chimpu alerts will show up here.');
+      }
+    }
+  };
+
+  const sendRealNotification = (title: string, body: string) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(title, {
+          body: body,
+          icon: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
+        });
+      } catch (err) {
+        console.warn('Native push notification error:', err);
+      }
+    }
+    try {
+      playUiSound();
+    } catch (e) {}
+  };
+
+  // Background Auto-Messaging Check
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      setTimeout(() => {
+        requestNotificationPermission();
+      }, 5000);
+    }
+
+    const notificationInterval = setInterval(() => {
+      // Check 1: If Day 1 Goal is not completed
+      if (!day1GoalCompleted) {
+        sendRealNotification(
+          'Tutor Task Reminder! ✍️',
+          'Hey! Your daily study task is pending: "Ask AI Tutor a homework question". Finish it to claim +20 XP!'
+        );
+      }
+
+      // Check 2: If Chimpu (pet) is hungry
+      if (petHappiness < 50 || petEnergy < 50) {
+        sendRealNotification(
+          `${userProfile.petName || 'Chimpu'} is hungry! 🐼`,
+          `Chimpu is waiting for you! Happiness is ${petHappiness}% and energy is ${petEnergy}%. Please feed him bamboo.`
+        );
+      }
+    }, 45000); // Trigger a check every 45 seconds for a lively and responsive user experience
+
+    return () => clearInterval(notificationInterval);
+  }, [day1GoalCompleted, petHappiness, petEnergy, userProfile.petName]);
+
   const handleCompleteDayGoal = () => {
     if (!day1GoalCompleted) {
       setDay1GoalCompleted(true);
       setStreakCompletedDays([true, false, false, false, false]);
       addXp(20);
+      sendRealNotification('Goal Completed! 🎉', 'Amazing! You finished your Day 1 target and earned +20 XP!');
     }
   };
 
@@ -551,6 +611,7 @@ export default function App() {
     setQuests(prev => prev.map(q => {
       if (q.id === id && !q.completed) {
         addXp(q.xp);
+        sendRealNotification('Quest Completed! 🏆', `Fantastic! You completed: "${q.title}" and claimed +${q.xp} XP!`);
         return { ...q, completed: true };
       }
       return q;
@@ -620,8 +681,6 @@ export default function App() {
   };
 
   // --- CHIMPU SANCTUARY (PET) STATE ---
-  const [petHappiness, setPetHappiness] = useState(85);
-  const [petEnergy, setPetEnergy] = useState(80);
   const [equippedAccessory, setEquippedAccessory] = useState<string | null>(null);
 
   const feedBamboo = () => {
@@ -629,6 +688,7 @@ export default function App() {
       addXp(-15);
       setPetHappiness(prev => Math.min(100, prev + 15));
       setPetEnergy(prev => Math.min(100, prev + 10));
+      sendRealNotification(`${userProfile.petName || 'Chimpu'} Fed! 🐼🌿`, 'Yum! Chimpu enjoyed the Bamboo. Happiness and Energy increased!');
     } else {
       alert('You need at least 15 XP to buy Bamboo feed!');
     }
@@ -638,7 +698,7 @@ export default function App() {
     if (userProfile.xp >= item.cost) {
       addXp(-item.cost);
       setEquippedAccessory(item.icon);
-      alert(`Equipped ${item.name} for ${userProfile.petName}!`);
+      sendRealNotification('Accessory Equipped! 👒✨', `Nice choice! Equipped ${item.name} for ${userProfile.petName || 'Chimpu'}.`);
     } else {
       alert(`You need ${item.cost} XP to buy ${item.name}!`);
     }
@@ -1035,13 +1095,13 @@ export default function App() {
 
       {/* MAIN CONTENT AREA - WITH pb-24 TO AVOID BOTTOM NAV OVERLAP */}
       <main className={`relative z-10 flex-1 p-3 sm:p-4 md:p-5 mx-auto w-full pb-24 overflow-x-hidden transition-all duration-300 ${activeTab === 'studyDocs' ? 'max-w-7xl' : 'max-w-xl space-y-4'}`}>
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="popLayout">
           <motion.div
             key={activeTab}
-            initial={{ opacity: 0, y: 6 }}
+            initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.18, ease: 'easeInOut' }}
             className="w-full space-y-4"
           >
         {/* DASHBOARD TAB */}
@@ -1095,6 +1155,24 @@ export default function App() {
                     </div>
 
 
+
+                    {/* Real-time Push Notifications Bell Button */}
+                    <motion.button
+                      whileHover={{ scale: 1.08 }}
+                      whileTap={{ scale: 0.92 }}
+                      onClick={requestNotificationPermission}
+                      className={`p-1.5 rounded-xl transition cursor-pointer shrink-0 shadow-xs flex items-center space-x-1 border ${
+                        'Notification' in window && Notification.permission === 'granted'
+                          ? 'text-yellow-300 bg-yellow-500/20 hover:bg-yellow-500/30 border-yellow-400/40 animate-pulse'
+                          : 'text-slate-300 bg-slate-500/10 hover:bg-slate-500/25 border-slate-400/30'
+                      }`}
+                      title="Enable Desktop/Mobile OS Notifications / पुश नोटिफिकेशन सक्षम करें"
+                    >
+                      <span className="text-xs">🔔</span>
+                      <span className="text-[9px] font-black uppercase tracking-wider">
+                        {'Notification' in window && Notification.permission === 'granted' ? 'Active' : 'Alerts'}
+                      </span>
+                    </motion.button>
 
                     {/* Auth / Sign In / Account Button */}
                     <motion.button
@@ -3306,7 +3384,7 @@ export default function App() {
             }}
           />
         )}
-          </motion.div>
+        </motion.div>
         </AnimatePresence>
       </main>
 

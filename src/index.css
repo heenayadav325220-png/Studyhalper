@@ -1,9 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0.600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Playfair Display", Georgia, Cambria, serif;
+  --font-serif: "Lora", "Newsreader", "Playfair Display", Georgia, Cambria, serif;
+  --font-editorial: "Lora", "Newsreader", Georgia, Cambria, serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   --font-rounded: "Outfit", ui-sans-serif, system-ui, sans-serif;
 }
@@ -51,70 +52,101 @@ html.dark ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.35); }
   min-height: 56px; padding: 10px clamp(14px, 3vw, 32px); border-color: #e7eaf0;
   box-shadow: 0 1px 10px rgba(15, 23, 42, 0.04);
 }
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > header > div:last-child > div { display: none; }
 #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > header h1 { letter-spacing: -0.025em; font-size: 13px; }
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto {
-  width: 100%; max-width: 880px; margin-inline: auto; padding: 28px clamp(16px, 4vw, 48px) 180px;
-  scroll-padding-bottom: 180px; overscroll-behavior-y: contain; scrollbar-gutter: stable;
+
+/* AI Tutor Classic Editorial & Scholarly Typography */
+.tutor-editorial {
+  font-family: "Lora", "Newsreader", "Playfair Display", Georgia, serif;
+  letter-spacing: -0.003em;
+  text-rendering: optimizeLegibility;
+}
+.tutor-editorial p {
+  line-height: 1.82;
+  font-size: clamp(0.975rem, 1.25vw, 1.05rem);
+  color: #1e293b;
+  margin-bottom: 0.9rem;
+}
+.tutor-editorial strong {
+  font-weight: 700;
+  color: #0f172a;
+}
+.tutor-editorial h1,
+.tutor-editorial h2,
+.tutor-editorial h3,
+.tutor-editorial h4 {
+  font-family: "Lora", "Newsreader", Georgia, serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+.tutor-editorial h1 {
+  font-size: 1.38rem;
+  margin: 1.4em 0 0.5em;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+.tutor-editorial h2 {
+  font-size: 1.2rem;
+  margin: 1.25em 0 0.4em;
+  color: #1e293b;
+}
+.tutor-editorial h3 {
+  font-size: 1.06rem;
+  margin: 1em 0 0.35em;
+  color: #334155;
+}
+.tutor-editorial ul, .tutor-editorial ol {
+  padding-left: 1.4rem;
+  margin: 0.85rem 0;
+  color: #1e293b;
+}
+.tutor-editorial li {
+  padding-left: 0.2rem;
+  margin: 0.4rem 0;
+  line-height: 1.76;
+}
+.tutor-editorial blockquote {
+  border-left: 4px solid #6366f1;
+  background: rgba(238, 242, 255, 0.45);
+  border-radius: 0 0.75rem 0.75rem 0;
+  color: #334155;
+  padding: 0.75rem 1rem;
+  margin: 1.1rem 0;
+  font-style: italic;
+}
+.tutor-editorial table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 1.1rem 0;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+.tutor-editorial th, .tutor-editorial td {
+  border: 1px solid #e2e8f0;
+  padding: 0.55rem 0.85rem;
+  text-align: left;
+  font-size: 0.875rem;
+}
+.tutor-editorial th {
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 700;
+}
+.tutor-editorial .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.45rem 0;
+  margin: 0.85rem 0;
 }
 
-/* Content-first AI conversation: no AI card, bubble, panel, border, or shadow. */
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto > div > div.flex.items-start.space-x-2\.5.justify-start {
-  align-items: flex-start; margin-bottom: 2.75rem; gap: 0.65rem;
-}
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto > div > div.flex.items-start.space-x-2\.5.justify-start > div:first-child {
-  width: 1.25rem; height: 1.25rem; margin-top: 0.35rem; border-radius: 0.35rem;
-  background: #eef2ff !important; box-shadow: none !important; ring: none !important;
-}
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto > div > div.flex.items-start.space-x-2\.5.justify-start > div:first-child svg {
-  width: 0.75rem; height: 0.75rem; color: #6366f1;
-}
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto > div > div.flex.items-start.space-x-2\.5.justify-start > div:nth-child(2) {
-  width: min(100%, 72ch); max-width: 72ch; gap: 0.5rem;
-}
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto > div > div.flex.items-start.space-x-2\.5.justify-start > div:nth-child(2) > div:first-child {
-  padding-left: 0; color: #64748b; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.01em;
-}
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto > div > div.flex.items-start.space-x-2\.5.justify-start > div:nth-child(2) > div:first-child span:first-child {
-  color: #475569; font-weight: 700;
-}
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto > div > div.flex.items-start.space-x-2\.5.justify-start > div:nth-child(2) > div.bg-white.border.border-slate-200.text-slate-900.rounded-2xl {
-  display: block; width: 100%; max-width: 72ch; padding: 0 !important; background: transparent !important;
-  border: 0 !important; border-radius: 0 !important; box-shadow: none !important; color: #263247;
-}
-#main-app-container .markdown-body {
-  max-width: 72ch; font-size: clamp(0.9rem, 1.2vw, 1rem); line-height: 1.78; color: #263247;
-}
-#main-app-container .markdown-body h1,
-#main-app-container .markdown-body h2,
-#main-app-container .markdown-body h3,
-#main-app-container .markdown-body h4 { color: #172033; font-weight: 750; letter-spacing: -0.02em; margin: 1.25em 0 0.45em; }
-#main-app-container .markdown-body h1 { font-size: 1.35rem; }
-#main-app-container .markdown-body h2 { font-size: 1.18rem; }
-#main-app-container .markdown-body h3 { font-size: 1.05rem; }
-#main-app-container .markdown-body ul, #main-app-container .markdown-body ol { padding-left: 1.35rem; margin: 0.8rem 0; }
-#main-app-container .markdown-body li { padding-left: 0.25rem; margin: 0.35rem 0; }
-#main-app-container .markdown-body blockquote { border-left: 3px solid #c7d2fe; color: #526079; padding-left: 1rem; margin: 1rem 0; }
-#main-app-container .markdown-body table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 1rem 0; }
-#main-app-container .markdown-body th, #main-app-container .markdown-body td { border: 1px solid #e2e8f0; padding: 0.5rem 0.7rem; text-align: left; }
-#main-app-container .markdown-body th { background: #f1f5f9; font-weight: 700; }
-#main-app-container .markdown-body pre { margin: 1rem 0; max-width: 100%; overflow-x: auto; border-radius: 10px; }
-#main-app-container .markdown-body .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.35rem 0; }
-/* Inline, quiet actions: no separator panel or bordered toolbar. */
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto > div > div.flex.items-start.space-x-2\.5.justify-start .pt-2.border-t {
-  border-top: 0 !important; padding: 0.55rem 0 0 !important; margin-top: 0.2rem; opacity: 0.68;
-}
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto > div > div.flex.items-start.space-x-2\.5.justify-start .pt-2.border-t button {
-  background: transparent !important; box-shadow: none !important; color: #64748b !important; padding: 0.3rem 0.4rem;
-}
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto > div > div.flex.items-start.space-x-2\.5.justify-start .pt-2.border-t button:hover {
-  color: #334155 !important; background: #eef2f7 !important; opacity: 1;
-}
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto .bg-white.border.border-slate-200.text-slate-900.rounded-2xl { border-color: transparent; box-shadow: none; background: transparent; }
-
-/* User messages remain compact, refined blue bubbles. */
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto > div > div.flex.items-start.justify-end .bg-blue-600 {
-  border-radius: 1rem 0.35rem 1rem 1rem; padding: 0.7rem 0.9rem; box-shadow: none; font-weight: 500;
+/* Modern clean fallback */
+.tutor-modern p {
+  line-height: 1.74;
+  font-size: clamp(0.92rem, 1.15vw, 0.98rem);
+  color: #1e293b;
+  margin-bottom: 0.75rem;
 }
 
 /* Composer and suggestions */

@@ -10,7 +10,6 @@ import {
   BrainCircuit,
   Loader2,
   Mic,
-  Bot,
   User as UserIcon,
   Calculator,
   Compass,
@@ -39,7 +38,8 @@ import {
   Zap,
   HelpCircle,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Type
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -351,9 +351,11 @@ function parseMarkdownBlocks(text: string): string[] {
 const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
   text,
   isLatest,
+  fontStyle = 'classic',
 }: {
   text: string;
   isLatest?: boolean;
+  fontStyle?: 'classic' | 'modern';
 }) {
   const blocks = parseMarkdownBlocks(text);
   const [visibleCount, setVisibleCount] = useState(() => (isLatest ? 1 : blocks.length));
@@ -379,9 +381,11 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
     return () => clearInterval(interval);
   }, [text, isLatest, blocks.length]);
 
+  const isClassic = fontStyle === 'classic';
+
   return (
     <div
-      className="markdown-body text-xs sm:text-sm text-slate-900 font-normal leading-relaxed space-y-2.5 overflow-x-auto relative group cursor-pointer select-text"
+      className={`markdown-body select-text w-full ${isClassic ? 'tutor-editorial font-serif' : 'tutor-modern font-sans'} text-slate-900 leading-relaxed space-y-2.5 overflow-x-auto relative group cursor-pointer`}
       onClick={() => {
         if (!isAllRevealed) {
           setVisibleCount(blocks.length);
@@ -401,11 +405,87 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
             remarkPlugins={[remarkMath]}
             rehypePlugins={[rehypeKatex]}
             components={{
+              h1({ children }) {
+                return (
+                  <h1 className={`font-bold text-slate-950 mt-5 mb-2.5 pb-1.5 border-b border-slate-200/80 tracking-tight ${isClassic ? 'font-serif text-[1.35rem] sm:text-[1.5rem]' : 'font-sans text-xl sm:text-2xl'}`}>
+                    {children}
+                  </h1>
+                );
+              },
+              h2({ children }) {
+                return (
+                  <h2 className={`font-bold text-slate-900 mt-4 mb-2 tracking-tight flex items-center gap-2 ${isClassic ? 'font-serif text-[1.18rem] sm:text-[1.28rem]' : 'font-sans text-lg sm:text-xl'}`}>
+                    {children}
+                  </h2>
+                );
+              },
+              h3({ children }) {
+                return (
+                  <h3 className={`font-bold text-slate-800 mt-3.5 mb-1.5 tracking-tight ${isClassic ? 'font-serif text-[1.05rem] sm:text-[1.12rem]' : 'font-sans text-base sm:text-lg'}`}>
+                    {children}
+                  </h3>
+                );
+              },
               p({ children }) {
-                return <p className="mb-2 last:mb-0 leading-relaxed text-slate-900">{children}</p>;
+                return (
+                  <p className={`mb-3 last:mb-0 leading-[1.82] ${isClassic ? 'font-serif text-[15.5px] sm:text-[16.5px] text-slate-900' : 'font-sans text-sm sm:text-[15px] text-slate-800'}`}>
+                    {children}
+                  </p>
+                );
+              },
+              ul({ children }) {
+                return (
+                  <ul className={`my-3 space-y-1.5 pl-5 list-disc marker:text-indigo-600 leading-[1.78] ${isClassic ? 'font-serif text-[15px] sm:text-[16px]' : 'font-sans text-sm sm:text-[15px]'}`}>
+                    {children}
+                  </ul>
+                );
+              },
+              ol({ children }) {
+                return (
+                  <ol className={`my-3 space-y-1.5 pl-5 list-decimal marker:text-indigo-600 font-semibold leading-[1.78] ${isClassic ? 'font-serif text-[15px] sm:text-[16px]' : 'font-sans text-sm sm:text-[15px]'}`}>
+                    {children}
+                  </ol>
+                );
+              },
+              li({ children }) {
+                return (
+                  <li className={`text-slate-800 mb-1 ${isClassic ? 'font-serif' : 'font-sans'}`}>
+                    {children}
+                  </li>
+                );
+              },
+              blockquote({ children }) {
+                return (
+                  <blockquote className="my-4 pl-4 py-2.5 border-l-[3.5px] border-indigo-500 bg-indigo-50/40 rounded-r-xl text-slate-700 italic font-serif text-[15px] sm:text-[16px]">
+                    {children}
+                  </blockquote>
+                );
+              },
+              table({ children }) {
+                return (
+                  <div className="my-4 overflow-x-auto rounded-xl border border-slate-200/90 shadow-xs">
+                    <table className={`w-full text-left text-xs sm:text-sm ${isClassic ? 'font-serif' : 'font-sans'}`}>
+                      {children}
+                    </table>
+                  </div>
+                );
+              },
+              th({ children }) {
+                return (
+                  <th className="bg-slate-100/90 text-slate-900 font-bold px-3.5 py-2.5 border-b border-slate-200">
+                    {children}
+                  </th>
+                );
+              },
+              td({ children }) {
+                return (
+                  <td className="px-3.5 py-2.5 border-b border-slate-100 text-slate-800">
+                    {children}
+                  </td>
+                );
               },
               strong({ children }) {
-                return <strong className="font-bold text-slate-900">{children}</strong>;
+                return <strong className="font-bold text-slate-950">{children}</strong>;
               },
               code({ node, className, children, ...props }: any) {
                 const match = /language-(\w+)/.exec(className || '');
@@ -415,8 +495,8 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
                 if (isMultiLine) {
                   const lang = match ? match[1] : 'code';
                   return (
-                    <div className="relative my-2 rounded-xl overflow-hidden border border-slate-300 bg-slate-900 text-left">
-                      <div className="bg-slate-800 px-3 py-1.5 flex items-center justify-between text-[10px] text-slate-300 font-mono border-b border-slate-700">
+                    <div className="relative my-3 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 text-left shadow-md">
+                      <div className="bg-slate-900 px-3.5 py-2 flex items-center justify-between text-[11px] text-slate-300 font-mono border-b border-slate-800">
                         <span className="uppercase font-bold text-cyan-400">{lang}</span>
                         <button
                           type="button"
@@ -424,7 +504,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
                             e.stopPropagation();
                             await safeClipboardWrite(codeString);
                           }}
-                          className="hover:text-white transition font-sans text-[10px] bg-slate-700 hover:bg-slate-600 px-2 py-0.5 rounded-md text-slate-200"
+                          className="hover:text-white transition font-sans text-[11px] bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-md text-slate-200 cursor-pointer"
                         >
                           Copy Code
                         </button>
@@ -433,7 +513,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
                         style={oneDark}
                         language={lang === 'code' ? 'text' : lang}
                         PreTag="div"
-                        customStyle={{ margin: 0, padding: '0.75rem', fontSize: '0.75rem', background: '#0f172a' }}
+                        customStyle={{ margin: 0, padding: '1rem', fontSize: '0.8rem', background: '#020617' }}
                         {...props}
                       >
                         {codeString}
@@ -443,7 +523,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
                 }
 
                 return (
-                  <code className="bg-blue-100/80 text-blue-950 px-1.5 py-0.5 rounded font-mono text-[11px] font-semibold border border-blue-200" {...props}>
+                  <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded-md font-mono text-[12px] font-semibold border border-slate-200/80" {...props}>
                     {children}
                   </code>
                 );
@@ -459,11 +539,11 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex items-center space-x-1.5 text-[10px] text-blue-600 font-bold pt-1"
+          className="flex items-center space-x-2 text-xs text-indigo-600 font-bold pt-1.5"
         >
-          <span className="inline-block w-1.5 h-3 bg-blue-600 animate-pulse rounded-xs" />
+          <span className="inline-block w-2 h-3.5 bg-indigo-600 animate-pulse rounded-xs" />
           <span>Generating explanation...</span>
-          <span className="text-slate-500 font-normal ml-2">(Click anywhere to reveal all)</span>
+          <span className="text-slate-400 font-normal text-xs ml-2">(Click anywhere to reveal all)</span>
         </motion.div>
       )}
     </div>
@@ -583,6 +663,21 @@ export const AiTutorApp = memo(function AiTutorApp({
     return DEFAULT_SAVED_FORMULAS;
   });
   const [showSavedFormulasPanel, setShowSavedFormulasPanel] = useState(false);
+  const [tutorFontStyle, setTutorFontStyle] = useState<'classic' | 'modern'>(() => {
+    try {
+      return (localStorage.getItem('ai_tutor_font_style') as 'classic' | 'modern') || 'classic';
+    } catch {
+      return 'classic';
+    }
+  });
+
+  const toggleTutorFontStyle = () => {
+    const next = tutorFontStyle === 'classic' ? 'modern' : 'classic';
+    setTutorFontStyle(next);
+    try {
+      localStorage.setItem('ai_tutor_font_style', next);
+    } catch {}
+  };
   const [newFormulaName, setNewFormulaName] = useState('');
   const [newFormulaLatex, setNewFormulaLatex] = useState('');
   const [showAddFormulaForm, setShowAddFormulaForm] = useState(false);
@@ -637,7 +732,6 @@ export const AiTutorApp = memo(function AiTutorApp({
   const autoHideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartYRef = useRef<number>(0);
   const bottomTouchStartYRef = useRef<number>(0);
-  const mouseStartYRef = useRef<number | null>(null);
 
   const resetAutoHideTimer = () => {
     if (autoHideTimerRef.current) {
@@ -775,13 +869,34 @@ export const AiTutorApp = memo(function AiTutorApp({
     setCameraError(null);
     stopCamera();
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: facing,
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+      let stream;
+      try {
+        // Try requested facing mode with high quality ideal resolution
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: facing,
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        });
+      } catch (firstErr) {
+        console.warn('First camera attempt failed, trying fallback with generic resolution:', firstErr);
+        try {
+          // Fall back to just the requested facing mode
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: facing
+            }
+          });
+        } catch (secondErr) {
+          console.warn('Second camera attempt failed, trying any available video source:', secondErr);
+          // Ultimate fallback to any working video camera (important for desktops without dual cameras)
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true
+          });
         }
-      });
+      }
+      
       mediaStreamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -1390,7 +1505,7 @@ export const AiTutorApp = memo(function AiTutorApp({
         }
       }}
     >
-      {/* COLLAPSIBLE HEADER CONTAINER WITH AUTO-HIDE (2.5 SECONDS) */}
+      {/* COLLAPSIBLE TOP DETAIL BAR (SLIDES UP OUT OF VIEW) */}
       <motion.div
         initial={false}
         animate={{
@@ -1398,7 +1513,7 @@ export const AiTutorApp = memo(function AiTutorApp({
           opacity: isHeaderVisible ? 1 : 0
         }}
         transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-30 shrink-0 overflow-hidden bg-white shadow-xs"
+        className="relative z-30 shrink-0 overflow-hidden bg-white"
         onMouseEnter={() => {
           setIsHeaderHoveredOrInteracting(true);
         }}
@@ -1416,11 +1531,11 @@ export const AiTutorApp = memo(function AiTutorApp({
           setIsHeaderHoveredOrInteracting(false);
         }}
       >
-        <header className="bg-white/95 backdrop-blur-sm border-b border-slate-200 px-3 sm:px-5 py-2.5 sm:py-3 flex items-center justify-between shrink-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)] z-10">
-          <div className="flex items-center space-x-2.5 sm:space-x-3">
+        <header className="bg-white/95 backdrop-blur-sm border-b border-slate-200 px-3 sm:px-5 py-2 sm:py-2.5 flex items-center justify-between shrink-0 shadow-[0_1px_2px_rgba(15,23,42,0.03)] z-10">
+          <div className="flex items-center space-x-2 sm:space-x-3">
             <button
               onClick={onBack}
-              className="p-1.5 sm:p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center space-x-1 border border-slate-200 group cursor-pointer"
+              className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center space-x-1 border border-slate-200 group cursor-pointer"
               title="Back to Ascend Study"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform text-slate-700" />
@@ -1428,22 +1543,22 @@ export const AiTutorApp = memo(function AiTutorApp({
             </button>
 
             <div className="flex items-center space-x-2.5">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#0f172a] to-[#1e293b] shadow-sm flex items-center justify-center text-cyan-400 font-bold text-lg tracking-wider">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0f172a] to-[#1e293b] shadow-sm flex items-center justify-center text-cyan-400 font-bold text-base tracking-wider">
                 A
               </div>
 
               <div>
                 <div className="flex items-center space-x-2 flex-wrap">
-                  <h1 className="text-xs sm:text-sm font-bold tracking-tight text-slate-900">
+                  <h1 className="text-xs font-bold tracking-tight text-slate-900">
                     ASCEND AI TUTOR
                   </h1>
-                  <span className="text-slate-400 font-bold text-xs">v2.5</span>
-                  <div className="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-[10px] px-2 py-0.5 rounded-full flex items-center space-x-1 shadow-2xs">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-slate-400 font-bold text-[10px]">v2.5</span>
+                  <div className="bg-emerald-50 text-emerald-700 border border-emerald-300/60 font-bold text-[9px] px-1.5 py-0.5 rounded-full flex items-center space-x-1 shadow-2xs">
+                    <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
                     <span>Online</span>
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-500 font-medium flex items-center space-x-1 mt-0.5">
+                <p className="text-[9px] text-slate-500 font-medium flex items-center space-x-1">
                   <span>Powered by Gemini AI</span>
                 </p>
               </div>
@@ -1451,20 +1566,20 @@ export const AiTutorApp = memo(function AiTutorApp({
           </div>
 
           <div className="flex items-center space-x-2">
-            <div className="hidden md:flex items-center space-x-1.5">
-              <div className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-1 rounded-full flex items-center space-x-1.5">
-                <UserIcon className="w-3.5 h-3.5 text-slate-500" />
-                <span className="truncate max-w-[110px]">{user.name || 'full Yadav'}</span>
+            <div className="hidden lg:flex items-center space-x-1.5">
+              <div className="bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex items-center space-x-1">
+                <UserIcon className="w-3 h-3 text-slate-500" />
+                <span className="truncate max-w-[90px]">{user.name || 'full Yadav'}</span>
               </div>
 
-              <div className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-1 rounded-full flex items-center space-x-1.5">
-                <GraduationCap className="w-3.5 h-3.5 text-slate-500" />
-                <span className="truncate max-w-[130px]">{user.className || 'Class 11th (PCB)'}</span>
+              <div className="bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex items-center space-x-1">
+                <GraduationCap className="w-3 h-3 text-slate-500" />
+                <span className="truncate max-w-[110px]">{user.className || 'Class 11th (PCB)'}</span>
               </div>
 
-              <div className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-1 rounded-full flex items-center space-x-1.5">
-                <UserIcon className="w-3.5 h-3.5 text-slate-500" />
-                <span className="truncate max-w-[100px]">{user.schoolName || 'chhabra'}</span>
+              <div className="bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex items-center space-x-1">
+                <UserIcon className="w-3 h-3 text-slate-500" />
+                <span className="truncate max-w-[80px]">{user.schoolName || 'chhabra'}</span>
               </div>
             </div>
 
@@ -1472,224 +1587,183 @@ export const AiTutorApp = memo(function AiTutorApp({
             <button
               type="button"
               onClick={handleVoiceInputToggle}
-              className={`p-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-bold ${
+              className={`p-1.5 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold ${
                 isListening
                   ? 'bg-rose-500 text-white animate-pulse shadow-md border border-rose-600'
                   : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-100 border border-slate-200'
               }`}
               title={isListening ? 'Listening... Click to stop' : 'Microphone Voice Input'}
             >
-              <Mic className="w-4 h-4" />
+              <Mic className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{isListening ? 'Listening...' : 'Mic'}</span>
             </button>
 
             <button
               type="button"
               onClick={() => setShowCustomVoiceModal(true)}
-              className="p-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-200/80 rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-[0_0_0_1px_rgba(99,102,241,0.05)]"
+              className="p-1.5 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-200/80 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold"
               title="Configure Tutor Custom Voice"
             >
-              <Volume2 className="w-4 h-4 text-indigo-600" />
+              <Volume2 className="w-3.5 h-3.5 text-indigo-600" />
               <span className="hidden sm:inline">Voice</span>
             </button>
 
             {messages.length > 0 && (
               <button
                 onClick={handleClearChat}
-                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
                 title="Clear Conversation"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             )}
 
             <button
               type="button"
               onClick={() => setShowMoreMenu(true)}
-              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition flex items-center justify-center relative shadow-2xs cursor-pointer active:scale-95"
+              className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition flex items-center justify-center relative cursor-pointer active:scale-95"
               title="Tools, Modes, Subject & Settings"
             >
-              <MoreVertical className="w-4 h-4 text-slate-700" />
+              <MoreVertical className="w-3.5 h-3.5 text-slate-700" />
             </button>
           </div>
         </header>
-
-        {pdfExportSuccess && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="bg-emerald-600 text-white px-4 py-2 text-xs font-bold flex items-center justify-between shadow-md z-20"
-          >
-            <div className="flex items-center space-x-2">
-              <Check className="w-4 h-4 text-white" />
-              <span>Formatted PDF study guide successfully downloaded! Saved for offline study.</span>
-            </div>
-            <span className="bg-emerald-800 text-emerald-100 text-[10px] px-2 py-0.5 rounded-full font-mono">
-              +15 XP Earned
-            </span>
-          </motion.div>
-        )}
-
-        <div className="bg-white border-b border-slate-200/80 px-3 sm:px-5 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
-          <div className="relative shrink-0">
-            <select
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value as Subject)}
-              className="appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs pl-8 pr-4 py-1.5 rounded-lg cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-            >
-              {SUBJECT_LIST.map((sub) => (
-                <option key={sub} value={sub} className="text-slate-900 bg-white">{sub}</option>
-              ))}
-            </select>
-            <FlaskConical className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-
-          <div className="relative shrink-0">
-            <select
-              value={selectedLanguage}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSelectedLanguage(val);
-                setStoredValue(`ai_tutor_language_${user.uid}`, val);
-                if (onLanguageChange) {
-                  const reverseMap: Record<string, string> = {
-                    'English': 'en',
-                    'Hindi': 'hi',
-                    'Hinglish': 'hinglish',
-                    'Marathi': 'marathi',
-                    'Tamil': 'tamil',
-                    'Bengali': 'bengali'
-                  };
-                  const code = reverseMap[val];
-                  if (code) onLanguageChange(code);
-                }
-              }}
-              className="appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs pl-8 pr-4 py-1.5 rounded-lg cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-            >
-              <option value="Hinglish">Hinglish</option>
-              <option value="Hindi">हिंदी (Hindi)</option>
-              <option value="English">English</option>
-              <option value="Marathi">मराठी (Marathi)</option>
-              <option value="Tamil">தமிழ் (Tamil)</option>
-              <option value="Bengali">বাংলा (Bengali)</option>
-            </select>
-            <Languages className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-
-          <div className="w-px h-5 bg-slate-200 shrink-0" />
-
-          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5 shrink-0">
-            {[
-              { id: 'homework' as const, label: 'Homework', icon: Zap },
-              { id: 'step' as const, label: 'Step-by-Step', icon: TrendingUp },
-              { id: 'explain' as const, label: 'Explain', icon: Lightbulb },
-              { id: 'quiz' as const, label: 'Quiz', icon: ClipboardList },
-            ].map((mode) => {
-              const Icon = mode.icon;
-              const active = tutorMode === mode.id;
-              return (
-                <button
-                  key={mode.id}
-                  type="button"
-                  onClick={() => setTutorMode(mode.id)}
-                  className={`px-2.5 py-1.5 rounded-md font-semibold text-xs flex items-center space-x-1.5 transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95 ${
-                    active
-                      ? 'bg-slate-900 text-white shadow-2xs'
-                      : 'text-slate-600 hover:bg-slate-200/60'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">{mode.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="w-px h-5 bg-slate-200 shrink-0" />
-
-          <button
-            type="button"
-            onClick={() => handleSendMessage(`Give me key high-yield exam insights, formula tricks, and JEE Main / Board questions for ${selectedSubject}.`)}
-            className="border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 font-semibold text-xs px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Exam Insights</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleExportPdf}
-            disabled={messages.length === 0 || isExportingPdf}
-            className="ml-auto border border-slate-200 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40 text-slate-600 font-semibold text-xs px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer"
-          >
-            {isExportingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">Export PDF</span>
-          </button>
-        </div>
-
-        {/* Small bottom pull-up button */}
-        <div className="flex justify-center -mt-0.5 pb-1 bg-white border-b border-slate-200/80">
-          <button
-            type="button"
-            onClick={hideHeader}
-            className="px-3 py-0.5 text-[10px] font-medium text-slate-400 hover:text-slate-700 flex items-center gap-1 cursor-pointer transition rounded-full hover:bg-slate-100 active:scale-95"
-            title="Click to hide header (auto-hides in ~2.5s)"
-          >
-            <span>{appLanguage === 'hi' ? 'ऊपर छुपाएं' : 'Hide Header'}</span>
-            <ChevronUp className="w-3 h-3" />
-          </button>
-        </div>
       </motion.div>
 
-      {/* FLOATING DOWN-ARROW PULL HANDLE WHEN HEADER IS HIDDEN */}
-      <AnimatePresence>
-        {!isHeaderVisible && (
-          <motion.div
-            initial={{ y: -30, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -30, opacity: 0 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="fixed top-0 left-1/2 -translate-x-1/2 z-40"
+      {/* PERSISTENT STUDY TOOLBAR (ALWAYS STAYS AS HEADER, REST SLIDES UP ABOVE) */}
+      <div className="bg-white border-b border-slate-200/90 px-3 sm:px-5 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0 z-20 relative">
+        {/* Back Arrow button to go back directly from persistent header */}
+        <button
+          type="button"
+          onClick={onBack}
+          className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 text-slate-600 hover:text-slate-900 transition flex items-center justify-center cursor-pointer shrink-0 active:scale-95"
+          title="Back"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+        </button>
+
+        <div className="relative shrink-0">
+          <select
+            value={selectedSubject}
+            onChange={(e) => setSelectedSubject(e.target.value as Subject)}
+            className="appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs pl-8 pr-4 py-1.5 rounded-lg cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
           >
-            <button
-              type="button"
-              onClick={showHeader}
-              onTouchStart={(e) => {
-                touchStartYRef.current = e.touches[0].clientY;
-              }}
-              onTouchMove={(e) => {
-                const deltaY = e.touches[0].clientY - touchStartYRef.current;
-                if (deltaY > 12) {
-                  showHeader();
-                }
-              }}
-              onMouseDown={(e) => {
-                mouseStartYRef.current = e.clientY;
-              }}
-              onMouseMove={(e) => {
-                if (mouseStartYRef.current !== null && e.clientY - mouseStartYRef.current > 12) {
-                  showHeader();
-                  mouseStartYRef.current = null;
-                }
-              }}
-              onMouseUp={() => {
-                mouseStartYRef.current = null;
-              }}
-              className="group px-4 py-1.5 bg-white/95 hover:bg-white text-slate-800 border-x border-b border-slate-200/90 rounded-b-2xl shadow-[0_4px_16px_rgba(15,23,42,0.12)] flex items-center gap-2 cursor-pointer transition-all active:scale-95 select-none"
-              title={appLanguage === 'hi' ? 'नीचे खींचें या क्लिक करें' : 'Slide or click to open AI Tutor header'}
-            >
-              <span className="text-[11px] font-bold text-slate-700 group-hover:text-indigo-600 transition-colors flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                <span>{appLanguage === 'hi' ? 'एआई ट्यूटर हेडर' : 'AI Tutor'}</span>
-              </span>
-              <div className="w-5 h-5 rounded-full bg-indigo-50 group-hover:bg-indigo-100 text-indigo-600 flex items-center justify-center transition-transform group-hover:translate-y-0.5">
-                <ChevronDown className="w-3.5 h-3.5 animate-bounce" />
-              </div>
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            {SUBJECT_LIST.map((sub) => (
+              <option key={sub} value={sub} className="text-slate-900 bg-white">{sub}</option>
+            ))}
+          </select>
+          <FlaskConical className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        </div>
+
+        {/* Minimal Toggle Chevron to easily roll details up/down right next to Science option */}
+        <button
+          type="button"
+          onClick={() => isHeaderVisible ? hideHeader() : showHeader()}
+          className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 text-slate-500 hover:text-slate-800 transition flex items-center justify-center cursor-pointer shrink-0 active:scale-95"
+          title={isHeaderVisible ? "Minimize top menu" : "Maximize top menu"}
+        >
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${isHeaderVisible ? 'rotate-180' : ''}`} />
+        </button>
+
+        <div className="relative shrink-0">
+          <select
+            value={selectedLanguage}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSelectedLanguage(val);
+              setStoredValue(`ai_tutor_language_${user.uid}`, val);
+              if (onLanguageChange) {
+                const reverseMap: Record<string, string> = {
+                  'English': 'en',
+                  'Hindi': 'hi',
+                  'Hinglish': 'hinglish',
+                  'Marathi': 'marathi',
+                  'Tamil': 'tamil',
+                  'Bengali': 'bengali'
+                };
+                const code = reverseMap[val];
+                if (code) onLanguageChange(code);
+              }
+            }}
+            className="appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs pl-8 pr-4 py-1.5 rounded-lg cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+          >
+            <option value="Hinglish">Hinglish</option>
+            <option value="Hindi">हिंदी (Hindi)</option>
+            <option value="English">English</option>
+            <option value="Marathi">मराठी (Marathi)</option>
+            <option value="Tamil">தமிழ் (Tamil)</option>
+            <option value="Bengali">বাংলा (Bengali)</option>
+          </select>
+          <Languages className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        </div>
+
+        <div className="w-px h-5 bg-slate-200 shrink-0" />
+
+        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5 shrink-0">
+          {[
+            { id: 'homework' as const, label: 'Homework', icon: Zap },
+            { id: 'step' as const, label: 'Step-by-Step', icon: TrendingUp },
+            { id: 'explain' as const, label: 'Explain', icon: Lightbulb },
+            { id: 'quiz' as const, label: 'Quiz', icon: ClipboardList },
+          ].map((mode) => {
+            const Icon = mode.icon;
+            const active = tutorMode === mode.id;
+            return (
+              <button
+                key={mode.id}
+                type="button"
+                onClick={() => setTutorMode(mode.id)}
+                className={`px-2.5 py-1.5 rounded-md font-bold text-xs flex items-center space-x-1.5 transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95 ${
+                  active
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'text-slate-600 hover:bg-slate-200/60'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{mode.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="w-px h-5 bg-slate-200 shrink-0" />
+
+        <button
+          type="button"
+          onClick={() => handleSendMessage(`Give me key high-yield exam insights, formula tricks, and JEE Main / Board questions for ${selectedSubject}.`)}
+          className="border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 font-bold text-xs px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer shrink-0 whitespace-nowrap"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
+          <span>Exam Insights</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={handleExportPdf}
+          disabled={messages.length === 0 || isExportingPdf}
+          className="ml-auto border border-slate-200 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40 text-slate-600 font-bold text-xs px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer shrink-0 whitespace-nowrap"
+        >
+          {isExportingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
+          <span className="hidden sm:inline">Export PDF</span>
+        </button>
+      </div>
+
+      {pdfExportSuccess && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className="bg-emerald-600 text-white px-4 py-2 text-xs font-bold flex items-center justify-between shadow-md z-20"
+        >
+          <div className="flex items-center space-x-2">
+            <Check className="w-4 h-4 text-white" />
+            <span>Formatted PDF study guide successfully downloaded! Saved for offline study.</span>
+          </div>
+          <span className="bg-emerald-800 text-emerald-100 text-[10px] px-2 py-0.5 rounded-full font-mono">
+            +15 XP Earned
+          </span>
+        </motion.div>
+      )}
 
       <div className="flex-1 overflow-y-auto overscroll-contain scroll-smooth p-3 sm:p-5 space-y-4 max-w-4xl mx-auto w-full">
         {messages.length === 0 ? (
@@ -1778,10 +1852,13 @@ export const AiTutorApp = memo(function AiTutorApp({
                     animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
                     exit={{ opacity: 0, y: -16, scale: 0.88, filter: 'blur(4px)', transition: { duration: 0.22, ease: 'easeOut' } }}
                     transition={{ type: 'spring', stiffness: 400, damping: 28, mass: 0.8 }}
-                    className="flex items-start justify-end space-x-2.5 group/usermsg"
+                    className="flex items-start justify-end space-x-2.5 group/usermsg w-full"
                   >
-                    <div className="flex flex-col items-end max-w-[85%] sm:max-w-[75%] space-y-1">
-                      <div className="flex items-center space-x-1.5 pr-1">
+                    <div className="flex flex-col items-end max-w-[85%] sm:max-w-[78%] space-y-1">
+                      <div className="flex items-center space-x-2 pr-1">
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          {user.name || 'You'} • {msg.timestamp}
+                        </span>
                         <button
                           type="button"
                           onClick={() => handleDeleteMessage(msg.id)}
@@ -1790,31 +1867,29 @@ export const AiTutorApp = memo(function AiTutorApp({
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
-                        <span className="text-[11px] text-slate-400 font-medium">
-                          {msg.timestamp}
-                        </span>
                       </div>
-                      <div className="bg-blue-600 text-white rounded-2xl rounded-tr-md p-3.5 shadow-sm space-y-2">
+
+                      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 text-white rounded-2xl rounded-tr-xs p-3.5 sm:p-4 border border-slate-700/60 shadow-[0_4px_16px_rgba(15,23,42,0.12)] space-y-2.5">
                         {msg.images && msg.images.length > 0 ? (
                           <div className={`grid gap-2 ${msg.images.length === 1 ? 'grid-cols-1 max-w-xs' : 'grid-cols-2 max-w-sm'}`}>
                             {msg.images.map((img, i) => (
-                              <img key={i} src={img} alt={`Attached ${i + 1}`} className="w-full max-h-48 object-contain rounded-xl border border-slate-300" />
+                              <img key={i} src={img} alt={`Attached ${i + 1}`} className="w-full max-h-48 object-contain rounded-xl border border-slate-700 bg-slate-800" />
                             ))}
                           </div>
                         ) : msg.image ? (
-                          <img src={msg.image} alt="Attached homework" className="w-full max-h-56 object-contain rounded-xl border border-slate-300" />
+                          <img src={msg.image} alt="Attached homework" className="w-full max-h-56 object-contain rounded-xl border border-slate-700 bg-slate-800" />
                         ) : null}
-                        <p className="text-xs sm:text-sm text-white whitespace-pre-wrap leading-relaxed font-medium">
+                        <p className="text-xs sm:text-[14.5px] text-slate-100 whitespace-pre-wrap leading-relaxed font-normal">
                           {msg.text}
                         </p>
                       </div>
                     </div>
 
-                    <div className="w-8 h-8 rounded-full ring-2 ring-white shadow-sm overflow-hidden bg-slate-200 flex items-center justify-center shrink-0 mt-4">
+                    <div className="w-8 h-8 rounded-full ring-2 ring-indigo-500/30 shadow-sm overflow-hidden bg-slate-800 flex items-center justify-center shrink-0 mt-4">
                       {user.avatar ? (
                         <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
                       ) : (
-                        <UserIcon className="w-4 h-4 text-slate-600" />
+                        <UserIcon className="w-4 h-4 text-slate-300" />
                       )}
                     </div>
                   </motion.div>
@@ -1825,50 +1900,82 @@ export const AiTutorApp = memo(function AiTutorApp({
                 <motion.div
                   key={msg.id}
                   layout
-                  initial={{ opacity: 0, y: 12 }}
+                  initial={{ opacity: 0, y: 14 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10, transition: { duration: 0.18, ease: 'easeOut' } }}
                   transition={{ duration: 0.28, ease: 'easeOut' }}
-                  className="flex justify-start group/aimsg w-full"
+                  className="flex justify-start w-full group/aimsg my-2"
                 >
-                  <div className="flex flex-col items-start w-full max-w-[780px] px-1 sm:px-2">
-                    <div className="flex items-center gap-2 mb-2 text-[11px] text-slate-400 opacity-0 group-hover/aimsg:opacity-100 transition-opacity duration-200">
-                      <span className="font-medium text-slate-500">AI Tutor</span>
-                      <span>{msg.timestamp}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteMessage(msg.id)}
-                        className="ml-1 text-slate-400 hover:text-rose-500 transition p-0.5 rounded cursor-pointer"
-                        title="Remove message"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                  <div className="w-full max-w-[820px] bg-transparent border-0 overflow-visible transition-all">
+                    {/* Professional Header Bar */}
+                    <div className="bg-transparent border-b border-slate-100 px-0 py-2 flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-indigo-800 text-white flex items-center justify-center shadow-xs">
+                          <GraduationCap className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-bold text-xs sm:text-sm text-slate-900 tracking-tight">AI Academic Tutor</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                            ✓ Verified Solution
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        {/* Font Style Toggle: Classic Editorial Serif vs Modern Clean */}
+                        <button
+                          type="button"
+                          onClick={toggleTutorFontStyle}
+                          className="inline-flex items-center space-x-1.5 text-[11px] font-medium px-2 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 transition cursor-pointer active:scale-95 shadow-xs"
+                          title="Click to toggle between Classic Editorial Serif and Modern Sans font style"
+                        >
+                          <Type className="w-3 h-3 text-indigo-600" />
+                          <span className={`${tutorFontStyle === 'classic' ? 'font-serif font-bold text-indigo-950' : 'font-sans font-semibold text-slate-700'}`}>
+                            {tutorFontStyle === 'classic' ? 'Classic Serif' : 'Modern Sans'}
+                          </span>
+                        </button>
+
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          {msg.timestamp}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMessage(msg.id)}
+                          className="text-slate-400 hover:text-rose-600 transition p-1 rounded-md hover:bg-rose-50 cursor-pointer"
+                          title="Remove message"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="text-[15px] sm:text-[16px] leading-7 text-slate-800 w-full space-y-4">
-                      <StaggeredRevealMarkdown text={msg.text} isLatest={isLatest} />
+                    {/* Classic Editorial or Modern Message Body - Khulla no padding or background */}
+                    <div className={`py-4 px-0 ${tutorFontStyle === 'classic' ? 'tutor-editorial font-serif' : 'tutor-modern font-sans'}`}>
+                      <StaggeredRevealMarkdown text={msg.text} isLatest={isLatest} fontStyle={tutorFontStyle} />
                     </div>
 
-                    <div className="mt-3 flex items-center gap-1 opacity-0 group-hover/aimsg:opacity-100 transition-opacity duration-200">
-                      <div className="flex flex-wrap items-center gap-1">
+                    {/* Professional Action Suite */}
+                    <div className="bg-transparent border-t border-slate-100 px-0 py-2.5 flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center space-x-1 flex-wrap gap-1">
                         <button
                           type="button"
                           onClick={() => handleCopyText(msg.id, msg.text)}
                           title="Copy answer"
-                          className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 text-xs font-medium px-2 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
+                          className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
                         >
-                          {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                          <span className="hidden sm:inline">{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
+                          {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
+                          <span className="hidden xs:inline">{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => handleSpeakText(msg.text)}
                           title="Listen to answer"
-                          className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 text-xs font-medium px-2 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
+                          className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
                         >
-                          <Volume2 className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Listen</span>
+                          <Volume2 className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="hidden xs:inline">Listen</span>
                         </button>
 
                         {onAddNote && (
@@ -1876,95 +1983,85 @@ export const AiTutorApp = memo(function AiTutorApp({
                             type="button"
                             onClick={() => handleSaveToNotebook(msg)}
                             title="Save to notebook"
-                            className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 text-xs font-medium px-2 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
+                            className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
                           >
-                            <Bookmark className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">{savedNoteId === msg.id ? 'Saved ✓' : 'Save'}</span>
+                            <Bookmark className="w-3.5 h-3.5 text-slate-500" />
+                            <span className="hidden xs:inline">{savedNoteId === msg.id ? 'Saved ✓' : 'Save Note'}</span>
                           </button>
                         )}
 
                         <button
                           type="button"
-                          onClick={() => handleDeleteMessage(msg.id)}
-                          className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs font-medium px-2 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
-                          title="Remove message from thread"
+                          onClick={() => handleExportToGoogleDoc(msg)}
+                          disabled={isExportingDocId === msg.id}
+                          className="text-emerald-700 hover:text-emerald-900 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200/80 text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs disabled:opacity-50"
+                          title="Export this tutoring answer to a live Google Document"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Delete</span>
+                          {isExportingDocId === msg.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                          ) : docExportSuccessId === msg.id ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          ) : (
+                            <FileDown className="w-3.5 h-3.5 text-emerald-600" />
+                          )}
+                          <span className="hidden sm:inline">{docExportSuccessId === msg.id ? 'Exported!' : isExportingDocId === msg.id ? 'Exporting...' : 'Export to Docs'}</span>
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setExpandedActionsId(expandedActionsId === msg.id ? null : msg.id)}
+                        title="More study tools"
+                        className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 ${
+                          expandedActionsId === msg.id
+                            ? 'bg-indigo-100 text-indigo-800'
+                            : 'text-indigo-600 hover:bg-indigo-50 border border-indigo-200/60'
+                        }`}
+                      >
+                        <SlidersHorizontal className="w-3.5 h-3.5" />
+                        <span>{expandedActionsId === msg.id ? 'Hide Tools' : 'Study Tools'}</span>
+                      </button>
+                    </div>
+
+                    {expandedActionsId === msg.id && (
+                      <div className="bg-slate-50/50 border-t border-slate-100 px-3.5 py-2.5 sm:px-5 flex flex-wrap items-center gap-1.5 rounded-b-2xl mt-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSendMessage('Can you explain this concept in simpler terms with a super easy everyday analogy?')}
+                          className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                        >
+                          <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Explain Simpler</span>
                         </button>
 
                         <button
                           type="button"
-                          onClick={() => setExpandedActionsId(expandedActionsId === msg.id ? null : msg.id)}
-                          title="More study actions"
-                          className={`ml-auto text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center space-x-1 transition cursor-pointer active:scale-95 ${
-                            expandedActionsId === msg.id
-                              ? 'bg-blue-50 text-blue-700'
-                              : 'text-blue-600 hover:bg-blue-50'
-                          }`}
+                          onClick={() => handleSendMessage('Give me 1 practice question based on this topic so I can test my understanding.')}
+                          className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
                         >
-                          <SlidersHorizontal className="w-3.5 h-3.5" />
-                          <span>{expandedActionsId === msg.id ? 'Hide' : 'More'}</span>
+                          <HelpCircle className="w-3.5 h-3.5 text-indigo-500" />
+                          <span>Practice Question</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleSendMessage('Please explain this in easy Hinglish with important key points for JEE Main / Board exams.')}
+                          className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                        >
+                          <Languages className="w-3.5 h-3.5 text-purple-500" />
+                          <span>JEE Main / Hinglish</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleSendMessage('Summarize the key concepts, formulas, and takeaways in a clean structured table.')}
+                          className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                        >
+                          <Table className="w-3.5 h-3.5 text-teal-500" />
+                          <span>Summary Table</span>
                         </button>
                       </div>
-
-                      {expandedActionsId === msg.id && (
-                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5 pt-1.5 border-t border-slate-100 w-full">
-                          <button
-                            type="button"
-                            onClick={() => handleSendMessage('Can you explain this concept in simpler terms with a super easy everyday analogy?')}
-                            className="border border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 text-slate-600 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
-                          >
-                            <Lightbulb className="w-3.5 h-3.5" />
-                            <span>Explain Simpler</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleSendMessage('Give me 1 practice question based on this topic so I can test my understanding.')}
-                            className="border border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 text-slate-600 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
-                          >
-                            <HelpCircle className="w-3.5 h-3.5" />
-                            <span>Practice Question</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleSendMessage('Please explain this in easy Hinglish with important key points for JEE Main / Board exams.')}
-                            className="border border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 text-slate-600 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
-                          >
-                            <Languages className="w-3.5 h-3.5" />
-                            <span>JEE Main / Hinglish</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleSendMessage('Summarize the key concepts, formulas, and takeaways in a clean structured table.')}
-                            className="border border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 text-slate-600 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
-                          >
-                            <Table className="w-3.5 h-3.5" />
-                            <span>Summary Table</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleExportToGoogleDoc(msg)}
-                            disabled={isExportingDocId === msg.id}
-                            className="border border-emerald-200 hover:border-emerald-300 bg-emerald-50 text-emerald-700 text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 disabled:opacity-50"
-                            title="Export this tutoring answer to a live Google Document"
-                          >
-                            {isExportingDocId === msg.id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
-                            ) : docExportSuccessId === msg.id ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            ) : (
-                              <FileDown className="w-3.5 h-3.5 text-emerald-600" />
-                            )}
-                            <span>{docExportSuccessId === msg.id ? 'Exported!' : isExportingDocId === msg.id ? 'Exporting...' : 'Export to Docs'}</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
                 </motion.div>
               );
@@ -1980,19 +2077,19 @@ export const AiTutorApp = memo(function AiTutorApp({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.9, transition: { duration: 0.2 } }}
               transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-              className="flex items-start space-x-2.5"
+              className="flex items-start space-x-2.5 my-2"
             >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-blue-50 ring-2 ring-white flex items-center justify-center text-blue-600 shadow-sm shrink-0 mt-2">
-                <Bot className="w-4 h-4 text-blue-600 animate-spin" />
+               <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-800 ring-2 ring-indigo-100 flex items-center justify-center text-white shadow-sm shrink-0 mt-1">
+                <GraduationCap className="w-4 h-4 text-white animate-pulse" />
               </div>
-              <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-md p-3.5 shadow-sm space-y-1.5 max-w-sm">
-                <div className="flex items-center space-x-2 text-slate-500 text-xs font-semibold">
-                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                  <span>AI Tutor is thinking...</span>
+              <div className="bg-transparent border-0 p-0 space-y-2 max-w-xl">
+                <div className="flex items-center space-x-2 text-indigo-700 text-xs font-bold tracking-tight">
+                  <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                  <span>AI Academic Tutor is writing structured solution...</span>
                 </div>
-                <div className="space-y-1 pt-1">
-                  <div className="h-2 bg-slate-100 rounded-full w-3/4 animate-pulse" />
-                  <div className="h-2 bg-slate-100 rounded-full w-1/2 animate-pulse" />
+                <div className="space-y-1.5 pt-1 w-48">
+                  <div className="h-1.5 bg-slate-200/80 rounded-full w-4/5 animate-pulse" />
+                  <div className="h-1.5 bg-slate-200/80 rounded-full w-3/5 animate-pulse" />
                 </div>
               </div>
             </motion.div>
@@ -2471,7 +2568,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                 className="p-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 transition flex items-center justify-center cursor-pointer shrink-0 mr-1"
                 title={appLanguage === 'hi' ? 'नेविगेशन बार दिखाएं' : 'Show Navigation Bar'}
               >
-                <ChevronUp className="w-3.5 h-3.5 text-emerald-600 animate-bounce" />
+                <ChevronUp className="w-3.5 h-3.5 text-emerald-600" />
               </button>
             )}
 
