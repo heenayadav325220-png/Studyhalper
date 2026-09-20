@@ -53,22 +53,34 @@ export function getBrowserVoices(): Promise<SpeechSynthesisVoice[]> {
       return;
     }
 
+    const dedupeVoices = (rawVoices: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] => {
+      const seen = new Set<string>();
+      return rawVoices.filter((v) => {
+        const id = `${v.voiceURI || v.name}__${v.lang}`;
+        if (seen.has(id)) {
+          return false;
+        }
+        seen.add(id);
+        return true;
+      });
+    };
+
     let voices = window.speechSynthesis.getVoices();
     if (voices.length > 0) {
-      resolve(voices);
+      resolve(dedupeVoices(voices));
       return;
     }
 
     const handler = () => {
       voices = window.speechSynthesis.getVoices();
       window.speechSynthesis.removeEventListener('voiceschanged', handler);
-      resolve(voices);
+      resolve(dedupeVoices(voices));
     };
 
     window.speechSynthesis.addEventListener('voiceschanged', handler);
     // Fallback timeout in case voiceschanged does not trigger
     setTimeout(() => {
-      resolve(window.speechSynthesis.getVoices());
+      resolve(dedupeVoices(window.speechSynthesis.getVoices()));
     }, 400);
   });
 }

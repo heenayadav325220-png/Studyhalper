@@ -600,6 +600,30 @@ export default function App() {
     }
   };
 
+  const handleToggleDay = (idx: number) => {
+    const updated = [...streakCompletedDays];
+    const originalState = updated[idx];
+    updated[idx] = !originalState;
+    setStreakCompletedDays(updated);
+    
+    const countCompleted = updated.filter(Boolean).length;
+    setUserProfile(prev => ({
+      ...prev,
+      streak: countCompleted
+    }));
+    
+    if (idx === 0) {
+      setDay1GoalCompleted(!originalState);
+    }
+    
+    if (!originalState) {
+      addXp(15);
+      sendRealNotification('Streak Updated! 🔥', `Day ${idx + 1} marked completed! Keep the momentum! +15 XP`);
+    } else {
+      addXp(-15);
+    }
+  };
+
   // --- DAILY QUESTS STATE ---
   const [quests, setQuests] = useState([
     { id: 1, title: 'Ask AI Tutor a homework question', xp: 15, completed: false },
@@ -2295,12 +2319,15 @@ export default function App() {
                   const isDay1 = idx === 0;
                   const isHighlighted = isDay1 || isDone;
                   return (
-                    <div 
+                    <motion.button 
                       key={idx}
-                      className={`p-2 sm:p-3 rounded-2xl text-center flex flex-col items-center justify-between h-22 sm:h-26 transition-all ${
+                      whileHover={{ scale: 1.06, y: -2 }}
+                      whileTap={{ scale: 0.94 }}
+                      onClick={() => handleToggleDay(idx)}
+                      className={`p-2 sm:p-3 rounded-2xl text-center flex flex-col items-center justify-between h-22 sm:h-26 transition-all cursor-pointer focus:outline-hidden ${
                         isHighlighted
-                          ? 'border-2 border-amber-400 bg-slate-900/90 shadow-[0_0_15px_rgba(251,191,36,0.35)] text-amber-100'
-                          : 'border border-slate-800/80 bg-[#0d122b]/80 text-slate-300'
+                          ? 'border-2 border-amber-400 bg-slate-900/95 shadow-[0_0_18px_rgba(251,191,36,0.45)] text-amber-100'
+                          : 'border border-slate-800/80 bg-[#0d122b]/80 hover:bg-[#11183d]/90 text-slate-300'
                       }`}
                     >
                       <div className={`text-[8.5px] sm:text-[10px] font-black uppercase tracking-wider ${isHighlighted ? 'text-amber-300' : 'text-slate-500'}`}>
@@ -2310,9 +2337,9 @@ export default function App() {
                         {item.w}
                       </div>
                       <div className="flex justify-center items-center">
-                        <span className="text-xs sm:text-sm">🎯</span>
+                        <span className="text-xs sm:text-sm">{isHighlighted ? '🔥' : '🎯'}</span>
                       </div>
-                    </div>
+                    </motion.button>
                   );
                 })}
               </div>

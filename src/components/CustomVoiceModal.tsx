@@ -260,8 +260,8 @@ export const CustomVoiceModal: React.FC<CustomVoiceModalProps> = ({
                 {availableVoices.length === 0 && (
                   <option value="">{appLanguage === 'hi' ? 'सिस्टम डिफॉल्ट आवाज़' : 'System Default Voice'}</option>
                 )}
-                {availableVoices.map((v) => (
-                  <option key={v.voiceURI} value={v.voiceURI}>
+                {availableVoices.map((v, idx) => (
+                  <option key={`${v.voiceURI || v.name}_${v.lang}_${idx}`} value={v.voiceURI}>
                     {v.name} ({v.lang})
                   </option>
                 ))}
