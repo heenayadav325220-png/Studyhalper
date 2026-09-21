@@ -399,7 +399,12 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
 
   return (
     <div
-      className={`markdown-body select-text w-full ${isClassic ? 'tutor-editorial font-serif' : 'tutor-modern font-sans'} text-slate-900 leading-[1.72] space-y-4 overflow-x-auto relative group cursor-pointer`}
+      style={{
+        fontFamily: isClassic ? undefined : 'Inter, Geist, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        maxWidth: '100%',
+        letterSpacing: '0.005em'
+      }}
+      className={`markdown-body select-text w-full ${isClassic ? 'tutor-editorial font-serif' : 'tutor-modern font-sans'} text-slate-800 leading-[1.7] overflow-x-auto relative group cursor-pointer`}
       onClick={() => {
         if (!isAllRevealed) {
           setVisibleCount(blocks.length);
@@ -413,7 +418,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
           initial={{ opacity: 0, y: 6, scale: 0.99 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.25, ease: 'easeOut' }}
-          className="space-y-2.5"
+          className="mb-6 last:mb-0 space-y-3"
         >
           <ReactMarkdown
             remarkPlugins={[remarkMath]}
@@ -421,63 +426,75 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
             components={{
               h1({ children }) {
                 return (
-                  <h1 className={`font-semibold text-slate-950 mt-6 mb-3 tracking-tight ${isClassic ? 'font-serif text-[1.28rem] sm:text-[1.38rem]' : 'font-sans text-lg sm:text-[1.22rem]'}`}>
+                  <h1 
+                    style={{ marginTop: '30px', marginBottom: '10px', fontSize: '21px', lineHeight: '1.25' }}
+                    className={`font-semibold text-slate-900 tracking-tight ${isClassic ? 'font-serif' : 'font-sans'}`}
+                  >
                     {children}
                   </h1>
                 );
               },
               h2({ children }) {
                 return (
-                  <h2 className={`font-semibold text-slate-900 mt-5 mb-2.5 tracking-tight flex items-center gap-2 ${isClassic ? 'font-serif text-[1.12rem] sm:text-[1.18rem]' : 'font-sans text-base sm:text-[1.12rem]'}`}>
+                  <h2 
+                    style={{ marginTop: '30px', marginBottom: '10px', fontSize: '21px', lineHeight: '1.25' }}
+                    className={`font-semibold text-slate-900 tracking-tight ${isClassic ? 'font-serif' : 'font-sans'}`}
+                  >
                     {children}
                   </h2>
                 );
               },
               h3({ children }) {
                 return (
-                  <h3 className={`font-semibold text-slate-800 mt-4 mb-2 tracking-tight ${isClassic ? 'font-serif text-[1rem] sm:text-[1.05rem]' : 'font-sans text-sm sm:text-[0.98rem]'}`}>
+                  <h3 
+                    style={{ marginTop: '24px', marginBottom: '8px', fontSize: '17.5px', lineHeight: '1.25' }}
+                    className={`font-semibold text-slate-850 tracking-tight ${isClassic ? 'font-serif' : 'font-sans'}`}
+                  >
                     {children}
                   </h3>
                 );
               },
               p({ children }) {
                 return (
-                  <p className={`mb-3.5 last:mb-0 leading-[1.72] ${isClassic ? 'font-serif text-[15.5px] sm:text-[16.5px] text-slate-900' : 'font-sans text-[15px] sm:text-[16px] text-slate-800'}`}>
+                  <p 
+                    style={{ marginBottom: '10px' }}
+                    className={`last:mb-0 leading-[1.7] ${isClassic ? 'font-serif text-[15.5px] sm:text-[16.5px] text-slate-900' : 'font-sans text-[15px] sm:text-[16px] text-slate-800 font-normal'}`}
+                  >
                     {children}
                   </p>
                 );
               },
               ul({ children }) {
                 return (
-                  <ul className={`my-4 space-y-2 pl-5 list-disc marker:text-indigo-500/80 leading-[1.7] ${isClassic ? 'font-serif text-[15px] sm:text-[16px]' : 'font-sans text-[15px] sm:text-[16px]'}`}>
+                  <ul className={`my-4 pl-5 list-disc marker:text-slate-400 space-y-1.5 leading-[1.7] ${isClassic ? 'font-serif text-[15px] sm:text-[16px]' : 'font-sans text-[15px] sm:text-[16px]'}`}>
                     {children}
                   </ul>
                 );
               },
               ol({ children }) {
                 return (
-                  <ol className={`my-4 space-y-2 pl-5 list-decimal marker:text-indigo-500/80 leading-[1.7] ${isClassic ? 'font-serif text-[15px] sm:text-[16px]' : 'font-sans text-[15px] sm:text-[16px]'}`}>
+                  <ol className={`my-4 pl-5 list-decimal marker:text-slate-400 space-y-1.5 leading-[1.7] ${isClassic ? 'font-serif text-[15px] sm:text-[16px]' : 'font-sans text-[15px] sm:text-[16px]'}`}>
                     {children}
                   </ol>
                 );
               },
               li({ children }) {
                 return (
-                  <li className={`text-slate-800 mb-1 leading-[1.72] ${isClassic ? 'font-serif' : 'font-sans text-slate-850'}`}>
+                  <li className={`text-slate-800 mb-1 leading-[1.7] ${isClassic ? 'font-serif' : 'font-sans text-slate-800'}`}>
                     {children}
                   </li>
                 );
               },
               blockquote({ children }) {
                 return (
-                  <blockquote className="my-5 pl-4 py-2 border-l-2 border-indigo-500/80 bg-slate-50/50 rounded-r-lg text-slate-650 font-sans text-[14.5px] sm:text-[15.5px] italic leading-relaxed">
+                  <blockquote className="my-4 pl-4 py-1 border-l-2 border-slate-300 text-slate-500 font-sans text-[14.5px] sm:text-[15.5px] italic leading-relaxed">
                     {children}
                   </blockquote>
                 );
               },
               table({ children }) {
                 return (
-                  <div className="my-5 overflow-x-auto rounded-xl border border-slate-200/60 bg-white shadow-xs">
+                  <div className="my-5 overflow-x-auto rounded-xl border border-slate-200/50 bg-white/50 shadow-2xs">
                     <table className={`w-full text-left text-xs sm:text-sm ${isClassic ? 'font-serif' : 'font-sans'} border-collapse`}>
                       {children}
                     </table>
@@ -486,31 +503,31 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
               },
               th({ children }) {
                 return (
-                  <th className="bg-slate-50 text-slate-800 font-semibold px-4 py-3 border-b border-slate-200 text-xs uppercase tracking-wider">
+                  <th className="bg-slate-50/50 text-slate-800 font-semibold px-4 py-2.5 border-b border-slate-200 text-xs uppercase tracking-wider">
                     {children}
                   </th>
                 );
               },
               td({ children }) {
                 return (
-                  <td className="px-4 py-3 border-b border-slate-100 text-slate-755 text-sm leading-relaxed">
+                  <td className="px-4 py-2.5 border-b border-slate-100 text-slate-700 text-sm leading-relaxed">
                     {children}
                   </td>
                 );
               },
               strong({ children }) {
-                return <strong className="font-semibold text-slate-950">{children}</strong>;
+                return <strong className="font-semibold text-slate-900">{children}</strong>;
               },
               code({ node, className, children, ...props }: any) {
                 const match = /language-(\w+)/.exec(className || '');
                 const codeString = String(children).replace(/\n$/, '');
                 const isMultiLine = String(children).includes('\n') || !!match;
-
+  
                 if (isMultiLine) {
                   const lang = match ? match[1] : 'code';
                   return (
-                    <div className="relative my-4 rounded-xl overflow-hidden border border-slate-200/80 bg-slate-900/95 text-left shadow-xs">
-                      <div className="bg-slate-900 px-4 py-2 flex items-center justify-between text-[11px] text-slate-300 font-mono border-b border-slate-800/60">
+                    <div className="relative my-4 rounded-xl overflow-hidden border border-slate-200/60 bg-slate-900 text-left shadow-2xs">
+                      <div className="bg-slate-900 px-4 py-2 flex items-center justify-between text-[11px] text-slate-300 font-mono border-b border-slate-800/40">
                         <span className="uppercase font-semibold text-indigo-400 tracking-wider">{lang}</span>
                         <button
                           type="button"
@@ -535,9 +552,9 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
                     </div>
                   );
                 }
-
+  
                 return (
-                  <code className="bg-slate-50 text-slate-800 px-1.5 py-0.5 rounded-md font-mono text-[12px] font-medium border border-slate-200/60" {...props}>
+                  <code className="bg-slate-105 text-slate-800 px-1.5 py-0.5 rounded-md font-mono text-[12.5px] font-medium border border-slate-200/40" {...props}>
                     {children}
                   </code>
                 );
