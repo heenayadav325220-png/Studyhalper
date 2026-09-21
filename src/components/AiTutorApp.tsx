@@ -414,10 +414,10 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
       {blocks.slice(0, visibleCount).map((block, index) => (
         <motion.div
           key={index}
-          initial={{ opacity: 0, y: 6, scale: 0.99 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.25, ease: 'easeOut' }}
-          className="mb-5 last:mb-0 space-y-2.5"
+          initial={{ opacity: 0, y: 12, filter: 'blur(3px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          className="mb-5 last:mb-0 space-y-2.5 relative"
         >
           <ReactMarkdown
             remarkPlugins={[remarkMath]}
@@ -563,13 +563,29 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
 
       {!isAllRevealed && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex items-center space-x-2 text-xs text-indigo-600 font-bold pt-1.5"
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          className="flex items-center space-x-2 text-xs text-indigo-600 font-semibold pt-2 select-none"
         >
-          <span className="inline-block w-2 h-3.5 bg-indigo-600 animate-pulse rounded-xs" />
-          <span>Generating explanation...</span>
-          <span className="text-slate-400 font-normal text-xs ml-2">(Click anywhere to reveal all)</span>
+          <span className="flex h-2.5 w-2.5 relative">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-600" />
+          </span>
+          <motion.span
+            animate={{ opacity: [0.6, 1, 0.6] }}
+            transition={{ repeat: Infinity, duration: 1.2, ease: 'easeInOut' }}
+          >
+            AI Tutor is drafting explanation...
+          </motion.span>
+          <motion.span
+            animate={{ opacity: [1, 0.2, 1] }}
+            transition={{ repeat: Infinity, duration: 0.75, ease: 'easeInOut' }}
+            className="inline-block w-1.5 h-3.5 bg-indigo-600 rounded-xs"
+          />
+          <span className="text-slate-400 hover:text-slate-600 font-normal text-[11px] ml-1.5 px-2 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 transition cursor-pointer">
+            Click to reveal all
+          </span>
         </motion.div>
       )}
     </div>
@@ -836,7 +852,20 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [showQuickActionsMenu, setShowQuickActionsMenu] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [activeUserMsgMenuId, setActiveUserMsgMenuId] = useState<string | null>(null);
+  const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
+  const [thinkingStep, setThinkingStep] = useState(0);
   const quickActionsMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setThinkingStep(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setThinkingStep((prev) => (prev + 1) % 4);
+    }, 1500);
+    return () => clearInterval(timer);
+  }, [isLoading]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -1593,10 +1622,24 @@ export const AiTutorApp = memo(function AiTutorApp({
     }
   };
 
-  const handleSpeakText = (text: string | unknown) => {
+  const handleSpeakText = (msgId: string, text: string | unknown) => {
     const cleanStr = typeof text === 'string' ? text : String(text || '');
     if (!cleanStr) return;
-    playTutorSpeech(cleanStr);
+    if (speakingMsgId === msgId) {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      setSpeakingMsgId(null);
+      return;
+    }
+    setSpeakingMsgId(msgId);
+    playTutorSpeech(
+      cleanStr,
+      undefined,
+      () => setSpeakingMsgId(msgId),
+      () => setSpeakingMsgId(null),
+      () => setSpeakingMsgId(null)
+    );
   };
 
   const handleSaveToNotebook = async (msg: ChatMessage) => {
@@ -1680,13 +1723,13 @@ export const AiTutorApp = memo(function AiTutorApp({
       }}
     >
       {/* PERSISTENT PREMIUM TOP HEADER */}
-      <header className="relative z-30 bg-white border-b border-slate-200/80 px-3 sm:px-5 py-2.5 sm:py-3 flex items-center justify-between shrink-0 shadow-[0_1px_3px_rgba(15,23,42,0.02)]">
+      <header className="relative z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-3 sm:px-5 py-2.5 sm:py-3 flex items-center justify-between shrink-0 shadow-[0_1px_3px_rgba(15,23,42,0.03)]">
         <div className="flex items-center space-x-2 sm:space-x-3">
           <button
             type="button"
             onClick={onBack}
-            className="p-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 transition flex items-center space-x-1 border border-slate-200/80 group cursor-pointer active:scale-95"
-            title="Back to Ascend Study"
+            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 transition flex items-center space-x-1.5 border border-slate-200/90 shadow-2xs hover:shadow-xs group cursor-pointer active:scale-95"
+            title="Back to StudyHelper"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform text-slate-700" />
             <span className="text-xs font-bold text-slate-700 hidden sm:inline">Back</span>
@@ -1696,7 +1739,7 @@ export const AiTutorApp = memo(function AiTutorApp({
           <button
             type="button"
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="hidden md:flex p-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition active:scale-95 cursor-pointer"
+            className="hidden md:flex p-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 shadow-2xs hover:shadow-xs transition active:scale-95 cursor-pointer"
             title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
           >
             {isSidebarCollapsed ? <PanelLeft className="w-4 h-4 text-slate-700" /> : <PanelLeftClose className="w-4 h-4 text-slate-700" />}
@@ -1706,34 +1749,42 @@ export const AiTutorApp = memo(function AiTutorApp({
           <button
             type="button"
             onClick={() => setIsMobileSidebarOpen(true)}
-            className="flex md:hidden p-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition active:scale-95 cursor-pointer"
+            className="flex md:hidden p-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 shadow-2xs hover:shadow-xs transition active:scale-95 cursor-pointer"
             title="Open Menu"
           >
             <Menu className="w-4 h-4 text-slate-700" />
           </button>
 
           <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0f172a] to-[#1e293b] shadow-xs flex items-center justify-center text-cyan-400 font-bold text-base tracking-wider">
-              A
+            <div className="w-8.5 h-8.5 rounded-xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-600 shadow-[0_2px_8px_rgba(79,70,229,0.28)] flex items-center justify-center text-white ring-1 ring-white/20">
+              <GraduationCap className="w-4.5 h-4.5 text-white" />
             </div>
 
-            <div>
-              <h1 className="text-xs font-black tracking-tight text-slate-900 uppercase">
-                Ascend AI Tutor
-              </h1>
+            <div className="flex flex-col">
+              <div className="flex items-center space-x-1.5">
+                <h1 className="text-xs sm:text-sm font-bold tracking-tight text-slate-900">
+                  StudyHelper
+                </h1>
+                <span className="px-1.5 py-0.2 rounded-md bg-indigo-50 border border-indigo-200/80 text-[10px] font-semibold text-indigo-700">
+                  AI Tutor
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 font-normal leading-tight hidden xs:block">
+                Academic Guide & Homework Solver
+              </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1.5 sm:space-x-2">
           {/* User profile badges - large screen only */}
           <div className="hidden lg:flex items-center space-x-1.5">
-            <div className="bg-slate-50 border border-slate-200 text-slate-700 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center space-x-1">
+            <div className="bg-slate-50/90 border border-slate-200/90 text-slate-700 text-[11px] font-medium px-3 py-1 rounded-full flex items-center space-x-1.5 shadow-2xs">
               <UserIcon className="w-3 h-3 text-slate-400" />
               <span className="truncate max-w-[90px]">{user.name || 'Student'}</span>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 text-slate-700 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center space-x-1">
+            <div className="bg-slate-50/90 border border-slate-200/90 text-slate-700 text-[11px] font-medium px-3 py-1 rounded-full flex items-center space-x-1.5 shadow-2xs">
               <GraduationCap className="w-3 h-3 text-slate-400" />
               <span className="truncate max-w-[110px]">{user.className || 'Class'}</span>
             </div>
@@ -1743,10 +1794,10 @@ export const AiTutorApp = memo(function AiTutorApp({
           <button
             type="button"
             onClick={handleVoiceInputToggle}
-            className={`p-1.5 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold border ${
+            className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-semibold border shadow-2xs ${
               isListening
                 ? 'bg-rose-500 text-white animate-pulse border-rose-600 shadow-md'
-                : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
+                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200/90'
             }`}
             title={isListening ? 'Listening... Click to stop' : 'Microphone Voice Input'}
           >
@@ -1758,7 +1809,7 @@ export const AiTutorApp = memo(function AiTutorApp({
           <button
             type="button"
             onClick={() => setShowCustomVoiceModal(true)}
-            className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-100 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold"
+            className="p-1.5 sm:px-2.5 sm:py-1.5 bg-indigo-50/90 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-semibold shadow-2xs"
             title="Configure Tutor Custom Voice"
           >
             <Volume2 className="w-3.5 h-3.5 text-indigo-600" />
@@ -1770,10 +1821,10 @@ export const AiTutorApp = memo(function AiTutorApp({
             <button
               type="button"
               onClick={() => setShowMoreMenu(!showMoreMenu)}
-              className={`p-1.5 rounded-lg border transition flex items-center justify-center cursor-pointer active:scale-95 ${
+              className={`p-2 rounded-xl border transition flex items-center justify-center cursor-pointer active:scale-95 shadow-2xs ${
                 showMoreMenu
                   ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80'
+                  : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200/90'
               }`}
               title="Tutor Tools & Settings"
             >
@@ -2237,17 +2288,20 @@ export const AiTutorApp = memo(function AiTutorApp({
                 className="fixed inset-y-0 left-0 w-72 bg-slate-50 border-r border-slate-200 shadow-2xl z-50 md:hidden flex flex-col h-full overflow-hidden"
               >
                 {/* Header of Mobile drawer */}
-                <div className="p-4 border-b border-slate-200/50 flex items-center justify-between bg-white shrink-0">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-7.5 h-7.5 rounded-lg bg-gradient-to-br from-[#0f172a] to-[#1e293b] flex items-center justify-center text-cyan-400 font-bold text-sm tracking-wider">
-                      A
+                <div className="p-4 border-b border-slate-200/70 flex items-center justify-between bg-white shrink-0">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-600 flex items-center justify-center text-white shadow-2xs">
+                      <GraduationCap className="w-4 h-4 text-white" />
                     </div>
-                    <span className="text-xs font-black text-slate-900 tracking-tight uppercase">ASCEND STUDY</span>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-slate-900 tracking-tight">StudyHelper</span>
+                      <span className="text-[10px] text-slate-400">AI Study Companion</span>
+                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsMobileSidebarOpen(false)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -2458,8 +2512,8 @@ export const AiTutorApp = memo(function AiTutorApp({
               transition={{ type: 'spring', stiffness: 260, damping: 20 }}
               className="relative"
             >
-              <div className="w-18 h-18 rounded-3xl bg-gradient-to-br from-[#0f172a] to-[#1e293b] flex items-center justify-center text-cyan-400 font-bold text-2xl shadow-lg shadow-slate-900/20 ring-1 ring-slate-900/5">
-                A
+              <div className="w-18 h-18 rounded-3xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-600 flex items-center justify-center text-white shadow-xl shadow-indigo-500/25 ring-4 ring-indigo-500/10">
+                <GraduationCap className="w-9 h-9 text-white" />
               </div>
               <span className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full bg-emerald-500 text-[10px] font-bold text-white uppercase tracking-wider shadow-sm ring-2 ring-white">
                 ONLINE
@@ -2579,7 +2633,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    handleSpeakText(msg.text);
+                                    handleSpeakText(msg.id, msg.text);
                                     setActiveUserMsgMenuId(null);
                                   }}
                                   className="w-full px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition text-left cursor-pointer"
@@ -2711,24 +2765,56 @@ export const AiTutorApp = memo(function AiTutorApp({
                 <motion.div
                   key={msg.id}
                   layout
-                  initial={{ opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10, transition: { duration: 0.18, ease: 'easeOut' } }}
-                  transition={{ duration: 0.28, ease: 'easeOut' }}
+                  initial={{ opacity: 0, y: 18, scale: 0.98, filter: 'blur(3px)' }}
+                  animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+                  exit={{ opacity: 0, y: -12, scale: 0.96, filter: 'blur(3px)', transition: { duration: 0.2, ease: 'easeOut' } }}
+                  transition={{ type: 'spring', stiffness: 280, damping: 26, mass: 0.75 }}
                   className="flex justify-start w-full group/aimsg my-2"
                 >
-                  <div className="w-full max-w-[720px] mx-auto bg-transparent border-0 overflow-visible transition-all">
+                  <div className="w-full max-w-[720px] mx-auto bg-transparent border-0 overflow-visible transition-all relative">
+                    {/* Subtle animated entry accent bar */}
+                    <motion.div 
+                      initial={{ scaleX: 0, opacity: 0 }}
+                      animate={{ scaleX: 1, opacity: 1 }}
+                      transition={{ duration: 0.5, ease: 'easeOut' }}
+                      className="h-[1.5px] w-full bg-gradient-to-r from-transparent via-indigo-400/40 to-transparent origin-left"
+                    />
+
                     {/* Professional Header Bar */}
-                    <div className="bg-transparent px-0 pt-4 pb-2 flex items-center justify-between flex-wrap gap-2 border-b border-slate-100/75">
+                    <div className="bg-transparent px-0 pt-3 pb-2 flex items-center justify-between flex-wrap gap-2 border-b border-slate-100/75">
                       <div className="flex items-center space-x-2">
-                        <div className="w-6 h-6 rounded-md bg-indigo-50 flex items-center justify-center border border-indigo-100 shrink-0">
-                          <GraduationCap className="w-3.5 h-3.5 text-indigo-600" />
+                        <div className="relative">
+                          {speakingMsgId === msg.id && (
+                            <motion.span
+                              animate={{ scale: [1, 1.4, 1.6], opacity: [0.6, 0.2, 0] }}
+                              transition={{ repeat: Infinity, duration: 1.6, ease: 'easeOut' }}
+                              className="absolute inset-0 rounded-md bg-indigo-400"
+                            />
+                          )}
+                          <div className="relative w-6 h-6 rounded-md bg-indigo-50 flex items-center justify-center border border-indigo-100 shrink-0">
+                            <GraduationCap className={`w-3.5 h-3.5 text-indigo-600 ${speakingMsgId === msg.id ? 'animate-pulse' : ''}`} />
+                          </div>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <span className="font-semibold text-xs sm:text-sm text-slate-800 tracking-tight">Ascend AI Tutor</span>
-                          <span className="inline-flex items-center text-[10px] text-emerald-600 font-medium">
-                            • Verified Solution
+                          <span className="font-semibold text-xs sm:text-sm text-slate-800 tracking-tight">StudyHelper AI Tutor</span>
+                          <span className="inline-flex items-center text-[10px] text-emerald-600 font-medium gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100/60">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            Verified Solution
                           </span>
+                          {speakingMsgId === msg.id && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.85 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 border border-indigo-200/80 rounded-full text-indigo-600 text-[10px] font-semibold"
+                            >
+                              <span className="flex items-center gap-0.5 h-2.5">
+                                <motion.span animate={{ height: ['3px', '10px', '3px'] }} transition={{ repeat: Infinity, duration: 0.55 }} className="w-0.5 bg-indigo-600 rounded-full" />
+                                <motion.span animate={{ height: ['9px', '3px', '11px'] }} transition={{ repeat: Infinity, duration: 0.55, delay: 0.1 }} className="w-0.5 bg-indigo-600 rounded-full" />
+                                <motion.span animate={{ height: ['4px', '10px', '4px'] }} transition={{ repeat: Infinity, duration: 0.55, delay: 0.2 }} className="w-0.5 bg-indigo-600 rounded-full" />
+                              </span>
+                              <span>Speaking</span>
+                            </motion.div>
+                          )}
                         </div>
                       </div>
 
@@ -2747,41 +2833,61 @@ export const AiTutorApp = memo(function AiTutorApp({
                     {/* Professional Action Suite */}
                     <div className="bg-transparent px-0 py-3 flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center space-x-1 flex-wrap gap-1">
-                        <button
+                        <motion.button
                           type="button"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.94 }}
                           onClick={() => handleCopyText(msg.id, msg.text)}
                           title="Copy answer"
-                          className="text-slate-600 hover:text-slate-800 hover:bg-slate-100/80 text-[11px] sm:text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
+                          className="text-slate-600 hover:text-slate-800 hover:bg-slate-100/80 text-[11px] sm:text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer"
                         >
                           {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
                           <span className="hidden xs:inline">{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
-                        </button>
+                        </motion.button>
 
-                        <button
+                        <motion.button
                           type="button"
-                          onClick={() => handleSpeakText(msg.text)}
-                          title="Listen to answer"
-                          className="text-slate-600 hover:text-slate-800 hover:bg-slate-100/80 text-[11px] sm:text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.94 }}
+                          onClick={() => handleSpeakText(msg.id, msg.text)}
+                          title={speakingMsgId === msg.id ? 'Stop listening' : 'Listen to answer'}
+                          className={`text-[11px] sm:text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer ${
+                            speakingMsgId === msg.id
+                              ? 'bg-indigo-100 text-indigo-700 font-semibold shadow-xs ring-1 ring-indigo-300'
+                              : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100/80'
+                          }`}
                         >
-                          <Volume2 className="w-3.5 h-3.5 text-slate-500" />
-                          <span className="hidden xs:inline">Listen</span>
-                        </button>
+                          {speakingMsgId === msg.id ? (
+                            <span className="flex items-center gap-0.5 h-3">
+                              <motion.span animate={{ height: ['4px', '12px', '4px'] }} transition={{ repeat: Infinity, duration: 0.6 }} className="w-0.5 bg-indigo-600 rounded-full" />
+                              <motion.span animate={{ height: ['10px', '4px', '12px'] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.1 }} className="w-0.5 bg-indigo-600 rounded-full" />
+                              <motion.span animate={{ height: ['6px', '12px', '5px'] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }} className="w-0.5 bg-indigo-600 rounded-full" />
+                            </span>
+                          ) : (
+                            <Volume2 className="w-3.5 h-3.5 text-slate-500" />
+                          )}
+                          <span className="hidden xs:inline">{speakingMsgId === msg.id ? 'Playing...' : 'Listen'}</span>
+                        </motion.button>
 
-                        <button
+                        <motion.button
                           type="button"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.94 }}
                           onClick={() => handleSaveToNotebook(msg)}
                           title="Save to notebook"
-                          className="text-slate-600 hover:text-slate-800 hover:bg-slate-100/80 text-[11px] sm:text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
+                          className="text-slate-600 hover:text-slate-800 hover:bg-slate-100/80 text-[11px] sm:text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer"
                         >
                           <Bookmark className="w-3.5 h-3.5 text-slate-500" />
                           <span className="hidden xs:inline">{savedNoteId === msg.id ? 'Saved ✓' : 'Save Note'}</span>
-                        </button>
+                        </motion.button>
 
-                        <button
+                        <motion.button
                           type="button"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.94 }}
                           onClick={handleVoiceInputToggle}
                           title={isListening ? 'Listening... Click to stop' : 'Voice Input / Mic'}
-                          className={`text-[11px] sm:text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 ${
+                          className={`text-[11px] sm:text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer ${
                             isListening
                               ? 'bg-rose-500 text-white animate-pulse'
                               : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100/80'
@@ -2789,13 +2895,15 @@ export const AiTutorApp = memo(function AiTutorApp({
                         >
                           <Mic className="w-3.5 h-3.5 text-slate-500" />
                           <span className="hidden xs:inline">{isListening ? 'Listening...' : 'Mic'}</span>
-                        </button>
+                        </motion.button>
 
-                        <button
+                        <motion.button
                           type="button"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.94 }}
                           onClick={() => handleExportToGoogleDoc(msg)}
                           disabled={isExportingDocId === msg.id}
-                          className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 text-[11px] sm:text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 disabled:opacity-50"
+                          className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 text-[11px] sm:text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer disabled:opacity-50"
                           title="Export this tutoring answer to a live Google Document"
                         >
                           {isExportingDocId === msg.id ? (
@@ -2806,14 +2914,16 @@ export const AiTutorApp = memo(function AiTutorApp({
                             <FileDown className="w-3.5 h-3.5 text-emerald-600" />
                           )}
                           <span className="hidden sm:inline">{docExportSuccessId === msg.id ? 'Exported!' : isExportingDocId === msg.id ? 'Exporting...' : 'Export to Docs'}</span>
-                        </button>
+                        </motion.button>
                       </div>
 
-                      <button
+                      <motion.button
                         type="button"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.94 }}
                         onClick={() => setExpandedActionsId(expandedActionsId === msg.id ? null : msg.id)}
                         title="More study tools"
-                        className={`text-[11px] sm:text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 ${
+                        className={`text-[11px] sm:text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer ${
                           expandedActionsId === msg.id
                             ? 'bg-indigo-50 text-indigo-700 font-semibold'
                             : 'text-indigo-600 hover:bg-indigo-50/80'
@@ -2821,48 +2931,64 @@ export const AiTutorApp = memo(function AiTutorApp({
                       >
                         <SlidersHorizontal className="w-3.5 h-3.5" />
                         <span>{expandedActionsId === msg.id ? 'Hide Tools' : 'Study Tools'}</span>
-                      </button>
+                      </motion.button>
                     </div>
 
-                    {expandedActionsId === msg.id && (
-                      <div className="bg-slate-50/50 border-t border-slate-100 px-3.5 py-2.5 sm:px-5 flex flex-wrap items-center gap-1.5 rounded-b-2xl mt-2">
-                        <button
-                          type="button"
-                          onClick={() => handleSendMessage('Can you explain this concept in simpler terms with a super easy everyday analogy?')}
-                          className="bg-white hover:bg-indigo-50/50 hover:text-indigo-700 border border-slate-200/60 text-slate-600 text-xs font-medium px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs"
+                    <AnimatePresence>
+                      {expandedActionsId === msg.id && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0, y: -6 }}
+                          animate={{ opacity: 1, height: 'auto', y: 0 }}
+                          exit={{ opacity: 0, height: 0, y: -6 }}
+                          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                          className="bg-slate-50/70 border-t border-slate-100 px-3.5 py-2.5 sm:px-5 flex flex-wrap items-center gap-1.5 rounded-b-2xl mt-2 overflow-hidden"
                         >
-                          <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-                          <span>Explain Simpler</span>
-                        </button>
+                          <motion.button
+                            type="button"
+                            whileHover={{ scale: 1.03, y: -1 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleSendMessage('Can you explain this concept in simpler terms with a super easy everyday analogy?')}
+                            className="bg-white hover:bg-indigo-50/50 hover:text-indigo-700 border border-slate-200/60 text-slate-600 text-xs font-medium px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer shadow-2xs"
+                          >
+                            <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                            <span>Explain Simpler</span>
+                          </motion.button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleSendMessage('Give me 1 practice question based on this topic so I can test my understanding.')}
-                          className="bg-white hover:bg-indigo-50/50 hover:text-indigo-700 border border-slate-200/60 text-slate-600 text-xs font-medium px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs"
-                        >
-                          <HelpCircle className="w-3.5 h-3.5 text-indigo-500" />
-                          <span>Practice Question</span>
-                        </button>
+                          <motion.button
+                            type="button"
+                            whileHover={{ scale: 1.03, y: -1 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleSendMessage('Give me 1 practice question based on this topic so I can test my understanding.')}
+                            className="bg-white hover:bg-indigo-50/50 hover:text-indigo-700 border border-slate-200/60 text-slate-600 text-xs font-medium px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer shadow-2xs"
+                          >
+                            <HelpCircle className="w-3.5 h-3.5 text-indigo-500" />
+                            <span>Practice Question</span>
+                          </motion.button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleSendMessage('Please explain this in easy Hinglish with important key points for JEE Main / Board exams.')}
-                          className="bg-white hover:bg-indigo-50/50 hover:text-indigo-700 border border-slate-200/60 text-slate-600 text-xs font-medium px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs"
-                        >
-                          <Languages className="w-3.5 h-3.5 text-purple-500" />
-                          <span>JEE Main / Hinglish</span>
-                        </button>
+                          <motion.button
+                            type="button"
+                            whileHover={{ scale: 1.03, y: -1 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleSendMessage('Please explain this in easy Hinglish with important key points for JEE Main / Board exams.')}
+                            className="bg-white hover:bg-indigo-50/50 hover:text-indigo-700 border border-slate-200/60 text-slate-600 text-xs font-medium px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer shadow-2xs"
+                          >
+                            <Languages className="w-3.5 h-3.5 text-purple-500" />
+                            <span>JEE Main / Hinglish</span>
+                          </motion.button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleSendMessage('Summarize the key concepts, formulas, and takeaways in a clean structured table.')}
-                          className="bg-white hover:bg-indigo-50/50 hover:text-indigo-700 border border-slate-200/60 text-slate-600 text-xs font-medium px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs"
-                        >
-                          <Table className="w-3.5 h-3.5 text-teal-500" />
-                          <span>Summary Table</span>
-                        </button>
-                      </div>
-                    )}
+                          <motion.button
+                            type="button"
+                            whileHover={{ scale: 1.03, y: -1 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleSendMessage('Summarize the key concepts, formulas, and takeaways in a clean structured table.')}
+                            className="bg-white hover:bg-indigo-50/50 hover:text-indigo-700 border border-slate-200/60 text-slate-600 text-xs font-medium px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer shadow-2xs"
+                          >
+                            <Table className="w-3.5 h-3.5 text-teal-500" />
+                            <span>Summary Table</span>
+                          </motion.button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </motion.div>
               );
@@ -2874,24 +3000,77 @@ export const AiTutorApp = memo(function AiTutorApp({
           {isLoading && (
             <motion.div 
               key="tutor-loading-bubble"
-              initial={{ opacity: 0, y: 14, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.95, transition: { duration: 0.18 } }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
-              className="flex items-start space-x-3 my-4 w-full max-w-[720px] mx-auto"
+              initial={{ opacity: 0, y: 16, scale: 0.98, filter: 'blur(3px)' }}
+              animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -10, scale: 0.96, filter: 'blur(3px)', transition: { duration: 0.2 } }}
+              transition={{ duration: 0.28, ease: 'easeOut' }}
+              className="flex items-start space-x-3 my-4 w-full max-w-[720px] mx-auto bg-indigo-50/30 border border-indigo-100/70 rounded-2xl p-4 sm:p-5 relative overflow-hidden"
             >
-               <div className="w-6 h-6 rounded-md bg-indigo-50 flex items-center justify-center border border-indigo-100 shrink-0 mt-0.5">
-                <GraduationCap className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+              {/* Animated top shimmer beam */}
+              <motion.div
+                animate={{ x: ['-100%', '200%'] }}
+                transition={{ repeat: Infinity, duration: 2.2, ease: 'easeInOut' }}
+                className="absolute top-0 left-0 w-1/2 h-[2px] bg-gradient-to-r from-transparent via-indigo-500 to-transparent"
+              />
+
+              {/* Avatar with dual expanding radar rings */}
+              <div className="relative shrink-0 mt-0.5">
+                <motion.span
+                  animate={{ scale: [1, 1.45, 1.7], opacity: [0.6, 0.2, 0] }}
+                  transition={{ repeat: Infinity, duration: 1.8, ease: 'easeOut' }}
+                  className="absolute inset-0 rounded-md bg-indigo-400"
+                />
+                <motion.span
+                  animate={{ scale: [1, 1.3, 1.5], opacity: [0.4, 0.1, 0] }}
+                  transition={{ repeat: Infinity, duration: 1.8, delay: 0.3, ease: 'easeOut' }}
+                  className="absolute inset-0 rounded-md bg-indigo-300"
+                />
+                <div className="relative w-6 h-6 rounded-md bg-indigo-50 flex items-center justify-center border border-indigo-200/80 shrink-0">
+                  <GraduationCap className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+                </div>
               </div>
+
               <div className="flex-1 bg-transparent border-0 p-0 space-y-2.5">
                 <div className="flex items-center space-x-2 text-slate-800 text-xs sm:text-sm font-medium tracking-tight">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" />
-                  <span>Ascend AI Tutor is organizing structured solution...</span>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={thinkingStep}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.2 }}
+                      className="text-slate-700"
+                    >
+                      {thinkingStep === 0 && 'Ascend AI Tutor is analyzing question context...'}
+                      {thinkingStep === 1 && 'Structuring step-by-step academic methodology...'}
+                      {thinkingStep === 2 && 'Validating formulas, proofs & accuracy...'}
+                      {thinkingStep === 3 && 'Finalizing clean, pedagogical solution...'}
+                    </motion.span>
+                  </AnimatePresence>
                 </div>
                 <div className="space-y-2 pt-1 max-w-sm">
-                  <div className="h-1.5 bg-slate-100 rounded-full w-full animate-pulse" />
-                  <div className="h-1.5 bg-slate-100 rounded-full w-5/6 animate-pulse" />
-                  <div className="h-1.5 bg-slate-100 rounded-full w-3/4 animate-pulse" />
+                  <div className="h-1.5 bg-slate-200/70 rounded-full w-full overflow-hidden relative">
+                    <motion.div
+                      animate={{ x: ['-100%', '100%'] }}
+                      transition={{ repeat: Infinity, duration: 1.4, ease: 'easeInOut' }}
+                      className="w-1/2 h-full bg-gradient-to-r from-transparent via-indigo-400/60 to-transparent"
+                    />
+                  </div>
+                  <div className="h-1.5 bg-slate-200/70 rounded-full w-5/6 overflow-hidden relative">
+                    <motion.div
+                      animate={{ x: ['-100%', '100%'] }}
+                      transition={{ repeat: Infinity, duration: 1.4, delay: 0.2, ease: 'easeInOut' }}
+                      className="w-1/2 h-full bg-gradient-to-r from-transparent via-indigo-400/60 to-transparent"
+                    />
+                  </div>
+                  <div className="h-1.5 bg-slate-200/70 rounded-full w-3/4 overflow-hidden relative">
+                    <motion.div
+                      animate={{ x: ['-100%', '100%'] }}
+                      transition={{ repeat: Infinity, duration: 1.4, delay: 0.4, ease: 'easeInOut' }}
+                      className="w-1/2 h-full bg-gradient-to-r from-transparent via-indigo-400/60 to-transparent"
+                    />
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -3380,7 +3559,7 @@ export const AiTutorApp = memo(function AiTutorApp({
               type="button"
               onClick={() => handleSendMessage()}
               disabled={(!inputQuery.trim() && selectedImages.length === 0) || isLoading}
-              className="p-2 sm:p-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white font-semibold rounded-xl shadow-xs hover:scale-102 active:scale-98 transition-all duration-150 flex items-center justify-center cursor-pointer shrink-0 ml-1"
+              className="p-2.5 sm:p-2.5 bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-40 disabled:from-indigo-600 disabled:to-indigo-600 text-white font-semibold rounded-xl shadow-[0_2px_10px_rgba(79,70,229,0.3)] hover:shadow-[0_4px_14px_rgba(79,70,229,0.4)] hover:scale-102 active:scale-98 transition-all duration-150 flex items-center justify-center cursor-pointer shrink-0 ml-1"
               title="Send Message"
             >
               {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}

@@ -2,20 +2,20 @@ export type Language = 'en' | 'hi' | 'hinglish' | 'marathi' | 'tamil' | 'bengali
 
 export const TRANSLATIONS: Record<string, Record<Language, string>> = {
   appName: {
-    en: 'ASCEND STUDY',
-    hi: 'असेंड स्टडी',
-    hinglish: 'Ascend Study',
-    marathi: 'असेंड स्टडी',
-    tamil: 'அசென்ட் ஸ்டடி',
-    bengali: 'অ্যাস্যান্ড স্টাডি'
+    en: 'StudyHelper',
+    hi: 'स्टडी हेल्पर',
+    hinglish: 'StudyHelper',
+    marathi: 'स्टडी हेल्पर',
+    tamil: 'ஸ்டடி ஹெல்ப்பர்',
+    bengali: 'স্টাডি হেল্পার'
   },
   appSub: {
-    en: 'Remix Study Buddy',
-    hi: 'रेमिक्स स्टडी बडी',
-    hinglish: 'Remix Study Buddy',
-    marathi: 'रेमिक्स स्टडी बडी',
-    tamil: 'ரீமிக்ஸ் ஸ்டடி படி',
-    bengali: 'রিমিক্স স্টাডি বাডি'
+    en: 'AI Study Companion',
+    hi: 'एआई स्टडी साथी',
+    hinglish: 'AI Study Companion',
+    marathi: 'एआय स्टडी साथी',
+    tamil: 'AI ஆய்வு தோழன்',
+    bengali: 'এআই স্টাডি সঙ্গী'
   },
   home: {
     en: 'Home',

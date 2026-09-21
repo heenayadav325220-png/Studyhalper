@@ -1,6 +1,6 @@
 {
-  "name": "ASCEND STUDY",
-  "description": "ASCEND STUDY - Remix Study Buddy created by Rohit Yadav (yadavrohityadav331@gmail.com). An advanced, ultra-modern full-stack educational assistant that empowers students with interactive features, group collaboration, visual study aids, mock exams, and persistent game mechanics (XP, streaks, quests, pet levels) synced in real-time.",
+  "name": "StudyHelper",
+  "description": "StudyHelper - AI Study Companion created by Rohit Yadav (yadavrohityadav331@gmail.com). An advanced, ultra-modern full-stack educational assistant that empowers students with interactive features, group collaboration, visual study aids, mock exams, and persistent game mechanics (XP, streaks, quests, pet levels) synced in real-time.",
   "requestFramePermissions": [
     "camera",
     "microphone"

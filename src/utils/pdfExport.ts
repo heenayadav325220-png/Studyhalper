@@ -162,7 +162,7 @@ export async function exportConversationToPdf({
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
   doc.setTextColor(255, 255, 255);
-  doc.text('ASCEND STUDY BUDDY — AI TUTOR STUDY GUIDE', margin + 6, currentY + 8);
+  doc.text('STUDYHELPER — AI TUTOR STUDY GUIDE', margin + 6, currentY + 8);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
