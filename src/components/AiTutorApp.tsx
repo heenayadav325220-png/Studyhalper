@@ -28,7 +28,6 @@ import {
   SlidersHorizontal,
   Sparkles,
   Sliders,
-  FlaskConical,
   GraduationCap,
   TrendingUp,
   Lightbulb,
@@ -39,7 +38,14 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronUp,
-  Type
+  Type,
+  Menu,
+  PanelLeftClose,
+  PanelLeft,
+  History,
+  FileText,
+  Edit3,
+  MessageSquare
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -97,6 +103,14 @@ interface ChatMessage {
   mode?: string;
   image?: string;
   images?: string[];
+}
+
+interface ChatSession {
+  id: string;
+  title: string;
+  timestamp: number;
+  messages: ChatMessage[];
+  subject: Subject;
 }
 
 const SUBJECT_LIST: Subject[] = ['Mathematics', 'Science', 'Physics', 'Chemistry', 'Biology', 'English'];
@@ -203,7 +217,7 @@ const SUBJECT_THEMES: Record<string, SubjectTheme> = {
   },
 };
 
-function getSubjectTheme(subject?: string): SubjectTheme {
+export function getSubjectTheme(subject?: string): SubjectTheme {
   if (subject && SUBJECT_THEMES[subject]) {
     return SUBJECT_THEMES[subject];
   }
@@ -385,7 +399,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
 
   return (
     <div
-      className={`markdown-body select-text w-full ${isClassic ? 'tutor-editorial font-serif' : 'tutor-modern font-sans'} text-slate-900 leading-relaxed space-y-2.5 overflow-x-auto relative group cursor-pointer`}
+      className={`markdown-body select-text w-full ${isClassic ? 'tutor-editorial font-serif' : 'tutor-modern font-sans'} text-slate-900 leading-[1.72] space-y-4 overflow-x-auto relative group cursor-pointer`}
       onClick={() => {
         if (!isAllRevealed) {
           setVisibleCount(blocks.length);
@@ -399,7 +413,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
           initial={{ opacity: 0, y: 6, scale: 0.99 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.25, ease: 'easeOut' }}
-          className="space-y-1.5"
+          className="space-y-2.5"
         >
           <ReactMarkdown
             remarkPlugins={[remarkMath]}
@@ -407,64 +421,64 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
             components={{
               h1({ children }) {
                 return (
-                  <h1 className={`font-bold text-slate-950 mt-5 mb-2.5 pb-1.5 border-b border-slate-200/80 tracking-tight ${isClassic ? 'font-serif text-[1.35rem] sm:text-[1.5rem]' : 'font-sans text-xl sm:text-2xl'}`}>
+                  <h1 className={`font-semibold text-slate-950 mt-6 mb-3 tracking-tight ${isClassic ? 'font-serif text-[1.28rem] sm:text-[1.38rem]' : 'font-sans text-lg sm:text-[1.22rem]'}`}>
                     {children}
                   </h1>
                 );
               },
               h2({ children }) {
                 return (
-                  <h2 className={`font-bold text-slate-900 mt-4 mb-2 tracking-tight flex items-center gap-2 ${isClassic ? 'font-serif text-[1.18rem] sm:text-[1.28rem]' : 'font-sans text-lg sm:text-xl'}`}>
+                  <h2 className={`font-semibold text-slate-900 mt-5 mb-2.5 tracking-tight flex items-center gap-2 ${isClassic ? 'font-serif text-[1.12rem] sm:text-[1.18rem]' : 'font-sans text-base sm:text-[1.12rem]'}`}>
                     {children}
                   </h2>
                 );
               },
               h3({ children }) {
                 return (
-                  <h3 className={`font-bold text-slate-800 mt-3.5 mb-1.5 tracking-tight ${isClassic ? 'font-serif text-[1.05rem] sm:text-[1.12rem]' : 'font-sans text-base sm:text-lg'}`}>
+                  <h3 className={`font-semibold text-slate-800 mt-4 mb-2 tracking-tight ${isClassic ? 'font-serif text-[1rem] sm:text-[1.05rem]' : 'font-sans text-sm sm:text-[0.98rem]'}`}>
                     {children}
                   </h3>
                 );
               },
               p({ children }) {
                 return (
-                  <p className={`mb-3 last:mb-0 leading-[1.82] ${isClassic ? 'font-serif text-[15.5px] sm:text-[16.5px] text-slate-900' : 'font-sans text-sm sm:text-[15px] text-slate-800'}`}>
+                  <p className={`mb-3.5 last:mb-0 leading-[1.72] ${isClassic ? 'font-serif text-[15.5px] sm:text-[16.5px] text-slate-900' : 'font-sans text-[15px] sm:text-[16px] text-slate-800'}`}>
                     {children}
                   </p>
                 );
               },
               ul({ children }) {
                 return (
-                  <ul className={`my-3 space-y-1.5 pl-5 list-disc marker:text-indigo-600 leading-[1.78] ${isClassic ? 'font-serif text-[15px] sm:text-[16px]' : 'font-sans text-sm sm:text-[15px]'}`}>
+                  <ul className={`my-4 space-y-2 pl-5 list-disc marker:text-indigo-500/80 leading-[1.7] ${isClassic ? 'font-serif text-[15px] sm:text-[16px]' : 'font-sans text-[15px] sm:text-[16px]'}`}>
                     {children}
                   </ul>
                 );
               },
               ol({ children }) {
                 return (
-                  <ol className={`my-3 space-y-1.5 pl-5 list-decimal marker:text-indigo-600 font-semibold leading-[1.78] ${isClassic ? 'font-serif text-[15px] sm:text-[16px]' : 'font-sans text-sm sm:text-[15px]'}`}>
+                  <ol className={`my-4 space-y-2 pl-5 list-decimal marker:text-indigo-500/80 leading-[1.7] ${isClassic ? 'font-serif text-[15px] sm:text-[16px]' : 'font-sans text-[15px] sm:text-[16px]'}`}>
                     {children}
                   </ol>
                 );
               },
               li({ children }) {
                 return (
-                  <li className={`text-slate-800 mb-1 ${isClassic ? 'font-serif' : 'font-sans'}`}>
+                  <li className={`text-slate-800 mb-1 leading-[1.72] ${isClassic ? 'font-serif' : 'font-sans text-slate-850'}`}>
                     {children}
                   </li>
                 );
               },
               blockquote({ children }) {
                 return (
-                  <blockquote className="my-4 pl-4 py-2.5 border-l-[3.5px] border-indigo-500 bg-indigo-50/40 rounded-r-xl text-slate-700 italic font-serif text-[15px] sm:text-[16px]">
+                  <blockquote className="my-5 pl-4 py-2 border-l-2 border-indigo-500/80 bg-slate-50/50 rounded-r-lg text-slate-650 font-sans text-[14.5px] sm:text-[15.5px] italic leading-relaxed">
                     {children}
                   </blockquote>
                 );
               },
               table({ children }) {
                 return (
-                  <div className="my-4 overflow-x-auto rounded-xl border border-slate-200/90 shadow-xs">
-                    <table className={`w-full text-left text-xs sm:text-sm ${isClassic ? 'font-serif' : 'font-sans'}`}>
+                  <div className="my-5 overflow-x-auto rounded-xl border border-slate-200/60 bg-white shadow-xs">
+                    <table className={`w-full text-left text-xs sm:text-sm ${isClassic ? 'font-serif' : 'font-sans'} border-collapse`}>
                       {children}
                     </table>
                   </div>
@@ -472,20 +486,20 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
               },
               th({ children }) {
                 return (
-                  <th className="bg-slate-100/90 text-slate-900 font-bold px-3.5 py-2.5 border-b border-slate-200">
+                  <th className="bg-slate-50 text-slate-800 font-semibold px-4 py-3 border-b border-slate-200 text-xs uppercase tracking-wider">
                     {children}
                   </th>
                 );
               },
               td({ children }) {
                 return (
-                  <td className="px-3.5 py-2.5 border-b border-slate-100 text-slate-800">
+                  <td className="px-4 py-3 border-b border-slate-100 text-slate-755 text-sm leading-relaxed">
                     {children}
                   </td>
                 );
               },
               strong({ children }) {
-                return <strong className="font-bold text-slate-950">{children}</strong>;
+                return <strong className="font-semibold text-slate-950">{children}</strong>;
               },
               code({ node, className, children, ...props }: any) {
                 const match = /language-(\w+)/.exec(className || '');
@@ -495,9 +509,9 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
                 if (isMultiLine) {
                   const lang = match ? match[1] : 'code';
                   return (
-                    <div className="relative my-3 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 text-left shadow-md">
-                      <div className="bg-slate-900 px-3.5 py-2 flex items-center justify-between text-[11px] text-slate-300 font-mono border-b border-slate-800">
-                        <span className="uppercase font-bold text-cyan-400">{lang}</span>
+                    <div className="relative my-4 rounded-xl overflow-hidden border border-slate-200/80 bg-slate-900/95 text-left shadow-xs">
+                      <div className="bg-slate-900 px-4 py-2 flex items-center justify-between text-[11px] text-slate-300 font-mono border-b border-slate-800/60">
+                        <span className="uppercase font-semibold text-indigo-400 tracking-wider">{lang}</span>
                         <button
                           type="button"
                           onClick={async (e) => {
@@ -513,7 +527,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
                         style={oneDark}
                         language={lang === 'code' ? 'text' : lang}
                         PreTag="div"
-                        customStyle={{ margin: 0, padding: '1rem', fontSize: '0.8rem', background: '#020617' }}
+                        customStyle={{ margin: 0, padding: '1.2rem', fontSize: '0.85rem', background: '#0f172a' }}
                         {...props}
                       >
                         {codeString}
@@ -523,7 +537,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
                 }
 
                 return (
-                  <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded-md font-mono text-[12px] font-semibold border border-slate-200/80" {...props}>
+                  <code className="bg-slate-50 text-slate-800 px-1.5 py-0.5 rounded-md font-mono text-[12px] font-medium border border-slate-200/60" {...props}>
                     {children}
                   </code>
                 );
@@ -577,8 +591,8 @@ export const AiTutorApp = memo(function AiTutorApp({
   isBottomNavVisible = true,
   onShowBottomNav
 }: AiTutorAppProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    const saved = getStoredValue(`ai_tutor_chat_${user.uid}`);
+  const [sessions, setSessions] = useState<ChatSession[]>(() => {
+    const saved = getStoredValue(`ai_tutor_sessions_${user.uid}`);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -586,23 +600,215 @@ export const AiTutorApp = memo(function AiTutorApp({
           return parsed;
         }
       } catch (e) {
-        console.error('Error parsing saved tutor chat', e);
+        console.error('Error parsing saved sessions', e);
       }
     }
+
+    const oldSaved = getStoredValue(`ai_tutor_chat_${user.uid}`);
+    let oldMessages: ChatMessage[] = [];
+    if (oldSaved) {
+      try {
+        const parsed = JSON.parse(oldSaved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          oldMessages = parsed;
+        }
+      } catch {}
+    }
+
+    if (oldMessages.length === 0) {
+      const studentName = user.name || 'Student';
+      const studentClass = user.className || 'Class';
+      const studentSchool = user.schoolName ? ` from ${user.schoolName}` : '';
+      const studentGoal = user.targetGoal ? ` (Target: ${user.targetGoal})` : '';
+
+      oldMessages = [
+        {
+          id: 'welcome_' + Date.now(),
+          sender: 'ai',
+          text: `Hello **${studentName}**! 👋 I am your personal AI Study Tutor for **${studentClass}**${studentSchool}${studentGoal}.\n\nHow can I help you today? Ask me any homework question, concept explanation, or step-by-step equation solver!`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ];
+    }
+
+    const firstUserMsg = oldMessages.find(m => m.sender === 'user');
+    const title = firstUserMsg ? (firstUserMsg.text.length > 25 ? firstUserMsg.text.slice(0, 25) + '...' : firstUserMsg.text) : 'Welcome Session';
+
+    return [{
+      id: 'session_' + Date.now(),
+      title,
+      timestamp: Date.now(),
+      messages: oldMessages,
+      subject: 'Science'
+    }];
+  });
+
+  const [activeSessionId, setActiveSessionId] = useState<string>(() => {
+    return sessions[0]?.id || '';
+  });
+
+  const activeSession = sessions.find(s => s.id === activeSessionId) || sessions[0];
+  const messages = activeSession ? activeSession.messages : [];
+
+  const setMessages = (updateFn: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => {
+    setSessions((prevSessions) => {
+      return prevSessions.map((s) => {
+        if (s.id === activeSessionId) {
+          const nextMessages = typeof updateFn === 'function' ? updateFn(s.messages) : updateFn;
+          let nextTitle = s.title;
+          if (s.title === 'Welcome Session' || s.title === 'New Chat') {
+            const firstUserMsg = nextMessages.find(m => m.sender === 'user');
+            if (firstUserMsg) {
+              nextTitle = firstUserMsg.text.length > 25 ? firstUserMsg.text.slice(0, 25) + '...' : firstUserMsg.text;
+            }
+          }
+          return {
+            ...s,
+            messages: nextMessages,
+            title: nextTitle
+          };
+        }
+        return s;
+      });
+    });
+  };
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(`ai_tutor_sessions_${user.uid}`, JSON.stringify(sessions));
+    } catch (e) {
+      console.error('Error saving sessions to local storage', e);
+    }
+  }, [sessions, user.uid]);
+
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
+  const [renamingText, setRenamingText] = useState('');
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [localSavedNotes, setLocalSavedNotes] = useState<any[]>([]);
+  const [activeDropdownSessionId, setActiveDropdownSessionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (showNotesModal) {
+      try {
+        const raw = localStorage.getItem('study_notebook_notes') || '[]';
+        setLocalSavedNotes(JSON.parse(raw));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [showNotesModal]);
+
+  const handleStartRename = (id: string, currentTitle: string) => {
+    setRenamingSessionId(id);
+    setRenamingText(currentTitle);
+  };
+
+  const handleSaveRename = (id: string) => {
+    if (!renamingText.trim()) {
+      setRenamingSessionId(null);
+      return;
+    }
+    setSessions((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, title: renamingText.trim() } : s))
+    );
+    setRenamingSessionId(null);
+  };
+
+  const handleCreateNewSession = () => {
     const studentName = user.name || 'Student';
     const studentClass = user.className || 'Class';
     const studentSchool = user.schoolName ? ` from ${user.schoolName}` : '';
     const studentGoal = user.targetGoal ? ` (Target: ${user.targetGoal})` : '';
 
-    return [
-      {
-        id: 'welcome_' + Date.now(),
-        sender: 'ai',
-        text: `Hello **${studentName}**! 👋 I am your personal AI Study Tutor for **${studentClass}**${studentSchool}${studentGoal}.\n\nHow can I help you today? Ask me any homework question, concept explanation, or step-by-step equation solver!`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const newId = 'session_' + Date.now();
+    const newSession: ChatSession = {
+      id: newId,
+      title: 'New Chat',
+      timestamp: Date.now(),
+      subject: selectedSubject,
+      messages: [
+        {
+          id: 'welcome_' + Date.now(),
+          sender: 'ai',
+          text: `Hello **${studentName}**! 👋 I am your personal AI Study Tutor for **${studentClass}**${studentSchool}${studentGoal}.\n\nHow can I help you today? Ask me any homework question, concept explanation, or step-by-step equation solver!`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]
+    };
+
+    setSessions((prev) => [newSession, ...prev]);
+    setActiveSessionId(newId);
+    setIsMobileSidebarOpen(false);
+  };
+
+  const handleDeleteSession = (id: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (sessions.length <= 1) {
+      alert("You need to keep at least one chat session.");
+      return;
+    }
+    if (window.confirm("Delete this conversation?")) {
+      const remaining = sessions.filter((s) => s.id !== id);
+      setSessions(remaining);
+      if (activeSessionId === id) {
+        setActiveSessionId(remaining[0].id);
       }
+    }
+  };
+
+  const getGroupedSessions = () => {
+    const groups: { title: string; sessions: ChatSession[] }[] = [
+      { title: 'Today', sessions: [] },
+      { title: 'Yesterday', sessions: [] },
+      { title: 'Previous 7 days', sessions: [] },
+      { title: 'Older', sessions: [] }
     ];
-  });
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const yesterdayStart = new Date(todayStart);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+
+    const sevenDaysAgoStart = new Date(todayStart);
+    sevenDaysAgoStart.setDate(sevenDaysAgoStart.getDate() - 7);
+
+    sessions.forEach((s) => {
+      const time = s.timestamp;
+      if (time >= todayStart.getTime()) {
+        groups[0].sessions.push(s);
+      } else if (time >= yesterdayStart.getTime()) {
+        groups[1].sessions.push(s);
+      } else if (time >= sevenDaysAgoStart.getTime()) {
+        groups[2].sessions.push(s);
+      } else {
+        groups[3].sessions.push(s);
+      }
+    });
+
+    return groups.filter(g => g.sessions.length > 0);
+  };
+
+  const getSidebarTranslation = (key: string, englishFallback: string) => {
+    const labels: Record<string, { en: string; hi: string }> = {
+      newChat: { en: '+ New Chat', hi: '+ नया चैट' },
+      chats: { en: 'Chats', hi: 'चैट्स' },
+      notes: { en: 'My Notes', hi: 'मेरे नोट्स' },
+      savedQuestions: { en: 'Saved Questions', hi: 'सुरक्षित प्रश्न' },
+      bookmarks: { en: 'Bookmarks', hi: 'बुकमार्क' },
+      studyProgress: { en: 'Study Progress', hi: 'अध्ययन प्रगति' },
+      subject: { en: 'Subject', hi: 'विषय' },
+      settings: { en: 'Settings', hi: 'सेटिंग्स' },
+      today: { en: 'Today', hi: 'आज' },
+      yesterday: { en: 'Yesterday', hi: 'कल' },
+      previous7days: { en: 'Previous 7 days', hi: 'पिछले 7 दिन' },
+      older: { en: 'Older', hi: 'पुराने' },
+    };
+    return labels[key]?.[appLanguage] || englishFallback;
+  };
 
   const [inputQuery, setInputQuery] = useState(() => getStoredValue(`ai_tutor_input_draft_${user.uid}`));
   const [selectedSubject, setSelectedSubject] = useState<Subject>('Science');
@@ -616,6 +822,7 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [showMathPalette, setShowMathPalette] = useState(false);
   const [activeMathCategory, setActiveMathCategory] = useState<'All' | 'Greek' | 'Algebra' | 'Operators' | 'Calculus'>('All');
   const [showQuickActionsMenu, setShowQuickActionsMenu] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const quickActionsMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -623,14 +830,17 @@ export const AiTutorApp = memo(function AiTutorApp({
       if (quickActionsMenuRef.current && !quickActionsMenuRef.current.contains(event.target as Node)) {
         setShowQuickActionsMenu(false);
       }
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+        setShowMoreMenu(false);
+      }
     }
-    if (showQuickActionsMenu) {
+    if (showQuickActionsMenu || showMoreMenu) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showQuickActionsMenu]);
+  }, [showQuickActionsMenu, showMoreMenu]);
 
   const appLanguage = getAppLanguage(selectedLanguage);
 
@@ -665,9 +875,9 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [showSavedFormulasPanel, setShowSavedFormulasPanel] = useState(false);
   const [tutorFontStyle, setTutorFontStyle] = useState<'classic' | 'modern'>(() => {
     try {
-      return (localStorage.getItem('ai_tutor_font_style') as 'classic' | 'modern') || 'classic';
+      return (localStorage.getItem('ai_tutor_font_style') as 'classic' | 'modern') || 'modern';
     } catch {
-      return 'classic';
+      return 'modern';
     }
   });
 
@@ -688,7 +898,6 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [isExportingDocId, setIsExportingDocId] = useState<string | null>(null);
   const [docExportSuccessId, setDocExportSuccessId] = useState<string | null>(null);
 
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showCustomVoiceModal, setShowCustomVoiceModal] = useState(false);
 
   const [suggestions, setSuggestions] = useState<AcademicSuggestion[]>(() => {
@@ -723,54 +932,11 @@ export const AiTutorApp = memo(function AiTutorApp({
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const moreMenuRef = useRef<HTMLDivElement | null>(null);
 
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
 
-  // Auto-hiding header system (slides up automatically in 2.5s, pull/click arrow down to restore)
-  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
-  const [isHeaderHoveredOrInteracting, setIsHeaderHoveredOrInteracting] = useState(false);
-  const autoHideTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const touchStartYRef = useRef<number>(0);
   const bottomTouchStartYRef = useRef<number>(0);
-
-  const resetAutoHideTimer = () => {
-    if (autoHideTimerRef.current) {
-      clearTimeout(autoHideTimerRef.current);
-      autoHideTimerRef.current = null;
-    }
-    if (!isHeaderHoveredOrInteracting && isHeaderVisible) {
-      autoHideTimerRef.current = setTimeout(() => {
-        setIsHeaderVisible(false);
-      }, 2500);
-    }
-  };
-
-  const showHeader = () => {
-    setIsHeaderVisible(true);
-    resetAutoHideTimer();
-  };
-
-  const hideHeader = () => {
-    if (autoHideTimerRef.current) {
-      clearTimeout(autoHideTimerRef.current);
-      autoHideTimerRef.current = null;
-    }
-    setIsHeaderVisible(false);
-  };
-
-  useEffect(() => {
-    if (isHeaderVisible && !isHeaderHoveredOrInteracting) {
-      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
-      autoHideTimerRef.current = setTimeout(() => {
-        setIsHeaderVisible(false);
-      }, 2500);
-    } else if (autoHideTimerRef.current) {
-      clearTimeout(autoHideTimerRef.current);
-    }
-    return () => {
-      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
-    };
-  }, [isHeaderVisible, isHeaderHoveredOrInteracting]);
 
   useEffect(() => {
     const vv = window.visualViewport;
@@ -1498,20 +1664,11 @@ export const AiTutorApp = memo(function AiTutorApp({
       className="fixed inset-0 z-50 bg-[#f8fafc] text-slate-900 flex flex-col font-sans overflow-hidden transition-[height] duration-150 ease-out"
       style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
       onTouchStart={(e) => {
-        if (!isHeaderVisible && e.touches[0].clientY < 60) {
-          touchStartYRef.current = e.touches[0].clientY;
-        }
         if (!isBottomNavVisible && e.touches[0].clientY > window.innerHeight - 80) {
           bottomTouchStartYRef.current = e.touches[0].clientY;
         }
       }}
       onTouchMove={(e) => {
-        if (!isHeaderVisible && touchStartYRef.current > 0) {
-          if (e.touches[0].clientY - touchStartYRef.current > 15) {
-            showHeader();
-            touchStartYRef.current = 0;
-          }
-        }
         if (!isBottomNavVisible && bottomTouchStartYRef.current > 0) {
           if (bottomTouchStartYRef.current - e.touches[0].clientY > 15) {
             onShowBottomNav?.();
@@ -1520,248 +1677,304 @@ export const AiTutorApp = memo(function AiTutorApp({
         }
       }}
     >
-      {/* COLLAPSIBLE TOP DETAIL BAR (SLIDES UP OUT OF VIEW) */}
-      <motion.div
-        initial={false}
-        animate={{
-          height: isHeaderVisible ? 'auto' : 0,
-          opacity: isHeaderVisible ? 1 : 0
-        }}
-        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-30 shrink-0 overflow-hidden bg-white"
-        onMouseEnter={() => {
-          setIsHeaderHoveredOrInteracting(true);
-        }}
-        onMouseLeave={() => {
-          setIsHeaderHoveredOrInteracting(false);
-        }}
-        onTouchStart={() => {
-          setIsHeaderHoveredOrInteracting(true);
-          resetAutoHideTimer();
-        }}
-        onFocusCapture={() => {
-          setIsHeaderHoveredOrInteracting(true);
-        }}
-        onBlurCapture={() => {
-          setIsHeaderHoveredOrInteracting(false);
-        }}
-      >
-        <header className="bg-white/95 backdrop-blur-sm border-b border-slate-200 px-3 sm:px-5 py-2 sm:py-2.5 flex items-center justify-between shrink-0 shadow-[0_1px_2px_rgba(15,23,42,0.03)] z-10">
-          <div className="flex items-center space-x-2 sm:space-x-3">
-            <button
-              onClick={onBack}
-              className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center space-x-1 border border-slate-200 group cursor-pointer"
-              title="Back to Ascend Study"
-            >
-              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform text-slate-700" />
-              <span className="text-xs font-bold text-slate-700 hidden sm:inline">Back</span>
-            </button>
+      {/* PERSISTENT PREMIUM TOP HEADER */}
+      <header className="relative z-30 bg-white border-b border-slate-200/80 px-3 sm:px-5 py-2.5 sm:py-3 flex items-center justify-between shrink-0 shadow-[0_1px_3px_rgba(15,23,42,0.02)]">
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="p-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 transition flex items-center space-x-1 border border-slate-200/80 group cursor-pointer active:scale-95"
+            title="Back to Ascend Study"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform text-slate-700" />
+            <span className="text-xs font-bold text-slate-700 hidden sm:inline">Back</span>
+          </button>
 
-            <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0f172a] to-[#1e293b] shadow-sm flex items-center justify-center text-cyan-400 font-bold text-base tracking-wider">
-                A
-              </div>
+          {/* Desktop Toggle Sidebar button */}
+          <button
+            type="button"
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className="hidden md:flex p-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition active:scale-95 cursor-pointer"
+            title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          >
+            {isSidebarCollapsed ? <PanelLeft className="w-4 h-4 text-slate-700" /> : <PanelLeftClose className="w-4 h-4 text-slate-700" />}
+          </button>
 
-              <div>
-                <div className="flex items-center space-x-2 flex-wrap">
-                  <h1 className="text-xs font-bold tracking-tight text-slate-900">
-                    ASCEND AI TUTOR
-                  </h1>
-                  <span className="text-slate-400 font-bold text-[10px]">v2.5</span>
-                  <div className="bg-emerald-50 text-emerald-700 border border-emerald-300/60 font-bold text-[9px] px-1.5 py-0.5 rounded-full flex items-center space-x-1 shadow-2xs">
-                    <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Online</span>
-                  </div>
-                </div>
-                <p className="text-[9px] text-slate-500 font-medium flex items-center space-x-1">
-                  <span>Powered by Gemini AI</span>
-                </p>
-              </div>
+          {/* Mobile Menu drawer button */}
+          <button
+            type="button"
+            onClick={() => setIsMobileSidebarOpen(true)}
+            className="flex md:hidden p-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition active:scale-95 cursor-pointer"
+            title="Open Menu"
+          >
+            <Menu className="w-4 h-4 text-slate-700" />
+          </button>
+
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0f172a] to-[#1e293b] shadow-xs flex items-center justify-center text-cyan-400 font-bold text-base tracking-wider">
+              A
+            </div>
+
+            <div>
+              <h1 className="text-xs font-black tracking-tight text-slate-900 uppercase">
+                Ascend AI Tutor
+              </h1>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          {/* User profile badges - large screen only */}
+          <div className="hidden lg:flex items-center space-x-1.5">
+            <div className="bg-slate-50 border border-slate-200 text-slate-700 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center space-x-1">
+              <UserIcon className="w-3 h-3 text-slate-400" />
+              <span className="truncate max-w-[90px]">{user.name || 'Student'}</span>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 text-slate-700 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center space-x-1">
+              <GraduationCap className="w-3 h-3 text-slate-400" />
+              <span className="truncate max-w-[110px]">{user.className || 'Class'}</span>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <div className="hidden lg:flex items-center space-x-1.5">
-              <div className="bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex items-center space-x-1">
-                <UserIcon className="w-3 h-3 text-slate-500" />
-                <span className="truncate max-w-[90px]">{user.name || 'full Yadav'}</span>
-              </div>
+          {/* Voice Input Mic */}
+          <button
+            type="button"
+            onClick={handleVoiceInputToggle}
+            className={`p-1.5 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold border ${
+              isListening
+                ? 'bg-rose-500 text-white animate-pulse border-rose-600 shadow-md'
+                : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
+            }`}
+            title={isListening ? 'Listening... Click to stop' : 'Microphone Voice Input'}
+          >
+            <Mic className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{isListening ? 'Listening...' : 'Mic'}</span>
+          </button>
 
-              <div className="bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex items-center space-x-1">
-                <GraduationCap className="w-3 h-3 text-slate-500" />
-                <span className="truncate max-w-[110px]">{user.className || 'Class 11th (PCB)'}</span>
-              </div>
+          {/* Voice setting */}
+          <button
+            type="button"
+            onClick={() => setShowCustomVoiceModal(true)}
+            className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-100 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold"
+            title="Configure Tutor Custom Voice"
+          >
+            <Volume2 className="w-3.5 h-3.5 text-indigo-600" />
+            <span className="hidden sm:inline">Voice</span>
+          </button>
 
-              <div className="bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex items-center space-x-1">
-                <UserIcon className="w-3 h-3 text-slate-500" />
-                <span className="truncate max-w-[80px]">{user.schoolName || 'chhabra'}</span>
-              </div>
-            </div>
-
-            {/* Direct Mic Speech-to-Text Button */}
+          {/* 3-DOTS ACTION MENU DROPDOWN */}
+          <div className="relative" ref={moreMenuRef}>
             <button
               type="button"
-              onClick={handleVoiceInputToggle}
-              className={`p-1.5 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold ${
-                isListening
-                  ? 'bg-rose-500 text-white animate-pulse shadow-md border border-rose-600'
-                  : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-100 border border-slate-200'
+              onClick={() => setShowMoreMenu(!showMoreMenu)}
+              className={`p-1.5 rounded-lg border transition flex items-center justify-center cursor-pointer active:scale-95 ${
+                showMoreMenu
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80'
               }`}
-              title={isListening ? 'Listening... Click to stop' : 'Microphone Voice Input'}
+              title="Tutor Tools & Settings"
             >
-              <Mic className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{isListening ? 'Listening...' : 'Mic'}</span>
+              <MoreVertical className="w-3.5 h-3.5" />
             </button>
 
-            <button
-              type="button"
-              onClick={() => setShowCustomVoiceModal(true)}
-              className="p-1.5 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-200/80 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold"
-              title="Configure Tutor Custom Voice"
-            >
-              <Volume2 className="w-3.5 h-3.5 text-indigo-600" />
-              <span className="hidden sm:inline">Voice</span>
-            </button>
+            <AnimatePresence>
+              {showMoreMenu && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.96, y: 8 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.96, y: 8 }}
+                  transition={{ duration: 0.15, ease: 'easeOut' }}
+                  className="absolute right-0 top-11 w-72 sm:w-80 bg-white border border-slate-200 rounded-2xl p-4 shadow-[0_12px_36px_rgba(15,23,42,0.12)] z-50 text-slate-800 space-y-4"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
+                        <SlidersHorizontal className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-wide">Study Settings</h3>
+                        <p className="text-[10px] text-slate-500">Configure your tutor companion</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowMoreMenu(false)}
+                      className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
 
-            {messages.length > 0 && (
-              <button
-                onClick={handleClearChat}
-                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                title="Clear Conversation"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            )}
+                  {/* Subject Selection Grid */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                      Select Subject
+                    </label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {SUBJECT_LIST.map((sub) => {
+                        const isSelected = selectedSubject === sub;
+                        return (
+                          <button
+                            key={sub}
+                            type="button"
+                            onClick={() => {
+                              setSelectedSubject(sub);
+                            }}
+                            className={`py-1.5 rounded-lg text-[11px] font-bold transition flex items-center justify-center border text-center cursor-pointer ${
+                              isSelected
+                                ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                                : 'bg-slate-50 text-slate-600 border-slate-200/85 hover:bg-slate-100 hover:text-slate-900'
+                            }`}
+                          >
+                            {sub}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-            <button
-              type="button"
-              onClick={() => setShowMoreMenu(true)}
-              className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition flex items-center justify-center relative cursor-pointer active:scale-95"
-              title="Tools, Modes, Subject & Settings"
-            >
-              <MoreVertical className="w-3.5 h-3.5 text-slate-700" />
-            </button>
+                  {/* Language Selector */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                      Response Language
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedLanguage}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSelectedLanguage(val);
+                          setStoredValue(`ai_tutor_language_${user.uid}`, val);
+                          if (onLanguageChange) {
+                            const reverseMap: Record<string, string> = {
+                              'English': 'en',
+                              'Hindi': 'hi',
+                              'Hinglish': 'hinglish',
+                              'Marathi': 'marathi',
+                              'Tamil': 'tamil',
+                              'Bengali': 'bengali'
+                            };
+                            const code = reverseMap[val];
+                            if (code) onLanguageChange(code);
+                          }
+                        }}
+                        className="w-full appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs pl-8 pr-8 py-1.5 rounded-lg cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                      >
+                        <option value="Hinglish">Hinglish</option>
+                        <option value="Hindi">हिंदी (Hindi)</option>
+                        <option value="English">English</option>
+                        <option value="Marathi">मরাঠী (Marathi)</option>
+                        <option value="Tamil">தமிழ் (Tamil)</option>
+                        <option value="Bengali">বাংলा (Bengali)</option>
+                      </select>
+                      <Languages className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Tutor Modes */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                      Tutor Mode
+                    </label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {[
+                        { id: 'homework' as const, label: 'Homework', desc: 'Instant solver', icon: Zap },
+                        { id: 'step' as const, label: 'Step-by-Step', desc: 'Math breakdowns', icon: TrendingUp },
+                        { id: 'explain' as const, label: 'Explain', desc: 'Clear analogies', icon: Lightbulb },
+                        { id: 'quiz' as const, label: 'Practice Quiz', desc: 'Comprehension test', icon: ClipboardList },
+                      ].map((mode) => {
+                        const Icon = mode.icon;
+                        const active = tutorMode === mode.id;
+                        return (
+                          <button
+                            key={mode.id}
+                            type="button"
+                            onClick={() => {
+                              setTutorMode(mode.id);
+                            }}
+                            className={`p-2 rounded-xl border text-left transition cursor-pointer active:scale-95 ${
+                              active
+                                ? 'bg-indigo-50 border-indigo-400/80 text-indigo-950 font-bold'
+                                : 'bg-slate-50 border-slate-200/80 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-1.5 font-bold text-[11px]">
+                              <Icon className={`w-3.5 h-3.5 ${active ? 'text-indigo-600' : 'text-slate-500'}`} />
+                              <span>{mode.label}</span>
+                            </div>
+                            <p className="text-[9px] text-slate-400 mt-0.5 truncate">{mode.desc}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* High-yield Exam Insights */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      handleSendMessage(`Give me key high-yield exam insights, formula tricks, and JEE Main / Board questions for ${selectedSubject}.`);
+                    }}
+                    className="w-full bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-slate-700 border border-indigo-100 hover:border-indigo-200/80 font-bold text-xs py-2 px-3 rounded-xl flex items-center justify-center space-x-2 transition cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4 text-indigo-500 animate-pulse" />
+                    <span>Request Exam Insights</span>
+                  </button>
+
+                  {/* Actions (Export PDF, LaTeX symbols, Clear Chat) */}
+                  <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                    <div className="flex items-center space-x-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMoreMenu(false);
+                          handleExportPdf();
+                        }}
+                        disabled={messages.length === 0 || isExportingPdf}
+                        className="flex-1 py-2 px-3 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer"
+                      >
+                        {isExportingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
+                        <span>Export PDF</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMoreMenu(false);
+                          setShowMathPalette(true);
+                          setShowSavedFormulasPanel(false);
+                        }}
+                        className="flex-1 py-2 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer"
+                      >
+                        <Variable className="w-3.5 h-3.5 text-slate-500" />
+                        <span>LaTeX Tools</span>
+                      </button>
+                    </div>
+
+                    {messages.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMoreMenu(false);
+                          handleClearChat();
+                        }}
+                        className="w-full py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-[11px] rounded-lg transition flex items-center justify-center space-x-1 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Clear Chat History</span>
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-        </header>
-      </motion.div>
-
-      {/* PERSISTENT STUDY TOOLBAR (ALWAYS STAYS AS HEADER, REST SLIDES UP ABOVE) */}
-      <div className="bg-white border-b border-slate-200/90 px-3 sm:px-5 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0 z-20 relative">
-        {/* Back Arrow button to go back directly from persistent header */}
-        <button
-          type="button"
-          onClick={onBack}
-          className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 text-slate-600 hover:text-slate-900 transition flex items-center justify-center cursor-pointer shrink-0 active:scale-95"
-          title="Back"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-        </button>
-
-        <div className="relative shrink-0">
-          <select
-            value={selectedSubject}
-            onChange={(e) => setSelectedSubject(e.target.value as Subject)}
-            className="appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs pl-8 pr-4 py-1.5 rounded-lg cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-          >
-            {SUBJECT_LIST.map((sub) => (
-              <option key={sub} value={sub} className="text-slate-900 bg-white">{sub}</option>
-            ))}
-          </select>
-          <FlaskConical className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>
-
-        {/* Minimal Toggle Chevron to easily roll details up/down right next to Science option */}
-        <button
-          type="button"
-          onClick={() => isHeaderVisible ? hideHeader() : showHeader()}
-          className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 text-slate-500 hover:text-slate-800 transition flex items-center justify-center cursor-pointer shrink-0 active:scale-95"
-          title={isHeaderVisible ? "Minimize top menu" : "Maximize top menu"}
-        >
-          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${isHeaderVisible ? 'rotate-180' : ''}`} />
-        </button>
-
-        <div className="relative shrink-0">
-          <select
-            value={selectedLanguage}
-            onChange={(e) => {
-              const val = e.target.value;
-              setSelectedLanguage(val);
-              setStoredValue(`ai_tutor_language_${user.uid}`, val);
-              if (onLanguageChange) {
-                const reverseMap: Record<string, string> = {
-                  'English': 'en',
-                  'Hindi': 'hi',
-                  'Hinglish': 'hinglish',
-                  'Marathi': 'marathi',
-                  'Tamil': 'tamil',
-                  'Bengali': 'bengali'
-                };
-                const code = reverseMap[val];
-                if (code) onLanguageChange(code);
-              }
-            }}
-            className="appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs pl-8 pr-4 py-1.5 rounded-lg cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-          >
-            <option value="Hinglish">Hinglish</option>
-            <option value="Hindi">हिंदी (Hindi)</option>
-            <option value="English">English</option>
-            <option value="Marathi">मराठी (Marathi)</option>
-            <option value="Tamil">தமிழ் (Tamil)</option>
-            <option value="Bengali">বাংলा (Bengali)</option>
-          </select>
-          <Languages className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
-
-        <div className="w-px h-5 bg-slate-200 shrink-0" />
-
-        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5 shrink-0">
-          {[
-            { id: 'homework' as const, label: 'Homework', icon: Zap },
-            { id: 'step' as const, label: 'Step-by-Step', icon: TrendingUp },
-            { id: 'explain' as const, label: 'Explain', icon: Lightbulb },
-            { id: 'quiz' as const, label: 'Quiz', icon: ClipboardList },
-          ].map((mode) => {
-            const Icon = mode.icon;
-            const active = tutorMode === mode.id;
-            return (
-              <button
-                key={mode.id}
-                type="button"
-                onClick={() => setTutorMode(mode.id)}
-                className={`px-2.5 py-1.5 rounded-md font-bold text-xs flex items-center space-x-1.5 transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95 ${
-                  active
-                    ? 'bg-slate-900 text-white shadow-2xs'
-                    : 'text-slate-600 hover:bg-slate-200/60'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{mode.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="w-px h-5 bg-slate-200 shrink-0" />
-
-        <button
-          type="button"
-          onClick={() => handleSendMessage(`Give me key high-yield exam insights, formula tricks, and JEE Main / Board questions for ${selectedSubject}.`)}
-          className="border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 font-bold text-xs px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer shrink-0 whitespace-nowrap"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
-          <span>Exam Insights</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={handleExportPdf}
-          disabled={messages.length === 0 || isExportingPdf}
-          className="ml-auto border border-slate-200 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40 text-slate-600 font-bold text-xs px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer shrink-0 whitespace-nowrap"
-        >
-          {isExportingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
-          <span className="hidden sm:inline">Export PDF</span>
-        </button>
-      </div>
+      </header>
 
       {pdfExportSuccess && (
         <motion.div
@@ -1780,7 +1993,456 @@ export const AiTutorApp = memo(function AiTutorApp({
         </motion.div>
       )}
 
-      <div className="flex-1 overflow-y-auto overscroll-contain scroll-smooth p-3 sm:p-5 space-y-4 max-w-4xl mx-auto w-full">
+      {/* SIDEBAR AND CONVERSATION LAYOUT WRAPPER */}
+      <div className="flex-1 flex overflow-hidden relative w-full">
+        {/* COLLAPSIBLE DESKTOP SIDEBAR */}
+        <div
+          className={`hidden md:flex flex-col bg-slate-50 border-r border-slate-200/60 h-full transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden shrink-0 ${
+            isSidebarCollapsed ? 'w-[68px]' : 'w-[270px]'
+          }`}
+        >
+          {/* Top segment: New Chat */}
+          <div className="p-3.5 flex flex-col space-y-2 border-b border-slate-200/50">
+            {isSidebarCollapsed ? (
+              <button
+                type="button"
+                onClick={handleCreateNewSession}
+                className="w-10 h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center transition active:scale-95 cursor-pointer mx-auto"
+                title={getSidebarTranslation('newChat', '+ New Chat')}
+              >
+                <Plus className="w-5 h-5" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleCreateNewSession}
+                className="w-full h-11 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center space-x-2 transition active:scale-95 cursor-pointer shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                <span>{getSidebarTranslation('newChat', '+ New Chat')}</span>
+              </button>
+            )}
+          </div>
+
+          {/* Primary Navigation list */}
+          <div className="px-2 py-3 border-b border-slate-200/50 flex flex-col space-y-1 shrink-0">
+            {[
+              { id: 'chats', label: getSidebarTranslation('chats', 'Chats'), icon: MessageSquare, onClick: () => { setIsMobileSidebarOpen(false); } },
+              { id: 'notes', label: getSidebarTranslation('notes', 'My Notes'), icon: FileText, onClick: () => { setShowNotesModal(true); setIsMobileSidebarOpen(false); } },
+              { id: 'bookmarks', label: getSidebarTranslation('savedQuestions', 'Saved Questions'), icon: Bookmark, onClick: () => { setShowSavedFormulasPanel(true); setIsMobileSidebarOpen(false); } },
+              { id: 'progress', label: getSidebarTranslation('studyProgress', 'Study Progress'), icon: TrendingUp, onClick: () => { setShowProgressModal(true); setIsMobileSidebarOpen(false); } }
+            ].map((item) => {
+              const Icon = item.icon;
+              const active = item.id === 'chats';
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={item.onClick}
+                  className={`w-full py-2 px-3 rounded-xl flex items-center transition cursor-pointer ${
+                    isSidebarCollapsed ? 'justify-center' : 'space-x-3'
+                  } ${
+                    active
+                      ? 'bg-indigo-50/70 text-indigo-600 font-bold border border-indigo-100/50'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  }`}
+                  title={isSidebarCollapsed ? item.label : undefined}
+                >
+                  <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-indigo-600' : 'text-slate-400'}`} />
+                  {!isSidebarCollapsed && <span className="text-xs">{item.label}</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Chat History Groupings */}
+          <div className="flex-1 overflow-y-auto px-2 py-3.5 space-y-4 min-h-0">
+            {!isSidebarCollapsed && (
+              <>
+                {getGroupedSessions().map((group) => (
+                  <div key={group.title} className="space-y-1">
+                    <span className="px-3 text-[9px] font-black tracking-wider text-slate-400 uppercase block">
+                      {getSidebarTranslation(group.title.toLowerCase().replace(/\s+/g, ''), group.title)}
+                    </span>
+                    <div className="space-y-0.5">
+                      {group.sessions.map((s) => {
+                        const active = s.id === activeSessionId;
+                        const isRenaming = renamingSessionId === s.id;
+                        return (
+                          <div
+                            key={s.id}
+                            className={`group/sessionitem w-full py-2 px-3 rounded-xl flex items-center justify-between text-left transition cursor-pointer relative ${
+                              active
+                                ? 'bg-slate-100/80 text-slate-900 font-bold'
+                                : 'text-slate-600 hover:bg-slate-100/50 hover:text-slate-900'
+                            }`}
+                            onClick={() => {
+                              if (!isRenaming) {
+                                setActiveSessionId(s.id);
+                              }
+                            }}
+                          >
+                            <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                              <MessageSquare className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              {isRenaming ? (
+                                <input
+                                  type="text"
+                                  value={renamingText}
+                                  onChange={(e) => setRenamingText(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveRename(s.id);
+                                    if (e.key === 'Escape') setRenamingSessionId(null);
+                                  }}
+                                  onBlur={() => handleSaveRename(s.id)}
+                                  className="bg-white border border-slate-200 text-xs text-slate-800 px-1.5 py-0.5 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/30 w-full font-normal"
+                                  autoFocus
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              ) : (
+                                <span className="text-[11px] truncate">{s.title}</span>
+                              )}
+                            </div>
+
+                            {/* Dropdown controls for session via subtle 3-dots */}
+                            {!isRenaming && (
+                              <div className="relative shrink-0 ml-1.5 flex items-center">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveDropdownSessionId(activeDropdownSessionId === s.id ? null : s.id);
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-lg transition"
+                                  title="Chat options"
+                                >
+                                  <MoreHorizontal className="w-3.5 h-3.5" />
+                                </button>
+
+                                {activeDropdownSessionId === s.id && (
+                                  <>
+                                    {/* Backdrop to dismiss on click */}
+                                    <div 
+                                      className="fixed inset-0 z-40 cursor-default" 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveDropdownSessionId(null);
+                                      }}
+                                    />
+                                    <div className="absolute right-0 top-6 bg-white border border-slate-200/90 rounded-xl shadow-xl py-1 w-32 z-50 flex flex-col text-slate-700">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleStartRename(s.id, s.title);
+                                          setActiveDropdownSessionId(null);
+                                        }}
+                                        className="w-full text-left px-3 py-1.5 text-[11px] hover:bg-slate-50 transition flex items-center space-x-1.5 font-bold"
+                                      >
+                                        <Edit3 className="w-3.5 h-3.5 text-slate-400" />
+                                        <span>Rename</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteSession(s.id, e);
+                                          setActiveDropdownSessionId(null);
+                                        }}
+                                        className="w-full text-left px-3 py-1.5 text-[11px] hover:bg-rose-50 text-rose-600 transition flex items-center space-x-1.5 font-bold"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                                        <span>Delete</span>
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+
+            {isSidebarCollapsed && (
+              <div className="flex flex-col items-center space-y-3">
+                <History className="w-4 h-4 text-slate-300" />
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar Bottom Segment: Subject selector, Profile */}
+          <div className="p-3 border-t border-slate-200/50 bg-slate-50/50 shrink-0 flex flex-col space-y-2.5">
+            {!isSidebarCollapsed && (
+              <div className="space-y-1">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block px-1">
+                  {getSidebarTranslation('subject', 'Subject')}
+                </span>
+                <select
+                  value={selectedSubject}
+                  onChange={(e) => setSelectedSubject(e.target.value as Subject)}
+                  className="w-full bg-white border border-slate-200 text-slate-700 font-bold text-[11px] px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500/30 cursor-pointer"
+                >
+                  {SUBJECT_LIST.map((sub) => (
+                    <option key={sub} value={sub}>
+                      {sub}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'space-x-2.5'} p-1`}>
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0 uppercase">
+                {user.name ? user.name[0] : 'S'}
+              </div>
+              {!isSidebarCollapsed && (
+                <div className="min-w-0 flex-1">
+                  <span className="text-[11px] font-bold text-slate-800 block truncate leading-none">
+                    {user.name || 'Student'}
+                  </span>
+                  <span className="text-[9px] font-bold text-indigo-500 block mt-0.5 leading-none">
+                    Lvl {user.level || 1} • {user.xp || 0} XP
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* MOBILE DRAWER BACKDROP AND SLIDE OVER */}
+        <AnimatePresence>
+          {isMobileSidebarOpen && (
+            <>
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsMobileSidebarOpen(false)}
+                className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-40 md:hidden"
+              />
+
+              {/* Slider panel */}
+              <motion.div
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+                className="fixed inset-y-0 left-0 w-72 bg-slate-50 border-r border-slate-200 shadow-2xl z-50 md:hidden flex flex-col h-full overflow-hidden"
+              >
+                {/* Header of Mobile drawer */}
+                <div className="p-4 border-b border-slate-200/50 flex items-center justify-between bg-white shrink-0">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-7.5 h-7.5 rounded-lg bg-gradient-to-br from-[#0f172a] to-[#1e293b] flex items-center justify-center text-cyan-400 font-bold text-sm tracking-wider">
+                      A
+                    </div>
+                    <span className="text-xs font-black text-slate-900 tracking-tight uppercase">ASCEND STUDY</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileSidebarOpen(false)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* New Chat on Mobile */}
+                <div className="p-3 border-b border-slate-200/50 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleCreateNewSession}
+                    className="w-full h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center space-x-2 transition active:scale-95 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>{getSidebarTranslation('newChat', '+ New Chat')}</span>
+                  </button>
+                </div>
+
+                {/* Nav on Mobile */}
+                <div className="px-2 py-3 border-b border-slate-200/50 flex flex-col space-y-1 shrink-0">
+                  {[
+                    { id: 'chats', label: getSidebarTranslation('chats', 'Chats'), icon: MessageSquare, onClick: () => { setIsMobileSidebarOpen(false); } },
+                    { id: 'notes', label: getSidebarTranslation('notes', 'My Notes'), icon: FileText, onClick: () => { setShowNotesModal(true); setIsMobileSidebarOpen(false); } },
+                    { id: 'bookmarks', label: getSidebarTranslation('savedQuestions', 'Saved Questions'), icon: Bookmark, onClick: () => { setShowSavedFormulasPanel(true); setIsMobileSidebarOpen(false); } },
+                    { id: 'progress', label: getSidebarTranslation('studyProgress', 'Study Progress'), icon: TrendingUp, onClick: () => { setShowProgressModal(true); setIsMobileSidebarOpen(false); } }
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    const active = item.id === 'chats';
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={item.onClick}
+                        className={`w-full py-2 px-3 rounded-xl flex items-center space-x-3 transition cursor-pointer ${
+                          active
+                            ? 'bg-indigo-50/70 text-indigo-600 font-bold border border-indigo-100/50'
+                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                        }`}
+                      >
+                        <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-indigo-600' : 'text-slate-400'}`} />
+                        <span className="text-xs">{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Date-grouped Chat history list on Mobile */}
+                <div className="flex-1 overflow-y-auto px-2 py-3 space-y-4 min-h-0">
+                  {getGroupedSessions().map((group) => (
+                    <div key={group.title} className="space-y-1">
+                      <span className="px-3 text-[9px] font-black tracking-wider text-slate-400 uppercase block">
+                        {getSidebarTranslation(group.title.toLowerCase().replace(/\s+/g, ''), group.title)}
+                      </span>
+                      <div className="space-y-0.5">
+                        {group.sessions.map((s) => {
+                          const active = s.id === activeSessionId;
+                          const isRenaming = renamingSessionId === s.id;
+                          return (
+                            <div
+                              key={s.id}
+                              className={`group/sessionitem w-full py-2 px-3 rounded-xl flex items-center justify-between text-left transition cursor-pointer relative ${
+                                active
+                                  ? 'bg-slate-100/80 text-slate-900 font-bold'
+                                  : 'text-slate-600 hover:bg-slate-100/50 hover:text-slate-900'
+                              }`}
+                              onClick={() => {
+                                if (!isRenaming) {
+                                  setActiveSessionId(s.id);
+                                  setIsMobileSidebarOpen(false);
+                                }
+                              }}
+                            >
+                              <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                                <MessageSquare className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                {isRenaming ? (
+                                  <input
+                                    type="text"
+                                    value={renamingText}
+                                    onChange={(e) => setRenamingText(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleSaveRename(s.id);
+                                      if (e.key === 'Escape') setRenamingSessionId(null);
+                                    }}
+                                    onBlur={() => handleSaveRename(s.id)}
+                                    className="bg-white border border-slate-200 text-xs text-slate-800 px-1.5 py-0.5 rounded-md w-full font-normal focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                                    autoFocus
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  <span className="text-[11px] truncate">{s.title}</span>
+                                )}
+                              </div>
+
+                              {/* Subtle 3-dots actions menu on mobile */}
+                              {!isRenaming && (
+                                <div className="relative shrink-0 ml-1.5 flex items-center">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveDropdownSessionId(activeDropdownSessionId === s.id ? null : s.id);
+                                    }}
+                                    className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition"
+                                  >
+                                    <MoreHorizontal className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  {activeDropdownSessionId === s.id && (
+                                    <>
+                                      {/* Tap dismiss overlay */}
+                                      <div 
+                                        className="fixed inset-0 z-40 cursor-default" 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setActiveDropdownSessionId(null);
+                                        }}
+                                      />
+                                      <div className="absolute right-0 top-6 bg-white border border-slate-200/90 rounded-xl shadow-xl py-1 w-32 z-50 flex flex-col text-slate-700">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleStartRename(s.id, s.title);
+                                            setActiveDropdownSessionId(null);
+                                          }}
+                                          className="w-full text-left px-3 py-1.5 text-[11px] hover:bg-slate-50 transition flex items-center space-x-1.5 font-bold"
+                                        >
+                                          <Edit3 className="w-3.5 h-3.5 text-slate-400" />
+                                          <span>Rename</span>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteSession(s.id, e);
+                                            setActiveDropdownSessionId(null);
+                                          }}
+                                          className="w-full text-left px-3 py-1.5 text-[11px] hover:bg-rose-50 text-rose-600 transition flex items-center space-x-1.5 font-bold"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                                          <span>Delete</span>
+                                        </button>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Bottom of Mobile drawer */}
+                <div className="p-3 border-t border-slate-200/50 bg-white shrink-0 flex flex-col space-y-2.5">
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block px-1">
+                      {getSidebarTranslation('subject', 'Subject')}
+                    </span>
+                    <select
+                      value={selectedSubject}
+                      onChange={(e) => setSelectedSubject(e.target.value as Subject)}
+                      className="w-full bg-slate-50 border border-slate-200 text-slate-700 font-bold text-[11px] px-2.5 py-1.5 rounded-lg focus:outline-none"
+                    >
+                      {SUBJECT_LIST.map((sub) => (
+                        <option key={sub} value={sub}>
+                          {sub}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center space-x-2.5 p-1">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 text-white flex items-center justify-center font-bold text-xs uppercase shadow-xs shrink-0">
+                      {user.name ? user.name[0] : 'S'}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[11px] font-bold text-slate-800 block truncate leading-none">
+                        {user.name || 'Student'}
+                      </span>
+                      <span className="text-[9px] font-bold text-indigo-500 block mt-0.5 leading-none">
+                        Lvl {user.level || 1} • {user.xp || 0} XP
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* MAIN CONVERSATION PANEL */}
+        <div className="flex-1 flex flex-col min-w-0 h-full relative overflow-hidden bg-[#f8fafc]">
+          {/* Scrollable messages container */}
+          <div className="flex-1 overflow-y-auto overscroll-contain scroll-smooth py-4 space-y-4 w-full px-[18px] sm:px-[24px]">
+            <div className="w-full md:max-w-[780px] lg:max-w-[820px] mx-auto flex flex-col space-y-4">
         {messages.length === 0 ? (
           <motion.div 
             initial={{ opacity: 0, y: 16 }}
@@ -2027,16 +2689,16 @@ export const AiTutorApp = memo(function AiTutorApp({
                   transition={{ duration: 0.28, ease: 'easeOut' }}
                   className="flex justify-start w-full group/aimsg my-2"
                 >
-                  <div className="w-full max-w-[820px] bg-transparent border-0 overflow-visible transition-all">
+                  <div className="w-full max-w-[720px] mx-auto bg-transparent border-0 overflow-visible transition-all">
                     {/* Professional Header Bar */}
-                    <div className="bg-transparent border-b border-slate-100 px-0 py-2 flex items-center justify-between flex-wrap gap-2">
+                    <div className="bg-transparent px-0 pt-4 pb-2 flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center space-x-2.5">
                         <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-indigo-800 text-white flex items-center justify-center shadow-xs">
                           <GraduationCap className="w-4 h-4 text-white" />
                         </div>
                         <div className="flex items-center space-x-2">
                           <span className="font-bold text-xs sm:text-sm text-slate-900 tracking-tight">AI Academic Tutor</span>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50/50 text-emerald-700 border border-emerald-200/50">
                             ✓ Verified Solution
                           </span>
                         </div>
@@ -2047,7 +2709,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                         <button
                           type="button"
                           onClick={toggleTutorFontStyle}
-                          className="inline-flex items-center space-x-1.5 text-[11px] font-medium px-2 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 transition cursor-pointer active:scale-95 shadow-xs"
+                          className="inline-flex items-center space-x-1.5 text-[11px] font-medium px-2 py-1 rounded-md border border-slate-200/60 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer active:scale-95 shadow-xs"
                           title="Click to toggle between Classic Editorial Serif and Modern Sans font style"
                         >
                           <Type className="w-3 h-3 text-indigo-600" />
@@ -2072,12 +2734,12 @@ export const AiTutorApp = memo(function AiTutorApp({
                     </div>
 
                     {/* Classic Editorial or Modern Message Body - Khulla no padding or background */}
-                    <div className={`py-4 px-0 ${tutorFontStyle === 'classic' ? 'tutor-editorial font-serif' : 'tutor-modern font-sans'}`}>
+                    <div className={`py-2 px-0 ${tutorFontStyle === 'classic' ? 'tutor-editorial font-serif' : 'tutor-modern font-sans'}`}>
                       <StaggeredRevealMarkdown text={msg.text} isLatest={isLatest} fontStyle={tutorFontStyle} />
                     </div>
 
                     {/* Professional Action Suite */}
-                    <div className="bg-transparent border-t border-slate-100 px-0 py-2.5 flex items-center justify-between flex-wrap gap-2">
+                    <div className="bg-transparent px-0 py-3 flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center space-x-1 flex-wrap gap-1">
                         <button
                           type="button"
@@ -2216,7 +2878,8 @@ export const AiTutorApp = memo(function AiTutorApp({
         </AnimatePresence>
 
         <div ref={messagesEndRef} />
-      </div>
+            </div> {/* w-full md:max-w-[780px] lg:max-w-[820px] inner wrap */}
+          </div> {/* Scrollable messages container */}
 
       <footer
         className="bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-2 sm:px-3 py-1 sm:py-1.5 shrink-0 relative shadow-[0_-4px_20px_-4px_rgba(15,23,42,0.08)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
@@ -2226,7 +2889,7 @@ export const AiTutorApp = memo(function AiTutorApp({
             : 'calc(6px + env(safe-area-inset-bottom, 0px))'
         }}
       >
-        <div className="max-w-4xl mx-auto space-y-1">
+        <div className="w-full md:max-w-[780px] lg:max-w-[820px] mx-auto space-y-1">
           <AnimatePresence>
             {showSavedFormulasPanel && (
               <motion.div 
@@ -2510,7 +3173,7 @@ export const AiTutorApp = memo(function AiTutorApp({
             </div>
           )}
 
-          <div className="relative flex items-center bg-white border border-slate-300/80 hover:border-slate-400 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15 rounded-2xl p-1 transition-all duration-200 shadow-sm">
+          <div className="relative flex items-center bg-white/90 backdrop-blur-md border border-slate-200/80 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/10 rounded-[20px] p-1.5 transition-all duration-200 shadow-[0_4px_20px_rgba(15,23,42,0.06)] min-h-[56px]">
             {/* MIC BUTTON */}
             <button
               type="button"
@@ -2696,10 +3359,10 @@ export const AiTutorApp = memo(function AiTutorApp({
               type="button"
               onClick={() => handleSendMessage()}
               disabled={(!inputQuery.trim() && selectedImages.length === 0) || isLoading}
-              className="p-2 sm:p-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600 text-white font-bold rounded-xl shadow-xs transition-all duration-150 flex items-center justify-center cursor-pointer shrink-0"
+              className="p-2 sm:p-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white font-semibold rounded-xl shadow-xs hover:scale-102 active:scale-98 transition-all duration-150 flex items-center justify-center cursor-pointer shrink-0 ml-1"
               title="Send Message"
             >
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
             </button>
           </div>
         </div>
@@ -2713,195 +3376,6 @@ export const AiTutorApp = memo(function AiTutorApp({
           onChange={handleFileUpload}
           className="hidden"
         />
-
-        <AnimatePresence>
-          {showMoreMenu && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-              onClick={() => setShowMoreMenu(false)}
-            >
-              <motion.div 
-                initial={{ y: '100%', opacity: 0.5 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: '100%', opacity: 0 }}
-                transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-                className="w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto no-scrollbar"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <div className="flex items-center space-x-2">
-                    <div className="p-2 rounded-xl bg-indigo-600/20 text-indigo-400">
-                      <SlidersHorizontal className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h3 className="text-xs sm:text-sm font-black text-white tracking-wide uppercase">AI Tutor Tools & Settings</h3>
-                      <p className="text-[10px] text-slate-400">Switch mode, subject, or open math tools</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowMoreMenu(false)}
-                    className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-                    Select Subject
-                  </span>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {SUBJECT_LIST.map((sub) => {
-                      const theme = getSubjectTheme(sub);
-                      const isSelected = selectedSubject === sub;
-                      return (
-                        <button
-                          key={sub}
-                          type="button"
-                          onClick={() => {
-                            setSelectedSubject(sub);
-                          }}
-                          className={`p-2 rounded-xl text-xs font-bold transition flex items-center justify-center border text-center ${
-                            isSelected
-                              ? `${theme.badgeBg} ${theme.badgeText} ${theme.badgeBorder} shadow-sm ring-1 ring-indigo-400/30`
-                              : 'bg-slate-800/80 text-slate-300 border-slate-700/60 hover:bg-slate-800'
-                          }`}
-                        >
-                          {sub}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-                    Tutor Mode
-                  </span>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { id: 'homework', label: '⚡ Homework Solver', desc: 'Step-by-step complete solutions' },
-                      { id: 'step', label: '📐 Step Math', desc: 'Detailed mathematical breakdown' },
-                      { id: 'explain', label: '💡 Explainer', desc: 'Concepts with easy analogies' },
-                      { id: 'quiz', label: '📝 Practice Quiz', desc: 'Custom 3-question testing quiz' }
-                    ].map((m) => {
-                      const isSelected = tutorMode === m.id;
-                      return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => {
-                            setTutorMode(m.id as any);
-                          }}
-                          className={`p-2.5 rounded-2xl text-left border transition ${
-                            isSelected
-                              ? 'bg-indigo-600/20 border-indigo-500 text-indigo-200'
-                              : 'bg-slate-800/60 border-slate-700/60 text-slate-300 hover:bg-slate-800'
-                          }`}
-                        >
-                          <div className="text-xs font-bold flex items-center justify-between">
-                            <span>{m.label}</span>
-                          </div>
-                          <div className="text-[9px] text-slate-400 mt-0.5">{m.desc}</div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-                    Math & Formula Tools
-                  </span>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowMoreMenu(false);
-                        setShowMathPalette(true);
-                        setShowSavedFormulasPanel(false);
-                      }}
-                      className="p-3 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-2xl transition text-left flex items-center space-x-2.5"
-                    >
-                      <div className="p-2 rounded-xl bg-indigo-600/20 text-indigo-400">
-                        <Variable className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <span className="text-xs font-bold text-slate-200 block">LaTeX Palette</span>
-                        <span className="text-[9px] text-slate-400">Insert math symbols</span>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowMoreMenu(false);
-                        setShowSavedFormulasPanel(true);
-                        setShowMathPalette(false);
-                      }}
-                      className="p-3 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-2xl transition text-left flex items-center space-x-2.5"
-                    >
-                      <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
-                        <Bookmark className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <span className="text-xs font-bold text-slate-200 block">Saved Formulas</span>
-                        <span className="text-[9px] text-slate-400">Quick formula book</span>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-2 pt-1 border-t border-slate-800">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-                    Actions
-                  </span>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowMoreMenu(false);
-                        handleExportPdf();
-                      }}
-                      disabled={messages.length === 0 || isExportingPdf}
-                      className="flex-1 p-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2"
-                    >
-                      {isExportingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-                      <span>Export Study PDF</span>
-                    </button>
-
-                    {messages.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowMoreMenu(false);
-                          handleClearChat();
-                        }}
-                        className="p-2.5 bg-slate-800 hover:bg-rose-950/80 text-rose-400 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        <span>Clear</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="bg-slate-950/80 border border-slate-800/80 p-3 rounded-2xl text-[11px] text-slate-300 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-white">👤 {user.name}</span>
-                    {user.className && <span className="text-indigo-400 font-mono text-[10px]">{user.className}</span>}
-                  </div>
-                  {user.schoolName && <div className="text-slate-400 text-[10px] truncate">🏫 {user.schoolName}</div>}
-                  {user.targetGoal && <div className="text-amber-300 text-[10px]">🎯 Goal: {user.targetGoal}</div>}
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <AnimatePresence>
           {showCameraModal && (
@@ -3295,6 +3769,236 @@ export const AiTutorApp = memo(function AiTutorApp({
           )}
         </AnimatePresence>
       </footer>
+
+        </div> {/* MAIN CONVERSATION PANEL */}
+      </div> {/* SIDEBAR AND CONVERSATION LAYOUT WRAPPER */}
+
+      {/* PREMIUM FLOATING NOTES OVERLAY MODAL */}
+      <AnimatePresence>
+        {showNotesModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowNotesModal(false)}
+              className="absolute inset-0 bg-slate-950/45 backdrop-blur-xs"
+            />
+
+            {/* Modal Box */}
+            <motion.div
+              initial={{ scale: 0.94, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.94, opacity: 0, y: 12 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+              className="relative bg-white border border-slate-200 rounded-3xl max-w-2xl w-full h-[540px] shadow-2xl flex flex-col overflow-hidden"
+            >
+              {/* Header */}
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                    <FileText className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">My Study Notes</h3>
+                    <p className="text-[10px] text-slate-500">Formulas, conceptual summaries, and saved AI answers</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowNotesModal(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Body Content */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-50/40">
+                {localSavedNotes.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-6">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                      <FileText className="w-6 h-6" />
+                    </div>
+                    <h4 className="text-xs font-bold text-slate-800">No notes saved yet</h4>
+                    <p className="text-[11px] text-slate-500 mt-1 max-w-xs">
+                      While studying, click the **Save to Notes** action under any AI Tutor answer to collect them here.
+                    </p>
+                  </div>
+                ) : (
+                  localSavedNotes.map((note) => (
+                    <div 
+                      key={note.id} 
+                      className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-xs hover:border-indigo-200 transition"
+                    >
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-2">
+                        <div className="flex items-center space-x-2 min-w-0">
+                          <span className="text-[10px] bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded-full border border-indigo-100/50">
+                            {note.subject || 'Study'}
+                          </span>
+                          <h4 className="text-[11px] font-bold text-slate-900 truncate">
+                            {note.title}
+                          </h4>
+                        </div>
+                        <span className="text-[9px] text-slate-400">
+                          {note.timestamp ? new Date(note.timestamp).toLocaleDateString() : 'Just now'}
+                        </span>
+                      </div>
+                      
+                      <div className="text-[11px] text-slate-600 leading-relaxed max-h-32 overflow-y-auto pr-1">
+                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                          {note.content}
+                        </ReactMarkdown>
+                      </div>
+
+                      <div className="flex justify-end space-x-1.5 pt-2.5 mt-2 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            safeClipboardWrite(note.content);
+                            alert("Copied note content to clipboard!");
+                          }}
+                          className="px-2.5 py-1 text-[10px] bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg transition font-semibold"
+                        >
+                          Copy Content
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm("Remove this note from your notebook?")) {
+                              const updated = localSavedNotes.filter(n => n.id !== note.id);
+                              localStorage.setItem('study_notebook_notes', JSON.stringify(updated));
+                              setLocalSavedNotes(updated);
+                            }
+                          }}
+                          className="px-2.5 py-1 text-[10px] bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition font-semibold"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* PREMIUM FLOATING PROGRESS OVERLAY MODAL */}
+      <AnimatePresence>
+        {showProgressModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowProgressModal(false)}
+              className="absolute inset-0 bg-slate-950/45 backdrop-blur-xs"
+            />
+
+            {/* Modal Box */}
+            <motion.div
+              initial={{ scale: 0.94, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.94, opacity: 0, y: 12 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+              className="relative bg-white border border-slate-200 rounded-3xl max-w-lg w-full h-[520px] shadow-2xl flex flex-col overflow-hidden"
+            >
+              {/* Header */}
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                    <TrendingUp className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Academic Study Progress</h3>
+                    <p className="text-[10px] text-slate-500">Your levels, study targets, and daily accomplishments</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowProgressModal(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Body Content */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/40">
+                {/* Level / XP Stats Block */}
+                <div className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white p-4.5 rounded-2xl shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-indigo-300 tracking-wider">Level Progress</span>
+                      <h4 className="text-lg font-black mt-0.5">Academic Level {user.level || 1}</h4>
+                    </div>
+                    <div className="bg-indigo-500/20 px-3 py-1.5 rounded-xl border border-indigo-500/30 text-right">
+                      <span className="text-[10px] text-indigo-200 block">Total XP</span>
+                      <span className="text-xs font-black text-white">{user.xp || 0} XP</span>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[10px] text-indigo-200">
+                      <span>XP to next level</span>
+                      <span>{((user.xp || 0) % 100)} / 100 XP</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden p-0.5 border border-white/5">
+                      <div 
+                        className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-indigo-400" 
+                        style={{ width: `${((user.xp || 0) % 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quests / Study Accomplishments */}
+                <div className="space-y-2">
+                  <span className="text-[9px] font-black tracking-widest text-slate-400 uppercase block px-1">
+                    Daily Study Goals
+                  </span>
+                  <div className="space-y-2">
+                    {[
+                      { title: 'Ask an AI Homework Question', xp: '+10 XP', done: true },
+                      { title: 'Save an AI Answer to My Notes', xp: '+15 XP', done: localSavedNotes.length > 0 },
+                      { title: 'Formulate/Capture with Camera filter', xp: '+20 XP', done: false }
+                    ].map((quest, idx) => (
+                      <div 
+                        key={idx} 
+                        className="p-3 bg-white border border-slate-200/80 rounded-xl flex items-center justify-between hover:border-slate-300 transition"
+                      >
+                        <div className="flex items-center space-x-2.5 min-w-0">
+                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                            quest.done ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 text-transparent'
+                          }`}>
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          </div>
+                          <span className={`text-xs ${quest.done ? 'text-slate-400 line-through' : 'text-slate-700 font-semibold'} truncate`}>
+                            {quest.title}
+                          </span>
+                        </div>
+                        <span className={`text-[10px] font-black shrink-0 ${quest.done ? 'text-slate-400' : 'text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md'}`}>
+                          {quest.xp}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Info Block */}
+                <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-xl text-[10px] text-slate-600 leading-relaxed">
+                  💡 **Pro Tip:** Daily study streaks increase your learning efficiency. Ask questions regularly to earn more experience points (XP) and unlock advanced visual solvers!
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <CustomVoiceModal
         isOpen={showCustomVoiceModal}
