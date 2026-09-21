@@ -38,7 +38,6 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronUp,
-  Type,
   Menu,
   PanelLeftClose,
   PanelLeft,
@@ -887,7 +886,7 @@ export const AiTutorApp = memo(function AiTutorApp({
     return DEFAULT_SAVED_FORMULAS;
   });
   const [showSavedFormulasPanel, setShowSavedFormulasPanel] = useState(false);
-  const [tutorFontStyle, setTutorFontStyle] = useState<'classic' | 'modern'>(() => {
+  const [tutorFontStyle] = useState<'classic' | 'modern'>(() => {
     try {
       return (localStorage.getItem('ai_tutor_font_style') as 'classic' | 'modern') || 'modern';
     } catch {
@@ -895,13 +894,6 @@ export const AiTutorApp = memo(function AiTutorApp({
     }
   });
 
-  const toggleTutorFontStyle = () => {
-    const next = tutorFontStyle === 'classic' ? 'modern' : 'classic';
-    setTutorFontStyle(next);
-    try {
-      localStorage.setItem('ai_tutor_font_style', next);
-    } catch {}
-  };
   const [newFormulaName, setNewFormulaName] = useState('');
   const [newFormulaLatex, setNewFormulaLatex] = useState('');
   const [showAddFormulaForm, setShowAddFormulaForm] = useState(false);
@@ -1592,10 +1584,6 @@ export const AiTutorApp = memo(function AiTutorApp({
     }
   };
 
-  const handleDeleteMessage = (id: string) => {
-    setMessages((prev) => prev.filter((m) => m.id !== id));
-  };
-
   const handleCopyText = async (id: string, text: string | unknown) => {
     const cleanStr = typeof text === 'string' ? text : String(text || '');
     const copied = await safeClipboardWrite(cleanStr);
@@ -1751,7 +1739,31 @@ export const AiTutorApp = memo(function AiTutorApp({
             </div>
           </div>
 
+          {/* Voice Input Mic */}
+          <button
+            type="button"
+            onClick={handleVoiceInputToggle}
+            className={`p-1.5 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold border ${
+              isListening
+                ? 'bg-rose-500 text-white animate-pulse border-rose-600 shadow-md'
+                : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
+            }`}
+            title={isListening ? 'Listening... Click to stop' : 'Microphone Voice Input'}
+          >
+            <Mic className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{isListening ? 'Listening...' : 'Mic'}</span>
+          </button>
 
+          {/* Voice setting */}
+          <button
+            type="button"
+            onClick={() => setShowCustomVoiceModal(true)}
+            className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-100 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold"
+            title="Configure Tutor Custom Voice"
+          >
+            <Volume2 className="w-3.5 h-3.5 text-indigo-600" />
+            <span className="hidden sm:inline">Voice</span>
+          </button>
 
           {/* 3-DOTS ACTION MENU DROPDOWN */}
           <div className="relative" ref={moreMenuRef}>
@@ -2660,20 +2672,6 @@ export const AiTutorApp = memo(function AiTutorApp({
                                   <Table className="w-3.5 h-3.5 text-teal-500" />
                                   <span>Summary Table</span>
                                 </button>
-
-                                <div className="border-t border-slate-100 my-1" />
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    handleDeleteMessage(msg.id);
-                                    setActiveUserMsgMenuId(null);
-                                  }}
-                                  className="w-full px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition text-left cursor-pointer"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                                  <span>Delete Message</span>
-                                </button>
                               </div>
                             </>
                           )}
@@ -2728,35 +2726,16 @@ export const AiTutorApp = memo(function AiTutorApp({
                         </div>
                         <div className="flex items-center space-x-2">
                           <span className="font-semibold text-xs sm:text-sm text-slate-800 tracking-tight">Ascend AI Tutor</span>
+                          <span className="inline-flex items-center text-[10px] text-emerald-600 font-medium">
+                            • Verified Solution
+                          </span>
                         </div>
                       </div>
 
                       <div className="flex items-center space-x-2">
-                        {/* Font Style Toggle: Classic Editorial Serif vs Modern Clean */}
-                        <button
-                          type="button"
-                          onClick={toggleTutorFontStyle}
-                          className="inline-flex items-center space-x-1.5 text-[10px] sm:text-[11px] font-medium px-2 py-1 rounded-md border border-slate-200/50 bg-white hover:bg-slate-50 text-slate-600 transition cursor-pointer active:scale-95"
-                          title="Click to toggle between Classic Editorial Serif and Modern Sans font style"
-                        >
-                          <Type className="w-3 h-3 text-indigo-500" />
-                          <span className={`${tutorFontStyle === 'classic' ? 'font-serif font-semibold text-slate-800' : 'font-sans font-medium text-slate-600'}`}>
-                            {tutorFontStyle === 'classic' ? 'Serif' : 'Sans'}
-                          </span>
-                        </button>
-
                         <span className="text-[10px] sm:text-[11px] text-slate-400 font-normal">
                           {msg.timestamp}
                         </span>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteMessage(msg.id)}
-                          className="text-slate-400 hover:text-rose-500 transition p-1 rounded-md hover:bg-rose-50 cursor-pointer"
-                          title="Remove message"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
                       </div>
                     </div>
 
@@ -2770,12 +2749,63 @@ export const AiTutorApp = memo(function AiTutorApp({
                       <div className="flex items-center space-x-1 flex-wrap gap-1">
                         <button
                           type="button"
+                          onClick={() => handleCopyText(msg.id, msg.text)}
+                          title="Copy answer"
+                          className="text-slate-600 hover:text-slate-800 hover:bg-slate-100/80 text-[11px] sm:text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
+                        >
+                          {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
+                          <span className="hidden xs:inline">{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleSpeakText(msg.text)}
+                          title="Listen to answer"
+                          className="text-slate-600 hover:text-slate-800 hover:bg-slate-100/80 text-[11px] sm:text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
+                        >
+                          <Volume2 className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="hidden xs:inline">Listen</span>
+                        </button>
+
+                        <button
+                          type="button"
                           onClick={() => handleSaveToNotebook(msg)}
                           title="Save to notebook"
                           className="text-slate-600 hover:text-slate-800 hover:bg-slate-100/80 text-[11px] sm:text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
                         >
                           <Bookmark className="w-3.5 h-3.5 text-slate-500" />
                           <span className="hidden xs:inline">{savedNoteId === msg.id ? 'Saved ✓' : 'Save Note'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleVoiceInputToggle}
+                          title={isListening ? 'Listening... Click to stop' : 'Voice Input / Mic'}
+                          className={`text-[11px] sm:text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 ${
+                            isListening
+                              ? 'bg-rose-500 text-white animate-pulse'
+                              : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100/80'
+                          }`}
+                        >
+                          <Mic className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="hidden xs:inline">{isListening ? 'Listening...' : 'Mic'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleExportToGoogleDoc(msg)}
+                          disabled={isExportingDocId === msg.id}
+                          className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 text-[11px] sm:text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 disabled:opacity-50"
+                          title="Export this tutoring answer to a live Google Document"
+                        >
+                          {isExportingDocId === msg.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                          ) : docExportSuccessId === msg.id ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          ) : (
+                            <FileDown className="w-3.5 h-3.5 text-emerald-600" />
+                          )}
+                          <span className="hidden sm:inline">{docExportSuccessId === msg.id ? 'Exported!' : isExportingDocId === msg.id ? 'Exporting...' : 'Export to Docs'}</span>
                         </button>
                       </div>
 
