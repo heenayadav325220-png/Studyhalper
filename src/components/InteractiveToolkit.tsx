@@ -68,7 +68,6 @@ import {
   generateQuiz,
   isAiQuotaExceeded
 } from '../services/geminiService';
-import { playTutorSpeech } from '../services/voiceSettings';
 
 interface InteractiveToolkitProps {
   onClose: () => void;
