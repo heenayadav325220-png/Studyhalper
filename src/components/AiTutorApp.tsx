@@ -365,7 +365,7 @@ function parseMarkdownBlocks(text: string): string[] {
 const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
   text,
   isLatest,
-  fontStyle = 'classic',
+  fontStyle = 'modern',
 }: {
   text: string;
   isLatest?: boolean;
@@ -404,7 +404,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
         maxWidth: '100%',
         letterSpacing: '0.005em'
       }}
-      className={`markdown-body select-text w-full ${isClassic ? 'tutor-editorial font-serif' : 'tutor-modern font-sans'} text-slate-800 leading-[1.7] overflow-x-auto relative group cursor-pointer`}
+      className={`markdown-body select-text w-full ${isClassic ? 'tutor-editorial font-serif' : 'tutor-modern font-sans'} text-slate-800 leading-[1.75] overflow-x-auto relative group cursor-pointer`}
       onClick={() => {
         if (!isAllRevealed) {
           setVisibleCount(blocks.length);
@@ -418,7 +418,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
           initial={{ opacity: 0, y: 6, scale: 0.99 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.25, ease: 'easeOut' }}
-          className="mb-6 last:mb-0 space-y-3"
+          className="mb-5 last:mb-0 space-y-2.5"
         >
           <ReactMarkdown
             remarkPlugins={[remarkMath]}
@@ -427,8 +427,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
               h1({ children }) {
                 return (
                   <h1 
-                    style={{ marginTop: '30px', marginBottom: '10px', fontSize: '21px', lineHeight: '1.25' }}
-                    className={`font-semibold text-slate-900 tracking-tight ${isClassic ? 'font-serif' : 'font-sans'}`}
+                    className={`font-semibold text-slate-900 tracking-tight mt-6 mb-3 text-xl sm:text-2xl ${isClassic ? 'font-serif' : 'font-sans'}`}
                   >
                     {children}
                   </h1>
@@ -437,8 +436,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
               h2({ children }) {
                 return (
                   <h2 
-                    style={{ marginTop: '30px', marginBottom: '10px', fontSize: '21px', lineHeight: '1.25' }}
-                    className={`font-semibold text-slate-900 tracking-tight ${isClassic ? 'font-serif' : 'font-sans'}`}
+                    className={`font-semibold text-slate-900 tracking-tight mt-5 mb-2.5 text-lg sm:text-xl ${isClassic ? 'font-serif' : 'font-sans'}`}
                   >
                     {children}
                   </h2>
@@ -447,8 +445,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
               h3({ children }) {
                 return (
                   <h3 
-                    style={{ marginTop: '24px', marginBottom: '8px', fontSize: '17.5px', lineHeight: '1.25' }}
-                    className={`font-semibold text-slate-850 tracking-tight ${isClassic ? 'font-serif' : 'font-sans'}`}
+                    className={`font-semibold text-slate-850 tracking-tight mt-4 mb-2 text-base sm:text-lg ${isClassic ? 'font-serif' : 'font-sans'}`}
                   >
                     {children}
                   </h3>
@@ -457,8 +454,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
               p({ children }) {
                 return (
                   <p 
-                    style={{ marginBottom: '10px' }}
-                    className={`last:mb-0 leading-[1.7] ${isClassic ? 'font-serif text-[15.5px] sm:text-[16.5px] text-slate-900' : 'font-sans text-[15px] sm:text-[16px] text-slate-800 font-normal'}`}
+                    className={`mb-4 last:mb-0 leading-[1.75] ${isClassic ? 'font-serif text-[15.5px] sm:text-[16.5px] text-slate-900' : 'font-sans text-[15px] sm:text-[16px] text-slate-800/90 font-normal tracking-[0.01em]'}`}
                   >
                     {children}
                   </p>
@@ -466,36 +462,36 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
               },
               ul({ children }) {
                 return (
-                  <ul className={`my-4 pl-5 list-disc marker:text-slate-400 space-y-1.5 leading-[1.7] ${isClassic ? 'font-serif text-[15px] sm:text-[16px]' : 'font-sans text-[15px] sm:text-[16px]'}`}>
+                  <ul className={`my-4 pl-5 list-disc marker:text-slate-400 space-y-2 leading-[1.75] ${isClassic ? 'font-serif text-[15px] sm:text-[16px]' : 'font-sans text-[15px] sm:text-[16px] text-slate-800/90'}`}>
                     {children}
                   </ul>
                 );
               },
               ol({ children }) {
                 return (
-                  <ol className={`my-4 pl-5 list-decimal marker:text-slate-400 space-y-1.5 leading-[1.7] ${isClassic ? 'font-serif text-[15px] sm:text-[16px]' : 'font-sans text-[15px] sm:text-[16px]'}`}>
+                  <ol className={`my-4 pl-5 list-decimal marker:text-slate-400 space-y-2 leading-[1.75] ${isClassic ? 'font-serif text-[15px] sm:text-[16px]' : 'font-sans text-[15px] sm:text-[16px] text-slate-800/90'}`}>
                     {children}
                   </ol>
                 );
               },
               li({ children }) {
                 return (
-                  <li className={`text-slate-800 mb-1 leading-[1.7] ${isClassic ? 'font-serif' : 'font-sans text-slate-800'}`}>
+                  <li className={`mb-1.5 leading-[1.75] ${isClassic ? 'font-serif text-slate-900' : 'font-sans text-slate-800/90'}`}>
                     {children}
                   </li>
                 );
               },
               blockquote({ children }) {
                 return (
-                  <blockquote className="my-4 pl-4 py-1 border-l-2 border-slate-300 text-slate-500 font-sans text-[14.5px] sm:text-[15.5px] italic leading-relaxed">
+                  <blockquote className="border-l-3 border-indigo-500/80 bg-indigo-50/40 text-slate-600 font-sans text-[14.5px] sm:text-[15px] px-4 py-2.5 rounded-r-lg my-4 leading-relaxed">
                     {children}
                   </blockquote>
                 );
               },
               table({ children }) {
                 return (
-                  <div className="my-5 overflow-x-auto rounded-xl border border-slate-200/50 bg-white/50 shadow-2xs">
-                    <table className={`w-full text-left text-xs sm:text-sm ${isClassic ? 'font-serif' : 'font-sans'} border-collapse`}>
+                  <div className="my-5 overflow-x-auto rounded-lg border border-slate-200 bg-white/40 shadow-xs">
+                    <table className={`w-full text-left text-[13px] sm:text-[14px] ${isClassic ? 'font-serif' : 'font-sans'} border-collapse`}>
                       {children}
                     </table>
                   </div>
@@ -503,20 +499,20 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
               },
               th({ children }) {
                 return (
-                  <th className="bg-slate-50/50 text-slate-800 font-semibold px-4 py-2.5 border-b border-slate-200 text-xs uppercase tracking-wider">
+                  <th className="bg-slate-50/60 text-slate-500 font-medium px-4 py-2.5 border-b border-slate-200 text-xs tracking-wider text-left uppercase">
                     {children}
                   </th>
                 );
               },
               td({ children }) {
                 return (
-                  <td className="px-4 py-2.5 border-b border-slate-100 text-slate-700 text-sm leading-relaxed">
+                  <td className="px-4 py-3 border-b border-slate-100 text-slate-700 text-sm leading-relaxed font-normal">
                     {children}
                   </td>
                 );
               },
               strong({ children }) {
-                return <strong className="font-semibold text-slate-900">{children}</strong>;
+                return <strong className="font-semibold text-slate-950">{children}</strong>;
               },
               code({ node, className, children, ...props }: any) {
                 const match = /language-(\w+)/.exec(className || '');
@@ -554,7 +550,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
                 }
   
                 return (
-                  <code className="bg-slate-105 text-slate-800 px-1.5 py-0.5 rounded-md font-mono text-[12.5px] font-medium border border-slate-200/40" {...props}>
+                  <code className="bg-slate-100/80 text-indigo-700 font-medium px-1.5 py-0.5 rounded-md font-mono text-[13px] border border-slate-200/40" {...props}>
                     {children}
                   </code>
                 );
@@ -840,6 +836,7 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [activeMathCategory, setActiveMathCategory] = useState<'All' | 'Greek' | 'Algebra' | 'Operators' | 'Calculus'>('All');
   const [showQuickActionsMenu, setShowQuickActionsMenu] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [activeUserMsgMenuId, setActiveUserMsgMenuId] = useState<string | null>(null);
   const quickActionsMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1754,31 +1751,7 @@ export const AiTutorApp = memo(function AiTutorApp({
             </div>
           </div>
 
-          {/* Voice Input Mic */}
-          <button
-            type="button"
-            onClick={handleVoiceInputToggle}
-            className={`p-1.5 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold border ${
-              isListening
-                ? 'bg-rose-500 text-white animate-pulse border-rose-600 shadow-md'
-                : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
-            }`}
-            title={isListening ? 'Listening... Click to stop' : 'Microphone Voice Input'}
-          >
-            <Mic className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{isListening ? 'Listening...' : 'Mic'}</span>
-          </button>
 
-          {/* Voice setting */}
-          <button
-            type="button"
-            onClick={() => setShowCustomVoiceModal(true)}
-            className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-100 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold"
-            title="Configure Tutor Custom Voice"
-          >
-            <Volume2 className="w-3.5 h-3.5 text-indigo-600" />
-            <span className="hidden sm:inline">Voice</span>
-          </button>
 
           {/* 3-DOTS ACTION MENU DROPDOWN */}
           <div className="relative" ref={moreMenuRef}>
@@ -2549,18 +2522,162 @@ export const AiTutorApp = memo(function AiTutorApp({
                     className="flex items-start justify-end space-x-2.5 group/usermsg w-full"
                   >
                     <div className="flex flex-col items-end max-w-[85%] sm:max-w-[78%] space-y-1">
-                      <div className="flex items-center space-x-2 pr-1">
+                      <div className="flex items-center space-x-2 pr-1 relative">
                         <span className="text-[11px] text-slate-400 font-medium">
                           {user.name || 'You'} • {msg.timestamp}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteMessage(msg.id)}
-                          className="opacity-0 group-hover/usermsg:opacity-100 transition text-slate-400 hover:text-rose-500 p-0.5 rounded cursor-pointer"
-                          title="Remove message"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
+
+                        {/* 3-DOTS ACTION MENU FOR USER MESSAGE */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveUserMsgMenuId(activeUserMsgMenuId === msg.id ? null : msg.id);
+                            }}
+                            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer flex items-center justify-center"
+                            title="Message actions"
+                          >
+                            <MoreVertical className="w-3.5 h-3.5" />
+                          </button>
+
+                          {activeUserMsgMenuId === msg.id && (
+                            <>
+                              {/* Backdrop click shield to close */}
+                              <div 
+                                className="fixed inset-0 z-40 cursor-default" 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveUserMsgMenuId(null);
+                                }} 
+                              />
+                              <div className="absolute right-0 mt-1.5 w-52 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-50 text-left">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleCopyText(msg.id, msg.text);
+                                    setActiveUserMsgMenuId(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition text-left cursor-pointer"
+                                >
+                                  {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                                  <span>{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleSpeakText(msg.text);
+                                    setActiveUserMsgMenuId(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition text-left cursor-pointer"
+                                >
+                                  <Volume2 className="w-3.5 h-3.5 text-slate-400" />
+                                  <span>Listen</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleSaveToNotebook(msg);
+                                    setActiveUserMsgMenuId(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition text-left cursor-pointer"
+                                >
+                                  <Bookmark className="w-3.5 h-3.5 text-slate-400" />
+                                  <span>{savedNoteId === msg.id ? 'Saved ✓' : 'Save Note'}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleExportToGoogleDoc(msg);
+                                    setActiveUserMsgMenuId(null);
+                                  }}
+                                  disabled={isExportingDocId === msg.id}
+                                  className="w-full px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition text-left disabled:opacity-50 cursor-pointer"
+                                >
+                                  {isExportingDocId === msg.id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                                  ) : docExportSuccessId === msg.id ? (
+                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                  ) : (
+                                    <FileDown className="w-3.5 h-3.5 text-emerald-600" />
+                                  )}
+                                  <span>{docExportSuccessId === msg.id ? 'Exported!' : isExportingDocId === msg.id ? 'Exporting...' : 'Export to Docs'}</span>
+                                </button>
+
+                                <div className="border-t border-slate-100 my-1" />
+
+                                <div className="px-3 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                  Study Tools
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleSendMessage(`Can you explain "${msg.text}" in simpler terms with an everyday analogy?`);
+                                    setActiveUserMsgMenuId(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition text-left cursor-pointer"
+                                >
+                                  <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                                  <span>Explain Simpler</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleSendMessage(`Give me 1 practice question based on "${msg.text}" to test my understanding.`);
+                                    setActiveUserMsgMenuId(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition text-left cursor-pointer"
+                                >
+                                  <HelpCircle className="w-3.5 h-3.5 text-indigo-500" />
+                                  <span>Practice Question</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleSendMessage(`Please explain "${msg.text}" in easy Hinglish with important key points for JEE Main / Board exams.`);
+                                    setActiveUserMsgMenuId(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition text-left cursor-pointer"
+                                >
+                                  <Languages className="w-3.5 h-3.5 text-purple-500" />
+                                  <span>JEE / Hinglish</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleSendMessage(`Summarize "${msg.text}" and its key concepts, formulas, and takeaways in a clean structured table.`);
+                                    setActiveUserMsgMenuId(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition text-left cursor-pointer"
+                                >
+                                  <Table className="w-3.5 h-3.5 text-teal-500" />
+                                  <span>Summary Table</span>
+                                </button>
+
+                                <div className="border-t border-slate-100 my-1" />
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleDeleteMessage(msg.id);
+                                    setActiveUserMsgMenuId(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition text-left cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                  <span>Delete Message</span>
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
 
                       <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 text-white rounded-2xl rounded-tr-xs p-3.5 sm:p-4 border border-slate-700/60 shadow-[0_4px_16px_rgba(15,23,42,0.12)] space-y-2.5">
@@ -2578,111 +2695,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                         </p>
                       </div>
 
-                      {/* Always Visible Action Suite for User Message */}
-                      <div className="w-full pt-1.5 flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center space-x-1 flex-wrap gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleCopyText(msg.id, msg.text)}
-                            title="Copy text"
-                            className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
-                          >
-                            {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
-                            <span className="hidden xs:inline">{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
-                          </button>
 
-                          <button
-                            type="button"
-                            onClick={() => handleSpeakText(msg.text)}
-                            title="Listen"
-                            className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
-                          >
-                            <Volume2 className="w-3.5 h-3.5 text-slate-500" />
-                            <span className="hidden xs:inline">Listen</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleSaveToNotebook(msg)}
-                            title="Save to notebook"
-                            className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
-                          >
-                            <Bookmark className="w-3.5 h-3.5 text-slate-500" />
-                            <span className="hidden xs:inline">{savedNoteId === msg.id ? 'Saved ✓' : 'Save Note'}</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleExportToGoogleDoc(msg)}
-                            disabled={isExportingDocId === msg.id}
-                            className="text-emerald-700 hover:text-emerald-900 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200/80 text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs disabled:opacity-50"
-                            title="Export to Google Document"
-                          >
-                            {isExportingDocId === msg.id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
-                            ) : docExportSuccessId === msg.id ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            ) : (
-                              <FileDown className="w-3.5 h-3.5 text-emerald-600" />
-                            )}
-                            <span className="hidden sm:inline">{docExportSuccessId === msg.id ? 'Exported!' : isExportingDocId === msg.id ? 'Exporting...' : 'Export to Docs'}</span>
-                          </button>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => setExpandedActionsId(expandedActionsId === msg.id ? null : msg.id)}
-                          title="More study tools"
-                          className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 ${
-                            expandedActionsId === msg.id
-                              ? 'bg-indigo-100 text-indigo-800'
-                              : 'text-indigo-600 hover:bg-indigo-50 border border-indigo-200/60'
-                          }`}
-                        >
-                          <SlidersHorizontal className="w-3.5 h-3.5" />
-                          <span>{expandedActionsId === msg.id ? 'Hide Tools' : 'Study Tools'}</span>
-                        </button>
-                      </div>
-
-                      {expandedActionsId === msg.id && (
-                        <div className="bg-slate-50/90 border border-slate-200 px-3 py-2 flex flex-wrap items-center gap-1.5 rounded-xl mt-1 w-full justify-end">
-                          <button
-                            type="button"
-                            onClick={() => handleSendMessage(`Can you explain "${msg.text}" in simpler terms with an everyday analogy?`)}
-                            className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
-                          >
-                            <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-                            <span>Explain Simpler</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleSendMessage(`Give me 1 practice question based on "${msg.text}" to test my understanding.`)}
-                            className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
-                          >
-                            <HelpCircle className="w-3.5 h-3.5 text-indigo-500" />
-                            <span>Practice Question</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleSendMessage(`Please explain "${msg.text}" in easy Hinglish with important key points for JEE Main / Board exams.`)}
-                            className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
-                          >
-                            <Languages className="w-3.5 h-3.5 text-purple-500" />
-                            <span>JEE Main / Hinglish</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleSendMessage(`Summarize "${msg.text}" and its key concepts, formulas, and takeaways in a clean structured table.`)}
-                            className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
-                          >
-                            <Table className="w-3.5 h-3.5 text-teal-500" />
-                            <span>Summary Table</span>
-                          </button>
-                        </div>
-                      )}
                     </div>
 
                     <div className="w-8 h-8 rounded-full ring-2 ring-indigo-500/30 shadow-sm overflow-hidden bg-slate-800 flex items-center justify-center shrink-0 mt-4">
@@ -2708,16 +2721,13 @@ export const AiTutorApp = memo(function AiTutorApp({
                 >
                   <div className="w-full max-w-[720px] mx-auto bg-transparent border-0 overflow-visible transition-all">
                     {/* Professional Header Bar */}
-                    <div className="bg-transparent px-0 pt-4 pb-2 flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center space-x-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-indigo-800 text-white flex items-center justify-center shadow-xs">
-                          <GraduationCap className="w-4 h-4 text-white" />
+                    <div className="bg-transparent px-0 pt-4 pb-2 flex items-center justify-between flex-wrap gap-2 border-b border-slate-100/75">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-6 h-6 rounded-md bg-indigo-50 flex items-center justify-center border border-indigo-100 shrink-0">
+                          <GraduationCap className="w-3.5 h-3.5 text-indigo-600" />
                         </div>
                         <div className="flex items-center space-x-2">
-                          <span className="font-bold text-xs sm:text-sm text-slate-900 tracking-tight">AI Academic Tutor</span>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50/50 text-emerald-700 border border-emerald-200/50">
-                            ✓ Verified Solution
-                          </span>
+                          <span className="font-semibold text-xs sm:text-sm text-slate-800 tracking-tight">Ascend AI Tutor</span>
                         </div>
                       </div>
 
@@ -2726,23 +2736,23 @@ export const AiTutorApp = memo(function AiTutorApp({
                         <button
                           type="button"
                           onClick={toggleTutorFontStyle}
-                          className="inline-flex items-center space-x-1.5 text-[11px] font-medium px-2 py-1 rounded-md border border-slate-200/60 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer active:scale-95 shadow-xs"
+                          className="inline-flex items-center space-x-1.5 text-[10px] sm:text-[11px] font-medium px-2 py-1 rounded-md border border-slate-200/50 bg-white hover:bg-slate-50 text-slate-600 transition cursor-pointer active:scale-95"
                           title="Click to toggle between Classic Editorial Serif and Modern Sans font style"
                         >
-                          <Type className="w-3 h-3 text-indigo-600" />
-                          <span className={`${tutorFontStyle === 'classic' ? 'font-serif font-bold text-indigo-950' : 'font-sans font-semibold text-slate-700'}`}>
-                            {tutorFontStyle === 'classic' ? 'Classic Serif' : 'Modern Sans'}
+                          <Type className="w-3 h-3 text-indigo-500" />
+                          <span className={`${tutorFontStyle === 'classic' ? 'font-serif font-semibold text-slate-800' : 'font-sans font-medium text-slate-600'}`}>
+                            {tutorFontStyle === 'classic' ? 'Serif' : 'Sans'}
                           </span>
                         </button>
 
-                        <span className="text-[11px] text-slate-400 font-medium">
+                        <span className="text-[10px] sm:text-[11px] text-slate-400 font-normal">
                           {msg.timestamp}
                         </span>
 
                         <button
                           type="button"
                           onClick={() => handleDeleteMessage(msg.id)}
-                          className="text-slate-400 hover:text-rose-600 transition p-1 rounded-md hover:bg-rose-50 cursor-pointer"
+                          className="text-slate-400 hover:text-rose-500 transition p-1 rounded-md hover:bg-rose-50 cursor-pointer"
                           title="Remove message"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -2760,49 +2770,12 @@ export const AiTutorApp = memo(function AiTutorApp({
                       <div className="flex items-center space-x-1 flex-wrap gap-1">
                         <button
                           type="button"
-                          onClick={() => handleCopyText(msg.id, msg.text)}
-                          title="Copy answer"
-                          className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
-                        >
-                          {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
-                          <span className="hidden xs:inline">{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleSpeakText(msg.text)}
-                          title="Listen to answer"
-                          className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
-                        >
-                          <Volume2 className="w-3.5 h-3.5 text-slate-500" />
-                          <span className="hidden xs:inline">Listen</span>
-                        </button>
-
-                        <button
-                          type="button"
                           onClick={() => handleSaveToNotebook(msg)}
                           title="Save to notebook"
-                          className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                          className="text-slate-600 hover:text-slate-800 hover:bg-slate-100/80 text-[11px] sm:text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95"
                         >
                           <Bookmark className="w-3.5 h-3.5 text-slate-500" />
                           <span className="hidden xs:inline">{savedNoteId === msg.id ? 'Saved ✓' : 'Save Note'}</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleExportToGoogleDoc(msg)}
-                          disabled={isExportingDocId === msg.id}
-                          className="text-emerald-700 hover:text-emerald-900 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200/80 text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs disabled:opacity-50"
-                          title="Export this tutoring answer to a live Google Document"
-                        >
-                          {isExportingDocId === msg.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
-                          ) : docExportSuccessId === msg.id ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          ) : (
-                            <FileDown className="w-3.5 h-3.5 text-emerald-600" />
-                          )}
-                          <span className="hidden sm:inline">{docExportSuccessId === msg.id ? 'Exported!' : isExportingDocId === msg.id ? 'Exporting...' : 'Export to Docs'}</span>
                         </button>
                       </div>
 
@@ -2810,10 +2783,10 @@ export const AiTutorApp = memo(function AiTutorApp({
                         type="button"
                         onClick={() => setExpandedActionsId(expandedActionsId === msg.id ? null : msg.id)}
                         title="More study tools"
-                        className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 ${
+                        className={`text-[11px] sm:text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 ${
                           expandedActionsId === msg.id
-                            ? 'bg-indigo-100 text-indigo-800'
-                            : 'text-indigo-600 hover:bg-indigo-50 border border-indigo-200/60'
+                            ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                            : 'text-indigo-600 hover:bg-indigo-50/80'
                         }`}
                       >
                         <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -2826,7 +2799,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                         <button
                           type="button"
                           onClick={() => handleSendMessage('Can you explain this concept in simpler terms with a super easy everyday analogy?')}
-                          className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                          className="bg-white hover:bg-indigo-50/50 hover:text-indigo-700 border border-slate-200/60 text-slate-600 text-xs font-medium px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs"
                         >
                           <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
                           <span>Explain Simpler</span>
@@ -2835,7 +2808,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                         <button
                           type="button"
                           onClick={() => handleSendMessage('Give me 1 practice question based on this topic so I can test my understanding.')}
-                          className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                          className="bg-white hover:bg-indigo-50/50 hover:text-indigo-700 border border-slate-200/60 text-slate-600 text-xs font-medium px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs"
                         >
                           <HelpCircle className="w-3.5 h-3.5 text-indigo-500" />
                           <span>Practice Question</span>
@@ -2844,7 +2817,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                         <button
                           type="button"
                           onClick={() => handleSendMessage('Please explain this in easy Hinglish with important key points for JEE Main / Board exams.')}
-                          className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                          className="bg-white hover:bg-indigo-50/50 hover:text-indigo-700 border border-slate-200/60 text-slate-600 text-xs font-medium px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs"
                         >
                           <Languages className="w-3.5 h-3.5 text-purple-500" />
                           <span>JEE Main / Hinglish</span>
@@ -2853,7 +2826,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                         <button
                           type="button"
                           onClick={() => handleSendMessage('Summarize the key concepts, formulas, and takeaways in a clean structured table.')}
-                          className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                          className="bg-white hover:bg-indigo-50/50 hover:text-indigo-700 border border-slate-200/60 text-slate-600 text-xs font-medium px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs"
                         >
                           <Table className="w-3.5 h-3.5 text-teal-500" />
                           <span>Summary Table</span>
@@ -2871,23 +2844,24 @@ export const AiTutorApp = memo(function AiTutorApp({
           {isLoading && (
             <motion.div 
               key="tutor-loading-bubble"
-              initial={{ opacity: 0, y: 14, scale: 0.94 }}
+              initial={{ opacity: 0, y: 14, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.9, transition: { duration: 0.2 } }}
-              transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-              className="flex items-start space-x-2.5 my-2"
+              exit={{ opacity: 0, y: -10, scale: 0.95, transition: { duration: 0.18 } }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="flex items-start space-x-3 my-4 w-full max-w-[720px] mx-auto"
             >
-               <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-800 ring-2 ring-indigo-100 flex items-center justify-center text-white shadow-sm shrink-0 mt-1">
-                <GraduationCap className="w-4 h-4 text-white animate-pulse" />
+               <div className="w-6 h-6 rounded-md bg-indigo-50 flex items-center justify-center border border-indigo-100 shrink-0 mt-0.5">
+                <GraduationCap className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
               </div>
-              <div className="bg-transparent border-0 p-0 space-y-2 max-w-xl">
-                <div className="flex items-center space-x-2 text-indigo-700 text-xs font-bold tracking-tight">
-                  <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
-                  <span>AI Academic Tutor is writing structured solution...</span>
+              <div className="flex-1 bg-transparent border-0 p-0 space-y-2.5">
+                <div className="flex items-center space-x-2 text-slate-800 text-xs sm:text-sm font-medium tracking-tight">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" />
+                  <span>Ascend AI Tutor is organizing structured solution...</span>
                 </div>
-                <div className="space-y-1.5 pt-1 w-48">
-                  <div className="h-1.5 bg-slate-200/80 rounded-full w-4/5 animate-pulse" />
-                  <div className="h-1.5 bg-slate-200/80 rounded-full w-3/5 animate-pulse" />
+                <div className="space-y-2 pt-1 max-w-sm">
+                  <div className="h-1.5 bg-slate-100 rounded-full w-full animate-pulse" />
+                  <div className="h-1.5 bg-slate-100 rounded-full w-5/6 animate-pulse" />
+                  <div className="h-1.5 bg-slate-100 rounded-full w-3/4 animate-pulse" />
                 </div>
               </div>
             </motion.div>

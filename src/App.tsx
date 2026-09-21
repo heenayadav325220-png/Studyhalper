@@ -974,52 +974,7 @@ export default function App() {
     }
   };
 
-  // Helper for top card lighting effect - Clean Rotating Neon Perimeter Strip / Ribbon (Patti)
-  const getLightingGlows = () => {
-    switch (uiCustomization.lightingEffect) {
-      case 'aurora_pulse':
-        return {
-          stripGradient: 'conic-gradient(from 0deg at 50% 50%, #10b981 0%, #06b6d4 30%, #3b82f6 60%, #10b981 100%)',
-          animOuter: 'animate-spin-slow',
-          accentColor: 'border-emerald-400/40',
-          previewCss: 'conic-gradient(from 0deg, #10b981, #06b6d4, #3b82f6, #10b981)'
-        };
-      case 'golden_radiance':
-        return {
-          stripGradient: 'conic-gradient(from 0deg at 50% 50%, #f59e0b 0%, #d97706 25%, #fbbf24 50%, #b45309 75%, #f59e0b 100%)',
-          animOuter: 'animate-spin-slow',
-          accentColor: 'border-amber-400/40',
-          previewCss: 'conic-gradient(from 0deg, #f59e0b, #fbbf24, #d97706, #f59e0b)'
-        };
-      case 'minimal_glow':
-        return {
-          stripGradient: 'conic-gradient(from 0deg at 50% 50%, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.9) 100%)',
-          animOuter: 'animate-spin-slow',
-          accentColor: 'border-white/40',
-          previewCss: 'conic-gradient(from 0deg, #ffffff, #64748b, #ffffff)'
-        };
-      case 'rainbow_spin':
-      default:
-        return {
-          stripGradient: 'conic-gradient(from 0deg at 50% 50%, #00f0ff 0%, #0077ff 12%, #a855f7 25%, #ec4899 38%, #f43f5e 50%, #ff6b00 62%, #eab308 75%, #10b981 88%, #00f0ff 100%)',
-          animOuter: 'animate-spin-slow',
-          accentColor: 'border-cyan-400/40',
-          previewCss: 'conic-gradient(from 0deg, #00f0ff, #a855f7, #f43f5e, #ff6b00, #10b981, #00f0ff)'
-        };
-    }
-  };
 
-  // Helper for neon strip thickness & opacity (4 modes: 3.5px, 2.5px, 1.5px, 0px)
-  const getNeonIntensityGlow = () => {
-    switch (uiCustomization.neonIntensity) {
-      case 'medium': return { padding: 'p-[2.5px]', opacity: 'opacity-85', show: true };
-      case 'soft': return { padding: 'p-[1.5px]', opacity: 'opacity-60', show: true };
-      case 'off': return { padding: 'p-[1px]', opacity: 'opacity-0', show: false };
-      case 'high':
-      default:
-        return { padding: 'p-[3.5px]', opacity: 'opacity-100', show: true };
-    }
-  };
 
   // Helper for card corner radius (4 modes)
   const getCardRadiusClasses = () => {
@@ -1056,23 +1011,6 @@ export default function App() {
     }
   };
 
-  // Helper for theme styling on the top card
-  const getThemeCardClasses = () => {
-    switch (uiCustomization.appThemeLook) {
-      case 'wooden_parchment':
-        return 'bg-[#2b1e15]/95 backdrop-blur-2xl border-[#8a5d3b]/80 text-[#faecd9]';
-      case 'midnight_amoled':
-        return 'bg-black backdrop-blur-none border-slate-800 text-white';
-      case 'aurora_synthwave':
-        return 'bg-gradient-to-br from-[#180829]/95 via-[#0b0318]/95 to-[#1c0836]/95 border-pink-500/40 text-pink-50';
-      case 'cyber_glass':
-      default:
-        return 'bg-slate-950/85 backdrop-blur-2xl border-white/20 text-white';
-    }
-  };
-
-  const lightingGlows = getLightingGlows();
-  const neonIntensityGlow = getNeonIntensityGlow();
   const cornerRadius = getCardRadiusClasses();
 
   return (
@@ -1132,149 +1070,120 @@ export default function App() {
         {activeTab === 'home' && (
           <div className="space-y-4">
             
-            {/* 1. TOP USER CARD - ULTRA-MODERN FROSTED GLASSMORPHISM WITH DYNAMIC ROTATING NEON PERIMETER STRIP & SELF CUSTOMIZE */}
-            <div id="top-user-card" className="relative">
-              {/* CARD CASING WITH CRISP ROTATING NEON STRIP / PATTI (BORDER ONLY, NO SCATTERED SHADOWS) */}
-              <div className={`relative ${neonIntensityGlow.padding} ${cornerRadius.casing} overflow-hidden transition-all duration-300 ${neonIntensityGlow.show ? 'bg-slate-900/90' : 'border border-white/20'}`}>
-                {neonIntensityGlow.show && (
-                  <div 
-                    className={`absolute -top-[120%] -left-[120%] w-[340%] h-[340%] ${lightingGlows.animOuter} pointer-events-none ${neonIntensityGlow.opacity}`}
-                    style={{ background: lightingGlows.stripGradient }}
-                  />
-                )}
-                <div className={`relative ${cornerRadius.inner} p-4 sm:p-5 shadow-[inset_0_1px_3px_rgba(255,255,255,0.35)] space-y-3.5 sm:space-y-4 overflow-hidden ${getThemeCardClasses()}`}>
-                  {/* Subtle Ambient Light Reflections */}
-                  <div className="absolute -top-12 -right-12 w-36 h-36 bg-indigo-500/25 rounded-full blur-2xl pointer-events-none" />
-                  <div className="absolute -bottom-12 -left-12 w-36 h-36 bg-pink-500/20 rounded-full blur-2xl pointer-events-none" />
+            {/* 1. TOP USER CARD - RADIANT NEON GRADIENT BORDER WITH GLOW */}
+            <div id="top-user-card" className={`relative p-[2px] sm:p-[2.5px] ${cornerRadius.casing || 'rounded-3xl'} bg-gradient-to-r from-cyan-400 via-fuchsia-500 via-purple-500 to-amber-400 shadow-[0_0_28px_rgba(34,211,238,0.38),0_0_35px_rgba(236,72,153,0.32)] transition-all duration-300`}>
+              {/* INNER DARK SLATE BACKDROP */}
+              <div className="relative overflow-hidden rounded-[22px] bg-slate-950/85 backdrop-blur-2xl p-4 sm:p-5 space-y-4">
+                {/* Multi-color Radiant Ambient Glows */}
+                <div className="absolute -top-16 -left-16 w-48 h-48 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -top-16 -right-16 w-48 h-48 bg-purple-500/25 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-16 right-16 w-48 h-48 bg-pink-500/20 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
 
-                {/* Top Row: Greeting Tag & Target Goal Facing Each Other with Gear Customize Button */}
-                <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2.5 relative z-10">
-                  <div className="flex items-center justify-between w-full gap-2">
-                    {/* Left: Greeting Badge (Frosted Glass) */}
-                    <div className="flex-1 min-w-0 bg-white/[0.08] backdrop-blur-md border border-white/15 rounded-xl px-2.5 py-1.5 shadow-xs flex items-center space-x-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] shrink-0 animate-pulse"></span>
-                      <span className="text-[10px] sm:text-[11px] font-black text-slate-100 uppercase tracking-wider truncate">
-                        {realtimeGreeting || getDynamicGreeting()}
-                      </span>
-                    </div>
+                {/* Top Row: Greeting Tag, Target Goal, Copilot >_, Sign In, Customize */}
+                <div className="flex flex-wrap items-center justify-between w-full gap-2 relative z-10 pb-1">
+                  
+                  {/* Left: Greeting Badge & Active status */}
+                  <div className="flex items-center space-x-1.5 bg-slate-950/80 border border-emerald-500/60 rounded-full px-3 py-1 shadow-[0_0_12px_rgba(16,185,129,0.25)]">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 animate-pulse"></span>
+                    <span className="text-[10px] sm:text-[11px] font-extrabold text-emerald-300 uppercase tracking-wider truncate max-w-[100px] xs:max-w-none">
+                      {realtimeGreeting || getDynamicGreeting()}
+                    </span>
+                  </div>
 
-                    {/* Right: Target Goal Badge (Frosted Glass) with integrated Edit action */}
-                    <div className="flex-1 min-w-0 bg-white/[0.08] backdrop-blur-md border border-white/15 rounded-xl px-2.5 py-1.5 shadow-xs flex items-center justify-between space-x-1.5">
-                      <div className="flex items-center space-x-1.5 min-w-0 truncate">
-                        <span className="text-amber-400 font-black text-xs shrink-0">🎯</span>
-                        <span className="text-[10px] sm:text-[11px] font-bold text-slate-100 truncate">
-                          {userProfile.targetGoal || 'JEE Exams'}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setIsEditingProfile(true);
-                          setShowOnboardingModal(true);
-                        }}
-                        className="p-1 text-amber-300 hover:text-white hover:bg-white/10 rounded-md transition cursor-pointer shrink-0"
-                        title="Edit Profile Goal"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-
-
-                    {/* Real-time Push Notifications Bell Button */}
-                    <motion.button
-                      whileHover={{ scale: 1.08 }}
-                      whileTap={{ scale: 0.92 }}
-                      onClick={requestNotificationPermission}
-                      className={`p-1.5 rounded-xl transition cursor-pointer shrink-0 shadow-xs flex items-center space-x-1 border ${
-                        'Notification' in window && Notification.permission === 'granted'
-                          ? 'text-yellow-300 bg-yellow-500/20 hover:bg-yellow-500/30 border-yellow-400/40 animate-pulse'
-                          : 'text-slate-300 bg-slate-500/10 hover:bg-slate-500/25 border-slate-400/30'
-                      }`}
-                      title="Enable Desktop/Mobile OS Notifications / पुश नोटिफिकेशन सक्षम करें"
+                  {/* Center: Target Goal Info Badge */}
+                  <div className="flex items-center space-x-1.5 bg-slate-950/80 border border-rose-500/60 rounded-full px-3 py-1 shadow-[0_0_12px_rgba(244,63,94,0.25)]">
+                    <span className="text-amber-400 text-xs shrink-0">🎯</span>
+                    <span className="text-[10px] sm:text-[11px] font-bold text-slate-200 truncate max-w-[90px] xs:max-w-[130px]">
+                      {userProfile.targetGoal || 'JEE Exams'}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setIsEditingProfile(true);
+                        setShowOnboardingModal(true);
+                      }}
+                      className="text-slate-400 hover:text-white transition cursor-pointer shrink-0 ml-0.5"
+                      title="Edit Profile Goal"
                     >
-                      <span className="text-xs">🔔</span>
-                      <span className="text-[9px] font-black uppercase tracking-wider">
-                        {'Notification' in window && Notification.permission === 'granted' ? 'Active' : 'Alerts'}
-                      </span>
-                    </motion.button>
+                      <Edit3 className="w-3 h-3 text-amber-300" />
+                    </button>
+                  </div>
 
-                    {/* Auth / Sign In / Account Button */}
+                  {/* Right Action Icons & Buttons */}
+                  <div className="flex items-center space-x-1.5 ml-auto xs:ml-0">
+                    {/* Auth / Sign In / Account */}
                     <motion.button
-                      whileHover={{ scale: 1.08 }}
-                      whileTap={{ scale: 0.92 }}
+                      whileHover={{ scale: 1.04 }}
+                      whileTap={{ scale: 0.96 }}
                       onClick={() => setShowAuthModal(true)}
-                      className={`p-1.5 rounded-xl transition cursor-pointer shrink-0 shadow-xs flex items-center space-x-1 border ${
+                      className={`px-3 py-1 rounded-full text-xs font-bold flex items-center space-x-1.5 shadow-[0_0_15px_rgba(99,102,241,0.4)] transition cursor-pointer border ${
                         isUserLoggedIn
-                          ? 'text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-400/40'
-                          : 'text-indigo-200 bg-indigo-600/30 hover:bg-indigo-600/50 border-indigo-400/50'
+                          ? 'text-emerald-300 bg-emerald-950/70 border-emerald-500/60 hover:bg-emerald-900/60'
+                          : 'text-white bg-indigo-600 hover:bg-indigo-500 border-indigo-400/50'
                       }`}
-                      title={isUserLoggedIn ? 'Account Settings / खाता सेटिंग्स' : 'Sign In / लॉगिन'}
+                      title={isUserLoggedIn ? 'Account Settings' : 'Sign In'}
                     >
                       {isUserLoggedIn ? (
                         <>
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                          <span className="text-[9px] font-black uppercase tracking-wider">Account</span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                          <span>Account</span>
                         </>
                       ) : (
                         <>
-                          <LogIn className="w-3.5 h-3.5 text-indigo-300" />
-                          <span className="text-[9px] font-black uppercase tracking-wider">Sign In</span>
+                          <LogIn className="w-3 h-3" />
+                          <span>SIGN IN</span>
                         </>
                       )}
                     </motion.button>
 
-                    {/* Self Customize Gear Trigger Button */}
+                    {/* Self Customize Sliders Gear Button */}
                     <motion.button
-                      whileHover={{ rotate: 90, scale: 1.08 }}
-                      whileTap={{ scale: 0.92 }}
+                      whileHover={{ rotate: 15, scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={() => setShowCustomizeModal(true)}
-                      className="p-1.5 text-pink-300 hover:text-white bg-pink-500/20 hover:bg-pink-500/30 border border-pink-400/40 rounded-xl transition cursor-pointer shrink-0 shadow-xs flex items-center space-x-1"
-                      title="Self Customize UI / खुद डिज़ाइन करें"
+                      className="p-1.5 text-purple-300 hover:text-white bg-slate-950/80 border border-purple-500/60 rounded-xl transition cursor-pointer shadow-[0_0_12px_rgba(168,85,247,0.3)] flex items-center"
+                      title="Self Customize UI"
                     >
-                      <Settings2 className="w-3.5 h-3.5 text-pink-300" />
+                      <Settings2 className="w-3.5 h-3.5" />
                     </motion.button>
                   </div>
                 </div>
 
                 {/* Main Student Profile & Avatar Section */}
-                <div className="flex items-start justify-between gap-3 relative z-10">
-                  <div className="space-y-2 flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-3 relative z-10 pt-1">
+                  <div className="space-y-1.5 flex-1 min-w-0">
                     <div>
-                      <h2 className="text-2xl sm:text-3xl font-black text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.2)] tracking-tight flex items-center gap-2">
-                        <span className="truncate">{userProfile.name || 'Student'}</span>
+                      <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2">
+                        <span className="truncate">{userProfile.name || 'R'}</span>
                         <span className="text-xl shrink-0">🚀</span>
                       </h2>
-                      <p className="text-xs text-slate-300 font-medium flex items-center space-x-1.5 mt-0.5">
-                        <UserIcon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                      <p className="text-xs text-slate-400 font-medium flex items-center space-x-1.5 mt-0.5">
+                        <UserIcon className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                         <span className="truncate">{userProfile.schoolName || 'School / College Not Set'}</span>
                       </p>
                     </div>
 
-                    {/* Organized Student Info Badges - Frosted Glass Capsules */}
-                    <div className="flex flex-col gap-1.5 pt-0.5">
-                      <div className="inline-flex">
-                        <span className="px-3 py-1 bg-white/[0.08] backdrop-blur-md text-slate-200 text-xs font-semibold rounded-xl border border-white/15 flex items-center space-x-1.5 shadow-xs">
-                          <GraduationCap className="w-3.5 h-3.5 text-indigo-300 shrink-0" />
-                          <span>{userProfile.className ? (userProfile.className.startsWith('Class') ? userProfile.className : `Class ${userProfile.className}`) : 'Class 12th (Science)'}</span>
-                        </span>
-                      </div>
+                    {/* Class & Details Badges */}
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      <span className="px-3 py-1 bg-indigo-950/60 text-indigo-300 text-xs font-semibold rounded-full border border-indigo-500/50 flex items-center space-x-1.5 shadow-[0_0_10px_rgba(99,102,241,0.25)]">
+                        <GraduationCap className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                        <span>{userProfile.className ? (userProfile.className.startsWith('Class') ? userProfile.className : `Class ${userProfile.className}`) : 'Class 12th (Science/PCM)'}</span>
+                      </span>
 
                       {userProfile.email && (
-                        <div className="inline-flex">
-                          <span className="px-3 py-1 bg-white/[0.08] backdrop-blur-md text-slate-200 text-xs font-medium rounded-xl border border-white/15 flex items-center space-x-1.5 shadow-xs truncate max-w-[240px]">
-                            <Mail className="w-3.5 h-3.5 text-indigo-300 shrink-0" />
-                            <span className="truncate">{userProfile.email}</span>
-                          </span>
-                        </div>
+                        <span className="px-3 py-1 bg-slate-950/60 text-slate-300 text-xs font-medium rounded-full border border-slate-700/60 flex items-center space-x-1.5 shadow-xs truncate max-w-[200px]">
+                          <Mail className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                          <span className="truncate">{userProfile.email}</span>
+                        </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Avatar with click action - Glass Frame */}
+                  {/* Avatar with Radiant Neon Ring */}
                   <div className="shrink-0 flex flex-col items-center">
                     <div 
                       onClick={() => setShowAvatarModal(true)}
-                      className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl bg-white/[0.08] backdrop-blur-md border-2 border-white/30 shadow-[0_8px_20px_rgba(0,0,0,0.35)] flex items-center justify-center relative cursor-pointer group active:scale-95 transition overflow-hidden p-1"
+                      className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl bg-white p-1 ring-2 ring-indigo-400 shadow-[0_0_18px_rgba(99,102,241,0.55),0_0_12px_rgba(56,189,248,0.4)] flex items-center justify-center relative cursor-pointer group active:scale-95 transition-all overflow-hidden"
                       title="Change Avatar"
                     >
                       <UserAvatar
@@ -1282,168 +1191,97 @@ export default function App() {
                         name={userProfile.name || 'Student'}
                         avatarType={userProfile.avatarType}
                         avatarBg={userProfile.avatarBg}
-                        size="xl"
-                        className="w-full h-full flex items-center justify-center"
+                        size="lg"
+                        className="w-full h-full flex items-center justify-center rounded-xl"
                       />
-                      {/* Floating Glass Cog Badge */}
-                      <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-indigo-600/90 backdrop-blur-md border border-white/40 flex items-center justify-center text-[10px] shadow-md font-black text-white z-20">
+                      {/* Purple Gear Badge */}
+                      <div className="absolute -bottom-1 -right-1 w-5.5 h-5.5 rounded-md bg-indigo-600 border border-indigo-400 flex items-center justify-center text-[10px] shadow-[0_0_8px_rgba(99,102,241,0.6)] text-white z-20">
                         ⚙️
                       </div>
                     </div>
                     <span 
                       onClick={() => setShowAvatarModal(true)}
-                      className="text-[11px] font-bold text-slate-300 hover:text-white text-center mt-1 cursor-pointer transition"
+                      className="text-[11px] font-bold text-slate-400 hover:text-white text-center mt-1 cursor-pointer transition-colors"
                     >
                       Change
                     </span>
                   </div>
                 </div>
 
-                {/* STAT BOXES - 4 CONFIGURABLE UI LAYOUTS */}
-                {uiCustomization.statBoxesLayout === 'horizontal_bar' ? (
-                  /* Option 2: Unified Gaming HUD Power Bar */
-                  <div className="bg-white/[0.08] backdrop-blur-md border border-white/15 rounded-2xl p-2.5 sm:p-3 relative z-10 flex items-center justify-between gap-2 shadow-xs">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 font-black text-xs">
-                        🔥
-                      </div>
-                      <div>
-                        <div className="text-[9px] text-amber-300 font-extrabold uppercase">STREAK</div>
-                        <div className="text-xs font-black text-white">{userProfile.streak || 5}d</div>
-                      </div>
-                    </div>
-
-                    <div className="h-6 w-[1px] bg-white/20" />
-
-                    <div className="flex items-center space-x-2">
-                      <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 font-black text-xs">
-                        📓
-                      </div>
-                      <div>
-                        <div className="text-[9px] text-emerald-300 font-extrabold uppercase">RANK</div>
-                        <div className="text-xs font-black text-white">Lvl {userProfile.level || 7}</div>
-                      </div>
-                    </div>
-
-                    <div className="h-6 w-[1px] bg-white/20" />
-
-                    <div className="flex items-center space-x-2">
-                      <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-300 font-black text-xs">
-                        ⭐
-                      </div>
-                      <div>
-                        <div className="text-[9px] text-purple-300 font-extrabold uppercase">ENERGY</div>
-                        <div className="text-xs font-black text-white">{userProfile.xp || 665} XP</div>
-                      </div>
-                    </div>
-                  </div>
-                ) : uiCustomization.statBoxesLayout === 'hexagon_badges' ? (
-                  /* Option 3: Hexagon Cyber Badges */
-                  <div className="grid grid-cols-3 gap-1.5 pt-0.5 relative z-10">
-                    <div className="bg-gradient-to-b from-amber-500/20 to-black/40 border-2 border-amber-400/50 rounded-xl py-2 px-1 text-center shadow-md">
-                      <div className="text-[9px] text-amber-300 font-black tracking-widest uppercase">✦ STREAK ✦</div>
-                      <div className="text-sm font-black text-amber-100">{userProfile.streak || 5} Days</div>
-                    </div>
-                    <div className="bg-gradient-to-b from-emerald-500/20 to-black/40 border-2 border-emerald-400/50 rounded-xl py-2 px-1 text-center shadow-md">
-                      <div className="text-[9px] text-emerald-300 font-black tracking-widest uppercase">✦ LEVEL ✦</div>
-                      <div className="text-sm font-black text-emerald-100">LVL {userProfile.level || 7}</div>
-                    </div>
-                    <div className="bg-gradient-to-b from-purple-500/20 to-black/40 border-2 border-purple-400/50 rounded-xl py-2 px-1 text-center shadow-md">
-                      <div className="text-[9px] text-purple-300 font-black tracking-widest uppercase">✦ EXP ✦</div>
-                      <div className="text-sm font-black text-purple-100">{userProfile.xp || 665}</div>
-                    </div>
-                  </div>
-                ) : uiCustomization.statBoxesLayout === 'card_grid' ? (
-                  /* Option 4: Glass Floating Capsules */
-                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2 pt-0.5 relative z-10">
-                    <div className="bg-white/10 backdrop-blur-xl border border-white/25 rounded-full py-1.5 px-2 text-center flex items-center justify-center space-x-1.5 shadow-sm">
+                {/* STAT BOXES - 3-Column Neon Stat Tiles with Vibrant Glowing Borders */}
+                <div className="grid grid-cols-3 gap-2 sm:gap-2.5 pt-1 relative z-10">
+                  {/* BOX 1: STREAK (Neon Amber Border & Glow) */}
+                  <div className="bg-slate-950/70 border-2 border-amber-500/75 hover:border-amber-400 rounded-2xl py-2 px-1 text-center relative overflow-hidden shadow-[0_0_16px_rgba(245,158,11,0.25)] transition-all">
+                    <div className="text-[10px] text-amber-400 font-black uppercase tracking-wider flex items-center justify-center space-x-1">
                       <span className="text-xs">🔥</span>
-                      <span className="text-xs font-black text-white">{userProfile.streak || 5}d Streak</span>
+                      <span>STREAK</span>
                     </div>
-                    <div className="bg-white/10 backdrop-blur-xl border border-white/25 rounded-full py-1.5 px-2 text-center flex items-center justify-center space-x-1.5 shadow-sm">
+                    <div className="text-sm sm:text-base font-black text-slate-100 mt-0.5 leading-tight">
+                      {userProfile.streak || 5} <span className="text-[10px] font-normal text-slate-400">days</span>
+                    </div>
+                  </div>
+
+                  {/* BOX 2: LEVEL (Neon Emerald / Cyan Border & Glow) */}
+                  <div className="bg-slate-950/70 border-2 border-emerald-500/75 hover:border-emerald-400 rounded-2xl py-2 px-1 text-center relative overflow-hidden shadow-[0_0_16px_rgba(16,185,129,0.25)] transition-all">
+                    <div className="text-[10px] text-emerald-400 font-black uppercase tracking-wider flex items-center justify-center space-x-1">
                       <span className="text-xs">📓</span>
-                      <span className="text-xs font-black text-white">Lvl {userProfile.level || 7}</span>
+                      <span>LEVEL</span>
                     </div>
-                    <div className="bg-white/10 backdrop-blur-xl border border-white/25 rounded-full py-1.5 px-2 text-center flex items-center justify-center space-x-1.5 shadow-sm">
+                    <div className="text-sm sm:text-base font-black text-slate-100 mt-0.5 leading-tight">
+                      Lvl {userProfile.level || 1}
+                    </div>
+                  </div>
+
+                  {/* BOX 3: TOTAL XP (Neon Purple Border & Glow) */}
+                  <div className="bg-slate-950/70 border-2 border-purple-500/75 hover:border-purple-400 rounded-2xl py-2 px-1 text-center relative overflow-hidden shadow-[0_0_18px_rgba(168,85,247,0.3)] transition-all">
+                    <div className="text-[10px] text-purple-400 font-black uppercase tracking-wider flex items-center justify-center space-x-1">
                       <span className="text-xs">⭐</span>
-                      <span className="text-xs font-black text-white">{userProfile.xp || 665} XP</span>
+                      <span>TOTAL XP</span>
+                    </div>
+                    <div className="text-sm sm:text-base font-black text-slate-100 mt-0.5 leading-tight">
+                      {userProfile.xp || 100} <span className="text-[10px] font-normal text-slate-400">XP</span>
                     </div>
                   </div>
-                ) : (
-                  /* Option 1 (Default): 3-Column Glassmorphism Color Stat Tiles */
-                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2 pt-0.5 relative z-10">
-                    {/* BOX 1: STREAK (Glass Amber) */}
-                    <div className="bg-amber-500/15 backdrop-blur-md border border-amber-400/30 rounded-2xl py-2 px-1 sm:px-2 text-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] relative overflow-hidden">
-                      <div className="text-[9.5px] sm:text-[10px] text-amber-300 font-extrabold uppercase tracking-wider flex items-center justify-center space-x-0.5">
-                        <span className="text-xs">🔥</span>
-                        <span>STREAK</span>
-                      </div>
-                      <div className="text-sm sm:text-base font-black text-amber-100 mt-0.5 leading-tight drop-shadow-xs">
-                        {userProfile.streak || 5} <span className="text-[10px] font-normal text-amber-200/80">days</span>
-                      </div>
-                    </div>
+                </div>
 
-                    {/* BOX 2: LEVEL (Glass Emerald) */}
-                    <div className="bg-emerald-500/15 backdrop-blur-md border border-emerald-400/30 rounded-2xl py-2 px-1 sm:px-2 text-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] relative overflow-hidden">
-                      <div className="text-[9.5px] sm:text-[10px] text-emerald-300 font-extrabold uppercase tracking-wider flex items-center justify-center space-x-0.5">
-                        <span className="text-xs">📓</span>
-                        <span>LEVEL</span>
-                      </div>
-                      <div className="text-sm sm:text-base font-black text-emerald-100 mt-0.5 leading-tight drop-shadow-xs">
-                        Lvl {userProfile.level || 7}
-                      </div>
-                    </div>
-
-                    {/* BOX 3: TOTAL XP (Glass Violet) */}
-                    <div className="bg-purple-500/15 backdrop-blur-md border border-purple-400/30 rounded-2xl py-2 px-1 sm:px-2 text-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] relative overflow-hidden">
-                      <div className="text-[9.5px] sm:text-[10px] text-purple-300 font-extrabold uppercase tracking-wider flex items-center justify-center space-x-0.5">
-                        <span className="text-xs">⭐</span>
-                        <span>TOTAL XP</span>
-                      </div>
-                      <div className="text-sm sm:text-base font-black text-purple-100 mt-0.5 leading-tight drop-shadow-xs">
-                        {userProfile.xp || 665} <span className="text-[10px] font-normal text-purple-200/80">XP</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Level & XP Progress Section - Frosted Glass Container */}
-                <div className="bg-white/[0.06] backdrop-blur-md border border-white/15 rounded-2xl p-3 shadow-xs space-y-2 relative z-10">
-                  <div className="flex items-center justify-between text-xs font-bold">
+                {/* Level & XP Progress Section - Neon Purple Border Container with Glowing Slider Thumb */}
+                <div className="bg-slate-950/70 border-2 border-purple-500/50 hover:border-purple-500/70 rounded-2xl p-3.5 space-y-2.5 relative z-10 shadow-[0_0_18px_rgba(168,85,247,0.2)]">
+                  <div className="flex items-center justify-between text-xs font-semibold">
                     <div className="flex items-center space-x-1.5">
-                      <span className="text-slate-300 text-[11px] font-semibold">Level {userProfile.level || 7} Progress:</span>
-                      <span className="text-white text-[11px] font-black">
-                        {userProfile.xp ? (userProfile.xp % 100) : 65} / 100 <span className="text-slate-300 font-normal">XP</span>
+                      <span className="text-slate-300 text-[11px] font-medium">Level {userProfile.level || 1} Progress:</span>
+                      <span className="text-white text-[11px] font-bold">
+                        {userProfile.xp ? (userProfile.xp % 100) : 0} / 100 <span className="text-slate-400 font-normal">XP</span>
                       </span>
                     </div>
                     <button 
                       onClick={() => addXp(10)}
-                      className="text-xs text-amber-300 hover:text-white bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 flex items-center space-x-1 cursor-pointer font-bold transition px-2.5 py-1 rounded-xl shadow-xs active:scale-95"
+                      className="text-xs text-amber-300 hover:text-amber-200 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/50 flex items-center space-x-1.5 cursor-pointer font-bold transition px-3 py-1.5 rounded-xl shadow-[0_0_12px_rgba(245,158,11,0.25)] active:scale-95"
                     >
-                      <Sparkles className="w-3 h-3 text-amber-300" />
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                       <span>+10 XP Booster</span>
                     </button>
                   </div>
-                  <div className="w-full h-3 bg-black/40 border border-white/10 rounded-full relative p-0.5 shadow-inner flex items-center">
+                  {/* Progress bar track with glowing slider thumb */}
+                  <div className="w-full h-3 bg-slate-950 border border-slate-800 rounded-full relative p-0.5 overflow-visible">
                     <div 
-                      className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-amber-400 rounded-full relative transition-all duration-500 flex items-center shadow-[0_0_12px_rgba(99,102,241,0.5)]"
-                      style={{ width: `${Math.max(10, userProfile.xp ? (userProfile.xp % 100) : 65)}%` }}
+                      className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-amber-400 rounded-full transition-all duration-500 relative shadow-[0_0_12px_rgba(168,85,247,0.6)]"
+                      style={{ width: `${Math.max(8, userProfile.xp ? (userProfile.xp % 100) : 15)}%` }}
                     >
-                      {/* Luminous Slider Knob */}
-                      <div className="w-3.5 h-3.5 bg-white border-2 border-amber-300 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.9)] absolute right-0 top-1/2 -translate-y-1/2"></div>
+                      {/* Glowing yellow slider thumb */}
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-amber-300 border-2 border-white shadow-[0_0_10px_rgba(252,211,77,0.9)] translate-x-1" />
                     </div>
                   </div>
                 </div>
+
               </div>
             </div>
-          </div>
 
-            {/* CLOUD AUTH & SYNC BANNER (WHEN NOT FULLY AUTHENTICATED) */}
+            {/* CLOUD AUTH & SYNC BANNER - VIBRANT GLOWING INDIGO GRADIENT */}
             {!isUserLoggedIn && (
-              <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 rounded-2xl p-3.5 sm:p-4 text-white flex items-center justify-between gap-3 shadow-md border border-indigo-800/60">
+              <div className="bg-gradient-to-r from-indigo-950/90 via-indigo-900/90 to-purple-950/90 rounded-2xl p-4 text-white flex items-center justify-between gap-3 shadow-[0_0_22px_rgba(99,102,241,0.35)] border-2 border-indigo-500/60 backdrop-blur-md">
                 <div className="space-y-0.5 min-w-0">
-                  <p className="text-xs font-black flex items-center gap-1.5 text-indigo-200">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                  <p className="text-xs sm:text-sm font-bold flex items-center gap-1.5 text-white">
+                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
                     <span>{appLanguage === 'hi' ? 'क्लाउड सिंक और +150 XP बोनस' : 'Sync Progress & Get +150 XP Bonus'}</span>
                   </p>
                   <p className="text-[11px] text-slate-300 line-clamp-1">
@@ -1454,72 +1292,70 @@ export default function App() {
                 </div>
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="px-3 py-1.5 bg-white hover:bg-slate-100 text-indigo-950 font-black text-xs rounded-xl transition cursor-pointer shrink-0 shadow-xs active:scale-95 flex items-center space-x-1"
+                  className="px-4 py-2 bg-white hover:bg-slate-100 text-indigo-950 font-black text-xs sm:text-sm rounded-xl transition cursor-pointer shrink-0 shadow-[0_0_15px_rgba(255,255,255,0.4)] active:scale-95 flex items-center space-x-1.5"
                 >
-                  <LogIn className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>{appLanguage === 'hi' ? 'लॉग इन' : 'Sign In'}</span>
+                  <LogIn className="w-4 h-4 text-indigo-950" />
+                  <span>{appLanguage === 'hi' ? 'साइन इन' : 'Sign In'}</span>
                 </button>
               </div>
             )}
 
             {/* HIGH-POWER QUICK ACTION DUO: VOICE TUTOR & PDF/BOOK SCANNER */}
-            <div id="quick-actions-section" className="grid grid-cols-2 gap-2 sm:gap-2.5">
-              {/* VOICE TUTOR LAUNCHER */}
+            <div id="quick-actions-section" className="grid grid-cols-2 gap-2.5 sm:gap-3">
+              {/* 1. VOICE TUTOR LAUNCHER (NEON PINK BORDER) */}
               <motion.button
-                whileHover={{ y: -2, scale: 1.01 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={{ y: -3, scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => {
                   playUiSound(uiCustomization.audioFeedback);
                   setShowVoiceTutorModal(true);
                 }}
-                className="p-2.5 sm:p-3.5 rounded-2xl border-2 border-pink-500/80 hover:border-pink-400 bg-gradient-to-br from-[#1b0a2a] via-[#12051d] to-[#24083a] shadow-[0_0_20px_rgba(236,72,153,0.25)] text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-all"
+                className="p-3 sm:p-4 rounded-2xl border-2 border-pink-500/90 hover:border-pink-400 shadow-[0_0_18px_rgba(236,72,153,0.35)] bg-slate-950/85 hover:bg-slate-950 text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-all duration-200"
               >
-                <div className="absolute -top-8 -right-8 w-20 h-20 bg-pink-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-pink-500/30 transition-all" />
-                <div className="flex items-center justify-between relative z-10 mb-1.5 sm:mb-2">
-                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-pink-500/20 border border-pink-400/40 flex items-center justify-center text-pink-300 group-hover:scale-110 transition-transform shrink-0">
-                    <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-pink-300 animate-pulse" />
+                <div className="flex items-center justify-between relative z-10 mb-2 sm:mb-3">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-pink-950/80 border border-pink-500/60 flex items-center justify-center text-pink-400 shrink-0 shadow-[0_0_12px_rgba(236,72,153,0.3)]">
+                    <Mic className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-pink-400" />
                   </div>
-                  <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-wider bg-pink-500/20 text-pink-300 px-1.5 sm:px-2 py-0.5 rounded-full border border-pink-400/30">
+                  <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider bg-pink-950/80 text-pink-300 px-2 sm:px-2.5 py-0.5 rounded-full border border-pink-500/50">
                     VOICE
                   </span>
                 </div>
                 <div className="relative z-10">
-                  <h4 className="font-extrabold text-[11px] sm:text-sm text-white flex items-center gap-1">
+                  <h4 className="font-bold text-xs sm:text-sm text-white flex items-center gap-1">
                     <span className="truncate">{appLanguage === 'hi' ? 'वॉयस ट्यूटर' : 'Voice Tutor'}</span>
                     <span className="text-pink-400 shrink-0">🎙️</span>
                   </h4>
-                  <p className="text-[8.5px] sm:text-[9.5px] text-pink-200/70 font-medium leading-tight mt-0.5 line-clamp-1">
-                    {appLanguage === 'hi' ? 'बोलकर पूछें व सुनें' : 'Live Voice Q&A'}
+                  <p className="text-[9.5px] sm:text-[11px] text-slate-400 font-medium leading-tight mt-0.5 truncate">
+                    {appLanguage === 'hi' ? 'बोलकर तुरंत पूछें व सुनें' : 'Live Voice Q&A Tutor'}
                   </p>
                 </div>
               </motion.button>
 
-              {/* PDF & BOOK SCANNER LAUNCHER */}
+              {/* 2. PDF & BOOK SCANNER LAUNCHER (NEON PURPLE BORDER) */}
               <motion.button
-                whileHover={{ y: -2, scale: 1.01 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={{ y: -3, scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => {
                   playUiSound(uiCustomization.audioFeedback);
                   setActiveTab('pdfScanner');
                 }}
-                className="p-2.5 sm:p-3.5 rounded-2xl border-2 border-purple-500/80 hover:border-purple-400 bg-gradient-to-br from-[#18092f] via-[#0f0420] to-[#250945] shadow-[0_0_20px_rgba(168,85,247,0.25)] text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-all"
+                className="p-3 sm:p-4 rounded-2xl border-2 border-purple-500/90 hover:border-purple-400 shadow-[0_0_18px_rgba(168,85,247,0.35)] bg-slate-950/85 hover:bg-slate-950 text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-all duration-200"
               >
-                <div className="absolute -top-8 -right-8 w-20 h-20 bg-purple-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/30 transition-all" />
-                <div className="flex items-center justify-between relative z-10 mb-1.5 sm:mb-2">
-                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-300 group-hover:scale-110 transition-transform shrink-0">
-                    <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-300" />
+                <div className="flex items-center justify-between relative z-10 mb-2 sm:mb-3">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-purple-950/80 border border-purple-500/60 flex items-center justify-center text-purple-400 shrink-0 shadow-[0_0_12px_rgba(168,85,247,0.3)]">
+                    <FileText className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-purple-400" />
                   </div>
-                  <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 px-1.5 sm:px-2 py-0.5 rounded-full border border-purple-400/30">
+                  <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider bg-purple-950/80 text-purple-300 px-2 sm:px-2.5 py-0.5 rounded-full border border-purple-500/50">
                     SCANNER
                   </span>
                 </div>
                 <div className="relative z-10">
-                  <h4 className="font-extrabold text-[11px] sm:text-sm text-white flex items-center gap-1">
+                  <h4 className="font-bold text-xs sm:text-sm text-white flex items-center gap-1">
                     <span className="truncate">{appLanguage === 'hi' ? 'PDF स्कैनर' : 'PDF Scanner'}</span>
-                    <span className="text-purple-300 shrink-0">📑</span>
+                    <span className="text-purple-400 shrink-0">📑</span>
                   </h4>
-                  <p className="text-[8.5px] sm:text-[9.5px] text-purple-200/70 font-medium leading-tight mt-0.5 line-clamp-1">
-                    {appLanguage === 'hi' ? 'सारांश व क्विज़' : 'Summary & Quiz'}
+                  <p className="text-[9.5px] sm:text-[11px] text-slate-400 font-medium leading-tight mt-0.5 truncate">
+                    {appLanguage === 'hi' ? 'किताबें सारांश व क्विज़' : 'Summary, Flashcards & Quiz'}
                   </p>
                 </div>
               </motion.button>
@@ -1528,23 +1364,23 @@ export default function App() {
             {/* 2. ACADEMY PLAYGROUND - WITH LISTED VIEW AS DEFAULT & VIEW SWITCHER */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="font-black text-white text-xs tracking-wider uppercase flex items-center space-x-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-                  <Sparkles className="w-4 h-4 text-cyan-400" />
-                  <span className="bg-gradient-to-r from-white via-cyan-100 to-indigo-200 bg-clip-text text-transparent">ACADEMY PLAYGROUND 🚀</span>
+                <h3 className="font-semibold text-slate-200 text-xs tracking-wider uppercase flex items-center space-x-2">
+                  <Sparkles className="w-4 h-4 text-indigo-400" />
+                  <span>ACADEMY PLAYGROUND</span>
                 </h3>
 
                 <div className="flex items-center space-x-2">
                   {/* View Mode Switcher: Listed View vs Grid View */}
-                  <div className="flex items-center bg-slate-900/80 border border-white/15 p-0.5 rounded-xl backdrop-blur-md shadow-inner">
+                  <div className="flex items-center bg-slate-950/60 border border-slate-800/80 p-0.5 rounded-lg">
                     <button
                       onClick={() => {
                         playUiSound(uiCustomization.audioFeedback);
                         setPlaygroundViewMode('list');
                       }}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-extrabold flex items-center space-x-1 transition cursor-pointer ${
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold flex items-center space-x-1 transition cursor-pointer ${
                         playgroundViewMode === 'list' 
-                          ? 'bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.65)]' 
-                          : 'text-slate-300 hover:text-white'
+                          ? 'bg-slate-800 text-white shadow-xs' 
+                          : 'text-slate-400 hover:text-slate-200'
                       }`}
                       title="Listed View / लिस्ट व्यू"
                     >
@@ -1556,10 +1392,10 @@ export default function App() {
                         playUiSound(uiCustomization.audioFeedback);
                         setPlaygroundViewMode('grid');
                       }}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-extrabold flex items-center space-x-1 transition cursor-pointer ${
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold flex items-center space-x-1 transition cursor-pointer ${
                         playgroundViewMode === 'grid' 
-                          ? 'bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.65)]' 
-                          : 'text-slate-300 hover:text-white'
+                          ? 'bg-slate-800 text-white shadow-xs' 
+                          : 'text-slate-400 hover:text-slate-200'
                       }`}
                       title="Grid View / ग्रिड व्यू"
                     >
@@ -1570,16 +1406,16 @@ export default function App() {
 
                   {/* Self Customize Gear Button */}
                   <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
                     onClick={() => {
                       playUiSound(uiCustomization.audioFeedback);
                       setShowCustomizeModal(true);
                     }}
-                    className="p-1.5 px-2.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/60 border border-indigo-400/40 text-indigo-200 hover:text-white text-[10.5px] font-black tracking-wider uppercase flex items-center space-x-1.5 shadow-sm transition cursor-pointer"
+                    className="p-1.5 px-2.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-[10.5px] font-bold tracking-wider uppercase flex items-center space-x-1.5 shadow-xs transition cursor-pointer"
                     title="Self Customize UI / खुद डिज़ाइन करें"
                   >
-                    <Settings2 className="w-3.5 h-3.5 text-pink-400 animate-spin-slow" />
+                    <Settings2 className="w-3.5 h-3.5 text-slate-400" />
                     <span className="hidden xs:inline">{appLanguage === 'hi' ? 'कस्टमाइज़' : 'Customize'}</span>
                   </motion.button>
                 </div>
@@ -2184,53 +2020,44 @@ export default function App() {
               )}
             </div>
 
-              {/* ADVANCED STUDY TOOLKIT BANNER - EXACT MATCH WITH REFERENCE IMAGE */}
+              {/* ADVANCED STUDY TOOLKIT BANNER - SOPHISTICATED MATTE DESIGN */}
               <motion.div
                 id="toolkit-banner-section"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                whileHover={{ y: -2 }}
-                className="w-full p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-[#080d20] via-[#0f1738] to-[#1a0f3d] border-2 border-indigo-500/50 shadow-[0_0_35px_rgba(99,102,241,0.3)] text-white relative overflow-hidden group"
+                whileHover={{ y: -1 }}
+                className="w-full p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-slate-800/80 text-white relative overflow-hidden group"
               >
-                {/* Ambient cosmic glows */}
-                <div className="absolute -right-10 -top-10 w-48 h-48 bg-indigo-500/25 rounded-full blur-3xl group-hover:bg-indigo-500/35 transition-all pointer-events-none" />
-                <div className="absolute -left-10 -bottom-10 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
-
-                {/* Subtle digital code / matrix watermark overlay */}
-                <div className="absolute right-12 top-2 bottom-2 w-48 opacity-10 pointer-events-none hidden sm:block font-mono text-[8px] text-indigo-300 select-none overflow-hidden">
-                  <div>const studyFlow = async () =&gt; &#123;</div>
-                  <div>&nbsp;&nbsp;await brain.activate();</div>
-                  <div>&nbsp;&nbsp;return &#123; solved: true, xp: +50 &#125;;</div>
-                  <div>&#125;</div>
-                </div>
+                {/* Quiet, deep ambient backdrop lighting */}
+                <div className="absolute -right-10 -top-10 w-48 h-48 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
 
                 <div className="flex items-center justify-between relative z-10">
                   <div className="flex items-center space-x-3.5">
-                    {/* Glowing Sparkle Badge */}
+                    {/* Minimal Sparkle Badge */}
                     <motion.div
-                      whileHover={{ rotate: 12, scale: 1.08 }}
+                      whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => openToolkitWithTool()}
-                      className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-indigo-500 via-indigo-600 to-purple-500 flex items-center justify-center text-white shrink-0 shadow-[0_0_20px_rgba(99,102,241,0.5)] cursor-pointer border border-indigo-300/40"
+                      className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0 shadow-xs cursor-pointer"
                     >
-                      <Sparkles className="w-7 h-7 text-white animate-pulse" />
+                      <Sparkles className="w-5 h-5 text-indigo-400" />
                     </motion.div>
 
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black tracking-wider px-2.5 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/40 uppercase">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 uppercase">
                           18 ➔ ADVANCED TOOLS
                         </span>
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                       </div>
                       <h4 
                         onClick={() => openToolkitWithTool()}
-                        className="font-extrabold text-base sm:text-lg text-white mt-1 cursor-pointer hover:text-indigo-300 transition flex items-center gap-1.5"
+                        className="font-bold text-sm sm:text-base text-slate-100 mt-1 cursor-pointer hover:text-indigo-400 transition flex items-center gap-1.5"
                       >
                         <span>Advanced Study Toolkit</span>
                         <span className="text-amber-400">⚡</span>
                       </h4>
-                      <p className="text-[11px] text-slate-300/80 mt-0.5 leading-relaxed max-w-md font-medium">
+                      <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed max-w-md font-medium">
                         Scientific Calculator, Mind Maps, Mock Tests, Ambient Sounds & OCR Vision
                       </p>
                     </div>
@@ -2238,18 +2065,18 @@ export default function App() {
 
                   {/* Circular Chevron Button */}
                   <motion.button
-                    whileHover={{ scale: 1.1, x: 2 }}
-                    whileTap={{ scale: 0.92 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => openToolkitWithTool()}
-                    className="w-10 h-10 rounded-full bg-white/10 hover:bg-indigo-600 text-slate-200 hover:text-white transition-all shadow-md border border-white/20 flex items-center justify-center cursor-pointer shrink-0"
+                    className="w-9 h-9 rounded-full bg-slate-950 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer shrink-0"
                     title="Launch Toolkit"
                   >
-                    <ChevronRight className="w-5 h-5" />
+                    <ChevronRight className="w-4 h-4" />
                   </motion.button>
                 </div>
 
                 {/* Quick-Launch Animated Tool Chips */}
-                <div className="mt-4 pt-3.5 border-t border-white/10 flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-none relative z-10">
+                <div className="mt-4 pt-3.5 border-t border-slate-800/60 flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-none relative z-10">
                   {[
                     { id: 'pdf_scanner', name: '📑 PDF Scan' },
                     { id: 'voice_tutor', name: '🎙️ Voice Tutor' },
@@ -2264,8 +2091,8 @@ export default function App() {
                   ].map((tool) => (
                     <motion.button
                       key={tool.id}
-                      whileHover={{ scale: 1.05, y: -1 }}
-                      whileTap={{ scale: 0.95 }}
+                      whileHover={{ scale: 1.03, y: -0.5 }}
+                      whileTap={{ scale: 0.97 }}
                       onClick={() => {
                         if (tool.id === 'pdf_scanner') {
                           playUiSound(uiCustomization.audioFeedback);
@@ -2277,7 +2104,7 @@ export default function App() {
                           openToolkitWithTool(tool.id);
                         }
                       }}
-                      className="px-3 py-1.5 rounded-2xl bg-slate-900/90 hover:bg-indigo-950/90 border border-slate-700/80 hover:border-indigo-400/60 text-[11px] font-bold text-slate-200 hover:text-white whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+                      className="px-2.5 py-1.5 rounded-lg bg-slate-950/60 hover:bg-slate-900 border border-slate-800/80 hover:border-slate-700/60 text-[10.5px] font-semibold text-slate-300 hover:text-white whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 shadow-xs"
                     >
                       {tool.name}
                     </motion.button>
@@ -2285,23 +2112,23 @@ export default function App() {
                 </div>
               </motion.div>
 
-            {/* 4. 5-DAY STUDY STREAK - MATCHING USER EDIT DESIGN */}
-            <div id="streak-card-section" className="rounded-3xl p-4 sm:p-5 border-2 border-indigo-500/70 bg-gradient-to-b from-[#101432] via-[#0b0e26] to-[#070a1e] text-white shadow-[0_0_30px_rgba(99,102,241,0.25)] space-y-3.5 sm:space-y-4 relative overflow-hidden">
+            {/* 4. 5-DAY STUDY STREAK - RESTRAINED ACADEMIC DESIGN */}
+            <div id="streak-card-section" className="rounded-2xl p-4 sm:p-5 border border-slate-800/80 bg-slate-900/60 text-white space-y-4 relative overflow-hidden">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-extrabold text-white text-xs sm:text-sm tracking-wide uppercase flex items-center space-x-1.5">
-                    <Calendar className="w-4 h-4 text-purple-400" />
+                  <h3 className="font-semibold text-slate-200 text-xs tracking-wider uppercase flex items-center space-x-1.5">
+                    <Calendar className="w-4 h-4 text-amber-500" />
                     <span>5-DAY STUDY STREAK</span>
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">Complete goals to keep momentum high</p>
                 </div>
 
                 {/* Streak Badge Pill */}
-                <div className="px-3 py-1.5 sm:px-3.5 sm:py-1.5 bg-gradient-to-r from-amber-500/20 via-amber-600/10 to-amber-500/20 border border-amber-400/60 rounded-2xl text-xs font-black text-amber-200 flex items-center gap-2 shadow-[0_0_15px_rgba(251,191,36,0.3)]">
+                <div className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs font-bold text-amber-300 flex items-center gap-2">
                   <span className="text-sm">💎</span>
                   <div className="leading-tight text-right sm:text-left">
-                    <div className="font-black text-[11px] sm:text-xs text-amber-100">Streak: {userProfile.streak}/5</div>
-                    <div className="text-[9px] font-bold text-amber-300/80 uppercase tracking-wider">Days</div>
+                    <div className="font-bold text-[11px] sm:text-xs text-amber-100">Streak: {userProfile.streak}/5</div>
+                    <div className="text-[9px] font-medium text-amber-400/80 uppercase tracking-wider">Days</div>
                   </div>
                 </div>
               </div>
@@ -2321,19 +2148,19 @@ export default function App() {
                   return (
                     <motion.button 
                       key={idx}
-                      whileHover={{ scale: 1.06, y: -2 }}
-                      whileTap={{ scale: 0.94 }}
+                      whileHover={{ y: -1 }}
+                      whileTap={{ scale: 0.96 }}
                       onClick={() => handleToggleDay(idx)}
-                      className={`p-2 sm:p-3 rounded-2xl text-center flex flex-col items-center justify-between h-22 sm:h-26 transition-all cursor-pointer focus:outline-hidden ${
+                      className={`p-2 sm:p-3 rounded-xl text-center flex flex-col items-center justify-between h-20 sm:h-24 transition-all cursor-pointer focus:outline-hidden ${
                         isHighlighted
-                          ? 'border-2 border-amber-400 bg-slate-900/95 shadow-[0_0_18px_rgba(251,191,36,0.45)] text-amber-100'
-                          : 'border border-slate-800/80 bg-[#0d122b]/80 hover:bg-[#11183d]/90 text-slate-300'
+                          ? 'border border-amber-500/30 bg-amber-500/10 text-amber-100'
+                          : 'border border-slate-800/80 bg-slate-950/40 hover:bg-slate-900/40 text-slate-400'
                       }`}
                     >
-                      <div className={`text-[8.5px] sm:text-[10px] font-black uppercase tracking-wider ${isHighlighted ? 'text-amber-300' : 'text-slate-500'}`}>
+                      <div className={`text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider ${isHighlighted ? 'text-amber-400' : 'text-slate-500'}`}>
                         {item.d}
                       </div>
-                      <div className={`font-black text-xs sm:text-sm ${isHighlighted ? 'text-amber-100' : 'text-slate-200'}`}>
+                      <div className={`font-bold text-xs sm:text-sm ${isHighlighted ? 'text-slate-100' : 'text-slate-400'}`}>
                         {item.w}
                       </div>
                       <div className="flex justify-center items-center">
@@ -2345,33 +2172,28 @@ export default function App() {
               </div>
 
               {/* GOAL BOX */}
-              <div className="p-3.5 sm:p-4 bg-[#0c122e]/90 border border-indigo-950/80 rounded-2xl flex items-center justify-between relative overflow-hidden">
+              <div className="p-3.5 sm:p-4 bg-slate-950/40 border border-slate-800/80 rounded-xl flex items-center justify-between relative overflow-hidden">
                 <div className="pr-2">
                   <div className="flex items-center space-x-1.5">
-                    <span className="text-[9px] sm:text-[10px] font-black bg-indigo-950 text-indigo-300 border border-indigo-700/60 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    <span className="text-[9px] sm:text-[10px] font-bold bg-slate-900 text-slate-300 border border-slate-800 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
                       DAY 1 GOAL
                     </span>
-                    <span className="text-[9px] sm:text-[10px] font-black bg-emerald-950 text-emerald-300 border border-emerald-600/60 px-2 py-0.5 rounded-full">
+                    <span className="text-[9px] sm:text-[10px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-md">
                       +20 XP
                     </span>
                   </div>
-                  <p className="font-extrabold text-white text-xs sm:text-sm mt-1.5 max-w-xs leading-snug">
+                  <p className="font-bold text-slate-200 text-xs sm:text-sm mt-1.5 max-w-xs leading-snug">
                     Ask AI Tutor a homework question
                   </p>
                 </div>
 
-                {/* Task Complete Button with Festive Confetti Sprinkles */}
+                {/* Task Complete Button with Refined Style */}
                 <div className="relative shrink-0">
-                  <div className="absolute -top-2.5 -left-2.5 pointer-events-none text-xs animate-bounce select-none">🎉</div>
-                  <div className="absolute -bottom-2 -left-1.5 pointer-events-none text-[10px] select-none text-cyan-400">✦</div>
-                  <div className="absolute -top-2 -right-1.5 pointer-events-none text-[10px] select-none text-amber-300">★</div>
-                  <div className="absolute -bottom-2.5 -right-2 pointer-events-none text-xs select-none">🎊</div>
-                  
                   <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
                     onClick={handleCompleteDayGoal}
-                    className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl font-black text-xs sm:text-sm bg-emerald-500 hover:bg-emerald-400 text-white shadow-[0_0_20px_rgba(16,185,129,0.5)] transition flex flex-col items-center justify-center leading-tight cursor-pointer"
+                    className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-lg font-bold text-xs sm:text-sm bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs border border-emerald-500/20 transition flex flex-col items-center justify-center leading-tight cursor-pointer"
                   >
                     <span>Task</span>
                     <span>Complete!</span>
@@ -2380,45 +2202,45 @@ export default function App() {
               </div>
             </div>
 
-            {/* 5. DAILY STUDY QUESTS - MATCHING USER EDIT DESIGN */}
-            <div className="rounded-3xl p-4 sm:p-5 border-2 border-slate-800/90 bg-gradient-to-b from-[#0e142e] via-[#090d22] to-[#060919] text-white shadow-[0_0_25px_rgba(30,58,138,0.25)] space-y-3.5 relative overflow-hidden">
+            {/* 5. DAILY STUDY QUESTS - PREMIUM SLEEK LOOK */}
+            <div className="rounded-2xl p-4 sm:p-5 border border-slate-800/80 bg-slate-900/60 text-white space-y-4 relative overflow-hidden">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-extrabold text-white text-xs sm:text-sm tracking-wide uppercase flex items-center space-x-1.5">
+                  <h3 className="font-semibold text-slate-200 text-xs tracking-wider uppercase flex items-center space-x-1.5">
                     <Flame className="w-4 h-4 text-amber-500" />
                     <span>DAILY STUDY QUESTS</span>
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">Finish missions, gain bonus XP</p>
                 </div>
-                <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/40 text-amber-300 font-bold text-[11px] sm:text-xs rounded-full flex items-center gap-1.5 shadow-[0_0_12px_rgba(245,158,11,0.25)]">
+                <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-300 font-bold text-[11px] sm:text-xs rounded-lg flex items-center gap-1.5">
                   <Flame className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
                   <span>Streak: 5 Days</span>
                 </div>
               </div>
 
-              <div className="space-y-2 sm:space-y-2.5">
+              <div className="space-y-2.5">
                 {quests.map((q) => (
                   <motion.div 
                     key={q.id} 
-                    whileHover={{ y: -1, scale: 1.005 }}
+                    whileHover={{ y: -1 }}
                     onClick={() => handleCompleteQuest(q.id)}
-                    className="p-3 sm:p-3.5 bg-[#0c1430]/80 hover:bg-[#101b3d] border border-indigo-950/80 rounded-2xl flex items-center justify-between transition group cursor-pointer shadow-xs"
+                    className="p-3 sm:p-3.5 bg-slate-950/40 hover:bg-slate-900/40 border border-slate-800/60 rounded-xl flex items-center justify-between transition group cursor-pointer shadow-xs"
                   >
                     <div className="flex items-center space-x-3 pr-2">
                       <button 
-                        className={`w-6 h-6 rounded-full flex items-center justify-center transition shrink-0 ${
+                        className={`w-5 h-5 rounded-md flex items-center justify-center transition shrink-0 ${
                           q.completed 
-                            ? 'bg-emerald-500 text-white shadow-[0_0_10px_rgba(16,185,129,0.5)]' 
-                            : 'border-2 border-indigo-400/40 group-hover:border-indigo-400'
+                            ? 'bg-emerald-600 text-white' 
+                            : 'border border-slate-700 group-hover:border-slate-500'
                         }`}
                       >
-                        {q.completed ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : null}
+                        {q.completed ? <Check className="w-3 h-3 stroke-[3]" /> : null}
                       </button>
-                      <span className={`text-xs sm:text-sm font-bold transition ${q.completed ? 'line-through text-slate-500' : 'text-slate-100 group-hover:text-white'}`}>
+                      <span className={`text-xs sm:text-sm font-semibold transition ${q.completed ? 'line-through text-slate-500' : 'text-slate-300 group-hover:text-slate-100'}`}>
                         {q.title}
                       </span>
                     </div>
-                    <span className="text-[10px] sm:text-[11px] font-black text-emerald-300 bg-emerald-950/90 px-2.5 py-1 rounded-full border border-emerald-500/40 shadow-xs shrink-0">
+                    <span className="text-[9.5px] sm:text-[10px] font-bold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 shrink-0">
                       +{q.xp} XP
                     </span>
                   </motion.div>
@@ -2426,32 +2248,32 @@ export default function App() {
               </div>
             </div>
 
-            {/* 6. FOCUS SESSION & TIMER - SLIM & COMPACT */}
-            <div className="bg-[#100d24]/90 rounded-2xl p-3 border border-purple-800/50 shadow-[0_0_15px_rgba(168,85,247,0.15)] space-y-2 backdrop-blur-sm">
+            {/* 6. FOCUS SESSION & TIMER - SOPHISTICATED ACADEMIC */}
+            <div className="bg-slate-900/60 rounded-2xl p-4 border border-slate-800/80 space-y-3.5 backdrop-blur-xs">
               {/* Header: Subject Selector & Time Duration Pills */}
-              <div className="flex items-center justify-between flex-wrap gap-1.5">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="relative min-w-[130px] sm:min-w-[160px]">
                   <select
                     value={selectedSubject}
                     onChange={(e) => setSelectedSubject(e.target.value as Subject)}
-                    className="w-full appearance-none px-2.5 py-1 bg-[#1b153b] border border-purple-800/60 rounded-lg text-xs font-bold text-white focus:outline-none focus:border-purple-400 shadow-xs pr-6 cursor-pointer"
+                    className="w-full appearance-none px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-bold text-slate-100 focus:outline-none focus:border-slate-700 shadow-xs pr-8 cursor-pointer"
                   >
                     {SUBJECTS.map((s) => (
-                      <option key={s} value={s} className="bg-[#151030] text-white">{s}</option>
+                      <option key={s} value={s} className="bg-slate-900 text-white">{s}</option>
                     ))}
                   </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-purple-300 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
 
-                <div className="flex items-center space-x-1 p-0.5 bg-[#181338] rounded-lg border border-purple-800/40">
+                <div className="flex items-center space-x-1 p-0.5 bg-slate-950 border border-slate-800 rounded-lg">
                   {[5, 25, 50].map((mins) => (
                     <button
                       key={mins}
                       onClick={() => setDurationMinutes(mins)}
-                      className={`px-2 py-0.5 rounded-md text-[10.5px] font-black transition cursor-pointer ${
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition cursor-pointer ${
                         durationMinutes === mins
-                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-xs'
-                          : 'text-purple-200/70 hover:text-white'
+                          ? 'bg-slate-800 text-white shadow-xs'
+                          : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
                       {mins}m
@@ -2460,28 +2282,28 @@ export default function App() {
                 </div>
               </div>
 
-              {/* TIMER DISPLAY - COMPACT LOW-PROFILE CONTAINER */}
-              <div className="py-2 px-3 bg-[#0a071c] border border-purple-500/30 rounded-xl text-center shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)] relative overflow-hidden flex items-center justify-between">
-                <span className="text-[9px] font-extrabold text-purple-300 tracking-[0.15em] uppercase">
+              {/* TIMER DISPLAY - LOW-PROFILE MODERN INTERFACE */}
+              <div className="py-2.5 px-4 bg-slate-950 border border-slate-800 rounded-xl text-center relative overflow-hidden flex items-center justify-between">
+                <span className="text-[9px] font-bold text-slate-400 tracking-wider uppercase">
                   FOCUS TIMER
                 </span>
-                <div className="text-2xl sm:text-3xl font-mono font-bold tracking-tight text-white select-none drop-shadow-[0_0_10px_rgba(168,85,247,0.4)]">
+                <div className="text-2xl sm:text-3xl font-mono font-bold tracking-tight text-white select-none">
                   {formatTimerTime(timerSeconds)}
                 </div>
-                <div className="flex items-center space-x-1.5">
+                <div className="flex items-center space-x-2">
                   <button
                     onClick={toggleTimer}
-                    className="px-3 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 border border-purple-400/40 text-white font-extrabold rounded-lg shadow-[0_0_8px_rgba(168,85,247,0.3)] transition flex items-center space-x-1 text-[11px] cursor-pointer active:scale-95"
+                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500/20 text-white font-bold rounded-lg transition flex items-center space-x-1 text-[11px] cursor-pointer active:scale-95"
                   >
                     {isTimerRunning ? <Pause className="w-2.5 h-2.5 fill-white" /> : <Play className="w-2.5 h-2.5 fill-white ml-0.5" />}
                     <span>{isTimerRunning ? 'Pause' : 'Start'}</span>
                   </button>
                   <button
                     onClick={resetTimer}
-                    className="w-6 h-6 bg-[#1e1742] hover:bg-[#2a205a] text-purple-200 rounded-lg transition border border-purple-700/50 shadow-xs flex items-center justify-center cursor-pointer active:scale-95"
+                    className="w-7 h-7 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-lg transition border border-slate-800 shadow-xs flex items-center justify-center cursor-pointer active:scale-95"
                     title="Reset Timer"
                   >
-                    <RotateCcw className="w-3 h-3 text-purple-300" />
+                    <RotateCcw className="w-3 h-3 text-slate-400" />
                   </button>
                 </div>
               </div>
@@ -2500,241 +2322,220 @@ export default function App() {
               }).length;
 
               return (
-                <div className="bg-[#2d221a] p-1.5 rounded-2xl border border-[#3e3025] shadow-xl">
-                  <div className="bg-gradient-to-b from-[#f6efe1] via-[#ece2ce] to-[#e4d6bf] rounded-xl border border-[#d5c2a3] p-3 shadow-[inset_0_1px_3px_rgba(255,255,255,0.8),0_2px_8px_rgba(0,0,0,0.2)] space-y-2.5 relative overflow-hidden text-[#3d2e1f]">
-                    
-                    {/* Header */}
-                    <div className="flex items-center justify-between border-b border-[#ddcdb4] pb-1.5">
-                      <h3 className="font-serif font-black text-[#544026] text-xs tracking-wider uppercase flex items-center space-x-1.5">
-                        <span className="text-sm text-[#8c6b3e]">🎖️</span>
-                        <span>{appLanguage === 'hi' ? 'शैक्षणिक पदक' : 'ACADEMIC BADGES'}</span>
-                      </h3>
-                      <span className="text-[9px] font-black bg-[#3f3226] text-[#dfc285] border border-[#5a4837] px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
-                        {earnedCount} / {BADGES_CONFIG.length} {appLanguage === 'hi' ? 'अर्जित' : 'EARNED'}
-                      </span>
-                    </div>
+                <div className="bg-slate-900/60 rounded-2xl p-4 sm:p-5 border border-slate-800/80 text-white space-y-4 relative overflow-hidden">
+                  {/* Header */}
+                  <div className="flex items-center justify-between border-b border-slate-800/60 pb-3">
+                    <h3 className="font-semibold text-slate-200 text-xs tracking-wider uppercase flex items-center space-x-1.5">
+                      <span className="text-sm">🎖️</span>
+                      <span>{appLanguage === 'hi' ? 'शैक्षणिक पदक' : 'ACADEMIC BADGES'}</span>
+                    </h3>
+                    <span className="text-[9px] font-bold bg-slate-950 text-slate-300 border border-slate-800 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
+                      {earnedCount} / {BADGES_CONFIG.length} {appLanguage === 'hi' ? 'अर्जित' : 'EARNED'}
+                    </span>
+                  </div>
 
-                    {/* Horizontal badges scroll container */}
-                    <div className="flex items-center space-x-3 overflow-x-auto pb-1 scrollbar-none">
-                      {BADGES_CONFIG.map((badge) => {
-                        const actual = badge.getActual(userProfile, docsCount, examsCount, pomoCount);
-                        const isEarned = actual >= badge.target;
-                        const percentage = Math.min(100, Math.round((actual / badge.target) * 100));
+                  {/* Horizontal badges scroll container */}
+                  <div className="flex items-center space-x-3 overflow-x-auto pb-1 scrollbar-none">
+                    {BADGES_CONFIG.map((badge) => {
+                      const actual = badge.getActual(userProfile, docsCount, examsCount, pomoCount);
+                      const isEarned = actual >= badge.target;
+                      const percentage = Math.min(100, Math.round((actual / badge.target) * 100));
 
-                        return (
-                          <div
-                            key={badge.id}
-                            className={`relative flex flex-col items-center justify-between w-24 h-28 shrink-0 rounded-2xl p-2 text-center transition-all duration-300 group ${
-                              isEarned
-                                ? "bg-gradient-to-b from-[#fffef5] to-[#f5edd2] border-2 border-[#cca25a] shadow-[0_4px_10px_rgba(204,162,90,0.25)] hover:scale-105"
-                                : "bg-[#ece2ce]/50 border border-[#c9b99e] opacity-75 hover:opacity-100 hover:bg-[#ece2ce]/80"
-                            }`}
-                          >
-                            {/* Seal Badge Header or Lock icon */}
+                      return (
+                        <div
+                          key={badge.id}
+                          className={`relative flex flex-col items-center justify-between w-24 h-28 shrink-0 rounded-xl p-2.5 text-center transition-all duration-200 group ${
+                            isEarned
+                              ? "bg-slate-950/60 border border-amber-500/20 hover:border-amber-500/30 text-amber-100"
+                              : "bg-slate-950/30 border border-slate-850/80 opacity-75 hover:opacity-100"
+                          }`}
+                        >
+                          {/* Seal Badge Header or Lock icon */}
+                          {isEarned ? (
+                            <div className="absolute top-1 right-1 bg-amber-500/10 text-amber-400 p-0.5 rounded text-[8px] font-black border border-amber-500/20">
+                              ✓
+                            </div>
+                          ) : (
+                            <div className="absolute top-1 right-1 text-slate-500 text-[9px]">
+                              🔒
+                            </div>
+                          )}
+
+                          {/* Badge Icon */}
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg ${
+                            isEarned 
+                              ? "bg-amber-500/10 text-amber-300" 
+                              : "bg-slate-800/40 grayscale opacity-40"
+                          }`}>
+                            {badge.icon}
+                          </div>
+
+                          {/* Title & Info */}
+                          <div className="w-full">
+                            <div className="font-semibold text-[10px] text-slate-200 leading-tight truncate">
+                              {appLanguage === 'hi' ? badge.nameHindi : badge.name}
+                            </div>
+                            
+                            {/* Requirement description / Progress bar */}
                             {isEarned ? (
-                              <div className="absolute top-1 right-1 bg-[#cca25a] text-white p-0.5 rounded-full text-[8px] font-black shadow-xs">
-                                ✓
+                              <div className="text-[7.5px] font-bold text-amber-400 tracking-wide mt-1 uppercase bg-amber-500/10 px-1 rounded-sm py-0.5 border border-amber-500/10">
+                                {appLanguage === 'hi' ? 'अनलॉक' : 'UNLOCKED'}
                               </div>
                             ) : (
-                              <div className="absolute top-1 right-1 text-[#8c7b69] text-[9px]">
-                                🔒
+                              <div className="space-y-1 mt-1">
+                                {/* Micro progress bar */}
+                                <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-slate-600 rounded-full transition-all duration-500"
+                                    style={{ width: `${percentage}%` }}
+                                  />
+                                </div>
+                                <div className="text-[7.5px] font-medium text-slate-500">
+                                  {actual} / {badge.target} {badge.displayUnit}
+                                </div>
                               </div>
                             )}
-
-                            {/* Badge Icon */}
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-lg shadow-inner ${
-                              isEarned 
-                                ? "bg-gradient-to-b from-[#fef3c7] to-[#fde047]/50" 
-                                : "bg-slate-200/50 grayscale opacity-60"
-                            }`}>
-                              {badge.icon}
-                            </div>
-
-                            {/* Title & Info */}
-                            <div className="w-full">
-                              <div className="font-serif font-black text-[10px] text-[#2a2016] leading-tight truncate">
-                                {appLanguage === 'hi' ? badge.nameHindi : badge.name}
-                              </div>
-                              
-                              {/* Requirement description / Progress bar */}
-                              {isEarned ? (
-                                <div className="text-[7.5px] font-black text-emerald-700 tracking-wide mt-0.5 uppercase bg-emerald-100/60 px-1 rounded-sm py-0.5">
-                                  {appLanguage === 'hi' ? 'अनलॉक' : 'UNLOCKED'}
-                                </div>
-                              ) : (
-                                <div className="space-y-0.5 mt-1">
-                                  {/* Micro progress bar */}
-                                  <div className="w-full h-1 bg-black/10 rounded-full overflow-hidden">
-                                    <div 
-                                      className="h-full bg-[#cca25a] rounded-full transition-all duration-500"
-                                      style={{ width: `${percentage}%` }}
-                                    />
-                                  </div>
-                                  <div className="text-[7.5px] font-bold text-[#8c7b69]">
-                                    {actual} / {badge.target} {badge.displayUnit}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Floating Requirement Tooltip on hover */}
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block w-36 bg-[#2a1d12] text-amber-100 text-[8px] font-medium leading-tight p-1.5 rounded-lg border border-amber-800 shadow-lg z-30 pointer-events-none">
-                              <p className="font-bold text-amber-300">{appLanguage === 'hi' ? badge.nameHindi : badge.name}</p>
-                              <p className="mt-0.5">{appLanguage === 'hi' ? badge.descHindi : badge.desc}</p>
-                            </div>
                           </div>
-                        );
-                      })}
-                    </div>
 
+                          {/* Floating Requirement Tooltip on hover */}
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block w-36 bg-slate-950 text-slate-200 text-[8px] font-medium leading-tight p-2 rounded-lg border border-slate-800 shadow-md z-30 pointer-events-none">
+                            <p className="font-bold text-slate-100">{appLanguage === 'hi' ? badge.nameHindi : badge.name}</p>
+                            <p className="mt-0.5 text-slate-400">{appLanguage === 'hi' ? badge.descHindi : badge.desc}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
             })()}
 
-            {/* 9. ONLINE CLASSMATES - FUSION OF CLASSIC ASTRONOMY & FUTURISTIC SPACE SCI-FI TELEMETRY */}
-            <div className="bg-gradient-to-b from-[#1b1510] via-[#101524] to-[#0a0f1d] p-2 sm:p-2.5 rounded-[30px] border-2 border-[#8c6b3e]/60 shadow-[0_10px_30px_rgba(0,0,0,0.8)] relative overflow-hidden">
-              {/* Subtle Cosmic Constellation & Astrolabe Grid Overlay */}
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_90%_90%_at_50%_-10%,rgba(223,194,133,0.15),rgba(14,165,233,0.12),rgba(0,0,0,0))] pointer-events-none" />
-              
-              {/* Corner Brass Celestial Brackets */}
-              <div className="absolute top-2 left-2 w-3.5 h-3.5 border-t-2 border-l-2 border-[#dfc285]/70 pointer-events-none rounded-tl-sm" />
-              <div className="absolute top-2 right-2 w-3.5 h-3.5 border-t-2 border-r-2 border-[#dfc285]/70 pointer-events-none rounded-tr-sm" />
-              <div className="absolute bottom-2 left-2 w-3.5 h-3.5 border-b-2 border-l-2 border-[#dfc285]/70 pointer-events-none rounded-bl-sm" />
-              <div className="absolute bottom-2 right-2 w-3.5 h-3.5 border-b-2 border-r-2 border-[#dfc285]/70 pointer-events-none rounded-br-sm" />
-
-              <div className="bg-gradient-to-b from-[#141b2e]/95 via-[#0e1424]/95 to-[#080d19]/95 rounded-[22px] border border-[#2a3756] p-4 sm:p-5 shadow-[inset_0_1px_4px_rgba(223,194,133,0.2),0_8px_25px_rgba(0,0,0,0.7)] space-y-3.5 relative z-10 text-slate-100">
-                {/* Traditional Astronomical Header with Sci-Fi Orbital Readout */}
-                <div className="flex items-center justify-between border-b border-[#223150] pb-3">
-                  <div className="flex items-center space-x-2.5">
-                    {/* Brass Astrolabe Compass Emblem */}
-                    <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-[#4a3b2c] via-[#2a2016] to-[#121929] border border-[#dfc285] flex items-center justify-center text-sm shadow-md text-[#dfc285]">
-                      🧭
-                    </div>
-                    <div>
-                      <h3 className="font-serif font-black text-[#f3e3c3] text-xs sm:text-sm tracking-wider uppercase flex items-center space-x-1.5 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
-                        <span>CELESTIAL CREW</span>
-                        <span className="text-[9.5px] text-[#dfc285]/80 font-mono font-bold tracking-widest hidden sm:inline">[ORBIT-04]</span>
-                      </h3>
-                      <p className="text-[8.5px] font-mono text-sky-300/80 uppercase tracking-widest">
-                        ASTRONOMICAL TELEMETRY SYNC
-                      </p>
-                    </div>
+            {/* 9. ONLINE CLASSMATES - SLEEK STUDY ROOM MEMBERS */}
+            <div className="bg-slate-900/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 text-white space-y-4 relative overflow-hidden">
+              <div className="flex items-center justify-between border-b border-slate-800/60 pb-3">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center text-sm shadow-xs text-slate-300">
+                    🧭
                   </div>
-
-                  {/* Active Radar & Astrolabe Beacon Status Pill */}
-                  <div className="flex items-center space-x-1.5 bg-gradient-to-r from-[#1e1710] to-[#0c1a2e] border border-[#8c6b3e] text-[#dfc285] px-3.5 py-1 rounded-full text-[10px] font-black font-mono uppercase tracking-wider shadow-inner">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,1)]"></span>
-                    </span>
-                    <span>{classmates.filter(c => c.online).length} IN ORBIT</span>
+                  <div>
+                    <h3 className="font-semibold text-slate-100 text-xs sm:text-sm tracking-wider uppercase flex items-center space-x-1.5">
+                      <span>CELESTIAL CREW</span>
+                    </h3>
+                    <p className="text-[8.5px] font-mono text-indigo-400 uppercase tracking-wider">
+                      STUDY NETWORK SYNC
+                    </p>
                   </div>
                 </div>
 
-                {/* Classmates Astrolabe Pod List */}
-                <div className="space-y-2.5">
-                  {classmates.map((peer) => (
-                    <div 
-                      key={peer.id} 
-                      className="p-3 bg-gradient-to-r from-[#172036] via-[#10172a] to-[#161c2d] border border-[#2c3d63] hover:border-[#dfc285]/70 rounded-2xl flex items-center justify-between shadow-md transition group"
-                    >
-                      <div className="flex items-center space-x-3 min-w-0">
-                        {/* Brass Porthole / Cosmonaut Pod Avatar */}
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#241c14] via-[#11192e] to-[#020617] border-2 border-[#b89558] flex items-center justify-center text-lg relative shadow-inner shrink-0 text-white">
-                          {peer.avatar}
-                          {/* Pulsing Emerald Starlight Beacon */}
-                          <span 
-                            className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-[#10172a] flex items-center justify-center ${
-                              peer.online 
-                                ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,1)]' 
-                                : 'bg-slate-600'
-                            }`}
-                          >
-                            {peer.online && <span className="w-1 h-1 rounded-full bg-white animate-ping" />}
-                          </span>
-                        </div>
+                {/* Active Status Pill */}
+                <div className="flex items-center space-x-1.5 bg-slate-950 border border-slate-800 text-slate-300 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                  </span>
+                  <span>{classmates.filter(c => c.online).length} IN ORBIT</span>
+                </div>
+              </div>
 
-                        {/* Crew Details, Classic Serif Name & Space Telemetry */}
-                        <div className="min-w-0">
-                          <h4 className="font-serif font-black text-xs sm:text-sm text-[#f6efe1] flex items-center space-x-1.5 truncate drop-shadow-xs">
-                            <span>{peer.name}</span>
-                            <span className="text-[9px] text-[#dfc285] font-mono font-bold tracking-tight">✦ POD</span>
-                          </h4>
-                          <p className="text-[9.5px] font-mono text-slate-300 flex items-center space-x-1.5 mt-0.5 truncate">
-                            <span className="text-sky-400 font-bold">FOCUS:</span>
-                            <span className="text-slate-100 font-semibold truncate">{peer.focus}</span>
-                          </p>
-                        </div>
+              {/* Classmates Pod List */}
+              <div className="space-y-2">
+                {classmates.map((peer) => (
+                  <div 
+                    key={peer.id} 
+                    className="p-3 bg-slate-950/40 border border-slate-850 hover:border-slate-800 rounded-xl flex items-center justify-between shadow-xs transition group"
+                  >
+                    <div className="flex items-center space-x-3 min-w-0">
+                      {/* Avatar container */}
+                      <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-lg relative shrink-0 text-white">
+                        {peer.avatar}
+                        <span 
+                          className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-slate-950 flex items-center justify-center ${
+                            peer.online 
+                              ? 'bg-emerald-500' 
+                              : 'bg-slate-600'
+                          }`}
+                        >
+                          {peer.online && <span className="w-0.5 h-0.5 rounded-full bg-white animate-ping" />}
+                        </span>
                       </div>
 
-                      {/* Classic-SciFi Wave / Quantum Beacon Button */}
-                      <div className="shrink-0 pl-2">
-                        {peer.online ? (
-                          <button
-                            onClick={() => handleWaveBack(peer.id)}
-                            className={`px-3.5 py-1.5 rounded-xl text-[10.5px] font-mono font-bold transition shadow-md cursor-pointer active:scale-95 flex items-center space-x-1.5 ${
-                              peer.waved
-                                ? 'bg-gradient-to-r from-[#064e3b] to-[#065f46] text-emerald-200 border border-emerald-400/60 shadow-[0_0_12px_rgba(16,185,129,0.4)]'
-                                : 'bg-gradient-to-r from-[#8c6b3e] via-[#4f46e5] to-[#0284c7] hover:from-[#a37d48] hover:to-[#38bdf8] text-[#fff8eb] border border-[#dfc285]/70 shadow-[0_0_12px_rgba(223,194,133,0.35)]'
-                            }`}
-                          >
-                            <span className="text-xs">{peer.waved ? '📡' : '🛰️'}</span>
-                            <span className="tracking-wider">{peer.waved ? 'LINKED' : 'TRANSMIT'}</span>
-                          </button>
-                        ) : (
-                          <span className="text-[9px] font-mono font-bold text-slate-500 bg-[#0a0f1c] border border-slate-800 px-2.5 py-1 rounded-xl">
-                            DORMANT
-                          </span>
-                        )}
+                      {/* Crew Details */}
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-xs sm:text-sm text-slate-200 flex items-center space-x-1 truncate">
+                          <span>{peer.name}</span>
+                        </h4>
+                        <p className="text-[9.5px] text-slate-400 flex items-center space-x-1.5 mt-0.5 truncate">
+                          <span className="text-indigo-400 font-semibold">FOCUS:</span>
+                          <span className="text-slate-300 truncate">{peer.focus}</span>
+                        </p>
                       </div>
                     </div>
-                  ))}
-                </div>
+
+                    {/* Action buttons */}
+                    <div className="shrink-0 pl-2">
+                      {peer.online ? (
+                        <button
+                          onClick={() => handleWaveBack(peer.id)}
+                          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer active:scale-95 flex items-center space-x-1.5 ${
+                            peer.waved
+                              ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                              : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
+                          }`}
+                        >
+                          <span className="text-xs">{peer.waved ? '📡' : '🛰️'}</span>
+                          <span className="tracking-wider">{peer.waved ? 'LINKED' : 'TRANSMIT'}</span>
+                        </button>
+                      ) : (
+                        <span className="text-[9px] font-bold text-slate-500 bg-slate-950 border border-slate-850 px-2.5 py-1 rounded-md">
+                          DORMANT
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
             {/* 10. CHIMPU'S SANCTUARY (VIRTUAL FRIEND) */}
-            <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs space-y-4">
+            <div className="bg-slate-900/60 rounded-2xl p-4 sm:p-5 border border-slate-800/80 text-white space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-extrabold text-slate-900 text-xs tracking-wide uppercase flex items-center space-x-1.5">
+                <h3 className="font-semibold text-slate-200 text-xs tracking-wide uppercase flex items-center space-x-1.5">
                   <Heart className="w-3.5 h-3.5 text-emerald-500" />
                   <span>CHIMPU'S SANCTUARY</span>
                 </h3>
-                <span className="text-[9px] font-bold text-emerald-600 uppercase bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                <span className="text-[9px] font-bold text-emerald-400 uppercase bg-emerald-500/10 px-2.5 py-0.5 rounded-md border border-emerald-500/20">
                   VIRTUAL FRIEND
                 </span>
               </div>
 
-              <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 text-center space-y-2 relative overflow-hidden">
-                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-4xl mx-auto shadow-xs relative">
+              <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-4 text-center space-y-3 relative overflow-hidden">
+                <div className="w-14 h-14 bg-slate-950 rounded-xl flex items-center justify-center text-3xl mx-auto shadow-xs relative border border-slate-800">
                   🐼
                   {equippedAccessory && (
-                    <span className="absolute -top-2 -right-2 text-xl">{equippedAccessory}</span>
+                    <span className="absolute -top-1.5 -right-1.5 text-lg">{equippedAccessory}</span>
                   )}
                 </div>
 
-                <div className="inline-block bg-white px-3 py-1 rounded-full shadow-xs border border-slate-200 text-xs font-bold text-slate-800">
+                <div className="inline-block bg-slate-950 px-3 py-1 rounded-md border border-slate-850 text-xs font-bold text-slate-300">
                   🥰 Let's study together, {userProfile.name || 'Friend'}!
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 pt-1">
                   <div className="space-y-1 text-left">
-                    <div className="flex justify-between text-[9px] font-bold text-slate-500">
+                    <div className="flex justify-between text-[9px] font-bold text-slate-400">
                       <span>❤️ Happiness</span>
                       <span>{petHappiness}%</span>
                     </div>
-                    <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-teal-500" style={{ width: `${petHappiness}%` }} />
+                    <div className="h-1.5 bg-slate-850 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500" style={{ width: `${petHappiness}%` }} />
                     </div>
                   </div>
 
                   <div className="space-y-1 text-left">
-                    <div className="flex justify-between text-[9px] font-bold text-slate-500">
+                    <div className="flex justify-between text-[9px] font-bold text-slate-400">
                       <span>⚡ Energy</span>
                       <span>{petEnergy}%</span>
                     </div>
-                    <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-slate-850 rounded-full overflow-hidden">
                       <div className="h-full bg-amber-500" style={{ width: `${petEnergy}%` }} />
                     </div>
                   </div>
@@ -2743,18 +2544,18 @@ export default function App() {
 
               <button
                 onClick={feedBamboo}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center space-x-1.5"
+                className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <span>🌿</span>
                 <span>Feed Bamboo (-15 XP)</span>
               </button>
 
-              <div className="space-y-1.5">
-                <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block">
+              <div className="space-y-2">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">
                   DRESSING AREA
                 </span>
 
-                <div className="grid grid-cols-4 gap-1.5">
+                <div className="grid grid-cols-4 gap-2">
                   {[
                     { name: 'Top Hat', cost: 100, icon: '🎩' },
                     { name: 'Sunglasses', cost: 120, icon: '🕶️' },
@@ -2764,10 +2565,10 @@ export default function App() {
                     <button
                       key={item.name}
                       onClick={() => buyAccessory(item)}
-                      className="p-2 bg-slate-50 border border-slate-200 hover:border-indigo-400 rounded-xl text-center transition flex flex-col items-center justify-between"
+                      className="p-2 bg-slate-950 border border-slate-850 hover:border-slate-700 rounded-lg text-center transition flex flex-col items-center justify-between cursor-pointer"
                     >
-                      <span className="text-xl mb-0.5">{item.icon}</span>
-                      <span className="text-[9px] font-bold text-slate-600">{item.cost} XP</span>
+                      <span className="text-lg mb-0.5">{item.icon}</span>
+                      <span className="text-[9px] font-bold text-slate-400">{item.cost} XP</span>
                     </button>
                   ))}
                 </div>
@@ -2775,7 +2576,7 @@ export default function App() {
             </div>
 
             {/* STUDENT PROFILE & QUICK ACTIONS CARD */}
-            <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-4 text-white border border-indigo-900/50 shadow-md flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left mt-2">
+            <div className="bg-slate-900/60 rounded-2xl p-4 text-white border border-slate-800/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left mt-2">
               <div className="flex items-center space-x-3.5">
                 <UserAvatar
                   avatar={userProfile.avatar}
@@ -2790,20 +2591,20 @@ export default function App() {
                 />
                 <div>
                   <div className="flex items-center space-x-1.5 justify-center sm:justify-start">
-                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-400 bg-indigo-950 px-2 py-0.5 rounded-full border border-indigo-800">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
                       Your Student Profile
                     </span>
-                    <span className="text-[10px] text-amber-400 font-bold bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-800/60">
+                    <span className="text-[9.5px] text-amber-300 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
                       Lv {userProfile.level}
                     </span>
                   </div>
-                  <h4 className="text-sm font-black text-white mt-0.5">
+                  <h4 className="text-sm font-bold text-slate-100 mt-1">
                     {userProfile.name || 'Student Learner'}
                   </h4>
-                  <p className="text-[11px] text-slate-300 flex items-center justify-center sm:justify-start space-x-1 mt-0.5">
+                  <p className="text-[11px] text-slate-400 flex items-center justify-center sm:justify-start space-x-1 mt-0.5">
                     {userProfile.email ? (
                       <>
-                        <Mail className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                        <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <span>{userProfile.email}</span>
                       </>
                     ) : (
@@ -2816,7 +2617,7 @@ export default function App() {
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setShowAvatarModal(true)}
-                  className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition border border-white/20 flex items-center space-x-1 shrink-0 active:scale-95 cursor-pointer"
+                  className="px-3 py-1.5 bg-slate-950 hover:bg-slate-900 text-slate-200 hover:text-white rounded-lg text-xs font-bold transition border border-slate-800 flex items-center space-x-1 shrink-0 active:scale-95 cursor-pointer"
                 >
                   <span>Avatar 🎨</span>
                 </button>
@@ -2825,7 +2626,7 @@ export default function App() {
                     setIsEditingProfile(true);
                     setShowOnboardingModal(true);
                   }}
-                  className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5 shrink-0 active:scale-95 cursor-pointer"
+                  className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition shadow-xs flex items-center space-x-1.5 shrink-0 active:scale-95 cursor-pointer"
                 >
                   <span>Edit Details ✏️</span>
                 </button>
@@ -3701,6 +3502,8 @@ export default function App() {
           });
         }}
       />
+
+
 
 
 
