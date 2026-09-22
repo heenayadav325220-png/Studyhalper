@@ -1055,7 +1055,38 @@ export default function App() {
       {/* 100+ REALTIME MOVING LIVING OBJECTS & HUMAN CHARACTERS (SATELLITES, ROCKETS, WAVING ASTRONAUTS, CYBORGS, ATOMS) */}
       <RealtimeMovingUniverse theme={uiCustomization.wallpaperAmbiance} interactive={true} />
 
-      {/* MAIN CONTENT AREA - WITH pb-24 TO AVOID BOTTOM NAV OVERLAP */}
+      {/* STANDALONE DEDICATED FULL AI TUTOR APP INTERFACE - MOUNTED AT ROOT TO PREVENT TRANSFORM/CONTAINING-BLOCK CLIPPING */}
+      {activeTab === 'aiTutor' ? (
+        <AiTutorApp
+          user={userProfile}
+          onBack={() => setActiveTab('home')}
+          onAddNote={async (note) => {
+            await saveStudyDocument({
+              id: 'doc_' + Date.now(),
+              ownerId: userProfile.uid,
+              title: note.title,
+              content: note.content,
+              summary: note.content.slice(0, 150) + '...',
+              tagsJson: JSON.stringify([note.subject]),
+              isShared: false,
+              timestamp: new Date().toISOString()
+            });
+          }}
+          onAddXp={addXp}
+          attachedWorkspaceFiles={attachedWorkspaceFiles}
+          onRemoveAttachedWorkspaceFile={(id) => {
+            setAttachedWorkspaceFiles(prev => prev.filter(f => f.id !== id));
+          }}
+          globalAppLanguage={appLanguage}
+          onLanguageChange={(lang: any) => {
+            setAppLanguage(lang);
+            updateUserProfile(userProfile.uid, { language: lang });
+          }}
+          isBottomNavVisible={isBottomNavVisible}
+          onShowBottomNav={showBottomNav}
+        />
+      ) : (
+      /* MAIN CONTENT AREA - WITH pb-24 TO AVOID BOTTOM NAV OVERLAP */
       <main className={`relative z-10 flex-1 p-3 sm:p-4 md:p-5 mx-auto w-full pb-24 overflow-x-hidden transition-all duration-300 ${activeTab === 'studyDocs' ? 'max-w-7xl' : 'max-w-xl space-y-4'}`}>
         <AnimatePresence mode="popLayout">
           <motion.div
@@ -1136,13 +1167,18 @@ export default function App() {
                       )}
                     </motion.button>
 
+                    {/* Global Dark Mode Switch (Late-Night Eye Care) */}
+                    <div className="flex items-center space-x-1.5 px-2 py-1 rounded-xl bg-slate-900/90 border border-slate-700/60 shadow-xs" title="Late-Night Dark Mode (Reduces Eye Strain)">
+                      <ThemeToggle variant="compact-switch" />
+                    </div>
+
                     {/* Self Customize Sliders Gear Button */}
                     <motion.button
                       whileHover={{ rotate: 15, scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => setShowCustomizeModal(true)}
                       className="p-1.5 text-purple-300 hover:text-white bg-slate-950/80 border border-purple-500/60 rounded-xl transition cursor-pointer shadow-[0_0_12px_rgba(168,85,247,0.3)] flex items-center"
-                      title="Self Customize UI"
+                      title="Self Customize UI / Settings"
                     >
                       <Settings2 className="w-3.5 h-3.5" />
                     </motion.button>
@@ -3122,38 +3158,6 @@ export default function App() {
           </div>
         )}
 
-        {/* STANDALONE DEDICATED FULL AI TUTOR APP INTERFACE */}
-        {activeTab === 'aiTutor' && (
-          <AiTutorApp
-            user={userProfile}
-            onBack={() => setActiveTab('home')}
-            onAddNote={async (note) => {
-              await saveStudyDocument({
-                id: 'doc_' + Date.now(),
-                ownerId: userProfile.uid,
-                title: note.title,
-                content: note.content,
-                summary: note.content.slice(0, 150) + '...',
-                tagsJson: JSON.stringify([note.subject]),
-                isShared: false,
-                timestamp: new Date().toISOString()
-              });
-            }}
-            onAddXp={addXp}
-            attachedWorkspaceFiles={attachedWorkspaceFiles}
-            onRemoveAttachedWorkspaceFile={(id) => {
-              setAttachedWorkspaceFiles(prev => prev.filter(f => f.id !== id));
-            }}
-            globalAppLanguage={appLanguage}
-            onLanguageChange={(lang: any) => {
-              setAppLanguage(lang);
-              updateUserProfile(userProfile.uid, { language: lang });
-            }}
-            isBottomNavVisible={isBottomNavVisible}
-            onShowBottomNav={showBottomNav}
-          />
-        )}
-
         {/* AI IMAGE GENERATOR (gemini-3-pro-image-preview) */}
         {activeTab === 'imageGen' && (
           <ImageGenerator
@@ -3215,6 +3219,7 @@ export default function App() {
         </motion.div>
         </AnimatePresence>
       </main>
+      )}
 
       {/* FLOATING MORE MENU OVERLAY */}
       <AnimatePresence>
@@ -3290,28 +3295,45 @@ export default function App() {
                 })}
               </div>
 
-              <div className="pt-2 border-t border-slate-800 grid grid-cols-2 gap-2 text-[11px]">
-                <div className="relative py-1 px-2 bg-slate-800 hover:bg-slate-750 text-slate-200 rounded-xl font-bold flex items-center justify-center space-x-1 transition">
-                  <Globe className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                  <select
-                    value={appLanguage}
-                    onChange={(e) => {
-                      const selected = e.target.value as Language;
-                      setAppLanguage(selected);
-                      updateUserProfile(userProfile.uid, { language: selected });
-                    }}
-                    className="bg-transparent text-slate-200 font-bold text-[11px] focus:outline-none cursor-pointer w-full"
-                  >
-                    <option value="en" className="bg-slate-900 text-white">English</option>
-                    <option value="hi" className="bg-slate-900 text-white">हिंदी (Hindi)</option>
-                    <option value="hinglish" className="bg-slate-900 text-white">Hinglish</option>
-                    <option value="marathi" className="bg-slate-900 text-white">मराठी (Marathi)</option>
-                    <option value="tamil" className="bg-slate-900 text-white">தமிழ் (Tamil)</option>
-                    <option value="bengali" className="bg-slate-900 text-white">বাংলা (Bengali)</option>
-                  </select>
-                </div>
+              {/* Studio Settings & Eye Comfort Controls */}
+              <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                {/* Late-Night Dark Mode Toggle Card */}
+                <ThemeToggle variant="settings" className="border-slate-800 bg-slate-900/90 text-[11px]" />
 
-                <ThemeToggle variant="pill" className="w-full justify-center" />
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div className="relative py-1.5 px-2 bg-slate-850 hover:bg-slate-800 text-slate-200 border border-slate-700/60 rounded-xl font-bold flex items-center justify-center space-x-1 transition shadow-xs">
+                    <Globe className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    <select
+                      value={appLanguage}
+                      onChange={(e) => {
+                        const selected = e.target.value as Language;
+                        setAppLanguage(selected);
+                        updateUserProfile(userProfile.uid, { language: selected });
+                      }}
+                      className="bg-transparent text-slate-200 font-bold text-[11px] focus:outline-none cursor-pointer w-full"
+                    >
+                      <option value="en" className="bg-slate-900 text-white">English</option>
+                      <option value="hi" className="bg-slate-900 text-white">हिंदी (Hindi)</option>
+                      <option value="hinglish" className="bg-slate-900 text-white">Hinglish</option>
+                      <option value="marathi" className="bg-slate-900 text-white">मराठी (Marathi)</option>
+                      <option value="tamil" className="bg-slate-900 text-white">தமிழ் (Tamil)</option>
+                      <option value="bengali" className="bg-slate-900 text-white">বাংলা (Bengali)</option>
+                    </select>
+                  </div>
+
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setShowCustomizeModal(true);
+                    }}
+                    className="py-1.5 px-2 rounded-xl bg-purple-950/70 border border-purple-700/50 hover:bg-purple-900/70 text-purple-300 font-bold text-[11px] flex items-center justify-center space-x-1.5 transition cursor-pointer shadow-xs"
+                    title="Open Studio Settings & Theme Customizer"
+                  >
+                    <Settings2 className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Settings Studio</span>
+                  </motion.button>
+                </div>
               </div>
             </motion.div>
           </>

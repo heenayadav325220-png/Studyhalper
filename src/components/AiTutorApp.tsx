@@ -44,8 +44,10 @@ import {
   History,
   FileText,
   Edit3,
-  MessageSquare
+  MessageSquare,
+  Moon
 } from 'lucide-react';
+import ThemeToggle from './ThemeToggle';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -970,21 +972,45 @@ export const AiTutorApp = memo(function AiTutorApp({
   const moreMenuRef = useRef<HTMLDivElement | null>(null);
 
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
   const bottomTouchStartYRef = useRef<number>(0);
 
   useEffect(() => {
+    const updateViewport = () => {
+      const vv = window.visualViewport;
+      const currentHeight = vv ? vv.height : window.innerHeight;
+      setViewportHeight(currentHeight);
+
+      // Detect if virtual keyboard is active (viewport significantly smaller than screen/window)
+      const fullHeight = window.screen.availHeight || window.innerHeight;
+      const isKeyb = (fullHeight - currentHeight) > 130;
+      setIsKeyboardOpen(isKeyb);
+
+      // If keyboard closed, ensure document scroll is reset to (0, 0)
+      if (!isKeyb && window.scrollY !== 0) {
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+      }
+    };
+
+    updateViewport();
+
     const vv = window.visualViewport;
-    if (!vv) return;
+    if (vv) {
+      vv.addEventListener('resize', updateViewport);
+      vv.addEventListener('scroll', updateViewport);
+    }
+    window.addEventListener('resize', updateViewport);
+    window.addEventListener('orientationchange', updateViewport);
 
-    const updateHeight = () => setViewportHeight(vv.height);
-    updateHeight();
-
-    vv.addEventListener('resize', updateHeight);
-    vv.addEventListener('scroll', updateHeight);
     return () => {
-      vv.removeEventListener('resize', updateHeight);
-      vv.removeEventListener('scroll', updateHeight);
+      if (vv) {
+        vv.removeEventListener('resize', updateViewport);
+        vv.removeEventListener('scroll', updateViewport);
+      }
+      window.removeEventListener('resize', updateViewport);
+      window.removeEventListener('orientationchange', updateViewport);
     };
   }, []);
 
@@ -1480,9 +1506,23 @@ export const AiTutorApp = memo(function AiTutorApp({
     if (typeof customText !== 'string') {
       setInputQuery('');
       setStoredValue(`ai_tutor_input_draft_${user.uid}`, null);
+      // Blur keyboard on mobile to reset layout viewport and prevent getting stuck
+      textareaRef.current?.blur();
+      setIsKeyboardOpen(false);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+        if (window.visualViewport) {
+          setViewportHeight(window.visualViewport.height);
+        }
+      }, 100);
     }
     setSelectedImages([]);
     setIsLoading(true);
+
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 120);
 
     try {
       const studentInfo = `[Student: ${user.name || 'Student'} | School: ${user.schoolName || 'School'} | Class: ${user.className || 'Class'} | Goal: ${user.targetGoal || 'General'}]`;
@@ -1706,8 +1746,17 @@ export const AiTutorApp = memo(function AiTutorApp({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-[#f8fafc] text-slate-900 flex flex-col font-sans overflow-hidden transition-[height] duration-150 ease-out"
-      style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
+      className="fixed inset-0 z-50 bg-[#f8fafc] text-slate-900 flex flex-col font-sans overflow-hidden w-full h-full min-h-screen select-text"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#f8fafc',
+      }}
       onTouchStart={(e) => {
         if (!isBottomNavVisible && e.touches[0].clientY > window.innerHeight - 80) {
           bottomTouchStartYRef.current = e.touches[0].clientY;
@@ -1722,6 +1771,11 @@ export const AiTutorApp = memo(function AiTutorApp({
         }
       }}
     >
+      {/* INNER VIEWPORT CONTAINER - SNUGLY DOCKED ABOVE KEYBOARD WITHOUT ANIMATION LAG */}
+      <div 
+        className="w-full flex-1 flex flex-col overflow-hidden relative"
+        style={viewportHeight ? { height: `${viewportHeight}px`, maxHeight: `${viewportHeight}px` } : { height: '100dvh', maxHeight: '100dvh' }}
+      >
       {/* PERSISTENT PREMIUM TOP HEADER */}
       <header className="relative z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-3 sm:px-5 py-2.5 sm:py-3 flex items-center justify-between shrink-0 shadow-[0_1px_3px_rgba(15,23,42,0.03)]">
         <div className="flex items-center space-x-2 sm:space-x-3">
@@ -1816,6 +1870,9 @@ export const AiTutorApp = memo(function AiTutorApp({
             <span className="hidden sm:inline">Voice</span>
           </button>
 
+          {/* Quick Late-Night Dark Mode Toggle */}
+          <ThemeToggle variant="header" className="shrink-0" />
+
           {/* 3-DOTS ACTION MENU DROPDOWN */}
           <div className="relative" ref={moreMenuRef}>
             <button
@@ -1838,26 +1895,45 @@ export const AiTutorApp = memo(function AiTutorApp({
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.96, y: 8 }}
                   transition={{ duration: 0.15, ease: 'easeOut' }}
-                  className="absolute right-0 top-11 w-72 sm:w-80 bg-white border border-slate-200 rounded-2xl p-4 shadow-[0_12px_36px_rgba(15,23,42,0.12)] z-50 text-slate-800 space-y-4"
+                  className="absolute right-0 top-11 w-72 sm:w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-[0_12px_36px_rgba(15,23,42,0.12)] z-50 text-slate-800 dark:text-slate-200 space-y-4"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                  <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
                     <div className="flex items-center space-x-2">
-                      <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
+                      <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
                         <SlidersHorizontal className="w-3.5 h-3.5" />
                       </div>
                       <div>
-                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-wide">Study Settings</h3>
-                        <p className="text-[10px] text-slate-500">Configure your tutor companion</p>
+                        <h3 className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-wide">Study Settings</h3>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400">Configure your tutor companion</p>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => setShowMoreMenu(false)}
-                      className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                      className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
+                  </div>
+
+                  {/* Late-Night Eye Care / Dark Mode Toggle */}
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                          <Moon className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                            <span>Dark Mode</span>
+                            <span className="text-[9px] px-1 py-0.2 rounded bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-bold border border-amber-300/40">Eye Care</span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Reduces late-night eye strain</span>
+                        </div>
+                      </div>
+                      <ThemeToggle variant="compact-switch" />
+                    </div>
                   </div>
 
                   {/* Subject Selection Grid */}
@@ -3082,9 +3158,9 @@ export const AiTutorApp = memo(function AiTutorApp({
           </div> {/* Scrollable messages container */}
 
       <footer
-        className="bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-2 sm:px-3 py-1 sm:py-1.5 shrink-0 relative shadow-[0_-4px_20px_-4px_rgba(15,23,42,0.08)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        className="bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-2 sm:px-3 py-1 sm:py-1.5 shrink-0 relative shadow-[0_-4px_20px_-4px_rgba(15,23,42,0.08)] transition-[padding] duration-150 ease-out"
         style={{
-          paddingBottom: isBottomNavVisible
+          paddingBottom: (isBottomNavVisible && !isKeyboardOpen)
             ? 'calc(48px + 8px + env(safe-area-inset-bottom, 0px))'
             : 'calc(6px + env(safe-area-inset-bottom, 0px))'
         }}
@@ -3510,6 +3586,25 @@ export const AiTutorApp = memo(function AiTutorApp({
               rows={1}
               value={inputQuery}
               onChange={(e) => setInputQuery(e.target.value)}
+              onFocus={() => {
+                setIsKeyboardOpen(true);
+                setTimeout(() => {
+                  if (window.visualViewport) {
+                    setViewportHeight(window.visualViewport.height);
+                  }
+                  messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+              }}
+              onBlur={() => {
+                setIsKeyboardOpen(false);
+                setTimeout(() => {
+                  window.scrollTo(0, 0);
+                  document.body.scrollTop = 0;
+                  if (window.visualViewport) {
+                    setViewportHeight(window.visualViewport.height);
+                  }
+                }, 100);
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
@@ -3972,6 +4067,7 @@ export const AiTutorApp = memo(function AiTutorApp({
 
         </div> {/* MAIN CONVERSATION PANEL */}
       </div> {/* SIDEBAR AND CONVERSATION LAYOUT WRAPPER */}
+      </div> {/* INNER VIEWPORT CONTAINER */}
 
       {/* PREMIUM FLOATING NOTES OVERLAY MODAL */}
       <AnimatePresence>

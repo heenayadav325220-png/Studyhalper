@@ -47,7 +47,22 @@ export class ThemeProvider extends React.Component<ThemeProviderProps, ThemeProv
 
   componentDidMount() {
     this.applyTheme(this.state.theme);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', this.handleStorageChange);
+    }
   }
+
+  componentWillUnmount() {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('storage', this.handleStorageChange);
+    }
+  }
+
+  handleStorageChange = (e: StorageEvent) => {
+    if (e.key === 'ascend_theme' && (e.newValue === 'light' || e.newValue === 'dark')) {
+      this.setState({ theme: e.newValue });
+    }
+  };
 
   componentDidUpdate(_prevProps: ThemeProviderProps, prevState: ThemeProviderState) {
     if (prevState.theme !== this.state.theme) {
@@ -61,10 +76,21 @@ export class ThemeProvider extends React.Component<ThemeProviderProps, ThemeProv
     if (theme === 'dark') {
       root.classList.add('dark');
       root.classList.remove('light');
+      root.style.colorScheme = 'dark';
+      root.setAttribute('data-theme', 'dark');
     } else {
       root.classList.remove('dark');
       root.classList.add('light');
+      root.style.colorScheme = 'light';
+      root.setAttribute('data-theme', 'light');
     }
+
+    // Synchronize meta theme-color for mobile status bar
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', theme === 'dark' ? '#090d16' : '#4338ca');
+    }
+
     try {
       localStorage.setItem('ascend_theme', theme);
     } catch (e) {

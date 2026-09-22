@@ -54,6 +54,84 @@ html.dark ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.35); }
 }
 #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > header h1 { letter-spacing: -0.025em; font-size: 13px; }
 
+/* AI Tutor Late-Night Dark Mode overrides (eliminates eye strain) */
+html.dark #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\],
+html.dark #main-app-container > div.fixed.inset-0.z-50.bg-\[\#090d16\],
+html.dark .ai-tutor-root-container {
+  background: #090d16 !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > header,
+html.dark #main-app-container > div.fixed.inset-0.z-50.bg-\[\#090d16\] > header,
+html.dark .ai-tutor-header {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border-color: #1e293b !important;
+  box-shadow: 0 1px 10px rgba(0, 0, 0, 0.4) !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer,
+html.dark #main-app-container > div.fixed.inset-0.z-50.bg-\[\#090d16\] > footer,
+html.dark .ai-tutor-footer {
+  background: rgba(11, 15, 25, 0.96) !important;
+  border-top-color: #1e293b !important;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.dark #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer .flex.items-center.bg-white.border,
+html.dark #main-app-container > div.fixed.inset-0.z-50.bg-\[\#090d16\] > footer .flex.items-center.bg-white.border,
+html.dark .ai-tutor-composer-box {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+}
+
+html.dark #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer textarea,
+html.dark #main-app-container > div.fixed.inset-0.z-50.bg-\[\#090d16\] > footer textarea,
+html.dark .ai-tutor-composer-box textarea {
+  color: #f8fafc !important;
+}
+
+html.dark .tutor-editorial p,
+html.dark .tutor-modern p {
+  color: #cbd5e1 !important;
+}
+
+html.dark .tutor-editorial strong {
+  color: #f8fafc !important;
+}
+
+html.dark .tutor-editorial h1,
+html.dark .tutor-editorial h2,
+html.dark .tutor-editorial h3,
+html.dark .tutor-editorial h4 {
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+html.dark .tutor-editorial blockquote {
+  background: rgba(30, 41, 59, 0.5) !important;
+  color: #cbd5e1 !important;
+  border-left-color: #818cf8 !important;
+}
+
+html.dark .tutor-editorial th {
+  background: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+html.dark .tutor-editorial th,
+html.dark .tutor-editorial td {
+  border-color: #334155 !important;
+  color: #cbd5e1 !important;
+}
+
+html.dark .tutor-editorial ul,
+html.dark .tutor-editorial ol {
+  color: #cbd5e1 !important;
+}
+
 /* AI Tutor Classic Editorial & Scholarly Typography */
 .tutor-editorial {
   font-family: "Lora", "Newsreader", "Playfair Display", Georgia, serif;

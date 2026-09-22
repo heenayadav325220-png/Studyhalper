@@ -5,6 +5,7 @@ import {
   Palette, 
   Type, 
   Sun, 
+  Moon,
   Bot, 
   Layout, 
   Sliders, 
@@ -19,6 +20,7 @@ import {
   Layers,
   Award
 } from 'lucide-react';
+import ThemeToggle from './ThemeToggle';
 import type { 
   UiCustomization, 
   AppThemeLook, 
@@ -623,6 +625,13 @@ export default function SelfCustomizeModal({
 
         {/* Actions on Top Right */}
         <div className="flex items-center space-x-2 sm:space-x-3">
+          {/* Global Dark Mode Switch for Late-Night Study */}
+          <div className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-[#2b1b11] border border-amber-700/50 shadow-inner">
+            <Moon className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span className="text-[11px] font-bold text-amber-200 hidden sm:inline">Dark Mode</span>
+            <ThemeToggle variant="compact-switch" />
+          </div>
+
           <button
             onClick={handleReset}
             className="hidden md:flex px-3 sm:px-4 py-2 rounded-xl text-xs font-bold text-amber-300/80 hover:text-amber-100 bg-[#2b1b11] hover:bg-[#3d2719] border border-amber-700/50 transition cursor-pointer items-center space-x-1.5 shadow-sm"
@@ -670,6 +679,22 @@ export default function SelfCustomizeModal({
             <span className="px-1.5 py-0.5 rounded bg-amber-950 border border-amber-700/50 text-[9px] text-amber-300 font-mono">
               10 MODES
             </span>
+          </div>
+
+          {/* LATE-NIGHT EYE PROTECTION / GLOBAL DARK MODE TOGGLE */}
+          <div className="hidden md:block mb-2 p-2.5 rounded-xl bg-[#281a10]/80 border border-amber-700/50 shadow-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="w-7 h-7 rounded-lg bg-amber-950/80 border border-amber-600/40 flex items-center justify-center text-amber-400">
+                  <Moon className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold text-amber-100 block">Dark Mode</span>
+                  <span className="text-[9.5px] text-amber-300/70 block">Late-Night Eye Care</span>
+                </div>
+              </div>
+              <ThemeToggle variant="compact-switch" />
+            </div>
           </div>
 
           {categoryList.map(item => {
@@ -811,8 +836,12 @@ export default function SelfCustomizeModal({
 
               {/* 2. MASTER APP THEME LOOK (4 MODES) */}
               {activeTab === 'theme' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-5">
-                  {themeOptions.map(thm => {
+                <div className="space-y-4">
+                  {/* Late-Night Dark Mode Toggle Card */}
+                  <ThemeToggle variant="settings" className="border-2 border-amber-600/50 bg-[#25170f] shadow-[0_4px_24px_rgba(245,158,11,0.15)]" />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-5">
+                    {themeOptions.map(thm => {
                     const isCurrent = tempConfig.appThemeLook === thm.id;
                     return (
                       <motion.div
@@ -864,6 +893,7 @@ export default function SelfCustomizeModal({
                       </motion.div>
                     );
                   })}
+                  </div>
                 </div>
               )}
 
