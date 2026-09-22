@@ -1010,28 +1010,7 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
     }
 
     // -------------------------------------------------------------------------
-    // 6. INTERACTIVE 3D SHOCKWAVE PULSE SYSTEM
-    // -------------------------------------------------------------------------
-    const activeShockwaves: { mesh: THREE.Mesh; life: number; maxLife: number }[] = [];
-    const shockwaveGeo = new THREE.RingGeometry(0.5, 1.2, 32);
-
-    const trigger3DShockwave = (position: THREE.Vector3) => {
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: 0x38bdf8,
-        transparent: true,
-        opacity: 0.95,
-        side: THREE.DoubleSide,
-        blending: THREE.AdditiveBlending
-      });
-      const shockRing = new THREE.Mesh(shockwaveGeo, ringMat);
-      shockRing.position.copy(position);
-      shockRing.lookAt(camera.position);
-      scene.add(shockRing);
-      activeShockwaves.push({ mesh: shockRing, life: 0, maxLife: 45 });
-    };
-
-    // -------------------------------------------------------------------------
-    // 7. DYNAMIC CAMERA CONTROLS (PARALLAX & POINTER RESILIENT)
+    // 6. DYNAMIC CAMERA CONTROLS (PARALLAX & POINTER RESILIENT)
     // -------------------------------------------------------------------------
     let mouseX = 0;
     let mouseY = 0;
@@ -1050,28 +1029,8 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
       targetCameraY = 10 - mouseY * 14;
     };
 
-    const handlePointerDown = (e: MouseEvent | TouchEvent) => {
-      if (!interactive) return;
-      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-
-      const mouseVector = new THREE.Vector2(
-        (clientX / window.innerWidth) * 2 - 1,
-        -(clientY / window.innerHeight) * 2 + 1
-      );
-
-      const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(mouseVector, camera);
-
-      const hitPoint = new THREE.Vector3();
-      raycaster.ray.at(35, hitPoint);
-      trigger3DShockwave(hitPoint);
-    };
-
     window.addEventListener('mousemove', handlePointerMove);
     window.addEventListener('touchmove', handlePointerMove);
-    window.addEventListener('mousedown', handlePointerDown);
-    window.addEventListener('touchstart', handlePointerDown);
 
     // -------------------------------------------------------------------------
     // 8. WINDOW RESIZE LISTENER & RESIZEOBSERVER
@@ -1127,28 +1086,13 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
         dynamicObjects[i].update(elapsedTime, delta);
       }
 
-      // Update active 3D shockwaves
-      for (let s = activeShockwaves.length - 1; s >= 0; s--) {
-        const sw = activeShockwaves[s];
-        sw.life++;
-        const scale = 1 + (sw.life / sw.maxLife) * 14;
-        sw.mesh.scale.set(scale, scale, 1);
-        const mat = sw.mesh.material as THREE.MeshBasicMaterial;
-        mat.opacity = 0.92 * (1 - sw.life / sw.maxLife);
-
-        if (sw.life >= sw.maxLife) {
-          scene.remove(sw.mesh);
-          activeShockwaves.splice(s, 1);
-        }
-      }
-
       renderer.render(scene, camera);
     };
 
     animate();
 
     // -------------------------------------------------------------------------
-    // 10. CLEANUP & MEMORY MANAGEMENT
+    // 8. CLEANUP & MEMORY MANAGEMENT
     // -------------------------------------------------------------------------
     return () => {
       cancelAnimationFrame(animationFrameId);
@@ -1157,8 +1101,6 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('mousemove', handlePointerMove);
       window.removeEventListener('touchmove', handlePointerMove);
-      window.removeEventListener('mousedown', handlePointerDown);
-      window.removeEventListener('touchstart', handlePointerDown);
       window.removeEventListener('resize', handleResize);
 
       if (container && renderer.domElement) {
@@ -1172,8 +1114,7 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
     <div
       ref={mountRef}
       id="realtime-moving-universe-3d-canvas"
-      className="fixed inset-0 pointer-events-auto z-[1] w-full h-full overflow-hidden select-none"
-      style={{ touchAction: 'none' }}
+      className="fixed inset-0 pointer-events-none z-[1] w-full h-full overflow-hidden select-none"
     />
   );
 };

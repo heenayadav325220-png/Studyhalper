@@ -350,20 +350,20 @@ export default function App() {
       }
 
       if (hour >= 5 && hour < 12) {
-        return 'GOOD MORNING 🌅';
+        return 'Good Morning';
       } else if (hour >= 12 && hour < 17) {
-        return 'GOOD AFTERNOON ☀️';
+        return 'Good Afternoon';
       } else if (hour >= 17 && hour < 21) {
-        return 'GOOD EVENING 🌆';
+        return 'Good Evening';
       } else {
-        return 'GOOD NIGHT 🌙';
+        return 'Good Night';
       }
     } catch (e) {
       const hour = new Date().getHours();
-      if (hour >= 5 && hour < 12) return 'GOOD MORNING 🌅';
-      if (hour >= 12 && hour < 17) return 'GOOD AFTERNOON ☀️';
-      if (hour >= 17 && hour < 21) return 'GOOD EVENING 🌆';
-      return 'GOOD NIGHT 🌙';
+      if (hour >= 5 && hour < 12) return 'Good Morning';
+      if (hour >= 12 && hour < 17) return 'Good Afternoon';
+      if (hour >= 17 && hour < 21) return 'Good Evening';
+      return 'Good Night';
     }
   };
 
@@ -1119,243 +1119,187 @@ export default function App() {
         {activeTab === 'home' && (
           <div className="space-y-4">
             
-            {/* 1. TOP USER CARD - RADIANT NEON GRADIENT BORDER WITH GLOW */}
-            <div id="top-user-card" className={`relative p-[2px] sm:p-[2.5px] ${cornerRadius.casing || 'rounded-3xl'} bg-gradient-to-r from-cyan-400 via-fuchsia-500 via-purple-500 to-amber-400 shadow-[0_0_28px_rgba(34,211,238,0.38),0_0_35px_rgba(236,72,153,0.32)] transition-all duration-300`}>
+            {/* 1. TOP USER CARD - REFINED MODERN AMBIENT PROFILE */}
+            <div id="top-user-card" className={`relative p-[1.5px] ${cornerRadius.casing || 'rounded-3xl'} bg-gradient-to-b from-indigo-500/30 via-slate-800/40 to-slate-800/20 border border-slate-800/60 shadow-lg transition-all duration-300`}>
               {/* INNER DARK SLATE BACKDROP */}
-              <div className="relative overflow-hidden rounded-[22px] bg-slate-950/85 backdrop-blur-2xl p-4 sm:p-5 space-y-4">
-                {/* Multi-color Radiant Ambient Glows */}
-                <div className="absolute -top-16 -left-16 w-48 h-48 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute -top-16 -right-16 w-48 h-48 bg-purple-500/25 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute -bottom-16 right-16 w-48 h-48 bg-pink-500/20 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
+              <div className="relative overflow-hidden rounded-[23px] bg-slate-950/90 backdrop-blur-xl px-4 pt-3.5 pb-4 sm:px-5 sm:pt-4 sm:pb-5 space-y-3.5">
+                {/* Subtle Ambient Glows */}
+                <div className="absolute -top-16 -left-16 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -top-16 -right-16 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
-                {/* Top Row: Greeting Tag, Target Goal, Copilot >_, Sign In, Customize */}
-                <div className="flex flex-wrap items-center justify-between w-full gap-2 relative z-10 pb-1">
-                  
-                  {/* Left: Greeting Badge & Active status */}
-                  <div className="flex items-center space-x-1.5 bg-slate-950/80 border border-emerald-500/60 rounded-full px-3 py-1 shadow-[0_0_12px_rgba(16,185,129,0.25)]">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 animate-pulse"></span>
-                    <span className="text-[10px] sm:text-[11px] font-extrabold text-emerald-300 uppercase tracking-wider truncate max-w-[100px] xs:max-w-none">
-                      {realtimeGreeting || getDynamicGreeting()}
-                    </span>
-                  </div>
-
-                  {/* Center: Target Goal Info Badge */}
-                  <div className="flex items-center space-x-1.5 bg-slate-950/80 border border-rose-500/60 rounded-full px-3 py-1 shadow-[0_0_12px_rgba(244,63,94,0.25)]">
-                    <span className="text-amber-400 text-xs shrink-0">🎯</span>
-                    <span className="text-[10px] sm:text-[11px] font-bold text-slate-200 truncate max-w-[90px] xs:max-w-[130px]">
-                      {userProfile.targetGoal || 'JEE Exams'}
-                    </span>
-                    <button
-                      onClick={() => {
-                        setIsEditingProfile(true);
-                        setShowOnboardingModal(true);
-                      }}
-                      className="text-slate-400 hover:text-white transition cursor-pointer shrink-0 ml-0.5"
-                      title="Edit Profile Goal"
-                    >
-                      <Edit3 className="w-3 h-3 text-amber-300" />
-                    </button>
-                  </div>
-
-                  {/* Right Action Icons & Buttons */}
-                  <div className="flex items-center space-x-1.5 ml-auto xs:ml-0">
-                    {/* Auth / Sign In / Account */}
-                    <motion.button
-                      whileHover={{ scale: 1.04 }}
-                      whileTap={{ scale: 0.96 }}
-                      onClick={() => setShowAuthModal(true)}
-                      className={`px-3 py-1 rounded-full text-xs font-bold flex items-center space-x-1.5 shadow-[0_0_15px_rgba(99,102,241,0.4)] transition cursor-pointer border ${
-                        isUserLoggedIn
-                          ? 'text-emerald-300 bg-emerald-950/70 border-emerald-500/60 hover:bg-emerald-900/60'
-                          : 'text-white bg-indigo-600 hover:bg-indigo-500 border-indigo-400/50'
-                      }`}
-                      title={isUserLoggedIn ? 'Account Settings' : 'Sign In'}
-                    >
-                      {isUserLoggedIn ? (
-                        <>
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                          <span>Account</span>
-                        </>
-                      ) : (
-                        <>
-                          <LogIn className="w-3 h-3" />
-                          <span>SIGN IN</span>
-                        </>
-                      )}
-                    </motion.button>
-
-                    {/* Global Dark Mode Switch (Late-Night Eye Care) */}
-                    <div className="flex items-center space-x-1.5 px-2 py-1 rounded-xl bg-slate-900/90 border border-slate-700/60 shadow-xs" title="Late-Night Dark Mode (Reduces Eye Strain)">
-                      <ThemeToggle variant="compact-switch" />
-                    </div>
-
-                    {/* Self Customize Sliders Gear Button */}
-                    <motion.button
-                      whileHover={{ rotate: 15, scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => setShowCustomizeModal(true)}
-                      className="p-1.5 text-purple-300 hover:text-white bg-slate-950/80 border border-purple-500/60 rounded-xl transition cursor-pointer shadow-[0_0_12px_rgba(168,85,247,0.3)] flex items-center"
-                      title="Self Customize UI / Settings"
-                    >
-                      <Settings2 className="w-3.5 h-3.5" />
-                    </motion.button>
-                  </div>
-                </div>
-
-                {/* Main Student Profile & Avatar Section */}
-                <div className="flex items-start justify-between gap-3 relative z-10 pt-1">
+                {/* Main Student Profile & Avatar Section - Positioned right at the top with integrated Theme Toggle & Settings */}
+                <div className="flex items-start justify-between gap-3 relative z-10">
                   <div className="space-y-1.5 flex-1 min-w-0">
                     <div>
-                      <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2">
-                        <span className="truncate">{userProfile.name || 'R'}</span>
-                        <span className="text-xl shrink-0">🚀</span>
+                      <h2 className="text-lg sm:text-xl md:text-2xl font-black text-white tracking-tight flex items-baseline flex-wrap gap-x-1.5 gap-y-0.5">
+                        <span className="text-slate-300 font-extrabold text-base sm:text-lg">
+                          {realtimeGreeting || getDynamicGreeting()},
+                        </span>
+                        <span className="text-white truncate max-w-[170px] xs:max-w-[220px] sm:max-w-xs">
+                          {userProfile.name?.trim() ? userProfile.name : 'Guest'}
+                        </span>
+                        <span className="text-base sm:text-lg shrink-0">✨</span>
                       </h2>
-                      <p className="text-xs text-slate-400 font-medium flex items-center space-x-1.5 mt-0.5">
-                        <UserIcon className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                        <span className="truncate">{userProfile.schoolName || 'School / College Not Set'}</span>
-                      </p>
                     </div>
 
-                    {/* Class & Details Badges */}
+                    {/* Class & School Details Badges */}
                     <div className="flex flex-wrap gap-1.5 pt-1">
-                      <span className="px-3 py-1 bg-indigo-950/60 text-indigo-300 text-xs font-semibold rounded-full border border-indigo-500/50 flex items-center space-x-1.5 shadow-[0_0_10px_rgba(99,102,241,0.25)]">
+                      {/* Class Badge */}
+                      <span className="px-2.5 py-0.5 bg-indigo-950/60 text-indigo-300 text-xs font-semibold rounded-full border border-indigo-500/40 flex items-center space-x-1.5 shrink-0 shadow-xs">
                         <GraduationCap className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                         <span>{userProfile.className ? (userProfile.className.startsWith('Class') ? userProfile.className : `Class ${userProfile.className}`) : 'Class 12th (Science/PCM)'}</span>
                       </span>
 
-                      {userProfile.email && (
-                        <span className="px-3 py-1 bg-slate-950/60 text-slate-300 text-xs font-medium rounded-full border border-slate-700/60 flex items-center space-x-1.5 shadow-xs truncate max-w-[200px]">
-                          <Mail className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                          <span className="truncate">{userProfile.email}</span>
-                        </span>
-                      )}
+                      {/* School / College Pill Badge */}
+                      <span className="px-2.5 py-0.5 bg-slate-900/80 text-slate-300 text-xs font-medium rounded-full border border-slate-700/70 hover:border-slate-600 flex items-center space-x-1.5 shrink-0 shadow-xs max-w-full">
+                        <UserIcon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                        <span className="whitespace-nowrap">{userProfile.schoolName || 'School / College Not Set'}</span>
+                      </span>
                     </div>
                   </div>
 
-                  {/* Avatar with Radiant Neon Ring */}
-                  <div className="shrink-0 flex flex-col items-center">
-                    <div 
-                      onClick={() => setShowAvatarModal(true)}
-                      className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl bg-white p-1 ring-2 ring-indigo-400 shadow-[0_0_18px_rgba(99,102,241,0.55),0_0_12px_rgba(56,189,248,0.4)] flex items-center justify-center relative cursor-pointer group active:scale-95 transition-all overflow-hidden"
-                      title="Change Avatar"
-                    >
-                      <UserAvatar
-                        avatar={userProfile.avatar}
-                        name={userProfile.name || 'Student'}
-                        avatarType={userProfile.avatarType}
-                        avatarBg={userProfile.avatarBg}
-                        size="lg"
-                        className="w-full h-full flex items-center justify-center rounded-xl"
-                      />
-                      {/* Purple Gear Badge */}
-                      <div className="absolute -bottom-1 -right-1 w-5.5 h-5.5 rounded-md bg-indigo-600 border border-indigo-400 flex items-center justify-center text-[10px] shadow-[0_0_8px_rgba(99,102,241,0.6)] text-white z-20">
-                        ⚙️
+                  {/* Top-Right: Integrated Controls (Theme Toggle & Settings Side-by-Side) alongside Avatar */}
+                  <div className="shrink-0 flex items-center space-x-2.5 ml-2">
+                    {/* Horizontal Controls Row: Theme Toggle & Settings Side-by-Side */}
+                    <div className="flex items-center space-x-1.5">
+                      {/* Global Dark Mode Switch */}
+                      <div className="flex items-center px-1.5 py-1 rounded-xl bg-slate-900/90 border border-slate-700/60 shadow-xs" title="Late-Night Dark Mode">
+                        <ThemeToggle variant="compact-switch" />
                       </div>
+
+                      {/* Self Customize Settings Gear Button */}
+                      <motion.button
+                        whileHover={{ rotate: 15, scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowCustomizeModal(true)}
+                        className="p-2 text-slate-300 hover:text-white bg-slate-900/90 border border-slate-700/60 rounded-xl transition cursor-pointer hover:border-slate-500 flex items-center justify-center shadow-xs"
+                        title="Self Customize UI / Settings"
+                      >
+                        <Settings2 className="w-3.5 h-3.5 text-indigo-300" />
+                      </motion.button>
                     </div>
-                    <span 
-                      onClick={() => setShowAvatarModal(true)}
-                      className="text-[11px] font-bold text-slate-400 hover:text-white text-center mt-1 cursor-pointer transition-colors"
-                    >
-                      Change
-                    </span>
+
+                    {/* Avatar Neatly Aligned with Clean Change Trigger */}
+                    <div className="flex flex-col items-center">
+                      <div 
+                        onClick={() => setShowAvatarModal(true)}
+                        className="w-13 h-13 sm:w-15 sm:h-15 rounded-2xl bg-slate-900 p-0.5 ring-2 ring-indigo-500/40 hover:ring-indigo-400 shadow-md flex items-center justify-center relative cursor-pointer group active:scale-95 transition-all"
+                        title="Change Avatar"
+                      >
+                        <UserAvatar
+                          avatar={userProfile.avatar}
+                          name={userProfile.name || 'Student'}
+                          avatarType={userProfile.avatarType}
+                          avatarBg={userProfile.avatarBg}
+                          size="lg"
+                          className="w-full h-full flex items-center justify-center rounded-[14px]"
+                        />
+                        {/* Clean Edit Trigger Button */}
+                        <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-indigo-600 hover:bg-indigo-500 border-2 border-slate-950 flex items-center justify-center text-white shadow-xs group-hover:scale-110 transition-transform">
+                          <Edit3 className="w-2.5 h-2.5 text-white" />
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => setShowAvatarModal(true)}
+                        className="text-[10px] font-bold text-slate-400 hover:text-indigo-300 text-center mt-1 cursor-pointer transition-colors"
+                      >
+                        Change
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                {/* STAT BOXES - 3-Column Neon Stat Tiles with Vibrant Glowing Borders */}
+                {/* STAT BOXES - 3-Column Softened, Unified Accent Stat Cards */}
                 <div className="grid grid-cols-3 gap-2 sm:gap-2.5 pt-1 relative z-10">
-                  {/* BOX 1: STREAK (Neon Amber Border & Glow) */}
-                  <div className="bg-slate-950/70 border-2 border-amber-500/75 hover:border-amber-400 rounded-2xl py-2 px-1 text-center relative overflow-hidden shadow-[0_0_16px_rgba(245,158,11,0.25)] transition-all">
-                    <div className="text-[10px] text-amber-400 font-black uppercase tracking-wider flex items-center justify-center space-x-1">
+                  {/* BOX 1: STREAK */}
+                  <div className="bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800/80 hover:border-amber-500/40 rounded-xl py-2.5 px-2 text-center relative overflow-hidden transition-all duration-200 shadow-xs">
+                    <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider flex items-center justify-center space-x-1">
                       <span className="text-xs">🔥</span>
-                      <span>STREAK</span>
+                      <span>Streak</span>
                     </div>
-                    <div className="text-sm sm:text-base font-black text-slate-100 mt-0.5 leading-tight">
+                    <div className="text-base sm:text-lg font-black text-white mt-0.5 leading-tight">
                       {userProfile.streak || 5} <span className="text-[10px] font-normal text-slate-400">days</span>
                     </div>
                   </div>
 
-                  {/* BOX 2: LEVEL (Neon Emerald / Cyan Border & Glow) */}
-                  <div className="bg-slate-950/70 border-2 border-emerald-500/75 hover:border-emerald-400 rounded-2xl py-2 px-1 text-center relative overflow-hidden shadow-[0_0_16px_rgba(16,185,129,0.25)] transition-all">
-                    <div className="text-[10px] text-emerald-400 font-black uppercase tracking-wider flex items-center justify-center space-x-1">
+                  {/* BOX 2: LEVEL */}
+                  <div className="bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800/80 hover:border-indigo-500/40 rounded-xl py-2.5 px-2 text-center relative overflow-hidden transition-all duration-200 shadow-xs">
+                    <div className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider flex items-center justify-center space-x-1">
                       <span className="text-xs">📓</span>
-                      <span>LEVEL</span>
+                      <span>Level</span>
                     </div>
-                    <div className="text-sm sm:text-base font-black text-slate-100 mt-0.5 leading-tight">
+                    <div className="text-base sm:text-lg font-black text-white mt-0.5 leading-tight">
                       Lvl {userProfile.level || 1}
                     </div>
                   </div>
 
-                  {/* BOX 3: TOTAL XP (Neon Purple Border & Glow) */}
-                  <div className="bg-slate-950/70 border-2 border-purple-500/75 hover:border-purple-400 rounded-2xl py-2 px-1 text-center relative overflow-hidden shadow-[0_0_18px_rgba(168,85,247,0.3)] transition-all">
-                    <div className="text-[10px] text-purple-400 font-black uppercase tracking-wider flex items-center justify-center space-x-1">
+                  {/* BOX 3: TOTAL XP */}
+                  <div className="bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800/80 hover:border-indigo-500/40 rounded-xl py-2.5 px-2 text-center relative overflow-hidden transition-all duration-200 shadow-xs">
+                    <div className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider flex items-center justify-center space-x-1">
                       <span className="text-xs">⭐</span>
-                      <span>TOTAL XP</span>
+                      <span>Total XP</span>
                     </div>
-                    <div className="text-sm sm:text-base font-black text-slate-100 mt-0.5 leading-tight">
+                    <div className="text-base sm:text-lg font-black text-white mt-0.5 leading-tight">
                       {userProfile.xp || 100} <span className="text-[10px] font-normal text-slate-400">XP</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Level & XP Progress Section - Neon Purple Border Container with Glowing Slider Thumb */}
-                <div className="bg-slate-950/70 border-2 border-purple-500/50 hover:border-purple-500/70 rounded-2xl p-3.5 space-y-2.5 relative z-10 shadow-[0_0_18px_rgba(168,85,247,0.2)]">
-                  <div className="flex items-center justify-between text-xs font-semibold">
-                    <div className="flex items-center space-x-1.5">
-                      <span className="text-slate-300 text-[11px] font-medium">Level {userProfile.level || 1} Progress:</span>
-                      <span className="text-white text-[11px] font-bold">
-                        {userProfile.xp ? (userProfile.xp % 100) : 0} / 100 <span className="text-slate-400 font-normal">XP</span>
+                {/* Level & XP Progress Section */}
+                <div className="bg-slate-900/60 border border-slate-800/80 hover:border-slate-700/80 rounded-xl p-3 sm:p-3.5 space-y-2.5 relative z-10 shadow-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-slate-300 text-[11px] sm:text-xs font-medium">Level {userProfile.level || 1} Progress:</span>
+                      <span className="text-white text-[11px] sm:text-xs font-bold">
+                        {userProfile.xp ? (userProfile.xp % 100) : 0} <span className="text-slate-500 font-normal">/</span> 100 <span className="text-slate-400 font-normal">XP</span>
                       </span>
                     </div>
                     <button 
                       onClick={() => addXp(10)}
-                      className="text-xs text-amber-300 hover:text-amber-200 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/50 flex items-center space-x-1.5 cursor-pointer font-bold transition px-3 py-1.5 rounded-xl shadow-[0_0_12px_rgba(245,158,11,0.25)] active:scale-95"
+                      className="text-xs text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 flex items-center space-x-1.5 cursor-pointer font-bold transition px-2.5 py-1 rounded-lg shadow-xs active:scale-95"
                     >
-                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                       <span>+10 XP Booster</span>
                     </button>
                   </div>
-                  {/* Progress bar track with glowing slider thumb */}
-                  <div className="w-full h-3 bg-slate-950 border border-slate-800 rounded-full relative p-0.5 overflow-visible">
+                  {/* Sleek modern progress bar track */}
+                  <div className="w-full h-2 bg-slate-950 border border-slate-800/90 rounded-full relative overflow-hidden">
                     <div 
-                      className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-amber-400 rounded-full transition-all duration-500 relative shadow-[0_0_12px_rgba(168,85,247,0.6)]"
-                      style={{ width: `${Math.max(8, userProfile.xp ? (userProfile.xp % 100) : 15)}%` }}
-                    >
-                      {/* Glowing yellow slider thumb */}
-                      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-amber-300 border-2 border-white shadow-[0_0_10px_rgba(252,211,77,0.9)] translate-x-1" />
-                    </div>
+                      className="h-full bg-gradient-to-r from-indigo-500 via-indigo-400 to-amber-400 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.max(6, userProfile.xp ? (userProfile.xp % 100) : 15)}%` }}
+                    />
                   </div>
                 </div>
 
               </div>
             </div>
 
-            {/* CLOUD AUTH & SYNC BANNER - VIBRANT GLOWING INDIGO GRADIENT */}
+            {/* CLOUD AUTH & SYNC BANNER - SLIMMER & CLEAN */}
             {!isUserLoggedIn && (
-              <div className="bg-gradient-to-r from-indigo-950/90 via-indigo-900/90 to-purple-950/90 rounded-2xl p-4 text-white flex items-center justify-between gap-3 shadow-[0_0_22px_rgba(99,102,241,0.35)] border-2 border-indigo-500/60 backdrop-blur-md">
-                <div className="space-y-0.5 min-w-0">
+              <div className="bg-slate-900/80 border border-indigo-500/30 rounded-xl px-3.5 py-2.5 sm:px-4 sm:py-3 text-white flex items-center justify-between gap-3 shadow-xs backdrop-blur-md">
+                <div className="space-y-0.5 min-w-0 flex-1">
                   <p className="text-xs sm:text-sm font-bold flex items-center gap-1.5 text-white">
-                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
-                    <span>{appLanguage === 'hi' ? 'क्लाउड सिंक और +150 XP बोनस' : 'Sync Progress & Get +150 XP Bonus'}</span>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span className="truncate">{appLanguage === 'hi' ? 'क्लाउड सिंक और +150 XP बोनस' : 'Sync Progress & Get +150 XP Bonus'}</span>
                   </p>
-                  <p className="text-[11px] text-slate-300 line-clamp-1">
+                  <p className="text-[11px] text-slate-400 leading-normal">
                     {appLanguage === 'hi' 
-                      ? 'गूगल या ईमेल से साइन इन करें ताकि नोट्स और परीक्षाएं सुरक्षित रहें।'
-                      : 'Sign in with Google or Email to backup your study progress across devices.'}
+                      ? 'गूगल या ईमेल से साइन इन करें ताकि आपके सभी नोट्स और क्विज़ सुरक्षित रहें।'
+                      : 'Sign in with Google or Email to backup your progress across all devices.'}
                   </p>
                 </div>
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="px-4 py-2 bg-white hover:bg-slate-100 text-indigo-950 font-black text-xs sm:text-sm rounded-xl transition cursor-pointer shrink-0 shadow-[0_0_15px_rgba(255,255,255,0.4)] active:scale-95 flex items-center space-x-1.5"
+                  className="px-3 py-1.5 sm:px-3.5 sm:py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg transition cursor-pointer shrink-0 shadow-xs active:scale-95 flex items-center space-x-1.5 whitespace-nowrap"
                 >
-                  <LogIn className="w-4 h-4 text-indigo-950" />
+                  <LogIn className="w-3.5 h-3.5 text-white" />
                   <span>{appLanguage === 'hi' ? 'साइन इन' : 'Sign In'}</span>
                 </button>
               </div>
             )}
 
             {/* HIGH-POWER QUICK ACTION DUO: VOICE TUTOR & PDF/BOOK SCANNER */}
-            <div id="quick-actions-section" className="grid grid-cols-2 gap-2.5 sm:gap-3">
+            <div id="quick-actions-section" className="grid grid-cols-2 gap-3 sm:gap-3.5">
               {/* 1. VOICE TUTOR LAUNCHER (NEON PINK BORDER) */}
               <motion.button
                 whileHover={{ y: -3, scale: 1.02 }}
@@ -1364,22 +1308,27 @@ export default function App() {
                   playUiSound(uiCustomization.audioFeedback);
                   setShowVoiceTutorModal(true);
                 }}
-                className="p-3 sm:p-4 rounded-2xl border-2 border-pink-500/90 hover:border-pink-400 shadow-[0_0_18px_rgba(236,72,153,0.35)] bg-slate-950/85 hover:bg-slate-950 text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-all duration-200"
+                className="p-3.5 sm:p-4 rounded-2xl border-2 border-pink-500/90 hover:border-pink-400 shadow-[0_0_18px_rgba(236,72,153,0.35)] bg-slate-950/85 hover:bg-slate-950 text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-all duration-200 min-h-[104px] sm:min-h-[114px]"
               >
-                <div className="flex items-center justify-between relative z-10 mb-2 sm:mb-3">
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-pink-950/80 border border-pink-500/60 flex items-center justify-center text-pink-400 shrink-0 shadow-[0_0_12px_rgba(236,72,153,0.3)]">
-                    <Mic className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-pink-400" />
-                  </div>
-                  <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider bg-pink-950/80 text-pink-300 px-2 sm:px-2.5 py-0.5 rounded-full border border-pink-500/50">
+                {/* Sleek Micro-Pill Badge in Top-Right Corner */}
+                <div className="absolute top-2.5 right-2.5 z-10">
+                  <span className="text-[7px] font-black tracking-widest uppercase bg-pink-950/90 text-pink-300 px-1.5 py-0.5 rounded-full border border-pink-500/40 shadow-xs">
                     VOICE
                   </span>
                 </div>
-                <div className="relative z-10">
+
+                <div className="relative z-10 mb-2 sm:mb-2.5">
+                  <div className="w-8 h-8 sm:w-8.5 sm:h-8.5 rounded-full bg-pink-950/80 border border-pink-500/60 flex items-center justify-center text-pink-400 shrink-0 shadow-[0_0_12px_rgba(236,72,153,0.3)]">
+                    <Mic className="w-4 h-4 text-pink-400" />
+                  </div>
+                </div>
+
+                <div className="relative z-10 space-y-0.5">
                   <h4 className="font-bold text-xs sm:text-sm text-white flex items-center gap-1">
                     <span className="truncate">{appLanguage === 'hi' ? 'वॉयस ट्यूटर' : 'Voice Tutor'}</span>
-                    <span className="text-pink-400 shrink-0">🎙️</span>
+                    <span className="text-pink-400 shrink-0 text-xs sm:text-sm">🎙️</span>
                   </h4>
-                  <p className="text-[9.5px] sm:text-[11px] text-slate-400 font-medium leading-tight mt-0.5 truncate">
+                  <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium leading-tight truncate">
                     {appLanguage === 'hi' ? 'बोलकर तुरंत पूछें व सुनें' : 'Live Voice Q&A Tutor'}
                   </p>
                 </div>
@@ -1393,22 +1342,27 @@ export default function App() {
                   playUiSound(uiCustomization.audioFeedback);
                   setActiveTab('pdfScanner');
                 }}
-                className="p-3 sm:p-4 rounded-2xl border-2 border-purple-500/90 hover:border-purple-400 shadow-[0_0_18px_rgba(168,85,247,0.35)] bg-slate-950/85 hover:bg-slate-950 text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-all duration-200"
+                className="p-3.5 sm:p-4 rounded-2xl border-2 border-purple-500/90 hover:border-purple-400 shadow-[0_0_18px_rgba(168,85,247,0.35)] bg-slate-950/85 hover:bg-slate-950 text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-all duration-200 min-h-[104px] sm:min-h-[114px]"
               >
-                <div className="flex items-center justify-between relative z-10 mb-2 sm:mb-3">
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-purple-950/80 border border-purple-500/60 flex items-center justify-center text-purple-400 shrink-0 shadow-[0_0_12px_rgba(168,85,247,0.3)]">
-                    <FileText className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-purple-400" />
-                  </div>
-                  <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider bg-purple-950/80 text-purple-300 px-2 sm:px-2.5 py-0.5 rounded-full border border-purple-500/50">
+                {/* Sleek Micro-Pill Badge in Top-Right Corner */}
+                <div className="absolute top-2.5 right-2.5 z-10">
+                  <span className="text-[7px] font-black tracking-widest uppercase bg-purple-950/90 text-purple-300 px-1.5 py-0.5 rounded-full border border-purple-500/40 shadow-xs">
                     SCANNER
                   </span>
                 </div>
-                <div className="relative z-10">
+
+                <div className="relative z-10 mb-2 sm:mb-2.5">
+                  <div className="w-8 h-8 sm:w-8.5 sm:h-8.5 rounded-full bg-purple-950/80 border border-purple-500/60 flex items-center justify-center text-purple-400 shrink-0 shadow-[0_0_12px_rgba(168,85,247,0.3)]">
+                    <FileText className="w-4 h-4 text-purple-400" />
+                  </div>
+                </div>
+
+                <div className="relative z-10 space-y-0.5">
                   <h4 className="font-bold text-xs sm:text-sm text-white flex items-center gap-1">
                     <span className="truncate">{appLanguage === 'hi' ? 'PDF स्कैनर' : 'PDF Scanner'}</span>
-                    <span className="text-purple-400 shrink-0">📑</span>
+                    <span className="text-purple-400 shrink-0 text-xs sm:text-sm">📑</span>
                   </h4>
-                  <p className="text-[9.5px] sm:text-[11px] text-slate-400 font-medium leading-tight mt-0.5 truncate">
+                  <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium leading-tight truncate">
                     {appLanguage === 'hi' ? 'किताबें सारांश व क्विज़' : 'Summary, Flashcards & Quiz'}
                   </p>
                 </div>
@@ -1417,13 +1371,13 @@ export default function App() {
 
             {/* 2. ACADEMY PLAYGROUND - WITH LISTED VIEW AS DEFAULT & VIEW SWITCHER */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-slate-200 text-xs tracking-wider uppercase flex items-center space-x-2">
-                  <Sparkles className="w-4 h-4 text-indigo-400" />
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-semibold text-slate-200 text-xs tracking-wider uppercase flex items-center space-x-2 shrink-0">
+                  <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
                   <span>ACADEMY PLAYGROUND</span>
                 </h3>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 shrink-0">
                   {/* View Mode Switcher: Listed View vs Grid View */}
                   <div className="flex items-center bg-slate-950/60 border border-slate-800/80 p-0.5 rounded-lg">
                     <button
@@ -1466,7 +1420,7 @@ export default function App() {
                       playUiSound(uiCustomization.audioFeedback);
                       setShowCustomizeModal(true);
                     }}
-                    className="p-1.5 px-2.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-[10.5px] font-bold tracking-wider uppercase flex items-center space-x-1.5 shadow-xs transition cursor-pointer"
+                    className="p-1 px-2.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-[10.5px] font-bold tracking-wider uppercase flex items-center space-x-1.5 shadow-xs transition cursor-pointer"
                     title="Self Customize UI / खुद डिज़ाइन करें"
                   >
                     <Settings2 className="w-3.5 h-3.5 text-slate-400" />
@@ -3425,10 +3379,10 @@ export default function App() {
                   transition={{ type: 'spring', stiffness: 450, damping: 32 }}
                 />
               )}
-              <div className="relative">
+              <div className="relative inline-flex items-center justify-center">
                 <Icon className={`w-4 h-4 transition-transform ${isActive ? 'scale-110 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'text-slate-400'}`} />
                 {tab.badge && (
-                  <span className="absolute -top-1.5 -right-3.5 px-1.5 py-0.5 bg-gradient-to-r from-emerald-600 to-indigo-600 text-white text-[7.5px] font-black rounded-full leading-none shadow-[0_0_8px_rgba(16,185,129,0.5)] border border-emerald-400/40 z-10 tracking-tight">
+                  <span className="absolute -top-1.5 -right-2 px-1 py-[0.5px] bg-gradient-to-r from-emerald-500 to-indigo-600 text-white text-[7px] font-black rounded-full leading-none shadow-[0_0_6px_rgba(16,185,129,0.5)] border border-emerald-300/40 z-20 tracking-tight pointer-events-none select-none">
                     {tab.badge}
                   </span>
                 )}
