@@ -740,11 +740,12 @@ export default function App() {
   ];
 
   useEffect(() => {
+    if (activeTab !== 'groupChat') return;
     const unsubscribe = subscribeToChats(selectedRoomId, (msgs) => {
       setRoomMessages(msgs);
     });
     return () => unsubscribe();
-  }, [selectedRoomId]);
+  }, [selectedRoomId, activeTab]);
 
   const handleSendRoomMessage = async () => {
     if (!chatInputText.trim()) return;
@@ -763,11 +764,12 @@ export default function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
+    if (activeTab !== 'whiteboard') return;
     const unsubscribe = subscribeToWhiteboard('global_board', (elements) => {
       setWhiteboardElements(elements);
     });
     return () => unsubscribe();
-  }, []);
+  }, [activeTab]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -853,17 +855,32 @@ export default function App() {
   };
 
   // --- MOCK EXAMS STATE ---
-  const [mockExams, setMockExams] = useState<MockExam[]>([]);
+  const [mockExams, setMockExams] = useState<MockExam[]>(() => {
+    try {
+      const local = localStorage.getItem(`local_exams_${userProfile.uid}`) || localStorage.getItem('local_exams_user_local_student');
+      return local ? JSON.parse(local) : [];
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
+    if (!['mockExam', 'quiz', 'toolkit'].includes(activeTab)) return;
     const unsubscribe = subscribeToMockExams(userProfile.uid, (exams) => {
       setMockExams(exams);
     });
     return () => unsubscribe();
-  }, [userProfile.uid]);
+  }, [userProfile.uid, activeTab]);
 
   // --- STUDY DOCS STATE ---
-  const [studyDocs, setStudyDocs] = useState<StudyDocument[]>([]);
+  const [studyDocs, setStudyDocs] = useState<StudyDocument[]>(() => {
+    try {
+      const local = localStorage.getItem(`local_docs_${userProfile.uid}`) || localStorage.getItem('local_docs_user_local_student');
+      return local ? JSON.parse(local) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const runBadgeEvaluation = (profileObj?: UserProfile) => {
     const currentProfile = profileObj || userProfile;
@@ -926,11 +943,12 @@ export default function App() {
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!['studyDocs', 'notebook', 'toolkit'].includes(activeTab)) return;
     const unsubscribe = subscribeToStudyDocuments(userProfile.uid, (docs) => {
       setStudyDocs(docs);
     });
     return () => unsubscribe();
-  }, [userProfile.uid]);
+  }, [userProfile.uid, activeTab]);
 
   const handleSaveDoc = async () => {
     if (!newDocTitle.trim()) return;

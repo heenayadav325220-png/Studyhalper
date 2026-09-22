@@ -10,7 +10,8 @@ import {
   query, 
   where, 
   orderBy,
-  limit
+  limit,
+  writeBatch
 } from './firebase';
 import type { UserProfile, RoomChatMessage, WhiteboardElement, MockExam, StudyDocument } from '../types';
 
@@ -43,13 +44,18 @@ export function subscribeUserProfile(userId: string, callback: (profile: UserPro
   }
 }
 
+// Write coalescing and debouncing for user profile updates
+// Prevents generating multiple Firestore document writes when XP/streaks/stats update rapidly
+let profileSyncTimer: any = null;
+let pendingProfileBatch: Record<string, Partial<UserProfile>> = {};
+
 export async function updateUserProfile(userId: string, profile: Partial<UserProfile>): Promise<void> {
   const verifiedUid = auth.currentUser?.uid || userId;
-  // Always persist to localStorage for seamless, instant fallback
+  // Always persist immediately to localStorage for zero-latency local UX
   try {
     const local = localStorage.getItem(`user_profile_${verifiedUid}`);
     const parsed = local ? JSON.parse(local) : {};
-    const updated = { ...parsed, ...profile, uid: verifiedUid, lastActive: new Date().toISOString() };
+    const updated = { ...parsed, ...profile, uid: verifiedUid };
     localStorage.setItem(`user_profile_${verifiedUid}`, JSON.stringify(updated));
     localStorage.setItem('ascend_user_profile', JSON.stringify(updated));
   } catch (e) {
@@ -59,15 +65,34 @@ export async function updateUserProfile(userId: string, profile: Partial<UserPro
   if (!db || isOffline() || !auth.currentUser) {
     return;
   }
-  try {
-    const userRef = doc(db, "users", verifiedUid);
-    // Strict 2-second timeout so Firestore write never hangs the application
-    const writePromise = setDoc(userRef, { ...profile, uid: verifiedUid, lastActive: new Date().toISOString() }, { merge: true });
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore write timeout')), 2000));
-    await Promise.race([writePromise, timeoutPromise]);
-  } catch (err) {
-    console.warn("Firestore updateUserProfile non-blocking note:", err);
+
+  // Merge into batch queue
+  pendingProfileBatch[verifiedUid] = {
+    ...(pendingProfileBatch[verifiedUid] || {}),
+    ...profile,
+    uid: verifiedUid
+  };
+
+  // Coalesce rapid updates within 1500ms into a single Firestore write
+  if (profileSyncTimer) {
+    clearTimeout(profileSyncTimer);
   }
+
+  profileSyncTimer = setTimeout(async () => {
+    const batchUpdates = pendingProfileBatch[verifiedUid];
+    delete pendingProfileBatch[verifiedUid];
+    if (!batchUpdates || !auth.currentUser) return;
+
+    try {
+      const userRef = doc(db, "users", verifiedUid);
+      // Strict 2-second timeout so Firestore write never hangs the application
+      const writePromise = setDoc(userRef, { ...batchUpdates, lastActive: new Date().toISOString() }, { merge: true });
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore write timeout')), 2000));
+      await Promise.race([writePromise, timeoutPromise]);
+    } catch (err) {
+      console.warn("Firestore updateUserProfile non-blocking note:", err);
+    }
+  }, 1500);
 }
 
 // --- STUDY ROOM CHATS ---
@@ -78,13 +103,15 @@ export function subscribeToChats(roomId: string, callback: (messages: RoomChatMe
   }
   try {
     const chatsRef = collection(db, `rooms/${roomId}/chats`);
-    const q = query(chatsRef, orderBy("timestamp", "asc"), limit(100));
+    // Cost Optimization: Fetch the latest 40 messages descending, then reverse for display
+    // Slices read volume by 60% compared to limit(100) while ensuring newest messages are seen
+    const q = query(chatsRef, orderBy("timestamp", "desc"), limit(40));
     return onSnapshot(q, (snapshot) => {
       const messages: RoomChatMessage[] = [];
       snapshot.forEach((d) => {
         messages.push({ id: d.id, ...d.data() } as RoomChatMessage);
       });
-      callback(messages);
+      callback(messages.reverse());
     }, (error) => {
       console.warn("Chats snapshot error:", error);
       callback([]);
@@ -133,13 +160,15 @@ export function subscribeToWhiteboard(roomId: string, callback: (elements: White
   }
   try {
     const wbRef = collection(db, `rooms/${roomId}/whiteboard`);
-    const q = query(wbRef, orderBy("timestamp", "asc"), limit(200));
+    // Cost Optimization: Limit to latest 60 drawing strokes descending, reversed in memory
+    // Reduces initial listener read cost by 70%
+    const q = query(wbRef, orderBy("timestamp", "desc"), limit(60));
     return onSnapshot(q, (snapshot) => {
       const elements: WhiteboardElement[] = [];
       snapshot.forEach((d) => {
         elements.push({ id: d.id, ...d.data() } as WhiteboardElement);
       });
-      callback(elements);
+      callback(elements.reverse());
     }, (error) => {
       console.warn("Whiteboard snapshot error:", error);
       callback([]);
@@ -203,13 +232,21 @@ export async function clearWhiteboardRoom(roomId: string): Promise<void> {
     const currentUid = auth.currentUser?.uid;
     const wbRef = collection(db, `rooms/${roomId}/whiteboard`);
     const snapshot = await getDocs(wbRef);
-    snapshot.forEach(async (d) => {
+    if (snapshot.empty) return;
+
+    // Batch delete in a single atomic commit instead of multiple sequential network calls
+    const batch = writeBatch(db);
+    let deleteCount = 0;
+    snapshot.forEach((d) => {
       const data = d.data();
-      // Zero-trust deletion: Only delete items owned by the authenticated student or unassigned
       if (!currentUid || data.senderId === currentUid || !data.senderId) {
-        await deleteDoc(doc(db, `rooms/${roomId}/whiteboard`, d.id)).catch(() => {});
+        batch.delete(doc(db, `rooms/${roomId}/whiteboard`, d.id));
+        deleteCount++;
       }
     });
+    if (deleteCount > 0) {
+      await batch.commit();
+    }
   } catch (err) {
     console.error("Error clearing whiteboard room:", err);
   }
@@ -224,7 +261,9 @@ export function subscribeToMockExams(userId: string, callback: (exams: MockExam[
   try {
     const verifiedUid = auth.currentUser?.uid || userId;
     const examsRef = collection(db, "exams");
-    const q = query(examsRef, where("userId", "==", verifiedUid), orderBy("timestamp", "desc"), limit(50));
+    // Cost Optimization: Limit to recent 20 mock exams (down from 50)
+    // Slices document read costs and prevents reading large question sets unnecessarily
+    const q = query(examsRef, where("userId", "==", verifiedUid), orderBy("timestamp", "desc"), limit(20));
     return onSnapshot(q, (snapshot) => {
       const exams: MockExam[] = [];
       snapshot.forEach((d) => {
@@ -286,7 +325,9 @@ export function subscribeToStudyDocuments(ownerId: string, callback: (docs: Stud
   try {
     const verifiedOwnerId = auth.currentUser?.uid || ownerId;
     const docsRef = collection(db, "documents");
-    const q = query(docsRef, where("ownerId", "==", verifiedOwnerId), orderBy("timestamp", "desc"), limit(100));
+    // Cost Optimization: Limit to recent 25 study documents (down from 100)
+    // Slices read consumption by 75% for note archives
+    const q = query(docsRef, where("ownerId", "==", verifiedOwnerId), orderBy("timestamp", "desc"), limit(25));
     return onSnapshot(q, (snapshot) => {
       const documents: StudyDocument[] = [];
       snapshot.forEach((d) => {

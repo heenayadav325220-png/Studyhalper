@@ -100,10 +100,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           lastActive: new Date().toISOString()
         };
 
-        // Non-blocking update lastActive timestamp in Firestore
-        updateDoc(userDocRef, {
-          lastActive: new Date().toISOString()
-        }).catch(() => {});
+        // Non-blocking update lastActive timestamp in Firestore (throttled to once every 15 minutes)
+        const lastActiveTime = data.lastActive ? new Date(data.lastActive).getTime() : 0;
+        if (Date.now() - lastActiveTime > 15 * 60 * 1000) {
+          updateDoc(userDocRef, {
+            lastActive: new Date().toISOString()
+          }).catch(() => {});
+        }
       } else {
         // Create initial user document complying with firestore.rules (isValidUser)
         setDoc(userDocRef, {
