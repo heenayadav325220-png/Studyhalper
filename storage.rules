@@ -1,0 +1,50 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidFileSize(maxMb) {
+      return request.resource.size < maxMb * 1024 * 1024;
+    }
+
+    // Default deny all unknown storage paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // Private user files (notes attachments, personal diagrams, study files)
+    match /users/{userId}/{fileName} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) 
+        && isValidFileSize(15) 
+        && request.resource.contentType.matches('image/.*|application/pdf|text/.*|application/json');
+      allow delete: if isOwner(userId);
+    }
+
+    // User profile avatars (readable by authenticated members, editable solely by account owner)
+    match /users/{userId}/avatars/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId)
+        && isValidFileSize(5)
+        && request.resource.contentType.matches('image/(jpeg|png|webp|gif|svg\\+xml)');
+      allow delete: if isOwner(userId);
+    }
+
+    // Collaborative study room shared attachments (isolated to authenticated users, strict size check)
+    match /rooms/{roomId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+        && isValidFileSize(20)
+        && request.resource.contentType.matches('image/.*|application/pdf|text/.*')
+        && (request.resource.metadata == null || request.resource.metadata.ownerId == request.auth.uid);
+      allow delete: if isSignedIn() && (resource.metadata == null || resource.metadata.ownerId == request.auth.uid);
+    }
+  }
+}

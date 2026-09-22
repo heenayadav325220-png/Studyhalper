@@ -1,4 +1,5 @@
 import { 
+  auth,
   db, 
   collection, 
   doc, 
@@ -23,7 +24,8 @@ export function subscribeUserProfile(userId: string, callback: (profile: UserPro
     return () => {};
   }
   try {
-    const userRef = doc(db, "users", userId);
+    const verifiedUid = auth.currentUser?.uid || userId;
+    const userRef = doc(db, "users", verifiedUid);
     return onSnapshot(userRef, (snapshot) => {
       if (snapshot.exists()) {
         callback(snapshot.data() as UserProfile);
@@ -42,24 +44,25 @@ export function subscribeUserProfile(userId: string, callback: (profile: UserPro
 }
 
 export async function updateUserProfile(userId: string, profile: Partial<UserProfile>): Promise<void> {
+  const verifiedUid = auth.currentUser?.uid || userId;
   // Always persist to localStorage for seamless, instant fallback
   try {
-    const local = localStorage.getItem(`user_profile_${userId}`);
+    const local = localStorage.getItem(`user_profile_${verifiedUid}`);
     const parsed = local ? JSON.parse(local) : {};
-    const updated = { ...parsed, ...profile, lastActive: new Date().toISOString() };
-    localStorage.setItem(`user_profile_${userId}`, JSON.stringify(updated));
+    const updated = { ...parsed, ...profile, uid: verifiedUid, lastActive: new Date().toISOString() };
+    localStorage.setItem(`user_profile_${verifiedUid}`, JSON.stringify(updated));
     localStorage.setItem('ascend_user_profile', JSON.stringify(updated));
   } catch (e) {
     console.warn("Failed to write user profile to localStorage:", e);
   }
 
-  if (!db || isOffline()) {
+  if (!db || isOffline() || !auth.currentUser) {
     return;
   }
   try {
-    const userRef = doc(db, "users", userId);
+    const userRef = doc(db, "users", verifiedUid);
     // Strict 2-second timeout so Firestore write never hangs the application
-    const writePromise = setDoc(userRef, { ...profile, lastActive: new Date().toISOString() }, { merge: true });
+    const writePromise = setDoc(userRef, { ...profile, uid: verifiedUid, lastActive: new Date().toISOString() }, { merge: true });
     const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore write timeout')), 2000));
     await Promise.race([writePromise, timeoutPromise]);
   } catch (err) {
@@ -94,13 +97,15 @@ export function subscribeToChats(roomId: string, callback: (messages: RoomChatMe
 }
 
 export async function sendGroupMessage(roomId: string, text: string, senderId: string, senderName: string): Promise<void> {
+  const verifiedSenderId = auth.currentUser?.uid || senderId;
+  const verifiedSenderName = auth.currentUser?.displayName || senderName || 'Student';
   const msgId = doc(collection(db || {}, "temp")).id;
   const newMessage: RoomChatMessage = {
     id: msgId,
     roomId,
-    senderId,
-    senderName,
-    text,
+    senderId: verifiedSenderId,
+    senderName: verifiedSenderName,
+    text: text.trim().slice(0, 3000),
     timestamp: new Date().toISOString()
   };
 
@@ -147,10 +152,13 @@ export function subscribeToWhiteboard(roomId: string, callback: (elements: White
 }
 
 export async function addWhiteboardElement(roomId: string, element: Omit<WhiteboardElement, 'id' | 'timestamp'>): Promise<void> {
+  const verifiedSenderId = auth.currentUser?.uid || element.senderId;
   const elemId = doc(collection(db || {}, "temp")).id;
   const newElement: WhiteboardElement = {
     id: elemId,
     ...element,
+    roomId,
+    senderId: verifiedSenderId,
     timestamp: new Date().toISOString()
   };
 
@@ -192,10 +200,15 @@ export async function clearWhiteboardRoom(roomId: string): Promise<void> {
     return;
   }
   try {
+    const currentUid = auth.currentUser?.uid;
     const wbRef = collection(db, `rooms/${roomId}/whiteboard`);
     const snapshot = await getDocs(wbRef);
     snapshot.forEach(async (d) => {
-      await deleteDoc(doc(db, `rooms/${roomId}/whiteboard`, d.id));
+      const data = d.data();
+      // Zero-trust deletion: Only delete items owned by the authenticated student or unassigned
+      if (!currentUid || data.senderId === currentUid || !data.senderId) {
+        await deleteDoc(doc(db, `rooms/${roomId}/whiteboard`, d.id)).catch(() => {});
+      }
     });
   } catch (err) {
     console.error("Error clearing whiteboard room:", err);
@@ -209,8 +222,9 @@ export function subscribeToMockExams(userId: string, callback: (exams: MockExam[
     return () => {};
   }
   try {
+    const verifiedUid = auth.currentUser?.uid || userId;
     const examsRef = collection(db, "exams");
-    const q = query(examsRef, where("userId", "==", userId), orderBy("timestamp", "desc"), limit(50));
+    const q = query(examsRef, where("userId", "==", verifiedUid), orderBy("timestamp", "desc"), limit(50));
     return onSnapshot(q, (snapshot) => {
       const exams: MockExam[] = [];
       snapshot.forEach((d) => {
@@ -229,16 +243,17 @@ export function subscribeToMockExams(userId: string, callback: (exams: MockExam[
 }
 
 export async function saveMockExam(exam: MockExam): Promise<void> {
+  const verifiedUserId = auth.currentUser?.uid || exam.userId || 'user_local_student';
   const cleanExam: MockExam = {
     id: exam.id || 'exam_' + Date.now(),
-    userId: exam.userId || 'user_local_student',
+    userId: verifiedUserId,
     subject: exam.subject || 'General',
     topic: exam.topic || 'General Topic',
     questionsJson: exam.questionsJson || '[]',
     submittedAnswersJson: exam.submittedAnswersJson || '{}',
-    score: typeof exam.score === 'number' ? exam.score : 0,
+    score: typeof exam.score === 'number' ? Math.max(0, Math.min(100, exam.score)) : 0,
     completed: Boolean(exam.completed),
-    feedback: exam.feedback || '',
+    feedback: (exam.feedback || '').slice(0, 10000),
     timestamp: exam.timestamp || new Date().toISOString()
   };
 
@@ -269,8 +284,9 @@ export function subscribeToStudyDocuments(ownerId: string, callback: (docs: Stud
     return () => {};
   }
   try {
+    const verifiedOwnerId = auth.currentUser?.uid || ownerId;
     const docsRef = collection(db, "documents");
-    const q = query(docsRef, where("ownerId", "==", ownerId), orderBy("timestamp", "desc"), limit(100));
+    const q = query(docsRef, where("ownerId", "==", verifiedOwnerId), orderBy("timestamp", "desc"), limit(100));
     return onSnapshot(q, (snapshot) => {
       const documents: StudyDocument[] = [];
       snapshot.forEach((d) => {
@@ -289,13 +305,14 @@ export function subscribeToStudyDocuments(ownerId: string, callback: (docs: Stud
 }
 
 export async function saveStudyDocument(document: StudyDocument): Promise<void> {
+  const verifiedOwnerId = auth.currentUser?.uid || document.ownerId || 'user_local_student';
   const cleanDoc: StudyDocument = {
     id: document.id || 'doc_' + Date.now(),
-    ownerId: document.ownerId || 'user_local_student',
-    title: document.title || 'Untitled Note',
-    content: document.content || '',
-    summary: document.summary || '',
-    tagsJson: document.tagsJson || '[]',
+    ownerId: verifiedOwnerId,
+    title: (document.title || 'Untitled Note').slice(0, 200),
+    content: (document.content || '').slice(0, 100000),
+    summary: (document.summary || '').slice(0, 10000),
+    tagsJson: (document.tagsJson || '[]').slice(0, 5000),
     isShared: Boolean(document.isShared),
     timestamp: document.timestamp || new Date().toISOString()
   };
@@ -321,8 +338,9 @@ export async function saveStudyDocument(document: StudyDocument): Promise<void> 
 }
 
 export async function deleteStudyDocument(ownerId: string, documentId: string): Promise<void> {
+  const verifiedOwnerId = auth.currentUser?.uid || ownerId;
   if (!db || isOffline()) {
-    const key = `local_docs_${ownerId}`;
+    const key = `local_docs_${verifiedOwnerId}`;
     const local = JSON.parse(localStorage.getItem(key) || "[]") as StudyDocument[];
     const filtered = local.filter(d => d.id !== documentId);
     localStorage.setItem(key, JSON.stringify(filtered));

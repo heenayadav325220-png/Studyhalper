@@ -2,17 +2,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions for zero-trust security
+    // Helper functions for zero-trust authentication and authorization
     function isSignedIn() {
-      return request.auth != null;
+      return request.auth != null && request.auth.uid != null;
     }
 
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function isValidId(id) {
-      return id is string && id.size() > 0 && id.size() <= 128;
     }
 
     function incoming() {
@@ -23,40 +19,96 @@ service cloud.firestore {
       return resource.data;
     }
 
-    // Validation for User Profile
-    function isValidUser(data) {
-      return data.uid is string && data.uid == request.auth.uid
-        && (data.name is string && data.name.size() <= 100)
+    // Validation for User Profile Create
+    function isValidUserCreate(data, userId) {
+      return data.uid is string 
+        && data.uid == userId
+        && data.uid == request.auth.uid
+        && (data.name is string && data.name.size() > 0 && data.name.size() <= 100)
+        && (!('email' in data) || (data.email is string && data.email.size() <= 200))
         && (data.xp is int || data.xp is float)
-        && (data.streak is int || data.streak is float);
+        && data.xp >= 0 && data.xp <= 50000000
+        && (data.streak is int || data.streak is float)
+        && data.streak >= 0 && data.streak <= 10000
+        && (!('level' in data) || ((data.level is int || data.level is float) && data.level >= 1 && data.level <= 10000))
+        && (!('petLevel' in data) || ((data.petLevel is int || data.petLevel is float) && data.petLevel >= 0))
+        && (!('petXp' in data) || ((data.petXp is int || data.petXp is float) && data.petXp >= 0))
+        && (!('petName' in data) || (data.petName is string && data.petName.size() <= 60))
+        && (!('language' in data) || (data.language is string && data.language.size() <= 20))
+        && (!('lastActive' in data) || (data.lastActive is string && data.lastActive.size() <= 60))
+        && (!('role' in data));
+    }
+
+    // Validation for User Profile Update (enforces UID immutability & prevents client role escalation)
+    function isValidUserUpdate(data, prev, userId) {
+      return data.uid is string
+        && data.uid == prev.uid
+        && data.uid == userId
+        && data.uid == request.auth.uid
+        && (data.name is string && data.name.size() > 0 && data.name.size() <= 100)
+        && (!('email' in data) || (data.email is string && data.email.size() <= 200))
+        && (!('xp' in data) || ((data.xp is int || data.xp is float) && data.xp >= 0))
+        && (!('streak' in data) || ((data.streak is int || data.streak is float) && data.streak >= 0))
+        && (!('createdAt' in prev) || !('createdAt' in data) || data.createdAt == prev.createdAt)
+        && (!('role' in data) || ('role' in prev && data.role == prev.role));
+    }
+
+    // Validation for Room Creation
+    function isValidRoom(data, roomId) {
+      return (data.id is string && data.id == roomId)
+        && (data.name is string && data.name.size() > 0 && data.name.size() <= 100)
+        && (!('desc' in data) || (data.desc is string && data.desc.size() <= 500))
+        && (!('creatorId' in data) || (data.creatorId is string && data.creatorId == request.auth.uid));
     }
 
     // Validation for Room Chat Message
-    function isValidChatMessage(data) {
-      return data.senderId is string && data.senderId == request.auth.uid
-        && (data.roomId is string && data.roomId.size() <= 100)
-        && (data.text is string && data.text.size() <= 2000);
+    function isValidChatMessage(data, roomId) {
+      return (data.id is string && data.id.size() <= 128)
+        && (data.senderId is string && data.senderId == request.auth.uid)
+        && (data.roomId is string && data.roomId == roomId)
+        && (data.text is string && data.text.size() > 0 && data.text.size() <= 3000)
+        && (data.senderName is string && data.senderName.size() <= 100)
+        && (!('timestamp' in data) || (data.timestamp is string && data.timestamp.size() <= 60));
     }
 
     // Validation for Whiteboard Element
-    function isValidWhiteboardElement(data) {
-      return (data.senderId is string && data.senderId == request.auth.uid)
-        && (data.roomId is string && data.roomId.size() <= 100)
-        && (data.type is string && data.type.size() <= 50);
+    function isValidWhiteboardElement(data, roomId) {
+      return (data.id is string && data.id.size() <= 128)
+        && (data.senderId is string && data.senderId == request.auth.uid)
+        && (data.roomId is string && data.roomId == roomId)
+        && (data.type is string && data.type.size() <= 50)
+        && (!('color' in data) || (data.color is string && data.color.size() <= 30))
+        && (!('thickness' in data) || ((data.thickness is int || data.thickness is float) && data.thickness >= 1 && data.thickness <= 100))
+        && (data.points is string && data.points.size() <= 50000)
+        && (!('text' in data) || (data.text is string && data.text.size() <= 2000))
+        && (!('timestamp' in data) || (data.timestamp is string && data.timestamp.size() <= 60));
     }
 
     // Validation for Mock Exam
     function isValidMockExam(data) {
-      return data.userId is string && data.userId == request.auth.uid
-        && (data.subject is string && data.subject.size() <= 100)
-        && (data.score is int || data.score is float);
+      return (data.id is string && data.id.size() <= 128)
+        && (data.userId is string && data.userId == request.auth.uid)
+        && (data.subject is string && data.subject.size() > 0 && data.subject.size() <= 100)
+        && (!('topic' in data) || (data.topic is string && data.topic.size() <= 150))
+        && (data.score is int || data.score is float)
+        && data.score >= 0 && data.score <= 100
+        && (!('completed' in data) || data.completed is bool)
+        && (!('feedback' in data) || (data.feedback is string && data.feedback.size() <= 10000))
+        && (!('questionsJson' in data) || (data.questionsJson is string && data.questionsJson.size() <= 30000))
+        && (!('submittedAnswersJson' in data) || (data.submittedAnswersJson is string && data.submittedAnswersJson.size() <= 15000))
+        && (!('timestamp' in data) || (data.timestamp is string && data.timestamp.size() <= 60));
     }
 
     // Validation for Study Document
     function isValidStudyDocument(data) {
-      return data.ownerId is string && data.ownerId == request.auth.uid
-        && (data.title is string && data.title.size() <= 200)
-        && (data.content is string && data.content.size() <= 50000);
+      return (data.id is string && data.id.size() <= 128)
+        && (data.ownerId is string && data.ownerId == request.auth.uid)
+        && (data.title is string && data.title.size() > 0 && data.title.size() <= 200)
+        && (data.content is string && data.content.size() <= 100000)
+        && (!('summary' in data) || (data.summary is string && data.summary.size() <= 10000))
+        && (!('tagsJson' in data) || (data.tagsJson is string && data.tagsJson.size() <= 5000))
+        && (!('isShared' in data) || data.isShared is bool)
+        && (!('timestamp' in data) || (data.timestamp is string && data.timestamp.size() <= 60));
     }
 
     // Default deny all unknown collections
@@ -67,50 +119,50 @@ service cloud.firestore {
     // 1. Users collection: Strictly private to account owner, anti-scraping list protection
     match /users/{userId} {
       allow get: if isOwner(userId);
-      // Deny bulk user listing to completely prevent data scraping/harvesting
       allow list: if false;
-      allow create: if isOwner(userId) && isValidUser(incoming());
-      allow update: if isOwner(userId) && isValidUser(incoming()) && incoming().uid == existing().uid;
+      allow create: if isOwner(userId) && isValidUserCreate(incoming(), userId);
+      allow update: if isOwner(userId) && isValidUserUpdate(incoming(), existing(), userId);
       allow delete: if isOwner(userId);
     }
 
-    // 2. Study Rooms container
+    // 2. Study Rooms container: Read by authenticated students, protected from unauthorized modification or deletion
     match /rooms/{roomId} {
       allow get, list: if isSignedIn();
-      allow create, update: if isSignedIn();
+      allow create: if isSignedIn() && isValidRoom(incoming(), roomId);
+      allow update: if isSignedIn() && incoming().id == existing().id && (!('creatorId' in existing()) || existing().creatorId == request.auth.uid);
       allow delete: if false;
     }
 
-    // 2b. Collaborative Study Room Chats
+    // 2b. Collaborative Study Room Chats: Authenticated room messages with strict sender validation
     match /rooms/{roomId}/chats/{chatId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidChatMessage(incoming());
-      allow update: if isSignedIn() && existing().senderId == request.auth.uid && isValidChatMessage(incoming());
+      allow create: if isSignedIn() && isValidChatMessage(incoming(), roomId);
+      allow update: if isSignedIn() && existing().senderId == request.auth.uid && incoming().senderId == existing().senderId && incoming().roomId == existing().roomId && isValidChatMessage(incoming(), roomId);
       allow delete: if isSignedIn() && existing().senderId == request.auth.uid;
     }
 
-    // 3. Collaborative Whiteboard Elements
+    // 3. Collaborative Whiteboard Elements: Real-time drawing elements with user identity isolation
     match /rooms/{roomId}/whiteboard/{elementId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidWhiteboardElement(incoming());
-      allow update: if isSignedIn() && existing().senderId == request.auth.uid && isValidWhiteboardElement(incoming());
+      allow create: if isSignedIn() && isValidWhiteboardElement(incoming(), roomId);
+      allow update: if isSignedIn() && existing().senderId == request.auth.uid && incoming().senderId == existing().senderId && incoming().roomId == existing().roomId && isValidWhiteboardElement(incoming(), roomId);
       allow delete: if isSignedIn() && (existing().senderId == request.auth.uid || !('senderId' in existing()));
     }
 
-    // 4. Mock Exams: Strictly isolated to the student taking the exam
+    // 4. Mock Exams: Strictly isolated to the student taking the exam (zero cross-user access)
     match /exams/{examId} {
       allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow create: if isSignedIn() && incoming().userId == request.auth.uid && isValidMockExam(incoming());
-      allow update: if isSignedIn() && existing().userId == request.auth.uid && isValidMockExam(incoming()) && incoming().userId == existing().userId;
+      allow update: if isSignedIn() && existing().userId == request.auth.uid && incoming().userId == existing().userId && isValidMockExam(incoming());
       allow delete: if isSignedIn() && existing().userId == request.auth.uid;
     }
 
-    // 5. Study Documents: Private to owner or shared if flagged (never editable or deletable by others)
+    // 5. Study Documents: Private to owner, or read-only if explicitly shared. Owner can never be modified.
     match /documents/{docId} {
       allow get: if isSignedIn() && (resource.data.ownerId == request.auth.uid || resource.data.isShared == true);
       allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
       allow create: if isSignedIn() && incoming().ownerId == request.auth.uid && isValidStudyDocument(incoming());
-      allow update: if isSignedIn() && existing().ownerId == request.auth.uid && isValidStudyDocument(incoming()) && incoming().ownerId == existing().ownerId;
+      allow update: if isSignedIn() && existing().ownerId == request.auth.uid && incoming().ownerId == existing().ownerId && isValidStudyDocument(incoming());
       allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
     }
   }

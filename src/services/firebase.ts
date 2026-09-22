@@ -190,9 +190,9 @@ export function withTimeout<T>(promise: Promise<T>, ms: number = 3500, fallbackM
 }
 
 /**
- * Sign in with Google Popup (with safe timeout)
+ * Sign in with Google Popup (with safe generous timeout for human interaction)
  */
-export async function signInWithGoogle(timeoutMs: number = 4000): Promise<FirebaseUser> {
+export async function signInWithGoogle(timeoutMs: number = 90000): Promise<FirebaseUser> {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   const popupPromise = signInWithPopup(auth, provider).then(res => res.user);

@@ -30,6 +30,8 @@ export const Login: React.FC<LoginProps> = ({ onSuccess, initialMode = 'signin' 
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isUnauthorizedDomain, setIsUnauthorizedDomain] = useState(false);
+  const [copiedDomain, setCopiedDomain] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -88,6 +90,8 @@ export const Login: React.FC<LoginProps> = ({ onSuccess, initialMode = 'signin' 
 
   const handleGoogleAuth = async () => {
     setError(null);
+    setIsUnauthorizedDomain(false);
+    setCopiedDomain(false);
     setSuccess(null);
     setLoading(true);
     try {
@@ -98,6 +102,10 @@ export const Login: React.FC<LoginProps> = ({ onSuccess, initialMode = 'signin' 
       }
     } catch (err: any) {
       if (!err.message?.includes('closed-by-user')) {
+        const errStr = `${err?.code || ''} ${err?.message || ''}`.toLowerCase();
+        if (errStr.includes('unauthorized-domain')) {
+          setIsUnauthorizedDomain(true);
+        }
         setError(err.message || 'Google Sign-In failed.');
       }
     } finally {
@@ -172,10 +180,54 @@ export const Login: React.FC<LoginProps> = ({ onSuccess, initialMode = 'signin' 
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-start space-x-2 text-rose-300 text-xs"
+            className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl space-y-2 text-rose-300 text-xs"
           >
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
-            <span className="leading-relaxed">{error}</span>
+            <div className="flex items-start space-x-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+              <span className="leading-relaxed">{error}</span>
+            </div>
+
+            {isUnauthorizedDomain && (
+              <div className="mt-2 pt-2 border-t border-rose-500/20 space-y-2 text-[11px] text-slate-300">
+                <div className="flex items-center justify-between font-semibold text-amber-300">
+                  <span>Firebase Authorized Domain:</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">coreai-a7cf4</span>
+                </div>
+
+                <div className="flex items-center space-x-2 bg-slate-950 border border-slate-700/60 p-2 rounded-lg">
+                  <code className="text-[11px] text-cyan-300 select-all font-mono break-all flex-1">
+                    {typeof window !== 'undefined' ? window.location.hostname : 'run.app domain'}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        navigator.clipboard.writeText(window.location.hostname);
+                        setCopiedDomain(true);
+                        setTimeout(() => setCopiedDomain(false), 2500);
+                      }
+                    }}
+                    className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-semibold shrink-0 transition cursor-pointer"
+                  >
+                    {copiedDomain ? 'Copied ✓' : 'Copy Domain'}
+                  </button>
+                </div>
+
+                <div className="text-[11px] text-slate-400 space-y-1">
+                  <p className="font-semibold text-slate-300">Steps to authorize in Firebase Console:</p>
+                  <ol className="list-decimal list-inside space-y-0.5 pl-1 text-slate-300">
+                    <li>Open Firebase Console (coreai-a7cf4)</li>
+                    <li>Go to Authentication → Settings → Authorized domains</li>
+                    <li>Click "Add domain" and paste the domain above</li>
+                  </ol>
+                </div>
+
+                <div className="p-2 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 flex items-center space-x-1.5">
+                  <span className="text-sm">✨</span>
+                  <span>Email & Password sign-up and login works 100% right now without any domain setup!</span>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
 

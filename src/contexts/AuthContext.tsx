@@ -255,7 +255,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     setAuthError(null);
     try {
-      const user = await firebaseSignInWithGoogle(3000);
+      const user = await firebaseSignInWithGoogle(90000);
       await fetchOrInitUserProfile(user);
       return user;
     } catch (err: any) {
