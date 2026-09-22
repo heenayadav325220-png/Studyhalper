@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { UserProfile } from '../types';
+import { playTutorSpeech } from '../services/voiceSettings';
 
 interface PdfBookScannerProps {
   user?: UserProfile;
@@ -195,23 +196,23 @@ export const PdfBookScanner: React.FC<PdfBookScannerProps> = ({
     if (!analysisResult) return;
 
     if (isPlayingAudio) {
-      window.speechSynthesis.cancel();
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
       setIsPlayingAudio(false);
       return;
     }
 
-    window.speechSynthesis.cancel();
-    const cleanSpeech = `${analysisResult.chapterTitle}. ${analysisResult.executiveSummary.replace(/[#*`_~]/g, '')}`;
-    const utterance = new SpeechSynthesisUtterance(cleanSpeech);
-    utterance.lang = appLanguage === 'hi' ? 'hi-IN' : 'en-US';
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-
-    utterance.onend = () => setIsPlayingAudio(false);
-    utterance.onerror = () => setIsPlayingAudio(false);
-
-    window.speechSynthesis.speak(utterance);
+    const cleanSpeech = `${analysisResult.chapterTitle}. ${analysisResult.executiveSummary}`;
     setIsPlayingAudio(true);
+
+    playTutorSpeech(
+      cleanSpeech,
+      {},
+      () => setIsPlayingAudio(true),
+      () => setIsPlayingAudio(false),
+      () => setIsPlayingAudio(false)
+    );
   };
 
   // Quiz Handling

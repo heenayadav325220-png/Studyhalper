@@ -534,89 +534,93 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
                     </div>
 
                     {/* Always-visible Action Buttons Suite */}
-                    <div className="border-t border-white/10 pt-2 mt-2 flex items-center justify-between flex-wrap gap-1.5">
-                      <div className="flex items-center space-x-1 flex-wrap gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleCopyText(msg.id, msg.text)}
-                          title="Copy text"
-                          className="bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium px-2 py-1 rounded-lg flex items-center space-x-1 transition cursor-pointer active:scale-95"
-                        >
-                          {copiedId === msg.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-slate-400" />}
-                          <span className="hidden xs:inline">{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
-                        </button>
+                    {!isStudent && (
+                      <>
+                        <div className="border-t border-white/10 pt-2 mt-2 flex items-center justify-between flex-wrap gap-1.5">
+                          <div className="flex items-center space-x-1 flex-wrap gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(msg.id, msg.text)}
+                              title="Copy text"
+                              className="bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium px-2 py-1 rounded-lg flex items-center space-x-1 transition cursor-pointer active:scale-95"
+                            >
+                              {copiedId === msg.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-slate-400" />}
+                              <span className="hidden xs:inline">{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
+                            </button>
 
-                        <button
-                          type="button"
-                          onClick={() => speakText(msg.speechText || msg.text)}
-                          title="Listen"
-                          className="bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium px-2 py-1 rounded-lg flex items-center space-x-1 transition cursor-pointer active:scale-95"
-                        >
-                          <Volume2 className="w-3 h-3 text-slate-400" />
-                          <span className="hidden xs:inline">Listen</span>
-                        </button>
+                            <button
+                              type="button"
+                              onClick={() => speakText(msg.speechText || msg.text)}
+                              title="Listen"
+                              className="bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium px-2 py-1 rounded-lg flex items-center space-x-1 transition cursor-pointer active:scale-95"
+                            >
+                              <Volume2 className="w-3 h-3 text-slate-400" />
+                              <span className="hidden xs:inline">Listen</span>
+                            </button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleSaveToNotebook(msg)}
-                          title="Save to notebook"
-                          className="bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium px-2 py-1 rounded-lg flex items-center space-x-1 transition cursor-pointer active:scale-95"
-                        >
-                          <Bookmark className="w-3 h-3 text-slate-400" />
-                          <span className="hidden xs:inline">{savedDocId === msg.id ? 'Saved ✓' : 'Save Note'}</span>
-                        </button>
-                      </div>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveToNotebook(msg)}
+                              title="Save to notebook"
+                              className="bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium px-2 py-1 rounded-lg flex items-center space-x-1 transition cursor-pointer active:scale-95"
+                            >
+                              <Bookmark className="w-3 h-3 text-slate-400" />
+                              <span className="hidden xs:inline">{savedDocId === msg.id ? 'Saved ✓' : 'Save Note'}</span>
+                            </button>
+                          </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setExpandedToolsId(expandedToolsId === msg.id ? null : msg.id)}
-                        title="Study Tools"
-                        className={`text-[11px] font-semibold px-2 py-1 rounded-lg flex items-center space-x-1 transition cursor-pointer active:scale-95 ${
-                          expandedToolsId === msg.id
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-indigo-950/80 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-900/60'
-                        }`}
-                      >
-                        <SlidersHorizontal className="w-3 h-3" />
-                        <span>{expandedToolsId === msg.id ? 'Hide Tools' : 'Study Tools'}</span>
-                      </button>
-                    </div>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedToolsId(expandedToolsId === msg.id ? null : msg.id)}
+                            title="Study Tools"
+                            className={`text-[11px] font-semibold px-2 py-1 rounded-lg flex items-center space-x-1 transition cursor-pointer active:scale-95 ${
+                              expandedToolsId === msg.id
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-indigo-950/80 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-900/60'
+                            }`}
+                          >
+                            <SlidersHorizontal className="w-3 h-3" />
+                            <span>{expandedToolsId === msg.id ? 'Hide Tools' : 'Study Tools'}</span>
+                          </button>
+                        </div>
 
-                    {expandedToolsId === msg.id && (
-                      <div className="bg-black/40 border border-indigo-500/30 p-2 rounded-xl mt-2 flex flex-wrap items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => handleSubmitSpokenQuestion(`Can you explain "${msg.text.slice(0, 80)}" in simpler terms with a super easy everyday analogy?`)}
-                          className="bg-white/5 hover:bg-indigo-600/30 border border-white/10 hover:border-indigo-400 text-slate-200 text-[10px] font-medium px-2 py-1 rounded-md flex items-center gap-1 transition cursor-pointer"
-                        >
-                          <Lightbulb className="w-3 h-3 text-amber-400" />
-                          <span>Explain Simpler</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSubmitSpokenQuestion(`Give me 1 practice question based on "${msg.text.slice(0, 80)}" to test my understanding.`)}
-                          className="bg-white/5 hover:bg-indigo-600/30 border border-white/10 hover:border-indigo-400 text-slate-200 text-[10px] font-medium px-2 py-1 rounded-md flex items-center gap-1 transition cursor-pointer"
-                        >
-                          <HelpCircle className="w-3 h-3 text-indigo-400" />
-                          <span>Practice Question</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSubmitSpokenQuestion(`Please explain "${msg.text.slice(0, 80)}" in easy Hinglish with important exam points.`)}
-                          className="bg-white/5 hover:bg-indigo-600/30 border border-white/10 hover:border-indigo-400 text-slate-200 text-[10px] font-medium px-2 py-1 rounded-md flex items-center gap-1 transition cursor-pointer"
-                        >
-                          <Languages className="w-3 h-3 text-purple-400" />
-                          <span>JEE Main / Hinglish</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSubmitSpokenQuestion(`Summarize "${msg.text.slice(0, 80)}" in a clean structured summary.`)}
-                          className="bg-white/5 hover:bg-indigo-600/30 border border-white/10 hover:border-indigo-400 text-slate-200 text-[10px] font-medium px-2 py-1 rounded-md flex items-center gap-1 transition cursor-pointer"
-                        >
-                          <Table className="w-3 h-3 text-teal-400" />
-                          <span>Summary</span>
-                        </button>
-                      </div>
+                        {expandedToolsId === msg.id && (
+                          <div className="bg-black/40 border border-indigo-500/30 p-2 rounded-xl mt-2 flex flex-wrap items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleSubmitSpokenQuestion(`Can you explain "${msg.text.slice(0, 80)}" in simpler terms with a super easy everyday analogy?`)}
+                              className="bg-white/5 hover:bg-indigo-600/30 border border-white/10 hover:border-indigo-400 text-slate-200 text-[10px] font-medium px-2 py-1 rounded-md flex items-center gap-1 transition cursor-pointer"
+                            >
+                              <Lightbulb className="w-3 h-3 text-amber-400" />
+                              <span>Explain Simpler</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSubmitSpokenQuestion(`Give me 1 practice question based on "${msg.text.slice(0, 80)}" to test my understanding.`)}
+                              className="bg-white/5 hover:bg-indigo-600/30 border border-white/10 hover:border-indigo-400 text-slate-200 text-[10px] font-medium px-2 py-1 rounded-md flex items-center gap-1 transition cursor-pointer"
+                            >
+                              <HelpCircle className="w-3 h-3 text-indigo-400" />
+                              <span>Practice Question</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSubmitSpokenQuestion(`Please explain "${msg.text.slice(0, 80)}" in easy Hinglish with important exam points.`)}
+                              className="bg-white/5 hover:bg-indigo-600/30 border border-white/10 hover:border-indigo-400 text-slate-200 text-[10px] font-medium px-2 py-1 rounded-md flex items-center gap-1 transition cursor-pointer"
+                            >
+                              <Languages className="w-3 h-3 text-purple-400" />
+                              <span>JEE Main / Hinglish</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSubmitSpokenQuestion(`Summarize "${msg.text.slice(0, 80)}" in a clean structured summary.`)}
+                              className="bg-white/5 hover:bg-indigo-600/30 border border-white/10 hover:border-indigo-400 text-slate-200 text-[10px] font-medium px-2 py-1 rounded-md flex items-center gap-1 transition cursor-pointer"
+                            >
+                              <Table className="w-3 h-3 text-teal-400" />
+                              <span>Summary</span>
+                            </button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                   <span className="text-[9px] text-slate-500 px-1">{msg.timestamp}</span>

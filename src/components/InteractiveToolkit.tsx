@@ -510,7 +510,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
   };
 
   const Q = (t: string | unknown) => {
-    if (!window.speechSynthesis) {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
       alert("TTS not supported in this browser.");
       return;
     }
@@ -521,11 +521,14 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
     }
     const rawStr = typeof t === 'string' ? t : String(t || '');
     if (!rawStr) return;
-    const cleanText = rawStr.replace(/[#*`_-]/g, "").substring(0, 500);
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.onend = () => ce(false);
-    ce(true);
-    window.speechSynthesis.speak(utterance);
+
+    playTutorSpeech(
+      rawStr,
+      {},
+      () => ce(true),
+      () => ce(false),
+      () => ce(false)
+    );
   };
 
   const We = async (t?: string | unknown) => {
