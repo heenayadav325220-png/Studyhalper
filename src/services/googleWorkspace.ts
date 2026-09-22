@@ -1,6 +1,6 @@
 import defaultFirebaseConfig from "../../firebase-applet-config.json";
 
-const OAUTH_CLIENT_ID = (defaultFirebaseConfig as any).oAuthClientId || "45675025134-7cr0ru7ro016h181rviraekn2h599bv1.apps.googleusercontent.com";
+const OAUTH_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID || (defaultFirebaseConfig as any).oAuthClientId || "";
 
 export interface IntegrationState {
   connected: boolean;

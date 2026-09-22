@@ -61,29 +61,6 @@ const TARGET_GOALS = [
   'Top My Class & Boost GPA'
 ];
 
-// Cryptographic one-way SHA-256 hash to prevent raw password storage
-async function hashSecret(plainSecret: string): Promise<string> {
-  try {
-    if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
-      const encoder = new TextEncoder();
-      const salt = "ascend_zero_trust_salt_2026_";
-      const data = encoder.encode(salt + plainSecret);
-      const hashBuffer = await window.crypto.subtle.digest("SHA-256", data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
-    }
-  } catch {
-    // Graceful fallback
-  }
-  let hash = 0;
-  const str = "ascend_salt_" + plainSecret;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return "h_" + Math.abs(hash).toString(16);
-}
-
 export default function AuthModal({
   isOpen,
   onClose,
@@ -143,28 +120,6 @@ export default function AuthModal({
     setCurrentTab(tab);
   };
 
-  // Helper to detect if a Firebase auth provider is unconfigured, restricted, or timed out
-  const isProviderIssue = (err: any): boolean => {
-    if (!err) return false;
-    const str = `${err?.code || ''} ${err?.message || ''} ${String(err || '')}`.toLowerCase();
-    return (
-      str.includes('operation-not-allowed') ||
-      str.includes('admin-restricted-operation') ||
-      str.includes('configuration-not-found') ||
-      str.includes('unauthorized-domain') ||
-      str.includes('app-not-authorized') ||
-      str.includes('auth/internal-error') ||
-      str.includes('api-key-not-valid') ||
-      str.includes('password_login_disabled') ||
-      str.includes('admin_only_operation') ||
-      str.includes('timeout') ||
-      str.includes('timed out') ||
-      str.includes('network-request-failed') ||
-      str.includes('popup-blocked') ||
-      str.includes('popup-closed')
-    );
-  };
-
   // 1. SIGN IN (LOGIN)
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,79 +137,19 @@ export default function AuthModal({
       let uid = '';
       let displayName = userProfile.name || cleanEmail.split('@')[0];
 
-      try {
-        // Strict 2.5s network timeout so user never waits 5 minutes
-        const userCredential = await withTimeout(
-          signInWithEmailAndPassword(auth, cleanEmail, password),
-          2500,
-          'Network auth timeout'
-        );
-        const user = userCredential.user;
-        uid = user.uid;
-        if (user.displayName) displayName = user.displayName;
-      } catch (authErr: any) {
-        console.warn('Firebase signIn note:', authErr?.code || authErr?.message);
-        
-        if (isProviderIssue(authErr)) {
-          // Check local registered accounts
-          const savedAccountsRaw = localStorage.getItem('ascend_saved_accounts') || '[]';
-          let savedAccounts: Array<{ email: string; passwordHash?: string; password?: string; name: string; uid: string }> = [];
-          try {
-            savedAccounts = JSON.parse(savedAccountsRaw);
-          } catch {
-            savedAccounts = [];
-          }
-
-          const existingAccount = savedAccounts.find(acc => acc.email.toLowerCase() === cleanEmail);
-          const hashedInputPassword = await hashSecret(password);
-
-          if (existingAccount) {
-            const hasLegacyPassword = !!existingAccount.password;
-            const isMatch = existingAccount.passwordHash
-              ? existingAccount.passwordHash === hashedInputPassword
-              : existingAccount.password === password;
-
-            if (!isMatch) {
-              setError(isHi ? 'गलत पासवर्ड। कृपया पुनः प्रयास करें।' : 'Incorrect password. Please try again.');
-              setLoading(false);
-              return;
-            }
-
-            // Immediately migrate legacy plaintext password to secure SHA-256 hash
-            if (hasLegacyPassword || !existingAccount.passwordHash) {
-              existingAccount.passwordHash = hashedInputPassword;
-              delete existingAccount.password;
-              localStorage.setItem('ascend_saved_accounts', JSON.stringify(savedAccounts));
-            }
-
-            uid = existingAccount.uid;
-            displayName = existingAccount.name || displayName;
-          } else {
-            // Auto-provision local study account smoothly with SHA-256 hashing
-            uid = `usr_${Math.abs(cleanEmail.split('').reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0)).toString(36)}`;
-            savedAccounts.push({
-              email: cleanEmail,
-              passwordHash: hashedInputPassword,
-              name: displayName,
-              uid: uid
-            });
-            localStorage.setItem('ascend_saved_accounts', JSON.stringify(savedAccounts));
-          }
-        } else {
-          // Check if wrong password error
-          const errStr = `${authErr?.code || ''} ${authErr?.message || ''}`.toLowerCase();
-          if (errStr.includes('wrong-password') || errStr.includes('invalid-credential') || errStr.includes('invalid-login-credentials')) {
-            setError(isHi ? 'गलत पासवर्ड या ईमेल। कृपया पुनः जांचें।' : 'Invalid email or password. Please verify.');
-            setLoading(false);
-            return;
-          }
-          throw authErr;
-        }
-      }
+      // Strict 5.0s network timeout so user is not blocked forever
+      const userCredential = await withTimeout(
+        signInWithEmailAndPassword(auth, cleanEmail, password),
+        5000,
+        'Network auth timeout'
+      );
+      const user = userCredential.user;
+      uid = user.uid;
+      if (user.displayName) displayName = user.displayName;
 
       const updatedProfile: UserProfile = {
         ...userProfile,
-        uid: uid || `student_${Date.now().toString(36)}`,
+        uid: uid,
         email: cleanEmail,
         name: displayName,
         authProvider: 'password',
@@ -310,54 +205,25 @@ export default function AuthModal({
     setSuccessMessage(null);
 
     try {
-      let uid = '';
+      // Fast 5.0s network timeout
+      const userCredential = await withTimeout(
+        createUserWithEmailAndPassword(auth, cleanEmail, password),
+        5000,
+        'Signup network timeout'
+      );
+      const user = userCredential.user;
+      const uid = user.uid;
 
+      // Update Firebase Auth Display Name
       try {
-        // Fast 2.5s network timeout so user never hangs
-        const userCredential = await withTimeout(
-          createUserWithEmailAndPassword(auth, cleanEmail, password),
-          2500,
-          'Signup network timeout'
-        );
-        const user = userCredential.user;
-        uid = user.uid;
-
-        // Update Firebase Auth Display Name
-        try {
-          await updateProfile(user, { displayName: cleanName });
-        } catch (profileErr) {
-          console.warn('Could not set displayName in Auth:', profileErr);
-        }
-      } catch (authErr: any) {
-        console.warn('Firebase createUser note:', authErr?.code || authErr?.message);
-        
-        if (isProviderIssue(authErr) || `${authErr?.code || ''}`.includes('email-already-in-use')) {
-          const savedAccountsRaw = localStorage.getItem('ascend_saved_accounts') || '[]';
-          let savedAccounts: Array<{ email: string; password?: string; passwordHash?: string; name: string; uid: string }> = [];
-          try {
-            savedAccounts = JSON.parse(savedAccountsRaw);
-          } catch {
-            savedAccounts = [];
-          }
-
-          uid = `usr_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
-          savedAccounts = savedAccounts.filter(acc => acc.email.toLowerCase() !== cleanEmail);
-          const hashedInputPassword = await hashSecret(password);
-          savedAccounts.push({
-            email: cleanEmail,
-            passwordHash: hashedInputPassword,
-            name: cleanName,
-            uid: uid
-          });
-          localStorage.setItem('ascend_saved_accounts', JSON.stringify(savedAccounts));
-        } else {
-          throw authErr;
-        }
+        await updateProfile(user, { displayName: cleanName });
+      } catch (profileErr) {
+        console.warn('Could not set displayName in Auth:', profileErr);
       }
 
       const updatedProfile: UserProfile = {
         ...userProfile,
-        uid: uid || `student_${Date.now().toString(36)}`,
+        uid: uid,
         email: cleanEmail,
         name: cleanName,
         className: selectedClass,
@@ -403,25 +269,8 @@ export default function AuthModal({
     setSuccessMessage(null);
 
     try {
-      let user: any = null;
-      try {
-        // 3-second safe timeout for Google popup
-        user = await signInWithGoogle(3000);
-      } catch (googleErr: any) {
-        console.warn('Google Auth Note (using seamless fallback):', googleErr?.code || googleErr?.message);
-        
-        // Use user's provided or detected Google email
-        const targetGoogleEmail = email.trim() || userProfile.email || 'yadavrohityadav331@gmail.com';
-        const targetGoogleName = fullName.trim() || userProfile.name || targetGoogleEmail.split('@')[0] || 'Google Student';
-
-        user = {
-          uid: `goog_${Date.now().toString(36)}`,
-          displayName: targetGoogleName,
-          email: targetGoogleEmail,
-          photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80'
-        };
-      }
-      
+      // 5-second safe timeout for Google popup
+      const user = await signInWithGoogle(5000);
       const displayName = user.displayName || user.email?.split('@')[0] || 'Student';
       const photoURL = user.photoURL || undefined;
 
@@ -480,16 +329,8 @@ export default function AuthModal({
     setSuccessMessage(null);
 
     try {
-      try {
-        await sendUserPasswordReset(cleanEmail);
-        setSuccessMessage(isHi ? 'पासवर्ड रीसेट लिंक आपके ईमेल पर भेज दिया गया है।' : 'Password reset link sent to your email. Please check your inbox.');
-      } catch (resetErr: any) {
-        if (isProviderIssue(resetErr)) {
-          setSuccessMessage(isHi ? 'पासवर्ड रीसेट अनुरोध दर्ज हो गया है। आप नए पासवर्ड के साथ साइन इन कर सकते हैं।' : 'Password reset noted. You can log in directly with your email and password.');
-        } else {
-          throw resetErr;
-        }
-      }
+      await sendUserPasswordReset(cleanEmail);
+      setSuccessMessage(isHi ? 'पासवर्ड रीसेट लिंक आपके ईमेल पर भेज दिया गया है।' : 'Password reset link sent to your email. Please check your inbox.');
     } catch (err: any) {
       console.warn('Password Reset Handled:', err?.message || err);
       const friendly = getFriendlyAuthErrorMessage(err?.code || err?.message || '', appLanguage);

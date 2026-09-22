@@ -46,6 +46,7 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || defaultFirebaseConfig.storageBucket,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || defaultFirebaseConfig.messagingSenderId,
   appId: import.meta.env.VITE_FIREBASE_APP_ID || defaultFirebaseConfig.appId,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || (defaultFirebaseConfig as any).databaseURL,
   firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || (defaultFirebaseConfig as any).firestoreDatabaseId || "(default)"
 };
 

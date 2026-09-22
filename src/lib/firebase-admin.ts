@@ -4,7 +4,7 @@ import firebaseConfig from '../../firebase-applet-config.json';
 
 if (!getApps().length) {
   initializeApp({
-    projectId: firebaseConfig.projectId,
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId,
   });
 }
 
