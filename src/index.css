@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500;1,6..72,600;1,6..72,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -132,6 +132,93 @@ html.dark .tutor-editorial ol {
   color: #cbd5e1 !important;
 }
 
+/* Global dark-mode coverage for the full app */
+html.dark {
+  background-color: #0d0f17;
+}
+
+html.dark body,
+html.dark #root,
+html.dark #main-app-container {
+  background: radial-gradient(circle at top, rgba(99, 102, 241, 0.12), transparent 26%), #0d0f17 !important;
+  color: #e2e8f0 !important;
+}
+
+html.dark #main-app-container [class*="bg-white"],
+html.dark #main-app-container [class*="bg-slate-50"],
+html.dark #main-app-container [class*="bg-slate-100"],
+html.dark #main-app-container [class*="bg-slate-200"],
+html.dark #main-app-container [class*="bg-slate-300"],
+html.dark #main-app-container [class*="bg-slate-850"],
+html.dark #main-app-container [class*="bg-slate-900"],
+html.dark #main-app-container .bg-[#f8fafc],
+html.dark #main-app-container .bg-[#ffffff],
+html.dark #main-app-container .bg-\[\#ffffff\],
+html.dark #main-app-container .bg-\[\#f8fafc\],
+html.dark #main-app-container .bg-\[\#fff\] {
+  background-color: #161926 !important;
+}
+
+html.dark #main-app-container [class*="border-slate-"],
+html.dark #main-app-container .border,
+html.dark #main-app-container .divide-slate-200 > * {
+  border-color: rgba(148, 163, 184, 0.25) !important;
+}
+
+html.dark #main-app-container [class*="text-slate-"] {
+  color: #e2e8f0 !important;
+}
+
+html.dark #main-app-container .text-slate-400,
+html.dark #main-app-container .text-slate-500,
+html.dark #main-app-container .text-slate-600,
+html.dark #main-app-container .text-slate-700,
+html.dark #main-app-container .text-slate-800,
+html.dark #main-app-container .text-slate-900 {
+  color: #e2e8f0 !important;
+}
+
+html.dark #main-app-container input,
+html.dark #main-app-container textarea,
+html.dark #main-app-container select,
+html.dark #main-app-container .bg-slate-950,
+html.dark #main-app-container .bg-slate-900,
+html.dark #main-app-container .bg-slate-800,
+html.dark #main-app-container .bg-slate-700 {
+  background-color: #111827 !important;
+  color: #f8fafc !important;
+  border-color: rgba(148, 163, 184, 0.25) !important;
+}
+
+html.dark #main-app-container input::placeholder,
+html.dark #main-app-container textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+html.dark #main-app-container option {
+  background-color: #111827 !important;
+  color: #f8fafc !important;
+}
+
+html.dark #main-app-container button:not([class*="bg-\[\#"]) {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+html.dark #main-app-container .shadow-xs,
+html.dark #main-app-container .shadow-sm,
+html.dark #main-app-container .shadow-md,
+html.dark #main-app-container .shadow-lg,
+html.dark #main-app-container .shadow-xl,
+html.dark #main-app-container .shadow-2xl {
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.32) !important;
+}
+
+html.dark #main-app-container .backdrop-blur-md,
+html.dark #main-app-container .backdrop-blur-lg,
+html.dark #main-app-container .backdrop-blur-xl {
+  backdrop-filter: blur(18px) saturate(160%);
+}
+
 /* AI Tutor Classic Editorial & Scholarly Typography */
 .tutor-editorial {
   font-family: "Lora", "Newsreader", "Playfair Display", Georgia, serif;
@@ -228,9 +315,9 @@ html.dark .tutor-editorial ol {
 }
 
 /* Composer and suggestions */
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer { position: relative; z-index: 20; border-top: 1px solid #e7eaf0; background: rgba(248, 250, 252, 0.94); padding: 10px clamp(14px, 3vw, 32px) max(12px, env(safe-area-inset-bottom)); box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.06); }
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer { position: relative; z-index: 20; border-top: 1px solid #e7eaf0; background: rgba(248, 250, 252, 0.94); padding: 10px clamp(14px, 3vw, 32px); }
 #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer > div { max-width: 880px; }
-#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer .flex.items-center.bg-white.border { border-color: #dfe4ec; border-radius: 18px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08); padding: 5px; }
+#main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer .flex.items-center.bg-white.border { border-color: #dfe4ec; border-radius: 18px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08); }
 #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer .flex.items-center.bg-white.border:focus-within { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12), 0 8px 24px rgba(15, 23, 42, 0.08); }
 #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer .flex.items-center.overflow-x-auto { padding: 2px 0 5px; scrollbar-width: none; }
 #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer .flex.items-center.overflow-x-auto::-webkit-scrollbar { display: none; }
