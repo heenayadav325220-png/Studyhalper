@@ -73,6 +73,7 @@ import ThemeToggle from './components/ThemeToggle';
 import QuizSection from './components/QuizSection';
 import PWAInstallBanner from './components/PWAInstallBanner';
 import { BadgeCelebrationModal } from './components/BadgeCelebrationModal';
+import Toast, { showToast } from './components/Toast';
 import type { 
   UserProfile, 
   RoomChatMessage, 
@@ -198,7 +199,9 @@ export default function App() {
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [showVoiceTutorModal, setShowVoiceTutorModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
   const [playgroundViewMode, setPlaygroundViewMode] = useState<'list' | 'grid'>('list');
+  const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false);
 
   // Bottom navigation auto-hide state for AI Tutor mode (auto-hides in 2s, pull-up arrow restores)
   const [isBottomNavVisible, setIsBottomNavVisible] = useState(true);
@@ -303,6 +306,7 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
+      setAuthInitialized(true);
       if (user && !user.isAnonymous) {
         // Authenticated user detected
         setUserProfile(prev => {
@@ -323,6 +327,30 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Listen to network status (online/offline)
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOffline(false);
+      showToast(
+        appLanguage === 'hi' ? 'आप वापस ऑनलाइन आ गए हैं! 🎉' : 'You are back online! 🎉',
+        'success'
+      );
+    };
+    const handleOffline = () => {
+      setIsOffline(true);
+      showToast(
+        appLanguage === 'hi' ? 'आप ऑफ़लाइन मोड में हैं। प्रगति स्थानीय रूप से सिंक की जाएगी।' : 'You are offline. Progress will sync locally.',
+        'info'
+      );
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [appLanguage]);
 
   // Real-time dynamic greeting helper based on current real-time hour (IST / Local timezone)
   const getDynamicGreeting = () => {
@@ -1072,6 +1100,14 @@ export default function App() {
 
       {/* 100+ REALTIME MOVING LIVING OBJECTS & HUMAN CHARACTERS (SATELLITES, ROCKETS, WAVING ASTRONAUTS, CYBORGS, ATOMS) */}
       <RealtimeMovingUniverse theme={uiCustomization.wallpaperAmbiance} interactive={true} />
+
+      {/* DYNAMIC OFFLINE INDICATOR PILL */}
+      {isOffline && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-3.5 py-1.5 bg-rose-500/15 border border-rose-500/30 text-rose-300 text-[11px] font-extrabold rounded-full shadow-2xl backdrop-blur-md flex items-center space-x-2 animate-bounce">
+          <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping shrink-0" />
+          <span>{appLanguage === 'hi' ? 'ऑफ़लाइन मोड (प्रगति स्थानीय रूप से सुरक्षित है)' : 'Offline Mode (Local Sync Mode)'}</span>
+        </div>
+      )}
 
       {/* STANDALONE DEDICATED FULL AI TUTOR APP INTERFACE - MOUNTED AT ROOT TO PREVENT TRANSFORM/CONTAINING-BLOCK CLIPPING */}
       {activeTab === 'aiTutor' ? (
@@ -3457,13 +3493,20 @@ export default function App() {
 
       {/* AUTHENTICATION MODAL (SIGN IN, SIGN UP, GOOGLE, FORGOT PASSWORD) */}
       <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
+        isOpen={showAuthModal || (authInitialized && !isUserLoggedIn)}
+        onClose={() => {
+          if (isUserLoggedIn) {
+            setShowAuthModal(false);
+          }
+        }}
         userProfile={userProfile}
         setUserProfile={setUserProfile}
         appLanguage={appLanguage}
         onAuthSuccess={(newProfile) => {
           setUserProfile(newProfile);
+          if (newProfile && newProfile.email) {
+            setShowAuthModal(false);
+          }
         }}
       />
 
@@ -3511,6 +3554,9 @@ export default function App() {
 
       {/* PWA INSTALL & OFFLINE PROMPT BANNER */}
       <PWAInstallBanner />
+
+      {/* GLOBAL TOAST NOTIFICATION CONTAINER */}
+      <Toast />
     </div>
   );
 }

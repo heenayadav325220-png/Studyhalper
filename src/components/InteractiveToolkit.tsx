@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { showToast } from './Toast';
+import { parseError, logError } from '../utils/errorHandler';
 
 // Safe JSON stringify helper to catch circular structures
 function safeJsonStringify(obj: any): string {
@@ -512,7 +514,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
 
   const Q = (t: string | unknown) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
-      alert("TTS not supported in this browser.");
+      showToast("TTS not supported in this browser.", "error");
       return;
     }
     if (re) {
@@ -534,19 +536,20 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
 
   const We = async (t?: string | unknown) => {
     if (ht || G) {
-      alert("Please wait 3 seconds between requests to protect the server!");
+      showToast(appLanguage === "Hindi" ? "कृपया सर्वर सुरक्षा के लिए अनुरोधों के बीच 3 सेकंड प्रतीक्षा करें!" : "Please wait 3 seconds between requests to protect the server!", "info");
       return;
     }
     const s = typeof t === 'string' ? t : E;
     if (!s && p !== "pdf" && p !== "ocr") {
-      alert("Please specify a topic or text first!");
+      showToast(appLanguage === "Hindi" ? "कृपया पहले विषय या पाठ दर्ज करें!" : "Please specify a topic or text first!", "info");
       return;
     }
     if (c.count >= c.limit) {
-      alert(
+      showToast(
         appLanguage === "Hindi"
-          ? "⚠️ आपके एडवांस्ड टूलकिट की दैनिक सीमा (50 मैसेजेस) समाप्त हो गई है। कृपया कल पुनः प्रयास करें या अन्य सामान्य असीमित (unlimited) सुविधाओं का उपयोग करें।"
-          : "⚠️ Your daily Advanced Toolkit limit of 50 messages has been reached. Please try again tomorrow or enjoy our other unlimited app features!"
+          ? "⚠️ आपके एडवांस्ड टूलकिट की दैनिक सीमा (50 मैसेजेस) समाप्त हो गई है। कृपया कल पुनः प्रयास करें।"
+          : "⚠️ Your daily Advanced Toolkit limit of 50 messages has been reached. Please try again tomorrow!",
+        "error"
       );
       return;
     }
@@ -573,15 +576,17 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
           window.dispatchEvent(new CustomEvent("studybuddy-trigger-ad"));
         }, 1500);
       } else {
-        alert("Failed to reach Gemini API model. Running internal offline generator.");
+        showToast(appLanguage === "Hindi" ? "ऑफ़लाइन मोड सक्रिय। आंतरिक जनरेटर चल रहा है।" : "Running internal offline generator.", "info");
         H({
           title: "Offline Concept Overview",
           content: `### ${s}\n\nHere is an automated overview of **${s}** for standard Class ${I} syllabus studies. Please check connection to use real-time AI reasoning.`
         });
       }
     } catch (err) {
-      console.error(err);
-      alert("AI Service is temporarily busy. Try again.");
+      logError(err, 'AI_TOOLKIT');
+      const parsed = parseError(err);
+      const isHindi = appLanguage === "Hindi";
+      showToast(isHindi ? parsed.messageHindi : parsed.message, "error");
     } finally {
       Te(false);
     }
@@ -589,14 +594,15 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
 
   const Lt = async () => {
     if (vt || Z) {
-      alert("Please wait 3 seconds between requests to protect the server!");
+      showToast(appLanguage === "Hindi" ? "कृपया सर्वर सुरक्षा के लिए अनुरोधों के बीच 3 सेकंड प्रतीक्षा करें!" : "Please wait 3 seconds between requests to protect the server!", "info");
       return;
     }
     if (c.count >= c.limit) {
-      alert(
+      showToast(
         appLanguage === "Hindi"
-          ? "⚠️ आपके एडवांस्ड टूलकिट की दैनिक सीमा (50 मैसेजेस) समाप्त हो गई है। कृपया कल पुनः प्रयास करें या अन्य सामान्य असीमित (unlimited) सुविधाओं का उपयोग करें।"
-          : "⚠️ Your daily Advanced Toolkit limit of 50 messages has been reached. Please try again tomorrow or enjoy our other unlimited app features!"
+          ? "⚠️ आपके एडवांस्ड टूलकिट की दैनिक सीमा (50 मैसेजेस) समाप्त हो गई है। कृपया कल पुनः प्रयास करें।"
+          : "⚠️ Your daily Advanced Toolkit limit of 50 messages has been reached. Please try again tomorrow!",
+        "error"
       );
       return;
     }
@@ -624,10 +630,13 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
           window.dispatchEvent(new CustomEvent("studybuddy-trigger-ad"));
         }, 1500);
       } else {
-        alert("Could not generate mock questions. Using fallback exam database.");
+        showToast(appLanguage === "Hindi" ? "प्रश्न जनरेट नहीं किए जा सके। बैकअप डेटाबेस का उपयोग कर रहे हैं।" : "Could not generate mock questions. Using fallback exam database.", "info");
       }
     } catch (err) {
-      console.error(err);
+      logError(err, 'MOCK_EXAM_GEN');
+      const parsed = parseError(err);
+      const isHindi = appLanguage === "Hindi";
+      showToast(isHindi ? parsed.messageHindi : parsed.message, "error");
     } finally {
       $e(false);
     }
@@ -645,18 +654,22 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
     if (onAddProgress) {
       await onAddProgress(correctCount, v.length, quizSubject);
     }
-    alert(
-      `📝 Test Completed! Score: ${correctCount}/${v.length}. You earned +${xpPoints} XP points for your study progress!`
+    showToast(
+      appLanguage === "Hindi"
+        ? `📝 परीक्षण पूरा हुआ! स्कोर: ${correctCount}/${v.length}. आपने +${xpPoints} XP अंक अर्जित किए!`
+        : `📝 Test Completed! Score: ${correctCount}/${v.length}. You earned +${xpPoints} XP points!`,
+      "success"
     );
   };
 
   const Gt = async () => {
     if (y) {
       if (c.count >= c.limit) {
-        alert(
+        showToast(
           appLanguage === "Hindi"
-            ? "⚠️ आपके एडवांस्ड टूलकिट की दैनिक सीमा (50 मैसेजेस) समाप्त हो गई है। कृपया कल पुनः प्रयास करें या अन्य सामान्य असीमित (unlimited) सुविधाओं का उपयोग करें।"
-            : "⚠️ Your daily Advanced Toolkit limit of 50 messages has been reached. Please try again tomorrow or enjoy our other unlimited app features!"
+            ? "⚠️ आपके एडवांस्ड टूलकिट की दैनिक सीमा (50 मैसेजेस) समाप्त हो गई है। कृपया कल पुनः प्रयास करें।"
+            : "⚠️ Your daily Advanced Toolkit limit of 50 messages has been reached. Please try again tomorrow!",
+          "error"
         );
         return;
       }
@@ -679,7 +692,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
           incrementToolkitUsage();
         }
       } catch (err) {
-        console.error(err);
+        logError(err, 'VOCAB_BUILDER');
         Pe({
           word: y,
           partOfSpeech: "noun",
@@ -687,6 +700,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
           synonyms: ["knowledge", "term"],
           example: `We registered ${y} inside our core Vocabulary Builder deck.`
         });
+        showToast(appLanguage === "Hindi" ? "शब्द खोजने में त्रुटि। स्थानीय परिभाषा दिखा रहा है।" : "Error finding definition. Showing offline default.", "info");
       } finally {
         Re(false);
       }
@@ -699,7 +713,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
         return;
       }
       Fe((t) => [...t, d]);
-      alert("Saved word successfully!");
+      showToast(appLanguage === "Hindi" ? "शब्द सफलतापूर्वक सहेजा गया!" : "Saved word successfully!", "success");
     }
   };
 
@@ -739,7 +753,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
         if (i.id === id) {
           const updated = !i.completed;
           if (updated) {
-            alert("🎯 Goal completed! +15 XP points logged!");
+            showToast(appLanguage === "Hindi" ? "🎯 लक्ष्य पूरा हुआ! +15 XP अंक दर्ज!" : "🎯 Goal completed! +15 XP points logged!", "success");
           }
           return { ...i, completed: updated };
         }
@@ -797,9 +811,9 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
           if (parsed.vocabList) Fe(parsed.vocabList);
           if (parsed.revisionNotes) ne(parsed.revisionNotes);
           if (parsed.friendsList) qe(parsed.friendsList);
-          alert("🎉 Core backup restored successfully!");
+          showToast(appLanguage === "Hindi" ? "🎉 कोर बैकअप सफलतापूर्वक पुनर्स्थापित किया गया!" : "🎉 Core backup restored successfully!", "success");
         } catch {
-          alert("Invalid backup file structure.");
+          showToast(appLanguage === "Hindi" ? "अमान्य बैकअप फ़ाइल संरचना।" : "Invalid backup file structure.", "error");
         }
       };
     }

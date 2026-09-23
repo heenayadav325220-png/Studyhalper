@@ -39,7 +39,8 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronUp,
-  Type
+  Type,
+  FolderOpen
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -50,8 +51,10 @@ import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const CodeHighlighter = SyntaxHighlighter as any;
 import { getStudyAnswer } from '../services/geminiService';
-import { createGoogleDoc, authorizeGoogleService, getSavedToken } from '../services/googleWorkspace';
+import { createGoogleDoc, authorizeGoogleService, getSavedToken, removeToken, fetchDriveFiles, fetchFileContent } from '../services/googleWorkspace';
 import { exportConversationToPdf } from '../utils/pdfExport';
+import { showToast } from './Toast';
+import { parseError, logError } from '../utils/errorHandler';
 import {
   AcademicSuggestion,
   generateContextualSuggestions,
@@ -717,9 +720,175 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [lowContrastDetected, setLowContrastDetected] = useState(false);
   const [showContrastToast, setShowContrastToast] = useState(false);
 
+  // New states and refs for multiple attachments & drive picker
+  const [localAttachedFiles, setLocalAttachedFiles] = useState<any[]>([]);
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
+  const [showDriveModal, setShowDriveModal] = useState(false);
+  const [driveFiles, setDriveFiles] = useState<any[]>([]);
+  const [isLoadingDriveFiles, setIsLoadingDriveFiles] = useState(false);
+  const [driveSearchQuery, setDriveSearchQuery] = useState('');
+  const [driveError, setDriveError] = useState<string | null>(null);
+  const [isAttachingDriveFile, setIsAttachingDriveFile] = useState(false);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const photosInputRef = useRef<HTMLInputElement | null>(null);
+  const genericFileInputRef = useRef<HTMLInputElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const attachmentMenuRef = useRef<HTMLDivElement>(null);
+
+  // Click outside listener for attachment menu
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (attachmentMenuRef.current && !attachmentMenuRef.current.contains(event.target as Node)) {
+        setShowAttachmentMenu(false);
+      }
+    }
+    if (showAttachmentMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showAttachmentMenu]);
+
+  // File selection handlers
+  const handlePhotosUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          const rawData = event.target.result as string;
+          setSelectedImages((prev) => [...prev, rawData]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+    showToast('Photos imported successfully!', 'success');
+  };
+
+  const handleGenericFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    Array.from(files).forEach((file) => {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (event.target?.result) {
+            const rawData = event.target.result as string;
+            setSelectedImages((prev) => [...prev, rawData]);
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (event.target?.result) {
+            const textContent = event.target.result as string;
+            setLocalAttachedFiles((prev) => {
+              if (prev.some(f => f.name === file.name)) return prev;
+              return [...prev, {
+                id: 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                name: file.name,
+                content: textContent.slice(0, 80000),
+                type: 'file'
+              }];
+            });
+            showToast(`"${file.name}" attached successfully!`, 'success');
+          }
+        };
+        try {
+          reader.readAsText(file);
+        } catch (err) {
+          showToast(`Could not read file: ${file.name}. Only text-based files are supported.`, 'error');
+        }
+      }
+    });
+    e.target.value = '';
+  };
+
+  const handleOpenDrive = async () => {
+    setShowAttachmentMenu(false);
+    setIsLoadingDriveFiles(true);
+    setDriveError(null);
+    setShowDriveModal(true);
+
+    const performFetch = async (accessToken: string) => {
+      try {
+        const files = await fetchDriveFiles(accessToken);
+        setDriveFiles(files);
+      } catch (err: any) {
+        logError(err, 'DRIVE_FILE_FETCH');
+        if (err.message === 'UNAUTHORIZED') {
+          removeToken('drive');
+          requestAuthorization();
+        } else {
+          setDriveError(err?.message || 'Failed to fetch Google Drive files.');
+        }
+      } finally {
+        setIsLoadingDriveFiles(false);
+      }
+    };
+
+    const requestAuthorization = () => {
+      authorizeGoogleService(
+        "drive",
+        async (newToken) => {
+          await performFetch(newToken);
+        },
+        (error) => {
+          setDriveError(`Google Drive authorization failed: ${error}`);
+          setIsLoadingDriveFiles(false);
+          showToast(`Google Drive authorization failed: ${error}`, 'error');
+        }
+      );
+    };
+
+    const token = getSavedToken("drive");
+    if (token) {
+      await performFetch(token);
+    } else {
+      requestAuthorization();
+    }
+  };
+
+  const handleSelectDriveFile = async (file: any) => {
+    setIsAttachingDriveFile(true);
+    const token = getSavedToken("drive");
+    if (!token) {
+      showToast("Google Drive session expired. Please connect again.", "error");
+      setIsAttachingDriveFile(false);
+      return;
+    }
+
+    try {
+      showToast(`Attaching "${file.name}"...`, "info");
+      const content = await fetchFileContent(token, file.id, file.mimeType);
+      
+      const newAttached = {
+        id: file.id,
+        name: file.name,
+        content: content,
+        type: "drive" as const
+      };
+
+      setLocalAttachedFiles(prev => {
+        if (prev.some(f => f.id === file.id)) return prev;
+        return [...prev, newAttached];
+      });
+
+      showToast(`"${file.name}" attached successfully!`, "success");
+      setShowDriveModal(false);
+    } catch (err: any) {
+      logError(err, 'DRIVE_FILE_ATTACH');
+      showToast(`Failed to attach file: ${err?.message || 'Unknown error'}`, "error");
+    } finally {
+      setIsAttachingDriveFile(false);
+    }
+  };
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -1287,9 +1456,10 @@ export const AiTutorApp = memo(function AiTutorApp({
       const studentInfo = `[Student: ${user.name || 'Student'} | School: ${user.schoolName || 'School'} | Class: ${user.className || 'Class'} | Goal: ${user.targetGoal || 'General'}]`;
       
       let workspaceContext = "";
-      if (attachedWorkspaceFiles && attachedWorkspaceFiles.length > 0) {
-        workspaceContext = attachedWorkspaceFiles.map(file => {
-          return `[Attached Workspace Document: "${file.name}" | Source: ${file.type}]\n${file.content}\n`;
+      const combinedAttachments = [...(attachedWorkspaceFiles || []), ...(localAttachedFiles || [])];
+      if (combinedAttachments.length > 0) {
+        workspaceContext = combinedAttachments.map(file => {
+          return `[Attached Document: "${file.name}" | Source: ${file.type || 'file'}]\n${file.content}\n`;
         }).join("\n---\n") + "\n[Use the above attached document context to address the prompt below accurately.]\n\n";
       }
 
@@ -1315,6 +1485,9 @@ export const AiTutorApp = memo(function AiTutorApp({
 
       setMessages((prev) => [...prev, aiMsg]);
       
+      // Clear local attached files
+      setLocalAttachedFiles([]);
+
       // Clear attached workspace files after successful send
       if (attachedWorkspaceFiles.length > 0 && onRemoveAttachedWorkspaceFile) {
         attachedWorkspaceFiles.forEach(file => {
@@ -1357,8 +1530,8 @@ export const AiTutorApp = memo(function AiTutorApp({
       if (onAddXp) onAddXp(15);
       setTimeout(() => setPdfExportSuccess(false), 3500);
     } catch (error) {
-      console.error('PDF Export error:', error);
-      alert('Failed to export PDF study guide. Please ensure there are conversation messages.');
+      logError(error, 'PDF_EXPORT');
+      showToast('Failed to export PDF study guide. Please ensure there are conversation messages.', 'error');
     } finally {
       setIsExportingPdf(false);
     }
@@ -1381,8 +1554,10 @@ export const AiTutorApp = memo(function AiTutorApp({
 
         setTimeout(() => setDocExportSuccessId(null), 4000);
       } catch (err: any) {
-        console.error("Failed to create Google Doc:", err);
-        alert(`Failed to export to Google Docs: ${err?.message || err}`);
+        logError(err, 'GOOGLE_WORKSPACE_DOC_EXPORT');
+        const parsed = parseError(err);
+        const isHindi = globalAppLanguage === 'Hindi' || globalAppLanguage === 'hi';
+        showToast(`Failed to export to Google Docs: ${isHindi ? parsed.messageHindi : parsed.message}`, 'error');
       } finally {
         setIsExportingDocId(null);
       }
@@ -1399,7 +1574,7 @@ export const AiTutorApp = memo(function AiTutorApp({
         },
         (error) => {
           setIsExportingDocId(null);
-          alert(`Google Docs connection failed: ${error}. Please authorize Google Workspace services in the Workspace Hub page.`);
+          showToast(`Google Docs connection failed: ${error}. Please authorize Google Workspace services in the Workspace Hub page.`, 'error');
         }
       );
     }
@@ -2385,7 +2560,7 @@ export const AiTutorApp = memo(function AiTutorApp({
               {attachedWorkspaceFiles.map((file) => (
                 <div 
                   key={file.id} 
-                  className="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-800 text-indigo-300 border border-slate-700 text-[10px] font-bold shadow-xs select-none"
+                  className="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-850 text-indigo-300 border border-slate-750 text-[10px] font-bold shadow-xs select-none"
                 >
                   <span>
                     {file.type === "drive" ? "📁" : file.type === "classroom" ? "🎓" : "📊"}
@@ -2394,7 +2569,31 @@ export const AiTutorApp = memo(function AiTutorApp({
                   <button
                     type="button"
                     onClick={() => onRemoveAttachedWorkspaceFile?.(file.id)}
-                    className="p-0.5 hover:bg-slate-700 rounded-full transition text-slate-400 hover:text-slate-200"
+                    className="p-0.5 hover:bg-slate-750 rounded-full transition text-slate-400 hover:text-slate-200 cursor-pointer"
+                    title="Remove attachment"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {localAttachedFiles && localAttachedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-1 px-1">
+              {localAttachedFiles.map((file) => (
+                <div 
+                  key={file.id} 
+                  className="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-850 text-cyan-300 border border-slate-750 text-[10px] font-bold shadow-xs select-none"
+                >
+                  <span>
+                    {file.type === "drive" ? "📁" : "📄"}
+                  </span>
+                  <span className="truncate max-w-[120px]">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setLocalAttachedFiles(prev => prev.filter(f => f.id !== file.id))}
+                    className="p-0.5 hover:bg-slate-750 rounded-full transition text-slate-400 hover:text-slate-200 cursor-pointer"
                     title="Remove attachment"
                   >
                     <X className="w-3 h-3" />
@@ -2514,26 +2713,106 @@ export const AiTutorApp = memo(function AiTutorApp({
               </AnimatePresence>
             </div>
 
-            {/* CAMERA BUTTON */}
-            <button
-              type="button"
-              onClick={() => setShowCameraModal(true)}
-              className={`p-1.5 sm:p-2 rounded-xl transition flex items-center justify-center shrink-0 cursor-pointer ${
-                selectedImages.length > 0 
-                  ? 'bg-emerald-600 text-white shadow-xs' 
-                  : 'text-blue-600 hover:bg-blue-50'
-              }`}
-              title="Snap or Upload Homework Assignment Pages"
-            >
-              <div className="relative">
-                <Camera className="w-4 h-4" />
-                {selectedImages.length > 0 && (
-                  <span className="absolute -top-1.5 -right-2 bg-white text-emerald-700 text-[8px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center shadow-xs">
-                    {selectedImages.length}
-                  </span>
+            {/* PLUS / ATTACHMENT MENU BUTTON */}
+            <div ref={attachmentMenuRef} className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
+                className={`p-1.5 sm:p-2 rounded-xl transition flex items-center justify-center shrink-0 cursor-pointer ${
+                  showAttachmentMenu || selectedImages.length > 0 || localAttachedFiles.length > 0
+                    ? 'bg-blue-600 text-white shadow-xs' 
+                    : 'text-blue-600 hover:bg-blue-50'
+                }`}
+                title={appLanguage === 'hi' ? 'अटैचमेंट जोड़ें' : 'Add Attachment'}
+              >
+                <div className="relative">
+                  <Plus className={`w-4 h-4 transition-transform duration-200 ${showAttachmentMenu ? 'rotate-45' : ''}`} />
+                  {(selectedImages.length > 0 || localAttachedFiles.length > 0) && (
+                    <span className="absolute -top-1.5 -right-2 bg-emerald-500 text-white text-[8px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center shadow-xs">
+                      {selectedImages.length + localAttachedFiles.length}
+                    </span>
+                  )}
+                </div>
+              </button>
+
+              <AnimatePresence>
+                {showAttachmentMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 8 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 8 }}
+                    transition={{ duration: 0.15, ease: 'easeOut' }}
+                    className="absolute bottom-full left-0 mb-2 w-56 sm:w-64 bg-slate-900 border border-slate-800 rounded-2xl p-2 shadow-2xl z-50 text-slate-100 space-y-1"
+                  >
+                    <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800/60 pb-1.5 mb-1 flex items-center justify-between">
+                      <span>{appLanguage === 'hi' ? 'अटैचमेंट' : 'Attachments'}</span>
+                      <X className="w-3 h-3 cursor-pointer text-slate-500 hover:text-white" onClick={() => setShowAttachmentMenu(false)} />
+                    </div>
+
+                    {/* CAMERA OPTION */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCameraModal(true);
+                        setShowAttachmentMenu(false);
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-slate-800 rounded-xl text-xs font-semibold transition flex items-center space-x-2.5 text-slate-200 hover:text-white"
+                    >
+                      <Camera className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <div>
+                        <div className="font-bold">{appLanguage === 'hi' ? 'कैमरा' : 'Camera'}</div>
+                        <div className="text-[9px] text-slate-400 font-normal">{appLanguage === 'hi' ? 'सीधे फोटो खींचें' : 'Take a photo of assignment'}</div>
+                      </div>
+                    </button>
+
+                    {/* PHOTOS OPTION */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        photosInputRef.current?.click();
+                        setShowAttachmentMenu(false);
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-slate-800 rounded-xl text-xs font-semibold transition flex items-center space-x-2.5 text-slate-200 hover:text-white"
+                    >
+                      <Images className="w-4 h-4 text-blue-400 shrink-0" />
+                      <div>
+                        <div className="font-bold">{appLanguage === 'hi' ? 'तस्वीरें' : 'Photos'}</div>
+                        <div className="text-[9px] text-slate-400 font-normal">{appLanguage === 'hi' ? 'गैलरी से चित्र चुनें' : 'Choose images from library'}</div>
+                      </div>
+                    </button>
+
+                    {/* FILE UPLOAD OPTION */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        genericFileInputRef.current?.click();
+                        setShowAttachmentMenu(false);
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-slate-800 rounded-xl text-xs font-semibold transition flex items-center space-x-2.5 text-slate-200 hover:text-white"
+                    >
+                      <Upload className="w-4 h-4 text-purple-400 shrink-0" />
+                      <div>
+                        <div className="font-bold">{appLanguage === 'hi' ? 'फ़ाइल अपलोड' : 'File Upload'}</div>
+                        <div className="text-[9px] text-slate-400 font-normal">{appLanguage === 'hi' ? 'दस्तावेज़ या पीडीएफ चुनें' : 'Attach docs, PDFs, or files'}</div>
+                      </div>
+                    </button>
+
+                    {/* DRIVE OPTION */}
+                    <button
+                      type="button"
+                      onClick={handleOpenDrive}
+                      className="w-full text-left px-3 py-2 hover:bg-slate-800 rounded-xl text-xs font-semibold transition flex items-center space-x-2.5 text-slate-200 hover:text-white"
+                    >
+                      <FolderOpen className="w-4 h-4 text-amber-400 shrink-0" />
+                      <div>
+                        <div className="font-bold">{appLanguage === 'hi' ? 'गूगल ड्राइव' : 'Google Drive'}</div>
+                        <div className="text-[9px] text-slate-400 font-normal">{appLanguage === 'hi' ? 'गूगल ड्राइव से फाइलें चुनें' : 'Select directly from Cloud'}</div>
+                      </div>
+                    </button>
+                  </motion.div>
                 )}
-              </div>
-            </button>
+              </AnimatePresence>
+            </div>
 
             {/* INPUT TEXTAREA */}
             <textarea
@@ -2607,6 +2886,167 @@ export const AiTutorApp = memo(function AiTutorApp({
           onChange={handleFileUpload}
           className="hidden"
         />
+
+        <input
+          type="file"
+          ref={photosInputRef}
+          accept="image/*"
+          multiple
+          onChange={handlePhotosUpload}
+          className="hidden"
+        />
+
+        <input
+          type="file"
+          ref={genericFileInputRef}
+          accept="image/*,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          multiple
+          onChange={handleGenericFileUpload}
+          className="hidden"
+        />
+
+        {/* GOOGLE DRIVE PICKER MODAL */}
+        <AnimatePresence>
+          {showDriveModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+              onClick={() => setShowDriveModal(false)}
+            >
+              <motion.div 
+                initial={{ scale: 0.95, y: 15 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.95, y: 15 }}
+                className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col max-h-[80vh] overflow-hidden text-slate-100"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="p-2 rounded-xl bg-amber-500/15 text-amber-400">
+                      <FolderOpen className="w-5 h-5 text-amber-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm sm:text-base font-black tracking-wide text-white">
+                        {appLanguage === 'hi' ? 'गूगल ड्राइव फ़ाइलें' : 'Google Drive Files'}
+                      </h3>
+                      <p className="text-[10px] text-slate-400">
+                        {appLanguage === 'hi' ? 'अध्ययन के लिए अपने क्लाउड दस्तावेज़ जोड़ें' : 'Choose documents to attach as tutor context'}
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => setShowDriveModal(false)}
+                    className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Search Bar */}
+                {!driveError && !isLoadingDriveFiles && driveFiles.length > 0 && (
+                  <div className="mt-4">
+                    <input
+                      type="text"
+                      placeholder={appLanguage === 'hi' ? 'फ़ाइल खोजें...' : 'Search files...'}
+                      value={driveSearchQuery}
+                      onChange={(e) => setDriveSearchQuery(e.target.value)}
+                      className="w-full bg-slate-950 text-slate-100 border border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition placeholder:text-slate-500 font-medium"
+                    />
+                  </div>
+                )}
+
+                {/* Modal Content / Files List */}
+                <div className="flex-1 overflow-y-auto min-h-[250px] max-h-[400px] mt-4 pr-1 space-y-1.5 no-scrollbar">
+                  {isLoadingDriveFiles ? (
+                    <div className="h-full flex flex-col items-center justify-center py-12 text-slate-400 space-y-2">
+                      <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                      <span className="text-xs font-bold">{appLanguage === 'hi' ? 'ड्राइव फ़ाइलें लोड हो रही हैं...' : 'Loading Drive files...'}</span>
+                    </div>
+                  ) : driveError ? (
+                    <div className="py-8 text-center space-y-3">
+                      <p className="text-xs text-rose-400 font-semibold">{driveError}</p>
+                      <button
+                        type="button"
+                        onClick={handleOpenDrive}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition cursor-pointer"
+                      >
+                        {appLanguage === 'hi' ? 'पुनः कनेक्ट करें' : 'Reconnect & Retry'}
+                      </button>
+                    </div>
+                  ) : isAttachingDriveFile ? (
+                    <div className="h-full flex flex-col items-center justify-center py-12 text-slate-400 space-y-2">
+                      <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+                      <span className="text-xs font-bold">{appLanguage === 'hi' ? 'फ़ाइल अटैच की जा रही है...' : 'Downloading and attaching file...'}</span>
+                    </div>
+                  ) : (
+                    <>
+                      {(() => {
+                        const filtered = driveFiles.filter(f => 
+                          f.name.toLowerCase().includes(driveSearchQuery.toLowerCase())
+                        );
+
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="h-full flex flex-col items-center justify-center py-12 text-slate-500">
+                              <span className="text-xs font-medium">{appLanguage === 'hi' ? 'कोई फ़ाइल नहीं मिली' : 'No matching files found'}</span>
+                            </div>
+                          );
+                        }
+
+                        return filtered.map((file) => {
+                          const isDoc = file.mimeType.includes('document');
+                          const isSheet = file.mimeType.includes('spreadsheet');
+                          const isPdf = file.mimeType.includes('pdf');
+                          const isImg = file.mimeType.includes('image');
+
+                          return (
+                            <div
+                              key={file.id}
+                              onClick={() => handleSelectDriveFile(file)}
+                              className="p-3 bg-slate-950/60 hover:bg-slate-850/80 border border-slate-850 hover:border-slate-750 rounded-xl transition cursor-pointer flex items-center justify-between group"
+                            >
+                              <div className="flex items-center space-x-3 min-w-0">
+                                <span className="text-lg shrink-0">
+                                  {isDoc ? '📝' : isSheet ? '📊' : isPdf ? '📕' : isImg ? '🖼️' : '📁'}
+                                </span>
+                                <div className="min-w-0">
+                                  <h4 className="text-xs font-bold text-slate-200 group-hover:text-white truncate max-w-[280px]">
+                                    {file.name}
+                                  </h4>
+                                  <p className="text-[9px] text-slate-500 font-medium">
+                                    {isDoc ? 'Google Doc' : isSheet ? 'Google Sheet' : isPdf ? 'PDF Document' : isImg ? 'Image' : 'File'}
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="text-[10px] text-blue-500 font-bold opacity-0 group-hover:opacity-100 transition pr-1">
+                                {appLanguage === 'hi' ? 'अटैच करें' : 'Attach'}
+                              </span>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </>
+                  )}
+                </div>
+
+                {/* Modal Footer */}
+                <div className="mt-4 pt-3.5 border-t border-slate-800 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowDriveModal(false)}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition cursor-pointer"
+                  >
+                    {appLanguage === 'hi' ? 'रद्द करें' : 'Close'}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <AnimatePresence>
           {showMoreMenu && (

@@ -26,6 +26,8 @@ import {
   X
 } from 'lucide-react';
 import { generateQuiz } from '../services/geminiService';
+import { showToast } from './Toast';
+import { parseError, logError } from '../utils/errorHandler';
 import type { Subject, MockExam, UserProfile } from '../types';
 
 interface QuizSectionProps {
@@ -174,8 +176,12 @@ export default function QuizSection({
         throw new Error('Could not load quiz questions.');
       }
     } catch (err: any) {
-      console.error('Quiz generation error:', err);
-      setErrorMsg(err.message || 'Failed to generate quiz. Please retry.');
+      logError(err, 'QUIZ_GEN');
+      const parsed = parseError(err);
+      const isHindi = language === 'hi' || language === 'Hindi';
+      const msg = isHindi ? parsed.messageHindi : parsed.message;
+      setErrorMsg(msg);
+      showToast(msg, 'error');
       setViewState('setup');
     }
   };
