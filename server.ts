@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import compression from "compression";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { requireAuth, AuthRequest } from "./src/middleware/auth.ts";
 import { getOrCreateUser, getUserProfile, updateUserStats } from "./src/db/users.ts";
@@ -73,22 +72,27 @@ process.on('uncaughtException', (error) => {
   console.error('Process resilience: uncaught exception caught:', error);
 });
 
-// Lazy-initialized Gemini Client with Dynamic Key Management & Leak Protection
+// Lazy-initialized Gemini Client with Dynamic Key Management & Multi-Env Resilience
 let aiClient: GoogleGenAI | null = null;
 let currentKey: string | null = null;
 let isKeyReportedLeaked = false;
 
 function getAiClient(): GoogleGenAI | null {
-  const key = process.env.GEMINI_API_KEY;
+  // Support standard GEMINI_API_KEY as well as common Vercel / Cloud env aliases
+  const key = process.env.GEMINI_API_KEY || 
+              process.env.VITE_GEMINI_API_KEY || 
+              process.env.GOOGLE_API_KEY || 
+              process.env.API_KEY || "";
+              
   if (!key || key.trim() === '') {
     return null;
   }
-  // If user updated their key in Settings, reset leak status and re-initialize
+  // If key changed in environment or Settings, reset leak status and re-initialize
   if (currentKey !== key) {
     currentKey = key;
     isKeyReportedLeaked = false;
     aiClient = new GoogleGenAI({
-      apiKey: key,
+      apiKey: key.trim(),
       httpOptions: {
         headers: {
           'User-Agent': 'aistudio-build',
@@ -103,7 +107,13 @@ function getAiClient(): GoogleGenAI | null {
 }
 
 // Resilient Gemini Execution with Multi-Model Fallback & Quota Protection
-const FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-flash-latest"];
+// gemini-2.5-flash is our primary production engine as mandated by RULE[GEMINI_md]
+const FALLBACK_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-3.8-flash",
+  "gemini-flash-latest",
+  "gemini-3.1-flash-lite"
+];
 
 async function callGeminiWithResilience(params: {
   contents: any;
@@ -114,7 +124,7 @@ async function callGeminiWithResilience(params: {
   if (!ai) {
     throw new Error(isKeyReportedLeaked ? "GEMINI_KEY_LEAKED_OR_FORBIDDEN" : "GEMINI_API_KEY_UNAVAILABLE");
   }
-  const preferred = params.preferredModel || "gemini-3.8-flash";
+  const preferred = params.preferredModel || "gemini-2.5-flash";
   const modelsToTry = [preferred, ...FALLBACK_MODELS.filter(m => m !== preferred)];
   
   let lastError: any = null;
@@ -132,12 +142,10 @@ async function callGeminiWithResilience(params: {
       lastError = err;
       const errMsg = err?.message || String(err);
       
-      const isLeakedOrForbidden = errMsg.includes("leaked") || 
-                                  errMsg.includes("PERMISSION_DENIED") || 
-                                  errMsg.includes("API key was reported as leaked") ||
-                                  errMsg.includes("403");
+      const isActualLeak = errMsg.includes("API key was reported as leaked") || 
+                           (errMsg.includes("leaked") && errMsg.includes("key"));
       
-      if (isLeakedOrForbidden) {
+      if (isActualLeak) {
         isKeyReportedLeaked = true;
         throw new Error("GEMINI_KEY_LEAKED_OR_FORBIDDEN");
       }
@@ -153,8 +161,8 @@ async function callGeminiWithResilience(params: {
         continue;
       }
       
-      // If other fatal error, rethrow
-      throw err;
+      console.warn(`[Gemini Resilience] Model ${model} attempt failed: ${errMsg.slice(0, 80)}. Trying fallback...`);
+      continue;
     }
   }
 
@@ -163,37 +171,62 @@ async function callGeminiWithResilience(params: {
 
 export const app = express();
 
-async function startServer() {
-  app.disable('x-powered-by');
+app.disable('x-powered-by');
 
-  // Enterprise Security Headers (MIME sniffing, XSS, framing, referrer protection)
-  app.use(securityHeaders);
+// Enterprise Security Headers (MIME sniffing, XSS, framing, referrer protection)
+app.use(securityHeaders);
 
-  // GZIP / Deflate Compression for high-bandwidth efficiency (saves up to 80% wire transfer)
-  app.use(compression({
-    filter: (req, res) => {
-      if (req.headers['x-no-compression']) return false;
-      return compression.filter(req, res);
-    },
-    level: 6
-  }) as any);
+// Universal Cross-Origin and Preflight configuration
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-gemini-quota-exceeded");
+  if (req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
 
-  // JSON Body Parser with safe memory limits
-  app.use(express.json({ limit: '10mb' }));
+// URL Normalization Middleware for Vercel Serverless Functions & Proxy Routing
+app.use((req, _res, next) => {
+  // If request arrived via Vercel rewrite where /api was stripped or preserved in headers
+  const matchedPath = (req.headers['x-matched-path'] as string) || (req.headers['x-vercel-matched-path'] as string);
+  if (matchedPath && matchedPath.startsWith('/api/')) {
+    req.url = matchedPath;
+  } else if (!req.url.startsWith('/api/') && req.url !== '/api') {
+    req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
+  }
+  next();
+});
 
-  // Global Payload Sanitization & General Rate Limiting for all /api endpoints
-  app.use("/api", sanitizeInputs);
-  app.use("/api", rateLimitGeneral);
+// GZIP / Deflate Compression for high-bandwidth efficiency
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  },
+  level: 6
+}) as any);
 
-  // Health and System Diagnostics Endpoint
-  app.get("/api/health", (_req, res) => {
-    res.json({ 
-      status: "ok", 
-      uptime: Math.round(process.uptime()),
-      memoryUsageMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-      cacheEntries: (apiCache as any).cache?.size || 0
-    });
+// JSON Body Parser with safe memory limits
+app.use(express.json({ limit: '10mb' }));
+
+// Global Payload Sanitization & General Rate Limiting for all /api endpoints
+app.use("/api", sanitizeInputs);
+app.use("/api", rateLimitGeneral);
+
+// Health and System Diagnostics Endpoint
+app.get("/api/health", (_req, res) => {
+  const hasKey = Boolean(process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.API_KEY);
+  res.json({ 
+    status: "ok", 
+    uptime: Math.round(process.uptime()),
+    hasAiKey: hasKey,
+    memoryUsageMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+    cacheEntries: (apiCache as any).cache?.size || 0
   });
+});
 
   // API Route: World-class AI Tutor Answer / Explanation
   app.post("/api/gemini/answer", rateLimitAi, async (req, res) => {
@@ -1480,31 +1513,40 @@ Rules:
     }
   });
 
-  // Vite middleware setup
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath, {
-      maxAge: '1y',
-      immutable: true,
-      etag: true
-    }));
-    app.get('*', (_req, res) => {
-      res.setHeader('Cache-Control', 'no-cache');
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+  // Dynamic Vite Dev Server or Standalone Production Server
+  async function startServer() {
+    if (process.env.NODE_ENV !== "production" && process.env.VERCEL !== "1") {
+      try {
+        const { createServer: createViteServer } = await import("vite");
+        const vite = await createViteServer({
+          server: { middlewareMode: true },
+          appType: "spa",
+        });
+        app.use(vite.middlewares);
+      } catch (e) {
+        console.warn("Vite dev server failed to start dynamically:", e);
+      }
+    } else if (process.env.VERCEL !== "1") {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath, {
+        maxAge: '1y',
+        immutable: true,
+        etag: true
+      }));
+      app.get('*', (_req, res) => {
+        res.setHeader('Cache-Control', 'no-cache');
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
+
+    if (process.env.VERCEL !== "1") {
+      app.listen(PORT, "0.0.0.0", () => {
+        console.log(`Server running on http://localhost:${PORT}`);
+      });
+    }
   }
 
   if (process.env.VERCEL !== "1") {
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
+    startServer();
   }
-}
 
-startServer();
