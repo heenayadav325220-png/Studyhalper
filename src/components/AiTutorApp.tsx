@@ -1072,7 +1072,21 @@ export const AiTutorApp = memo(function AiTutorApp({
       }
     } catch (err: any) {
       console.error('Camera access error:', err);
-      setCameraError('Could not access camera. Please check camera permissions or select a photo from your device.');
+      let msg = 'Could not access camera. Please check camera permissions or select a photo from your device.';
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        msg = appLanguage === 'hi' 
+          ? 'कैमरा अनुमति अस्वीकार कर दी गई। कृपया स्कैन करने के लिए अपने ब्राउज़र सेटिंग्स में कैमरा अनुमति सक्षम करें।' 
+          : 'Camera permission denied. Please enable camera access in your browser settings to scan homework.';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError' || err.message?.includes('device not found') || err.message?.includes('Requested device not found')) {
+        msg = appLanguage === 'hi'
+          ? 'अनुरोधित कैमरा डिवाइस नहीं मिला। यदि आप कंप्यूटर/लैपटॉप पर हैं, तो फ्रंट वेबकैम पर स्विच करके देखें।'
+          : 'Requested camera device not found. If you are on a laptop/desktop, please switch to the front-facing webcam or upload files instead.';
+      } else if (err.name === 'OverconstrainedError') {
+        msg = appLanguage === 'hi'
+          ? 'कैमरा प्रतिबंध संतुष्ट नहीं किया जा सका। कृपया फ्रंट वेबकैम का उपयोग करें।'
+          : 'Camera constraints could not be satisfied. Try switching to your front-facing webcam.';
+      }
+      setCameraError(msg);
     }
   };
 
@@ -3401,19 +3415,42 @@ export const AiTutorApp = memo(function AiTutorApp({
                   </AnimatePresence>
 
                   {cameraError ? (
-                    <div className="text-center p-6 space-y-3">
+                    <div className="text-center p-6 space-y-4">
                       <div className="p-3 bg-rose-500/10 text-rose-400 rounded-full w-fit mx-auto border border-rose-500/20">
                         <Camera className="w-8 h-8" />
                       </div>
-                      <p className="text-xs text-rose-300 font-medium max-w-xs mx-auto">{cameraError}</p>
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 mx-auto shadow-md cursor-pointer"
-                      >
-                        <Upload className="w-4 h-4" />
-                        <span>Choose Images from Device</span>
-                      </button>
+                      <p className="text-xs text-rose-300 font-medium max-w-xs mx-auto leading-relaxed">{cameraError}</p>
+                      
+                      <div className="flex flex-col sm:flex-row items-center justify-center gap-2 max-w-sm mx-auto">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const targetFacing = cameraFacing === 'environment' ? 'user' : 'environment';
+                            setCameraFacing(targetFacing);
+                            startCamera(targetFacing);
+                          }}
+                          className="w-full sm:w-auto px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 border border-slate-700 cursor-pointer"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5 text-indigo-400 animate-spin-slow" />
+                          <span>
+                            {appLanguage === 'hi' 
+                              ? (cameraFacing === 'environment' ? 'फ्रंट कैमरा आजमाएं' : 'बैक कैमरा आजमाएं')
+                              : (cameraFacing === 'environment' ? 'Try Front Camera' : 'Try Rear Camera')}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowCameraModal(false);
+                            photosInputRef.current?.click();
+                          }}
+                          className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow-md cursor-pointer"
+                        >
+                          <Upload className="w-4 h-4" />
+                          <span>{appLanguage === 'hi' ? 'गैलरी से चित्र चुनें' : 'Choose from Device'}</span>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <>
