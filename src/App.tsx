@@ -1158,32 +1158,6 @@ export default function App() {
               id="top-user-card" 
               className={`relative ${cornerRadius.casing || 'rounded-[28px]'} transition-all duration-300 group`}
             >
-              {/* 1A. OUTER AURA HALO - RADIANT VIBRANT GLOW SPREADING AROUND PERIMETER */}
-              <div 
-                className={`absolute -inset-1 sm:-inset-1.5 ${cornerRadius.casing || 'rounded-[28px]'} overflow-hidden pointer-events-none opacity-85 sm:opacity-95 blur-xl animate-aura-glow`}
-                aria-hidden="true"
-              >
-                <div 
-                  className="absolute -top-[125%] -left-[125%] w-[350%] h-[350%] animate-aura-rotate"
-                  style={{
-                    background: 'conic-gradient(from 0deg, transparent 0deg, transparent 50deg, rgba(99,102,241,0.2) 80deg, #6366f1 110deg, #a855f7 150deg, #ec4899 190deg, #06b6d4 235deg, #6366f1 280deg, rgba(99,102,241,0.2) 320deg, transparent 350deg, transparent 360deg)'
-                  }}
-                />
-              </div>
-
-              {/* 1B. MID-LAYER AURA - INTENSE ACCENT GLOW DIRECTLY ON THE BORDER CONTOUR */}
-              <div 
-                className={`absolute -inset-[3px] ${cornerRadius.casing || 'rounded-[28px]'} overflow-hidden pointer-events-none opacity-80 blur-md`}
-                aria-hidden="true"
-              >
-                <div 
-                  className="absolute -top-[125%] -left-[125%] w-[350%] h-[350%] animate-aura-rotate"
-                  style={{
-                    background: 'conic-gradient(from 0deg, transparent 0deg, transparent 50deg, rgba(99,102,241,0.2) 80deg, #6366f1 110deg, #a855f7 150deg, #ec4899 190deg, #06b6d4 235deg, #6366f1 280deg, rgba(99,102,241,0.2) 320deg, transparent 350deg, transparent 360deg)'
-                  }}
-                />
-              </div>
-
               {/* 1C. SHARP ANIMATED BORDER LIGHT - CRISP CONTINUOUS FLOWING LASER LINE */}
               <div 
                 className={`absolute -inset-[1.5px] ${cornerRadius.casing || 'rounded-[28px]'} overflow-hidden pointer-events-none`}
