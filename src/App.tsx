@@ -199,7 +199,6 @@ export default function App() {
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [showVoiceTutorModal, setShowVoiceTutorModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
-  const [authInitialized, setAuthInitialized] = useState(false);
   const [playgroundViewMode, setPlaygroundViewMode] = useState<'list' | 'grid'>('list');
   const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false);
 
@@ -306,7 +305,6 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
-      setAuthInitialized(true);
       if (user && !user.isAnonymous) {
         // Authenticated user detected
         setUserProfile(prev => {
@@ -1155,10 +1153,52 @@ export default function App() {
         {activeTab === 'home' && (
           <div className="space-y-4">
             
-            {/* 1. TOP USER CARD - REFINED MODERN AMBIENT PROFILE */}
-            <div id="top-user-card" className={`relative p-[1.5px] ${cornerRadius.casing || 'rounded-3xl'} bg-gradient-to-b from-indigo-500/30 via-slate-800/40 to-slate-800/20 border border-slate-800/60 shadow-lg transition-all duration-300`}>
+            {/* 1. TOP USER CARD - REFINED MODERN AMBIENT PROFILE WITH ANIMATED GLOWING AURA & PERIMETER BORDER LIGHT */}
+            <div 
+              id="top-user-card" 
+              className={`relative ${cornerRadius.casing || 'rounded-[28px]'} transition-all duration-300 group`}
+            >
+              {/* 1A. OUTER AURA HALO - RADIANT VIBRANT GLOW SPREADING AROUND PERIMETER */}
+              <div 
+                className={`absolute -inset-1 sm:-inset-1.5 ${cornerRadius.casing || 'rounded-[28px]'} overflow-hidden pointer-events-none opacity-85 sm:opacity-95 blur-xl animate-aura-glow`}
+                aria-hidden="true"
+              >
+                <div 
+                  className="absolute -top-[125%] -left-[125%] w-[350%] h-[350%] animate-aura-rotate"
+                  style={{
+                    background: 'conic-gradient(from 0deg, transparent 0deg, transparent 50deg, rgba(99,102,241,0.2) 80deg, #6366f1 110deg, #a855f7 150deg, #ec4899 190deg, #06b6d4 235deg, #6366f1 280deg, rgba(99,102,241,0.2) 320deg, transparent 350deg, transparent 360deg)'
+                  }}
+                />
+              </div>
+
+              {/* 1B. MID-LAYER AURA - INTENSE ACCENT GLOW DIRECTLY ON THE BORDER CONTOUR */}
+              <div 
+                className={`absolute -inset-[3px] ${cornerRadius.casing || 'rounded-[28px]'} overflow-hidden pointer-events-none opacity-80 blur-md`}
+                aria-hidden="true"
+              >
+                <div 
+                  className="absolute -top-[125%] -left-[125%] w-[350%] h-[350%] animate-aura-rotate"
+                  style={{
+                    background: 'conic-gradient(from 0deg, transparent 0deg, transparent 50deg, rgba(99,102,241,0.2) 80deg, #6366f1 110deg, #a855f7 150deg, #ec4899 190deg, #06b6d4 235deg, #6366f1 280deg, rgba(99,102,241,0.2) 320deg, transparent 350deg, transparent 360deg)'
+                  }}
+                />
+              </div>
+
+              {/* 1C. SHARP ANIMATED BORDER LIGHT - CRISP CONTINUOUS FLOWING LASER LINE */}
+              <div 
+                className={`absolute -inset-[1.5px] ${cornerRadius.casing || 'rounded-[28px]'} overflow-hidden pointer-events-none`}
+                aria-hidden="true"
+              >
+                <div 
+                  className="absolute -top-[125%] -left-[125%] w-[350%] h-[350%] animate-aura-rotate"
+                  style={{
+                    background: 'conic-gradient(from 0deg, transparent 0deg, transparent 50deg, rgba(99,102,241,0.15) 80deg, #818cf8 110deg, #c084fc 150deg, #f472b6 190deg, #38bdf8 235deg, #818cf8 280deg, rgba(99,102,241,0.15) 320deg, transparent 350deg, transparent 360deg)'
+                  }}
+                />
+              </div>
+
               {/* INNER DARK SLATE BACKDROP */}
-              <div className="relative overflow-hidden rounded-[23px] bg-slate-950/90 backdrop-blur-xl px-4 pt-3.5 pb-4 sm:px-5 sm:pt-4 sm:pb-5 space-y-3.5">
+              <div className={`relative z-10 overflow-hidden ${cornerRadius.inner || 'rounded-[26px]'} bg-slate-950/92 backdrop-blur-xl px-4 pt-3.5 pb-4 sm:px-5 sm:pt-4 sm:pb-5 space-y-3.5 border border-slate-800/80 shadow-2xl`}>
                 {/* Subtle Ambient Glows */}
                 <div className="absolute -top-16 -left-16 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
                 <div className="absolute -top-16 -right-16 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -3493,12 +3533,8 @@ export default function App() {
 
       {/* AUTHENTICATION MODAL (SIGN IN, SIGN UP, GOOGLE, FORGOT PASSWORD) */}
       <AuthModal
-        isOpen={showAuthModal || (authInitialized && !isUserLoggedIn)}
-        onClose={() => {
-          if (isUserLoggedIn) {
-            setShowAuthModal(false);
-          }
-        }}
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
         userProfile={userProfile}
         setUserProfile={setUserProfile}
         appLanguage={appLanguage}

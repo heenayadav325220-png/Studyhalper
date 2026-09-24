@@ -46,6 +46,40 @@ html.dark ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.35); }
 .animate-subtle-pulse { animation: subtlePulse 3s ease-in-out infinite; }
 .backdrop-blur-md, .backdrop-blur-lg, .backdrop-blur-xl { -webkit-backdrop-filter: blur(16px); }
 
+/* Animated Aura and Glowing Border Effects */
+@keyframes auraRotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes auraGlowPulse {
+  0%, 100% {
+    opacity: 0.75;
+    filter: blur(18px);
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.98;
+    filter: blur(24px);
+    transform: scale(1.018);
+  }
+}
+
+.animate-aura-rotate {
+  animation: auraRotate 4.2s linear infinite;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+.animate-aura-glow {
+  animation: auraGlowPulse 3.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-aura-rotate { animation: none !important; }
+  .animate-aura-glow { animation: none !important; }
+}
+
 /* AI Tutor shell */
 #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] { background: #f8fafc !important; color: #172033; }
 #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > header {

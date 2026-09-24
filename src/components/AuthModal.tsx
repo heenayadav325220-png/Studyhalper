@@ -405,15 +405,13 @@ export default function AuthModal({
               </p>
             </div>
           </div>
-          {isLoggedIn && (
-            <button
-              onClick={onClose}
-              className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition cursor-pointer"
-              title="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          )}
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition cursor-pointer"
+            title="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Tab Navigation (If not currently signed in) */}

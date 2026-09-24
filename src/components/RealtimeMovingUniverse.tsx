@@ -95,52 +95,65 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
   interactive = true
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
+  const [webGlSupported, setWebGlSupported] = React.useState(true);
 
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
 
-    // -------------------------------------------------------------------------
-    // 1. SCENE, CAMERA, RENDERER SETUP
-    // -------------------------------------------------------------------------
-    const scene = new THREE.Scene();
+    let renderer: THREE.WebGLRenderer | null = null;
+    let animationFrameId: number | null = null;
+    let resizeObserver: ResizeObserver | null = null;
+    let resizeTimeout: NodeJS.Timeout | null = null;
 
-    // Thematic background fog
-    const fogColors: Record<WallpaperAmbiance, number> = {
-      solar_system: 0x020617,
-      cosmic_nebula: 0x07051a,
-      earth_forest: 0x021d13,
-      deep_ocean: 0x021329,
-      cyber_matrix: 0x020f09,
-      science_chalkboard: 0x071510,
-      retro_arcade: 0x140428,
-      celestial_zen: 0x0c0817,
-      deep_obsidian: 0x030308
-    };
-    scene.fog = new THREE.FogExp2(fogColors[theme] ?? 0x020617, 0.0008);
+    let handleVisibilityChange: (() => void) | null = null;
+    let handlePointerMove: ((e: MouseEvent | TouchEvent) => void) | null = null;
+    let handleResize: (() => void) | null = null;
 
-    const cameraFieldOfView = 54;
-    const camera = new THREE.PerspectiveCamera(
-      cameraFieldOfView,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      3500
-    );
-    camera.position.set(0, 10, 68);
+    try {
+      // -------------------------------------------------------------------------
+      // 1. SCENE, CAMERA, RENDERER SETUP WITH IFRAME COMPATIBILITY SHIELD
+      // -------------------------------------------------------------------------
+      const scene = new THREE.Scene();
 
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: true,
-      powerPreference: 'high-performance'
-    });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.2;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      // Thematic background fog
+      const fogColors: Record<WallpaperAmbiance, number> = {
+        solar_system: 0x020617,
+        cosmic_nebula: 0x07051a,
+        earth_forest: 0x021d13,
+        deep_ocean: 0x021329,
+        cyber_matrix: 0x020f09,
+        science_chalkboard: 0x071510,
+        retro_arcade: 0x140428,
+        celestial_zen: 0x0c0817,
+        deep_obsidian: 0x030308
+      };
+      scene.fog = new THREE.FogExp2(fogColors[theme] ?? 0x020617, 0.0008);
 
-    container.appendChild(renderer.domElement);
+      const cameraFieldOfView = 54;
+      const camera = new THREE.PerspectiveCamera(
+        cameraFieldOfView,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        3500
+      );
+      camera.position.set(0, 10, 68);
+
+      renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        powerPreference: 'high-performance'
+      });
+      renderer.setClearColor(0x000000, 0); // Guarantee 100% alpha transparency
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.2;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+      container.appendChild(renderer.domElement);
+
 
     // -------------------------------------------------------------------------
     // 2. THEMATIC LIGHTING ENGINE
@@ -1035,10 +1048,11 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
     // -------------------------------------------------------------------------
     // 8. WINDOW RESIZE LISTENER & RESIZEOBSERVER
     // -------------------------------------------------------------------------
-    let resizeTimeout: any = null;
-    const handleResize = () => {
-      if (resizeTimeout) clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(() => {
+    let resizeTimeoutLocal: any = null;
+    const handleResizeLocal = () => {
+      if (resizeTimeoutLocal) clearTimeout(resizeTimeoutLocal);
+      resizeTimeoutLocal = setTimeout(() => {
+        if (!camera || !renderer) return;
         const w = window.innerWidth;
         const h = window.innerHeight;
         camera.aspect = w / h;
@@ -1047,27 +1061,31 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       }, 60);
     };
-    window.addEventListener('resize', handleResize);
+    handleResize = handleResizeLocal;
+    window.addEventListener('resize', handleResizeLocal);
 
-    const resizeObserver = new ResizeObserver(handleResize);
-    resizeObserver.observe(container);
+    const resizeObserverLocal = new ResizeObserver(handleResizeLocal);
+    resizeObserverLocal.observe(container);
+    resizeObserver = resizeObserverLocal;
 
     // Visibility change handling for power efficiency and performance scalability
     let isTabVisible = true;
-    const handleVisibilityChange = () => {
+    const handleVisibilityChangeLocal = () => {
       isTabVisible = !document.hidden;
     };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    handleVisibilityChange = handleVisibilityChangeLocal;
+    document.addEventListener('visibilitychange', handleVisibilityChangeLocal);
 
     // -------------------------------------------------------------------------
     // 9. REAL-TIME 60FPS ANIMATION LOOP
     // -------------------------------------------------------------------------
-    let animationFrameId: number;
+    let animFrameId: number;
     const clock = new THREE.Clock();
 
     const animate = () => {
-      animationFrameId = requestAnimationFrame(animate);
-      if (!isTabVisible) return;
+      animFrameId = requestAnimationFrame(animate);
+      animationFrameId = animFrameId;
+      if (!isTabVisible || !renderer || !scene || !camera) return;
 
       const delta = Math.min(clock.getDelta(), 0.1);
       const elapsedTime = clock.getElapsedTime();
@@ -1078,8 +1096,10 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
       camera.lookAt(0, 0, 0);
 
       // Starfield / particle slow celestial rotation
-      backgroundParticles.rotation.y = elapsedTime * 0.012;
-      backgroundParticles.rotation.x = Math.sin(elapsedTime * 0.006) * 0.04;
+      if (backgroundParticles) {
+        backgroundParticles.rotation.y = elapsedTime * 0.012;
+        backgroundParticles.rotation.x = Math.sin(elapsedTime * 0.006) * 0.04;
+      }
 
       // Update all 3D Dynamic Objects (Autonomous Wanderers)
       for (let i = 0; i < dynamicObjects.length; i++) {
@@ -1090,25 +1110,51 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
     };
 
     animate();
+    } catch (error) {
+      console.warn("WebGL initialization failed or is not supported. Activating fallback starry background.", error);
+      setWebGlSupported(false);
+    }
 
     // -------------------------------------------------------------------------
-    // 8. CLEANUP & MEMORY MANAGEMENT
+    // 8. CLEANUP & MEMORY MANAGEMENT (SAFE-SHIELD AGAINST NULL POINTERS)
     // -------------------------------------------------------------------------
     return () => {
-      cancelAnimationFrame(animationFrameId);
-      if (resizeTimeout) clearTimeout(resizeTimeout);
-      resizeObserver.disconnect();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('mousemove', handlePointerMove);
-      window.removeEventListener('touchmove', handlePointerMove);
-      window.removeEventListener('resize', handleResize);
-
-      if (container && renderer.domElement) {
-        container.removeChild(renderer.domElement);
+      if (animationFrameId !== null) cancelAnimationFrame(animationFrameId);
+      if (resizeTimeout !== null) clearTimeout(resizeTimeout);
+      if (resizeObserver) resizeObserver.disconnect();
+      if (handleVisibilityChange) document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (handlePointerMove) {
+        window.removeEventListener('mousemove', handlePointerMove);
+        window.removeEventListener('touchmove', handlePointerMove);
       }
-      renderer.dispose();
+      if (handleResize) window.removeEventListener('resize', handleResize);
+
+      if (container && renderer && renderer.domElement) {
+        try {
+          container.removeChild(renderer.domElement);
+        } catch (e) {}
+      }
+      if (renderer) {
+        try {
+          renderer.dispose();
+        } catch (e) {}
+      }
     };
   }, [theme, interactive]);
+
+  if (!webGlSupported) {
+    return (
+      <div
+        id="realtime-moving-universe-css-starfield"
+        className="fixed inset-0 pointer-events-none z-[1] w-full h-full overflow-hidden select-none"
+        style={{
+          background: 'radial-gradient(ellipse at 50% 50%, rgba(30, 27, 75, 0.25) 0%, rgba(3, 7, 18, 0) 100%)'
+        }}
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:40px_40px] opacity-25 animate-[subtlePulse_4s_ease-in-out_infinite]" />
+      </div>
+    );
+  }
 
   return (
     <div

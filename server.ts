@@ -189,16 +189,18 @@ app.use((req, res, next) => {
 });
 
 // URL Normalization Middleware for Vercel Serverless Functions & Proxy Routing
-app.use((req, _res, next) => {
-  // If request arrived via Vercel rewrite where /api was stripped or preserved in headers
-  const matchedPath = (req.headers['x-matched-path'] as string) || (req.headers['x-vercel-matched-path'] as string);
-  if (matchedPath && matchedPath.startsWith('/api/')) {
-    req.url = matchedPath;
-  } else if (!req.url.startsWith('/api/') && req.url !== '/api') {
-    req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
-  }
-  next();
-});
+if (process.env.VERCEL === "1") {
+  app.use((req, _res, next) => {
+    // If request arrived via Vercel rewrite where /api was stripped or preserved in headers
+    const matchedPath = (req.headers['x-matched-path'] as string) || (req.headers['x-vercel-matched-path'] as string);
+    if (matchedPath && matchedPath.startsWith('/api/')) {
+      req.url = matchedPath;
+    } else if (!req.url.startsWith('/api/') && req.url !== '/api') {
+      req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
+    }
+    next();
+  });
+}
 
 // GZIP / Deflate Compression for high-bandwidth efficiency
 app.use(compression({
