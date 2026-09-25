@@ -23,6 +23,7 @@ import ReactMarkdown from 'react-markdown';
 import { UserProfile } from '../types';
 import { playTutorSpeech } from '../services/voiceSettings';
 import { CustomVoiceModal } from './CustomVoiceModal';
+import { showToast } from './Toast';
 
 interface VoiceTutorModalProps {
   isOpen: boolean;
@@ -197,7 +198,10 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
           console.warn('Could not start recognition:', err);
         }
       } else {
-        alert(appLanguage === 'hi' ? 'आपके ब्राउज़र में स्पीच रिकग्निशन समर्थित नहीं है।' : 'Speech recognition not supported in this browser.');
+        showToast(
+          appLanguage === 'hi' ? 'आपके ब्राउज़र में स्पीच रिकग्निशन समर्थित नहीं है।' : 'Speech recognition not supported in this browser.',
+          'error'
+        );
       }
     }
   };

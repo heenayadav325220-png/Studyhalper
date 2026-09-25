@@ -23,7 +23,6 @@ import {
   RefreshCw,
   FileDown,
   Images,
-  MoreVertical,
   MoreHorizontal,
   SlidersHorizontal,
   Sparkles,
@@ -40,7 +39,8 @@ import {
   ChevronDown,
   ChevronUp,
   Type,
-  FolderOpen
+  FolderOpen,
+  Grid
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -430,8 +430,25 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
                 );
               },
               p({ children }) {
+                const textStr = String(children);
+                const isHint = textStr.toLowerCase().startsWith('english hint:') || textStr.toLowerCase().startsWith('hint:');
+                if (isHint) {
+                  return (
+                    <p className="mt-1.5 mb-3 text-xs sm:text-[13px] font-medium text-indigo-600/90 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30 border-l-2 border-indigo-500/80 px-2.5 py-1.5 rounded-r-lg leading-relaxed">
+                      {children}
+                    </p>
+                  );
+                }
+                const hasHindi = /[\u0900-\u097F]/.test(textStr);
+                if (hasHindi) {
+                  return (
+                    <p className={`mb-2.5 last:mb-0 leading-[1.78] ${isClassic ? 'font-serif text-[15.5px] sm:text-[17px] text-slate-900 font-medium' : 'font-sans text-sm sm:text-[15px] text-slate-800 font-medium'}`}>
+                      {children}
+                    </p>
+                  );
+                }
                 return (
-                  <p className={`mb-3 last:mb-0 leading-[1.82] ${isClassic ? 'font-serif text-[15.5px] sm:text-[16.5px] text-slate-900' : 'font-sans text-sm sm:text-[15px] text-slate-800'}`}>
+                  <p className={`mb-2.5 last:mb-0 leading-[1.8] ${isClassic ? 'font-serif text-[15px] sm:text-[16px] text-slate-900' : 'font-sans text-sm sm:text-[14.5px] text-slate-800'}`}>
                     {children}
                   </p>
                 );
@@ -693,6 +710,8 @@ export const AiTutorApp = memo(function AiTutorApp({
 
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showCustomVoiceModal, setShowCustomVoiceModal] = useState(false);
+  const [showTopRightMenu, setShowTopRightMenu] = useState(false);
+  const topRightMenuRef = useRef<HTMLDivElement>(null);
 
   const [suggestions, setSuggestions] = useState<AcademicSuggestion[]>(() => {
     return generateContextualSuggestions({
@@ -751,6 +770,21 @@ export const AiTutorApp = memo(function AiTutorApp({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showAttachmentMenu]);
+
+  // Click outside listener for top-right menu
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (topRightMenuRef.current && !topRightMenuRef.current.contains(event.target as Node)) {
+        setShowTopRightMenu(false);
+      }
+    }
+    if (showTopRightMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showTopRightMenu]);
 
   // File selection handlers
   const handlePhotosUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1747,20 +1781,17 @@ export const AiTutorApp = memo(function AiTutorApp({
             </button>
 
             <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0f172a] to-[#1e293b] shadow-sm flex items-center justify-center text-cyan-400 font-bold text-base tracking-wider">
-                A
-              </div>
+              <img
+                src="/favicon.svg"
+                alt="Ascend Logo"
+                className="w-8 h-8 rounded-lg shadow-sm"
+              />
 
               <div>
                 <div className="flex items-center space-x-2 flex-wrap">
                   <h1 className="text-xs font-bold tracking-tight text-slate-900">
                     ASCEND AI TUTOR
                   </h1>
-                  <span className="text-slate-400 font-bold text-[10px]">v2.5</span>
-                  <div className="bg-emerald-50 text-emerald-700 border border-emerald-300/60 font-bold text-[9px] px-1.5 py-0.5 rounded-full flex items-center space-x-1 shadow-2xs">
-                    <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Online</span>
-                  </div>
                 </div>
                 <p className="text-[9px] text-slate-500 font-medium flex items-center space-x-1">
                   <span>Powered by Gemini AI</span>
@@ -1769,67 +1800,151 @@ export const AiTutorApp = memo(function AiTutorApp({
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <div className="hidden lg:flex items-center space-x-1.5">
-              <div className="bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex items-center space-x-1">
-                <UserIcon className="w-3 h-3 text-slate-500" />
-                <span className="truncate max-w-[90px]">{user.name || 'full Yadav'}</span>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex items-center space-x-1">
-                <GraduationCap className="w-3 h-3 text-slate-500" />
-                <span className="truncate max-w-[110px]">{user.className || 'Class 11th (PCB)'}</span>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex items-center space-x-1">
-                <UserIcon className="w-3 h-3 text-slate-500" />
-                <span className="truncate max-w-[80px]">{user.schoolName || 'chhabra'}</span>
-              </div>
-            </div>
-
-            {/* Direct Mic Speech-to-Text Button */}
+          <div className="flex items-center space-x-2 relative" ref={topRightMenuRef}>
             <button
               type="button"
-              onClick={handleVoiceInputToggle}
-              className={`p-1.5 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold ${
-                isListening
-                  ? 'bg-rose-500 text-white animate-pulse shadow-md border border-rose-600'
-                  : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-100 border border-slate-200'
-              }`}
-              title={isListening ? 'Listening... Click to stop' : 'Microphone Voice Input'}
+              onClick={() => setShowTopRightMenu(!showTopRightMenu)}
+              className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition flex items-center justify-center cursor-pointer active:scale-95"
+              title="Menu"
             >
-              <Mic className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{isListening ? 'Listening...' : 'Mic'}</span>
+              <Grid className="w-4 h-4 text-slate-700" />
             </button>
 
-            <button
-              type="button"
-              onClick={() => setShowCustomVoiceModal(true)}
-              className="p-1.5 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-200/80 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold"
-              title="Configure Tutor Custom Voice"
-            >
-              <Volume2 className="w-3.5 h-3.5 text-indigo-600" />
-              <span className="hidden sm:inline">Voice</span>
-            </button>
+            <AnimatePresence>
+              {showTopRightMenu && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                  transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 py-3 px-3.5 space-y-3 text-slate-700"
+                >
+                  {/* Profile Card Section */}
+                  <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl flex items-center space-x-3 shadow-3xs">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white font-bold text-sm shadow-xs border border-indigo-400/20 shrink-0">
+                      {user.name ? user.name.charAt(0).toUpperCase() : 'H'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-bold text-slate-900 truncate">
+                        {user.name || 'Heena Yadav'}
+                      </div>
+                      {user.className && (
+                        <div className="text-[10px] text-indigo-600 font-semibold flex items-center space-x-1 mt-0.5">
+                          <GraduationCap className="w-3.5 h-3.5 inline shrink-0 text-indigo-500" />
+                          <span className="truncate">{user.className || 'Class 12th (Science)'}</span>
+                        </div>
+                      )}
+                      {user.schoolName && (
+                        <div className="text-[9px] text-slate-500 font-medium truncate mt-0.5">
+                          🏫 {user.schoolName || 'chhabra'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
-            {messages.length > 0 && (
-              <button
-                onClick={handleClearChat}
-                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                title="Clear Conversation"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            )}
+                  <div className="w-full h-px bg-slate-100" />
 
-            <button
-              type="button"
-              onClick={() => setShowMoreMenu(true)}
-              className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition flex items-center justify-center relative cursor-pointer active:scale-95"
-              title="Tools, Modes, Subject & Settings"
-            >
-              <MoreVertical className="w-3.5 h-3.5 text-slate-700" />
-            </button>
+                  {/* Options Menu List */}
+                  <div className="space-y-1">
+                    {/* Mic Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleVoiceInputToggle();
+                        setShowTopRightMenu(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between cursor-pointer ${
+                        isListening
+                          ? 'bg-rose-500 text-white animate-pulse shadow-xs'
+                          : 'hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Mic className="w-4 h-4 shrink-0" />
+                        <span>{isListening ? 'Listening...' : 'Mic'}</span>
+                      </div>
+                      <span className="text-[10px] opacity-75 font-semibold">
+                        {isListening ? 'ON' : 'OFF'}
+                      </span>
+                    </button>
+
+                    {/* Voice Option */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCustomVoiceModal(true);
+                        setShowTopRightMenu(false);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 text-slate-700 transition flex items-center space-x-2 cursor-pointer"
+                    >
+                      <Volume2 className="w-4 h-4 text-indigo-500 shrink-0" />
+                      <span>Voice</span>
+                    </button>
+
+                    {/* Study Tools Settings option */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowMoreMenu(true);
+                        setShowTopRightMenu(false);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 text-slate-700 transition flex items-center space-x-2 cursor-pointer"
+                    >
+                      <SlidersHorizontal className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Study Tools</span>
+                    </button>
+
+                    {/* Exam Insights */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleSendMessage(`Give me key high-yield exam insights, formula tricks, and JEE Main / Board questions for ${selectedSubject}.`);
+                        setShowTopRightMenu(false);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 text-slate-700 transition flex items-center space-x-2 cursor-pointer"
+                    >
+                      <Sparkles className="w-4 h-4 text-blue-500 shrink-0" />
+                      <span>Exam Insights</span>
+                    </button>
+
+                    {/* Export PDF */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (messages.length > 0 && !isExportingPdf) {
+                          handleExportPdf();
+                          setShowTopRightMenu(false);
+                        }
+                      }}
+                      disabled={messages.length === 0 || isExportingPdf}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent text-slate-700 transition flex items-center space-x-2 cursor-pointer"
+                    >
+                      {isExportingPdf ? (
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                      ) : (
+                        <FileDown className="w-4 h-4 text-amber-500 shrink-0" />
+                      )}
+                      <span>Export PDF</span>
+                    </button>
+
+                    {/* Clear Conversation inside menu to keep header perfectly clean */}
+                    {messages.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleClearChat();
+                          setShowTopRightMenu(false);
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold hover:bg-rose-50 text-rose-600 transition flex items-center space-x-2 cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4 shrink-0" />
+                        <span>Clear Chat</span>
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </header>
       </motion.div>
@@ -2089,7 +2204,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                     </div>
                   </div>
 
-                    <div className="w-8 h-8 rounded-full ring-2 ring-indigo-500/30 shadow-sm overflow-hidden bg-slate-800 flex items-center justify-center shrink-0 mt-4">
+                    <div className="w-8 h-8 rounded-full ring-2 ring-indigo-500/20 shadow-xs overflow-hidden bg-slate-800 flex items-center justify-center shrink-0 mt-1">
                       {user.avatar ? (
                         <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
                       ) : (
@@ -2117,9 +2232,10 @@ export const AiTutorApp = memo(function AiTutorApp({
                         <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-indigo-800 text-white flex items-center justify-center shadow-xs">
                           <GraduationCap className="w-4 h-4 text-white" />
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-1.5 text-slate-500">
                           <span className="font-bold text-xs sm:text-sm text-slate-900 tracking-tight">AI Academic Tutor</span>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                          <span className="text-slate-300 dark:text-slate-700 text-xs select-none" aria-hidden="true">•</span>
+                          <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 select-none">
                             ✓ Verified Solution
                           </span>
                         </div>
@@ -2155,20 +2271,20 @@ export const AiTutorApp = memo(function AiTutorApp({
                     </div>
 
                     {/* Classic Editorial or Modern Message Body - Khulla no padding or background */}
-                    <div className={`py-4 px-0 ${tutorFontStyle === 'classic' ? 'tutor-editorial font-serif' : 'tutor-modern font-sans'}`}>
+                    <div className={`pt-1 pb-2 px-0 ${tutorFontStyle === 'classic' ? 'tutor-editorial font-serif' : 'tutor-modern font-sans'}`}>
                       <StaggeredRevealMarkdown text={msg.text} isLatest={isLatest} fontStyle={tutorFontStyle} />
                     </div>
 
                     {/* Professional Action Suite */}
-                    <div className="bg-transparent border-t border-slate-100 px-0 py-2.5 flex items-center justify-between flex-wrap gap-2">
+                    <div className="bg-transparent border-t border-slate-100 px-0 py-2 flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center space-x-1 flex-wrap gap-1">
                         <button
                           type="button"
                           onClick={() => handleCopyText(msg.id, msg.text)}
                           title="Copy answer"
-                          className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                          className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-semibold h-8 px-2.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs"
                         >
-                          {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
+                          {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> : <Copy className="w-3.5 h-3.5 text-slate-500 shrink-0" />}
                           <span className="hidden xs:inline">{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
                         </button>
 
@@ -2176,9 +2292,9 @@ export const AiTutorApp = memo(function AiTutorApp({
                           type="button"
                           onClick={() => handleSpeakText(msg.text)}
                           title="Listen to answer"
-                          className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                          className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-semibold h-8 px-2.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs"
                         >
-                          <Volume2 className="w-3.5 h-3.5 text-slate-500" />
+                          <Volume2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                           <span className="hidden xs:inline">Listen</span>
                         </button>
 
@@ -2186,9 +2302,9 @@ export const AiTutorApp = memo(function AiTutorApp({
                           type="button"
                           onClick={() => handleSaveToNotebook(msg)}
                           title="Save to notebook"
-                          className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
+                          className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-semibold h-8 px-2.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs"
                         >
-                          <Bookmark className="w-3.5 h-3.5 text-slate-500" />
+                          <Bookmark className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                           <span className="hidden xs:inline">{savedNoteId === msg.id ? 'Saved ✓' : 'Save Note'}</span>
                         </button>
 
@@ -2196,15 +2312,15 @@ export const AiTutorApp = memo(function AiTutorApp({
                           type="button"
                           onClick={() => handleExportToGoogleDoc(msg)}
                           disabled={isExportingDocId === msg.id}
-                          className="text-emerald-700 hover:text-emerald-900 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200/80 text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs disabled:opacity-50"
+                          className="text-emerald-700 hover:text-emerald-900 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200/80 text-xs font-bold h-8 px-2.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs disabled:opacity-50"
                           title="Export this tutoring answer to a live Google Document"
                         >
                           {isExportingDocId === msg.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600 shrink-0" />
                           ) : docExportSuccessId === msg.id ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                           ) : (
-                            <FileDown className="w-3.5 h-3.5 text-emerald-600" />
+                            <FileDown className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                           )}
                           <span className="hidden sm:inline">{docExportSuccessId === msg.id ? 'Exported!' : isExportingDocId === msg.id ? 'Exporting...' : 'Export to Docs'}</span>
                         </button>
@@ -2214,13 +2330,13 @@ export const AiTutorApp = memo(function AiTutorApp({
                         type="button"
                         onClick={() => setExpandedActionsId(expandedActionsId === msg.id ? null : msg.id)}
                         title="More study tools"
-                        className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 ${
+                        className={`text-xs font-bold h-8 px-2.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs ${
                           expandedActionsId === msg.id
-                            ? 'bg-indigo-100 text-indigo-800'
+                            ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
                             : 'text-indigo-600 hover:bg-indigo-50 border border-indigo-200/60'
                         }`}
                       >
-                        <SlidersHorizontal className="w-3.5 h-3.5" />
+                        <SlidersHorizontal className="w-3.5 h-3.5 shrink-0" />
                         <span>{expandedActionsId === msg.id ? 'Hide Tools' : 'Study Tools'}</span>
                       </button>
                     </div>
@@ -2617,14 +2733,14 @@ export const AiTutorApp = memo(function AiTutorApp({
             </div>
           )}
 
-          <div className="relative flex items-center bg-white border border-slate-300/80 hover:border-slate-400 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15 rounded-2xl p-1 transition-all duration-200 shadow-sm">
+          <div className="relative flex items-center bg-white border border-slate-250/90 hover:border-slate-350 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/15 rounded-2xl p-1 transition-all duration-200 shadow-sm">
             {/* MIC BUTTON */}
             <button
               type="button"
               onClick={handleVoiceInputToggle}
-              className={`p-1.5 sm:p-2 rounded-xl transition cursor-pointer shrink-0 ${
+              className={`w-9 h-9 flex items-center justify-center rounded-xl transition cursor-pointer shrink-0 ${
                 isListening 
-                  ? 'bg-rose-600 text-white animate-bounce' 
+                  ? 'bg-rose-600 text-white animate-bounce shadow-sm' 
                   : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
               }`}
               title={isListening ? 'Listening... Click to stop' : 'Voice Input'}
@@ -2637,9 +2753,9 @@ export const AiTutorApp = memo(function AiTutorApp({
               <button
                 type="button"
                 onClick={() => setShowQuickActionsMenu(!showQuickActionsMenu)}
-                className={`p-1.5 sm:p-2 rounded-xl transition cursor-pointer flex items-center justify-center ${
+                className={`w-9 h-9 flex items-center justify-center rounded-xl transition cursor-pointer ${
                   showQuickActionsMenu 
-                    ? 'bg-blue-600 text-white shadow-xs' 
+                    ? 'bg-indigo-600 text-white shadow-xs' 
                     : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                 }`}
                 title={appLanguage === 'hi' ? 'त्वरित अध्ययन सुझाव' : 'Quick Actions & Study Prompts'}
@@ -2732,10 +2848,10 @@ export const AiTutorApp = memo(function AiTutorApp({
               <button
                 type="button"
                 onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
-                className={`p-1.5 sm:p-2 rounded-xl transition flex items-center justify-center shrink-0 cursor-pointer ${
+                className={`w-9 h-9 flex items-center justify-center rounded-xl transition shrink-0 cursor-pointer ${
                   showAttachmentMenu || selectedImages.length > 0 || localAttachedFiles.length > 0
-                    ? 'bg-blue-600 text-white shadow-xs' 
-                    : 'text-blue-600 hover:bg-blue-50'
+                    ? 'bg-indigo-600 text-white shadow-xs' 
+                    : 'text-indigo-600 hover:bg-indigo-50'
                 }`}
                 title={appLanguage === 'hi' ? 'अटैचमेंट जोड़ें' : 'Add Attachment'}
               >
@@ -2883,7 +2999,7 @@ export const AiTutorApp = memo(function AiTutorApp({
               type="button"
               onClick={() => handleSendMessage()}
               disabled={(!inputQuery.trim() && selectedImages.length === 0) || isLoading}
-              className="p-2 sm:p-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600 text-white font-bold rounded-xl shadow-xs transition-all duration-150 flex items-center justify-center cursor-pointer shrink-0"
+              className="w-9 h-9 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white font-bold rounded-xl shadow-xs transition-all duration-150 cursor-pointer shrink-0"
               title="Send Message"
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

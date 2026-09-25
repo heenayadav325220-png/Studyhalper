@@ -177,7 +177,7 @@ const DEFAULT_USER: UserProfile = {
   avatarBg: 'bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600',
   xp: 100,
   level: 1,
-  streak: 5,
+  streak: 0,
   petLevel: 1,
   petXp: 80,
   petName: 'Chimpu',
@@ -186,7 +186,8 @@ const DEFAULT_USER: UserProfile = {
   schoolName: '',
   className: '',
   targetGoal: '',
-  isOnboarded: false
+  isOnboarded: false,
+  lastStreakDate: ''
 };
 
 // High-performance rotating neon border component with custom masking to preserve card gradients and details
@@ -617,8 +618,118 @@ export default function App() {
   };
 
   // --- STREAK & GOALS STATE ---
-  const [streakCompletedDays, setStreakCompletedDays] = useState<boolean[]>([false, false, false, false, false]);
+  const completedDaysCount = Math.min(userProfile?.streak || 0, 5);
+  const streakCompletedDays = [
+    completedDaysCount >= 1,
+    completedDaysCount >= 2,
+    completedDaysCount >= 3,
+    completedDaysCount >= 4,
+    completedDaysCount >= 5
+  ];
   const [day1GoalCompleted, setDay1GoalCompleted] = useState(false);
+
+  // Automatic date-based streak validation system
+  useEffect(() => {
+    // Only run if the userProfile exists and has a valid uid
+    if (!userProfile || !userProfile.uid) return;
+
+    // Get device local date in YYYY-MM-DD format
+    const getLocalDateString = () => {
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const todayStr = getLocalDateString();
+    const lastStreakStr = userProfile.lastStreakDate || '';
+
+    // If today is the same as the last streak date, the streak is already counted/handled today.
+    if (lastStreakStr === todayStr) {
+      return;
+    }
+
+    let newStreak = 1;
+    let xpReward = 0;
+    let showPromo = false;
+
+    if (lastStreakStr !== '') {
+      // Calculate day difference between today and lastStreakDate
+      const todayDate = new Date(todayStr + 'T00:00:00');
+      const lastStreakDate = new Date(lastStreakStr + 'T00:00:00');
+      const diffTime = todayDate.getTime() - lastStreakDate.getTime();
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 1) {
+        // Continuous streak! Increment by 1
+        newStreak = (userProfile.streak || 0) + 1;
+        xpReward = 15; // Give +15 XP for genuine streak continuation
+        showPromo = true;
+      } else if (diffDays > 1) {
+        // Gap of > 1 day. Streak broken! Reset to 1.
+        newStreak = 1;
+        xpReward = 15; // Start new streak with +15 XP too!
+        showPromo = true;
+        // Alert user that their streak was reset
+        setTimeout(() => {
+          sendRealNotification(
+            'Streak Reset! ⚠️', 
+            `You missed a study day. Your previous ${userProfile.streak || 0}-day streak has reset. Let's build a new one starting today!`
+          );
+        }, 1000);
+      } else {
+        // If somehow diffDays < 0 (system time went backwards), do nothing
+        return;
+      }
+    } else {
+      // First time setting a streak! Start at 1.
+      newStreak = 1;
+      xpReward = 15; // Give +15 XP for starting the journey!
+      showPromo = true;
+    }
+
+    // Apply the updates to state and persist to database/localStorage
+    setUserProfile((prev) => {
+      const finalXp = Math.max(0, (prev.xp || 0) + xpReward);
+      const finalLevel = Math.floor(finalXp / 100) + 1;
+      const updatedProfile: UserProfile = {
+        ...prev,
+        streak: newStreak,
+        lastStreakDate: todayStr,
+        xp: finalXp,
+        level: finalLevel
+      };
+
+      // Persist locally
+      localStorage.setItem('ascend_user_profile', JSON.stringify(updatedProfile));
+      localStorage.setItem('user_profile_data', JSON.stringify(updatedProfile));
+      localStorage.setItem(`user_profile_${prev.uid}`, JSON.stringify(updatedProfile));
+
+      // Sync with Firestore/Database
+      try {
+        updateUserProfile(prev.uid, {
+          streak: newStreak,
+          lastStreakDate: todayStr,
+          xp: finalXp,
+          level: finalLevel
+        });
+      } catch (err) {
+        console.warn('Error syncing streak to Firestore:', err);
+      }
+
+      if (showPromo) {
+        setTimeout(() => {
+          sendRealNotification(
+            'Streak Active! 🔥',
+            `Fantastic! Day ${newStreak} of your study streak is now active. Earned +15 XP!`
+          );
+        }, 1000);
+      }
+
+      return updatedProfile;
+    });
+  }, [userProfile.uid]);
 
   // --- CHIMPU SANCTUARY (PET) STATE DECLARATION ---
   const [petHappiness, setPetHappiness] = useState(85);
@@ -682,33 +793,8 @@ export default function App() {
   const handleCompleteDayGoal = () => {
     if (!day1GoalCompleted) {
       setDay1GoalCompleted(true);
-      setStreakCompletedDays([true, false, false, false, false]);
       addXp(20);
       sendRealNotification('Goal Completed! 🎉', 'Amazing! You finished your Day 1 target and earned +20 XP!');
-    }
-  };
-
-  const handleToggleDay = (idx: number) => {
-    const updated = [...streakCompletedDays];
-    const originalState = updated[idx];
-    updated[idx] = !originalState;
-    setStreakCompletedDays(updated);
-    
-    const countCompleted = updated.filter(Boolean).length;
-    setUserProfile(prev => ({
-      ...prev,
-      streak: countCompleted
-    }));
-    
-    if (idx === 0) {
-      setDay1GoalCompleted(!originalState);
-    }
-    
-    if (!originalState) {
-      addXp(15);
-      sendRealNotification('Streak Updated! 🔥', `Day ${idx + 1} marked completed! Keep the momentum! +15 XP`);
-    } else {
-      addXp(-15);
     }
   };
 
@@ -962,14 +1048,19 @@ export default function App() {
     const docsCount = studyDocs.length;
     const examsCount = mockExams.filter(e => e.completed).length;
 
-    let celebrated: string[] = [];
-    try {
-      const saved = localStorage.getItem('ascend_celebrated_badges');
-      if (saved) {
-        celebrated = JSON.parse(saved);
+    let celebrated: string[] = Array.isArray(currentProfile.unlockedBadges) ? currentProfile.unlockedBadges : [];
+    if (celebrated.length === 0) {
+      try {
+        const saved = localStorage.getItem('ascend_celebrated_badges');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            celebrated = parsed;
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing celebrated badges fallback", e);
       }
-    } catch (e) {
-      console.error("Error parsing celebrated badges", e);
     }
 
     for (const badge of BADGES_CONFIG) {
@@ -977,8 +1068,8 @@ export default function App() {
         const actual = badge.getActual(currentProfile, docsCount, examsCount, pomoCount);
         if (actual >= badge.target) {
           // Add to celebrated immediately to lock it
-          celebrated.push(badge.id);
-          localStorage.setItem('ascend_celebrated_badges', JSON.stringify(celebrated));
+          const updatedCelebrated = [...celebrated, badge.id];
+          localStorage.setItem('ascend_celebrated_badges', JSON.stringify(updatedCelebrated));
           
           // Trigger celebration modal popup
           setUnlockedBadgeCelebration(badge);
@@ -987,10 +1078,19 @@ export default function App() {
           setUserProfile((prev) => {
             const finalXp = (prev.xp || 0) + 100;
             const finalLevel = Math.floor(finalXp / 100) + 1;
-            const finalProfile: UserProfile = { ...prev, xp: finalXp, level: finalLevel };
+            const finalProfile: UserProfile = { 
+              ...prev, 
+              xp: finalXp, 
+              level: finalLevel,
+              unlockedBadges: updatedCelebrated
+            };
             localStorage.setItem('ascend_user_profile', JSON.stringify(finalProfile));
             localStorage.setItem('user_profile_data', JSON.stringify(finalProfile));
-            updateUserProfile(prev.uid, { xp: finalXp, level: finalLevel });
+            updateUserProfile(prev.uid, { 
+              xp: finalXp, 
+              level: finalLevel,
+              unlockedBadges: updatedCelebrated
+            });
             return finalProfile;
           });
           break; // celebrate one badge at a time
@@ -2303,12 +2403,9 @@ export default function App() {
                 ].map((item, idx) => {
                   const isDone = streakCompletedDays[idx];
                   return (
-                    <motion.button 
+                    <div 
                       key={idx}
-                      whileHover={{ y: -2 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => handleToggleDay(idx)}
-                      className={`p-2 sm:p-3 rounded-xl text-center flex flex-col items-center justify-between h-22 sm:h-26 transition-all cursor-pointer focus:outline-hidden relative overflow-hidden ${
+                      className={`p-2 sm:p-3 rounded-xl text-center flex flex-col items-center justify-between h-22 sm:h-26 transition-all cursor-default relative overflow-hidden ${
                         isDone
                           ? 'border border-amber-500/50 bg-gradient-to-b from-amber-500/20 to-amber-950/40 text-amber-100 shadow-[0_0_14px_rgba(245,158,11,0.22)]'
                           : 'border border-slate-800/90 bg-[#070c18]/90 hover:bg-[#0c1428] text-slate-400'
@@ -2330,9 +2427,9 @@ export default function App() {
                           ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
                           : 'bg-slate-900 text-slate-400 border border-slate-800'
                       }`}>
-                        {isDone ? 'DONE' : '+20 XP'}
+                        {isDone ? 'DONE' : 'LOCKED'}
                       </span>
-                    </motion.button>
+                    </div>
                   );
                 })}
               </div>

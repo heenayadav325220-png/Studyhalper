@@ -72,6 +72,8 @@ export async function getUserProfile(uid: string) {
 }
 
 export async function updateUserStats(uid: string, xpEarned: number, streak?: number) {
+  // NOTE: Daily streak validation is verified on the frontend using timezone-safe
+  // lastStreakDate comparison to prevent manual farming/forgery before synchronization.
   if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
     const user = memoryUsers.get(uid);
     if (!user) return null;

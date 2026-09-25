@@ -36,6 +36,8 @@ service cloud.firestore {
         && (!('petName' in data) || (data.petName is string && data.petName.size() <= 60))
         && (!('language' in data) || (data.language is string && data.language.size() <= 20))
         && (!('lastActive' in data) || (data.lastActive is string && data.lastActive.size() <= 60))
+        && (!('lastStreakDate' in data) || (data.lastStreakDate is string && data.lastStreakDate.size() <= 40))
+        && (!('unlockedBadges' in data) || (data.unlockedBadges is list && data.unlockedBadges.size() <= 100))
         && (!('role' in data));
     }
 
@@ -49,6 +51,8 @@ service cloud.firestore {
         && (!('email' in data) || (data.email is string && data.email.size() <= 200))
         && (!('xp' in data) || ((data.xp is int || data.xp is float) && data.xp >= 0))
         && (!('streak' in data) || ((data.streak is int || data.streak is float) && data.streak >= 0))
+        && (!('lastStreakDate' in data) || (data.lastStreakDate is string && data.lastStreakDate.size() <= 40))
+        && (!('unlockedBadges' in data) || (data.unlockedBadges is list && data.unlockedBadges.size() <= 100))
         && (!('createdAt' in prev) || !('createdAt' in data) || data.createdAt == prev.createdAt)
         && (!('role' in data) || ('role' in prev && data.role == prev.role));
     }

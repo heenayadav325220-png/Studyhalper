@@ -523,6 +523,6 @@ html.dark #main-app-container .backdrop-blur-xl {
 #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer .flex.items-center.overflow-x-auto::-webkit-scrollbar { display: none; }
 @media (min-width: 768px) { #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > header { padding-inline: clamp(24px, 5vw, 64px); } }
 @media (max-width: 767px) {
-  #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto { padding-top: 18px; padding-bottom: 196px; scroll-padding-bottom: 196px; }
+  #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > div.flex-1.overflow-y-auto { padding-top: 14px; padding-bottom: 96px; scroll-padding-bottom: 96px; }
   #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer { padding-top: 8px; }
 }

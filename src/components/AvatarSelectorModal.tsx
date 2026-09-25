@@ -13,6 +13,7 @@ import {
   ImageIcon
 } from 'lucide-react';
 import UserAvatar from './UserAvatar';
+import { showToast } from './Toast';
 
 export interface AvatarSelectionData {
   avatar: string;
@@ -137,7 +138,7 @@ export default function AvatarSelectorModal({
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file (.png, .jpg, .webp)');
+      showToast('Please select an image file (.png, .jpg, .webp)', 'error');
       return;
     }
 

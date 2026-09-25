@@ -46,14 +46,16 @@ const DEFAULT_PROFILE: UserProfile = {
   avatarBg: 'bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600',
   xp: 100,
   level: 1,
-  streak: 1,
+  streak: 0,
   petLevel: 1,
   petXp: 0,
   petName: 'Nova',
   language: 'en',
   lastActive: new Date().toISOString(),
   isOnboarded: false,
-  authProvider: 'password'
+  authProvider: 'password',
+  lastStreakDate: '',
+  unlockedBadges: []
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -89,15 +91,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const snap = await withTimeout(getDoc(userDocRef), 2000, 'getDoc timeout');
       if (snap.exists()) {
         const data = snap.data() as Partial<UserProfile>;
+        let unlocked = Array.isArray(data.unlockedBadges) ? data.unlockedBadges : [];
+        if (unlocked.length === 0) {
+          // Migration from localStorage backward compatibility
+          try {
+            const saved = localStorage.getItem('ascend_celebrated_badges');
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                unlocked = parsed;
+                updateDoc(userDocRef, { unlockedBadges: unlocked }).catch(() => {});
+              }
+            }
+          } catch (e) {
+            console.warn('Local storage badge migration warning:', e);
+          }
+        }
+
         profile = {
           ...profile,
           ...data,
           uid: user.uid, // Ensure uid strictly matches
           name: data.name || profile.name,
           xp: typeof data.xp === 'number' ? data.xp : 100,
-          streak: typeof data.streak === 'number' ? data.streak : 1,
+          streak: typeof data.streak === 'number' ? data.streak : 0,
           level: typeof data.level === 'number' ? data.level : 1,
-          lastActive: new Date().toISOString()
+          lastActive: new Date().toISOString(),
+          lastStreakDate: data.lastStreakDate || '',
+          unlockedBadges: unlocked
         };
 
         // Non-blocking update lastActive timestamp in Firestore (throttled to once every 15 minutes)
@@ -121,6 +142,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           petName: profile.petName,
           language: profile.language,
           lastActive: profile.lastActive,
+          lastStreakDate: profile.lastStreakDate || '',
+          unlockedBadges: [],
           isOnboarded: profile.isOnboarded || false,
           authProvider: profile.authProvider,
           createdAt: serverTimestamp()
@@ -213,11 +236,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: cleanName,
         email: cleanEmail,
         xp: 250, // Welcome signup bonus
-        streak: 1,
+        streak: 0,
         level: 1,
+        unlockedBadges: [],
         isOnboarded: true,
         authProvider: 'password',
-        lastActive: new Date().toISOString()
+        lastActive: new Date().toISOString(),
+        lastStreakDate: ''
       };
 
       setDoc(userDocRef, {
@@ -232,6 +257,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         petName: newProfile.petName,
         language: newProfile.language,
         lastActive: newProfile.lastActive,
+        lastStreakDate: '',
+        unlockedBadges: [],
         isOnboarded: true,
         className: newProfile.className || '',
         targetGoal: newProfile.targetGoal || '',
@@ -304,9 +331,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const uid = currentUser?.uid || userProfile?.uid;
     if (!uid) return;
 
+    let finalData = { ...data };
+
+    // Anti-cheat guard: prevent client-side tampering of massive XP increments
+    if (finalData.xp !== undefined && userProfile) {
+      const currentXp = userProfile.xp || 0;
+      const proposedXp = finalData.xp;
+      const diffXp = proposedXp - currentXp;
+      if (diffXp > 500) {
+        console.warn(`[Anti-Cheat Alert] Suspicious XP change rejected: proposed +${diffXp} XP (single update limit is 500). Capping at safe max of +500.`);
+        finalData.xp = currentXp + 500;
+      }
+    }
+
     const updated = {
       ...(userProfile || DEFAULT_PROFILE),
-      ...data,
+      ...finalData,
       uid,
       lastActive: new Date().toISOString()
     };
@@ -319,7 +359,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const userDocRef = doc(db, 'users', uid);
         await updateDoc(userDocRef, {
-          ...data,
+          ...finalData,
           lastActive: new Date().toISOString()
         });
       } catch (err) {

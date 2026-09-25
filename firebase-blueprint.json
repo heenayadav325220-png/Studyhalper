@@ -44,6 +44,17 @@
         "lastActive": {
           "type": "string",
           "description": "ISO string of last activity timestamp"
+        },
+        "lastStreakDate": {
+          "type": "string",
+          "description": "YYYY-MM-DD local date of last streak continuation"
+        },
+        "unlockedBadges": {
+          "type": "array",
+          "description": "Array of unlocked badge IDs",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": ["uid", "name", "xp", "level", "streak", "petLevel", "petXp", "petName", "language", "lastActive"]

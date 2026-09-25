@@ -250,6 +250,43 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
   return executeFetch();
 }
 
+/**
+ * Highly resilient JSON cleaner and parser helper.
+ * Strips markdown json blocks, comments, and handles partial or malformed responses.
+ */
+export function cleanAndParseJson<T>(text: string, fallback: T): T {
+  if (!text) return fallback;
+  let cleaned = text.trim();
+  // Strip Markdown JSON/text block syntax if wrapped
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```(?:json|text|)?\s*/i, "").replace(/\s*```$/, "");
+  }
+  cleaned = cleaned.trim();
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch (err) {
+    // Try to find first open bracket/brace to extract valid JSON
+    try {
+      const firstBrace = cleaned.indexOf("{");
+      const lastBrace = cleaned.lastIndexOf("}");
+      const firstBracket = cleaned.indexOf("[");
+      const lastBracket = cleaned.lastIndexOf("]");
+      
+      if (firstBrace !== -1 && lastBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+        const sliced = cleaned.slice(firstBrace, lastBrace + 1);
+        return JSON.parse(sliced) as T;
+      } else if (firstBracket !== -1 && lastBracket !== -1) {
+        const sliced = cleaned.slice(firstBracket, lastBracket + 1);
+        return JSON.parse(sliced) as T;
+      }
+    } catch (innerErr) {
+      console.warn("[JSON Parse Repair Failed]", innerErr);
+    }
+    console.warn("[cleanAndParseJson] Resilient fallback invoked due to parse error:", err, "Original text snippet:", text.slice(0, 120));
+    return fallback;
+  }
+}
+
 // Lazy-loaded client-side fallback
 let clientAiInstance: any = null;
 function getClientAiInstance(): any {
@@ -1155,7 +1192,7 @@ export async function generateQuiz(
     });
 
     try {
-      const parsed = JSON.parse(response.text || "[]");
+      const parsed = cleanAndParseJson(response.text || "[]", [] as any[]);
       if (Array.isArray(parsed) && parsed.length > 0) {
         setLocalCache("quiz", country, subject, quizCacheKey, parsed);
         return parsed;
@@ -1280,7 +1317,7 @@ export async function generateFlashcards(
         const responses = await Promise.all(batchPromises);
         for (const res of responses) {
           try {
-            const parsed = JSON.parse(res.text || "[]");
+            const parsed = cleanAndParseJson(res.text || "[]", [] as any[]);
             if (Array.isArray(parsed)) {
               finalCards.push(...parsed);
             }
@@ -1302,7 +1339,7 @@ Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`;
         });
 
         try {
-          const parsed = JSON.parse(response.text || "[]");
+          const parsed = cleanAndParseJson(response.text || "[]", [] as any[]);
           if (Array.isArray(parsed) && parsed.length > 0) {
             finalCards = parsed;
           }
@@ -1391,7 +1428,7 @@ export async function generateNotes(
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });
-      return JSON.parse(response.text || "{}");
+      return cleanAndParseJson(response.text || "{}", { title: `${topic} Notes`, content: "" });
     }
   } catch (err) {
     console.error("Client-side notes generator failed:", err);
@@ -1504,7 +1541,7 @@ export async function generateMindmap(topic: string): Promise<{ name: string; ch
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });
-      return JSON.parse(response.text || "{}");
+      return cleanAndParseJson(response.text || "{}", { name: topic, children: [] });
     }
   } catch (err) {
     console.error("Client-side mindmap failed:", err);
@@ -1630,7 +1667,7 @@ export async function summarizePdf(textContent: string): Promise<{ summary: stri
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });
-      return JSON.parse(response.text || "{}");
+      return cleanAndParseJson(response.text || "{}", { summary: "Could not summarize document dynamically.", keyTerms: [], questions: [] });
     }
   } catch (err) {
     console.error("Client-side PDF-summary failed:", err);

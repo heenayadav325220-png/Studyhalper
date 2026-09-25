@@ -18,6 +18,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import { UserProfile } from '../types';
 import { playTutorSpeech } from '../services/voiceSettings';
+import { showToast } from './Toast';
 
 interface PdfBookScannerProps {
   user?: UserProfile;
@@ -135,7 +136,10 @@ export const PdfBookScanner: React.FC<PdfBookScannerProps> = ({
   const handleScanAndAnalyze = async (customText?: string, customTitle?: string) => {
     const textToAnalyze = customText || pastedText;
     if (!fileBase64 && !textToAnalyze.trim()) {
-      alert(appLanguage === 'hi' ? 'कृपया कोई PDF, फोटो या चैप्टर टेक्स्ट दर्ज करें!' : 'Please upload a PDF, image, or enter chapter text!');
+      showToast(
+        appLanguage === 'hi' ? 'कृपया कोई PDF, फोटो या चैप्टर टेक्स्ट दर्ज करें!' : 'Please upload a PDF, image, or enter chapter text!',
+        'error'
+      );
       return;
     }
 
@@ -176,7 +180,10 @@ export const PdfBookScanner: React.FC<PdfBookScannerProps> = ({
       if (onAddXp) onAddXp(30);
     } catch (err: any) {
       console.error('Scan analysis failed:', err);
-      alert(appLanguage === 'hi' ? 'विश्लेषण में समस्या आई, कृपया पुनः प्रयास करें।' : 'Failed to scan and summarize. Please retry.');
+      showToast(
+        appLanguage === 'hi' ? 'विश्लेषण में समस्या आई, कृपया पुनः प्रयास करें।' : 'Failed to scan and summarize. Please retry.',
+        'error'
+      );
     } finally {
       setIsLoading(false);
     }

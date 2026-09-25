@@ -220,14 +220,15 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
         content: `### ${cleanTitle}\n\n${cleanContent}\n\n*Generated from Mindmap of topic: **${E}**.*`,
         subject: f
       });
-      alert(
+      showToast(
         appLanguage === "Hindi"
           ? `✅ "${title}" को आपके नोटबुक में सफलतापूर्वक जोड़ दिया गया है!`
-          : `✅ "${title}" has been successfully added to your Notebook!`
+          : `✅ "${title}" has been successfully added to your Notebook!`,
+        'success'
       );
     } catch (i) {
       console.error(i);
-      alert(appLanguage === "Hindi" ? "नोट सहेजने में विफल।" : "Failed to save note.");
+      showToast(appLanguage === "Hindi" ? "नोट सहेजने में विफल।" : "Failed to save note.", "error");
     }
   };
 
@@ -474,7 +475,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
           if (t <= 1) {
             ae(false);
             if (N.current) clearInterval(N.current);
-            alert("⏰ Great job! You completed your distraction-free study session!");
+            showToast("⏰ Great job! You completed your distraction-free study session!", "success");
             return 0;
           }
           return t - 1;
@@ -491,7 +492,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
   const _t = () => {
     const SpeechClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechClass) {
-      alert("Speech recognition is not supported in this browser. Please try Chrome/Edge.");
+      showToast("Speech recognition is not supported in this browser. Please try Chrome/Edge.", "error");
       return;
     }
     if (!pe.current) {
@@ -846,7 +847,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
       content: saveContent,
       subject: f
     });
-    alert("📝 Study Note successfully saved in your notebook library!");
+    showToast("📝 Study Note successfully saved in your notebook library!", "success");
   };
 
   const es = (noteId: number, noteTitle: string) => {
@@ -876,7 +877,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
       }
     });
 
-    alert(`📅 Revision logged! Spaced review set for ${daysToAdd} day(s) from now.`);
+    showToast(`📅 Revision logged! Spaced review set for ${daysToAdd} day(s) from now.`, "success");
   };
 
   const ts = (t: any) => {

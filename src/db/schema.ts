@@ -13,6 +13,7 @@ export const users = pgTable('users', {
   petLevel: integer('pet_level').default(1),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  lastStreakDate: text('last_streak_date'),
 });
 
 // Define the 'notes' table

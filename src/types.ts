@@ -99,6 +99,8 @@ export interface UserProfile {
   isOnboarded?: boolean;
   authProvider?: 'google' | 'password' | 'guest' | 'anonymous';
   photoURL?: string;
+  lastStreakDate?: string;
+  unlockedBadges?: string[];
 }
 
 export interface RoomChatMessage {

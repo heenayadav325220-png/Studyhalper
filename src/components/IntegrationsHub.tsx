@@ -32,6 +32,7 @@ import {
   GoogleCalendarEvent
 } from "../services/googleWorkspace";
 import { playUiSound } from "../services/soundEffects";
+import { showToast } from "./Toast";
 
 interface IntegrationsHubProps {
   appLanguage: string;
@@ -200,7 +201,7 @@ export default function IntegrationsHub({
       });
       setBrowsingDrive(false);
     } catch (err) {
-      alert("Could not load file content: " + err);
+      showToast("Could not load file content: " + err, "error");
     } finally {
       setLoadingDrive(false);
     }
@@ -238,7 +239,7 @@ export default function IntegrationsHub({
       const work = await fetchClassroomCourseWork(token, course.id);
       setCoursework(work);
     } catch (err) {
-      alert("Failed to load coursework: " + err);
+      showToast("Failed to load coursework: " + err, "error");
     } finally {
       setLoadingClassroom(false);
     }
@@ -290,14 +291,14 @@ export default function IntegrationsHub({
         newSessionTime,
         parseInt(newSessionDuration)
       );
-      alert("Study Session added to your Google Calendar!");
+      showToast("Study Session added to your Google Calendar!", "success");
       setScheduleModal(false);
       setNewSessionTitle("");
       setNewSessionDate("");
       setNewSessionTime("");
       handleBrowseCalendar(); // refresh
     } catch (err) {
-      alert("Scheduling failed: " + err);
+      showToast("Scheduling failed: " + err, "error");
     } finally {
       setScheduling(false);
     }
@@ -336,7 +337,7 @@ export default function IntegrationsHub({
       const values = await fetchSpreadsheetValues(token, sheet.id, "Sheet1!A1:Z100");
       setSheetValues(values);
     } catch (err) {
-      alert("Could not read spreadsheet values: " + err);
+      showToast("Could not read spreadsheet values: " + err, "error");
     } finally {
       setLoadingSheets(false);
     }
