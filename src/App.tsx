@@ -17,7 +17,6 @@ import {
   RotateCcw,
   BookOpen,
   Check,
-  Calendar,
   ChevronRight,
   BrainCircuit,
   LayoutGrid,
@@ -33,7 +32,9 @@ import {
   Terminal,
   Mic,
   Search,
-  Notebook
+  Notebook,
+  Clock,
+  Target
 } from 'lucide-react';
 import InteractiveToolkit from './components/InteractiveToolkit';
 import AiTutorApp from './components/AiTutorApp';
@@ -186,6 +187,40 @@ const DEFAULT_USER: UserProfile = {
   className: '',
   targetGoal: '',
   isOnboarded: false
+};
+
+// High-performance rotating neon border component with custom masking to preserve card gradients and details
+const NeonBorder: React.FC<{
+  color1?: string;
+  color2?: string;
+  className?: string;
+  duration?: string;
+  borderWidth?: string;
+}> = ({ color1 = '#10b981', color2 = '#6366f1', className = '', duration = '4s', borderWidth = '1.5px' }) => {
+  return (
+    <div 
+      className={`absolute inset-0 rounded-[inherit] pointer-events-none overflow-hidden z-20 ${className}`} 
+      style={{ padding: borderWidth }}
+    >
+      <div 
+        className="absolute inset-0 rounded-[inherit]" 
+        style={{
+          mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+          maskComposite: 'exclude',
+          WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+          WebkitMaskComposite: 'xor',
+        } as any}
+      >
+        <div 
+          className="absolute inset-[-250%] opacity-100"
+          style={{
+            background: `conic-gradient(from 0deg, transparent 35%, ${color1} 46%, ${color2} 54%, transparent 65%)`,
+            animation: `spin ${duration} linear infinite`
+          }}
+        />
+      </div>
+    </div>
+  );
 };
 
 export default function App() {
@@ -1058,15 +1093,15 @@ export default function App() {
   const cornerRadius = getCardRadiusClasses();
 
   return (
-    <div id="main-app-container" className={`min-h-screen text-slate-100 ${getAppFontClass()} flex flex-col selection:bg-emerald-500 selection:text-white w-full max-w-full overflow-x-hidden relative bg-[#0d1117]`}>
+    <div id="main-app-container" className={`min-h-screen text-slate-100 ${getAppFontClass()} flex flex-col selection:bg-emerald-500 selection:text-white w-full max-w-full overflow-x-hidden relative bg-[#060913]`}>
       {/* DYNAMIC LIVE CUSTOM CSS INJECTED BY AI COPILOT */}
       <style id="ai-editor-live-styles">{uiCustomization.customCss || ''}</style>
       
-      {/* FULL-PAGE LIVE WALLPAPER AMBIANCE (4 MODES) WITH DIRECT DOM ID TARGETING */}
+      {/* FULL-PAGE LIVE WALLPAPER AMBIANCE (4 MODES) WITH 15-20% REFINED VISIBILITY */}
       {uiCustomization.wallpaperAmbiance === 'cosmic_nebula' ? (
         <div 
           id="app-wallpaper-layer"
-          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-95 transition-all duration-500"
+          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-[0.22] transition-all duration-500"
           style={{ 
             background: 'radial-gradient(ellipse at 50% 0%, #1e1b4b 0%, #030712 60%, #000000 100%)' 
           }}
@@ -1076,7 +1111,7 @@ export default function App() {
       ) : uiCustomization.wallpaperAmbiance === 'cyber_matrix' ? (
         <div 
           id="app-wallpaper-layer"
-          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-95 transition-all duration-500"
+          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-[0.20] transition-all duration-500"
           style={{ 
             background: 'radial-gradient(ellipse at top, #022c22 0%, #020617 80%)' 
           }}
@@ -1084,17 +1119,17 @@ export default function App() {
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#00ffcc0a_1px,transparent_1px),linear-gradient(to_bottom,#00ffcc0a_1px,transparent_1px)] [background-size:28px_28px] opacity-70" />
         </div>
       ) : uiCustomization.wallpaperAmbiance === 'deep_obsidian' ? (
-        <div id="app-wallpaper-layer" className="fixed inset-0 pointer-events-none z-0 bg-[#030712] transition-all duration-500" />
+        <div id="app-wallpaper-layer" className="fixed inset-0 pointer-events-none z-0 bg-[#060913] transition-all duration-500" />
       ) : (
-        /* science_chalkboard (default) */
+        /* science_chalkboard (default) - Refined to ~18% visibility so foreground cards stand out sharply */
         <div 
           id="app-wallpaper-layer"
-          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-95 transition-all duration-500"
+          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-[0.18] transition-all duration-500"
           style={{ backgroundImage: `url('/science_bg.jpg')` }}
         />
       )}
-      {/* AMBIENT CHALKBOARD VIGNETTE OVERLAY */}
-      <div id="app-vignette-layer" className="fixed inset-0 pointer-events-none z-0 bg-gradient-to-b from-black/60 via-black/35 to-black/75 backdrop-brightness-95 transition-all duration-500" />
+      {/* AMBIENT CHALKBOARD VIGNETTE OVERLAY - REFINED DARK GLASSMORPHIC OVERLAY */}
+      <div id="app-vignette-layer" className="fixed inset-0 pointer-events-none z-0 bg-gradient-to-b from-[#060913]/90 via-[#070b16]/75 to-[#05070e]/95 backdrop-blur-[2px] transition-all duration-500" />
 
       {/* 100+ REALTIME MOVING LIVING OBJECTS & HUMAN CHARACTERS (SATELLITES, ROCKETS, WAVING ASTRONAUTS, CYBORGS, ATOMS) */}
       <RealtimeMovingUniverse theme={uiCustomization.wallpaperAmbiance} interactive={true} />
@@ -1138,8 +1173,8 @@ export default function App() {
           onShowBottomNav={showBottomNav}
         />
       ) : (
-      /* MAIN CONTENT AREA - WITH pb-24 TO AVOID BOTTOM NAV OVERLAP */
-      <main className={`relative z-10 flex-1 p-3 sm:p-4 md:p-5 mx-auto w-full pb-24 overflow-x-hidden transition-all duration-300 ${activeTab === 'studyDocs' ? 'max-w-7xl' : 'max-w-xl space-y-4'}`}>
+      /* MAIN CONTENT AREA - WITH pb-20 sm:pb-24 FOR FULL-WIDTH STICKY BOTTOM NAVIGATION BAR */
+      <main className={`relative z-10 flex-1 p-3.5 sm:p-5 md:p-6 mx-auto w-full pb-20 sm:pb-24 overflow-x-hidden transition-all duration-300 ${activeTab === 'studyDocs' ? 'max-w-7xl' : 'max-w-xl space-y-4 sm:space-y-5'}`}>
         <AnimatePresence mode="popLayout">
           <motion.div
             key={activeTab}
@@ -1172,7 +1207,7 @@ export default function App() {
               </div>
 
               {/* INNER DARK SLATE BACKDROP */}
-              <div className={`relative z-10 overflow-hidden ${cornerRadius.inner || 'rounded-[26px]'} bg-slate-950/92 backdrop-blur-xl px-4 pt-3.5 pb-4 sm:px-5 sm:pt-4 sm:pb-5 space-y-3.5 border border-slate-800/80 shadow-2xl`}>
+              <div className={`relative z-10 overflow-hidden ${cornerRadius.inner || 'rounded-[26px]'} bg-[#0a101d]/90 backdrop-blur-xl px-4 pt-3.5 pb-4 sm:px-5 sm:pt-4 sm:pb-5 space-y-3.5 border border-slate-800/80 shadow-2xl`}>
                 {/* Subtle Ambient Glows */}
                 <div className="absolute -top-16 -left-16 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
                 <div className="absolute -top-16 -right-16 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -1195,13 +1230,13 @@ export default function App() {
                     {/* Class & School Details Badges */}
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       {/* Class Badge */}
-                      <span className="px-2.5 py-0.5 bg-indigo-950/60 text-indigo-300 text-xs font-semibold rounded-full border border-indigo-500/40 flex items-center space-x-1.5 shrink-0 shadow-xs">
+                      <span className="px-2.5 py-0.5 bg-indigo-950/70 text-indigo-300 text-xs font-semibold rounded-full border border-indigo-500/40 flex items-center space-x-1.5 shrink-0 shadow-xs">
                         <GraduationCap className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                         <span>{userProfile.className ? (userProfile.className.startsWith('Class') ? userProfile.className : `Class ${userProfile.className}`) : 'Class 12th (Science/PCM)'}</span>
                       </span>
 
                       {/* School / College Pill Badge */}
-                      <span className="px-2.5 py-0.5 bg-slate-900/80 text-slate-300 text-xs font-medium rounded-full border border-slate-700/70 hover:border-slate-600 flex items-center space-x-1.5 shrink-0 shadow-xs max-w-full">
+                      <span className="px-2.5 py-0.5 bg-slate-900/90 text-slate-300 text-xs font-medium rounded-full border border-slate-700/70 hover:border-slate-600 flex items-center space-x-1.5 shrink-0 shadow-xs max-w-full">
                         <UserIcon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                         <span className="whitespace-nowrap">{userProfile.schoolName || 'School / College Not Set'}</span>
                       </span>
@@ -1262,44 +1297,44 @@ export default function App() {
                 {/* STAT BOXES - 3-Column Softened, Unified Accent Stat Cards */}
                 <div className="grid grid-cols-3 gap-2 sm:gap-2.5 pt-1 relative z-10">
                   {/* BOX 1: STREAK */}
-                  <div className="bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800/80 hover:border-amber-500/40 rounded-xl py-2.5 px-2 text-center relative overflow-hidden transition-all duration-200 shadow-xs">
+                  <div className="bg-[#0f172a]/90 hover:bg-[#141f36] border border-amber-500/30 hover:border-amber-500/50 rounded-xl py-2.5 px-2 text-center relative overflow-hidden transition-all duration-200 shadow-xs">
                     <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider flex items-center justify-center space-x-1">
                       <span className="text-xs">🔥</span>
                       <span>Streak</span>
                     </div>
-                    <div className="text-base sm:text-lg font-black text-white mt-0.5 leading-tight">
+                    <div className="text-base sm:text-lg font-black text-amber-100 mt-0.5 leading-tight">
                       {userProfile.streak || 5} <span className="text-[10px] font-normal text-slate-400">days</span>
                     </div>
                   </div>
 
                   {/* BOX 2: LEVEL */}
-                  <div className="bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800/80 hover:border-indigo-500/40 rounded-xl py-2.5 px-2 text-center relative overflow-hidden transition-all duration-200 shadow-xs">
-                    <div className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider flex items-center justify-center space-x-1">
+                  <div className="bg-[#0f172a]/90 hover:bg-[#141f36] border border-indigo-500/30 hover:border-indigo-500/50 rounded-xl py-2.5 px-2 text-center relative overflow-hidden transition-all duration-200 shadow-xs">
+                    <div className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider flex items-center justify-center space-x-1">
                       <span className="text-xs">📓</span>
                       <span>Level</span>
                     </div>
-                    <div className="text-base sm:text-lg font-black text-white mt-0.5 leading-tight">
+                    <div className="text-base sm:text-lg font-black text-indigo-100 mt-0.5 leading-tight">
                       Lvl {userProfile.level || 1}
                     </div>
                   </div>
 
                   {/* BOX 3: TOTAL XP */}
-                  <div className="bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800/80 hover:border-indigo-500/40 rounded-xl py-2.5 px-2 text-center relative overflow-hidden transition-all duration-200 shadow-xs">
-                    <div className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider flex items-center justify-center space-x-1">
+                  <div className="bg-[#0f172a]/90 hover:bg-[#141f36] border border-cyan-500/30 hover:border-cyan-500/50 rounded-xl py-2.5 px-2 text-center relative overflow-hidden transition-all duration-200 shadow-xs">
+                    <div className="text-[10px] text-cyan-300 font-bold uppercase tracking-wider flex items-center justify-center space-x-1">
                       <span className="text-xs">⭐</span>
                       <span>Total XP</span>
                     </div>
-                    <div className="text-base sm:text-lg font-black text-white mt-0.5 leading-tight">
+                    <div className="text-base sm:text-lg font-black text-cyan-100 mt-0.5 leading-tight">
                       {userProfile.xp || 100} <span className="text-[10px] font-normal text-slate-400">XP</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Level & XP Progress Section */}
-                <div className="bg-slate-900/60 border border-slate-800/80 hover:border-slate-700/80 rounded-xl p-3 sm:p-3.5 space-y-2.5 relative z-10 shadow-xs">
+                <div className="bg-[#0f172a]/90 border border-slate-800/80 hover:border-slate-700/80 rounded-xl p-3 sm:p-3.5 space-y-2.5 relative z-10 shadow-xs">
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                     <div className="flex items-center space-x-2">
-                      <span className="text-slate-300 text-[11px] sm:text-xs font-medium">Level {userProfile.level || 1} Progress:</span>
+                      <span className="text-slate-300 text-[11px] sm:text-xs font-semibold">Level {userProfile.level || 1} Progress:</span>
                       <span className="text-white text-[11px] sm:text-xs font-bold">
                         {userProfile.xp ? (userProfile.xp % 100) : 0} <span className="text-slate-500 font-normal">/</span> 100 <span className="text-slate-400 font-normal">XP</span>
                       </span>
@@ -1313,9 +1348,9 @@ export default function App() {
                     </button>
                   </div>
                   {/* Sleek modern progress bar track */}
-                  <div className="w-full h-2 bg-slate-950 border border-slate-800/90 rounded-full relative overflow-hidden">
+                  <div className="w-full h-2.5 bg-[#060913] border border-slate-800/90 rounded-full relative overflow-hidden">
                     <div 
-                      className="h-full bg-gradient-to-r from-indigo-500 via-indigo-400 to-amber-400 rounded-full transition-all duration-500"
+                      className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"
                       style={{ width: `${Math.max(6, userProfile.xp ? (userProfile.xp % 100) : 15)}%` }}
                     />
                   </div>
@@ -1326,13 +1361,13 @@ export default function App() {
 
             {/* CLOUD AUTH & SYNC BANNER - SLIMMER & CLEAN */}
             {!isUserLoggedIn && (
-              <div className="bg-slate-900/80 border border-indigo-500/30 rounded-xl px-3.5 py-2.5 sm:px-4 sm:py-3 text-white flex items-center justify-between gap-3 shadow-xs backdrop-blur-md">
+              <div className="bg-gradient-to-r from-[#0c142b]/90 via-[#0e162d]/90 to-[#070b16]/90 border border-indigo-500/40 rounded-2xl px-4 py-3 sm:px-4.5 sm:py-3.5 text-white flex items-center justify-between gap-3 shadow-lg backdrop-blur-xl">
                 <div className="space-y-0.5 min-w-0 flex-1">
                   <p className="text-xs sm:text-sm font-bold flex items-center gap-1.5 text-white">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
                     <span className="truncate">{appLanguage === 'hi' ? 'क्लाउड सिंक और +150 XP बोनस' : 'Sync Progress & Get +150 XP Bonus'}</span>
                   </p>
-                  <p className="text-[11px] text-slate-400 leading-normal">
+                  <p className="text-[11px] text-slate-300 leading-normal">
                     {appLanguage === 'hi' 
                       ? 'गूगल या ईमेल से साइन इन करें ताकि आपके सभी नोट्स और क्विज़ सुरक्षित रहें।'
                       : 'Sign in with Google or Email to backup your progress across all devices.'}
@@ -1340,7 +1375,7 @@ export default function App() {
                 </div>
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="px-3 py-1.5 sm:px-3.5 sm:py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg transition cursor-pointer shrink-0 shadow-xs active:scale-95 flex items-center space-x-1.5 whitespace-nowrap"
+                  className="px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold text-xs rounded-xl transition cursor-pointer shrink-0 shadow-[0_0_15px_rgba(99,102,241,0.4)] active:scale-95 flex items-center space-x-1.5 whitespace-nowrap"
                 >
                   <LogIn className="w-3.5 h-3.5 text-white" />
                   <span>{appLanguage === 'hi' ? 'साइन इन' : 'Sign In'}</span>
@@ -1350,7 +1385,7 @@ export default function App() {
 
             {/* HIGH-POWER QUICK ACTION DUO: VOICE TUTOR & PDF/BOOK SCANNER */}
             <div id="quick-actions-section" className="grid grid-cols-2 gap-3 sm:gap-3.5">
-              {/* 1. VOICE TUTOR LAUNCHER (NEON PINK BORDER) */}
+              {/* 1. VOICE TUTOR LAUNCHER */}
               <motion.button
                 whileHover={{ y: -3, scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
@@ -1358,18 +1393,21 @@ export default function App() {
                   playUiSound(uiCustomization.audioFeedback);
                   setShowVoiceTutorModal(true);
                 }}
-                className="p-3.5 sm:p-4 rounded-2xl border-2 border-pink-500/90 hover:border-pink-400 shadow-[0_0_18px_rgba(236,72,153,0.35)] bg-slate-950/85 hover:bg-slate-950 text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-all duration-200 min-h-[104px] sm:min-h-[114px]"
+                className="p-3.5 sm:p-4 rounded-2xl border border-pink-500/50 hover:border-pink-400 shadow-[0_4px_20px_rgba(236,72,153,0.18)] bg-[#0c1220]/90 hover:bg-[#12192e] backdrop-blur-xl text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-all duration-200 min-h-[112px] sm:min-h-[120px]"
               >
+                {/* Subtle Ambient Glow */}
+                <div className="absolute -top-10 -right-10 w-24 h-24 bg-pink-500/10 rounded-full blur-xl pointer-events-none group-hover:bg-pink-500/20 transition-all" />
+
                 {/* Sleek Micro-Pill Badge in Top-Right Corner */}
-                <div className="absolute top-2.5 right-2.5 z-10">
-                  <span className="text-[7px] font-black tracking-widest uppercase bg-pink-950/90 text-pink-300 px-1.5 py-0.5 rounded-full border border-pink-500/40 shadow-xs">
-                    VOICE
+                <div className="absolute top-3 right-3 z-10">
+                  <span className="text-[7.5px] sm:text-[8px] font-black tracking-widest uppercase bg-pink-950/90 text-pink-300 px-2 py-0.5 rounded-full border border-pink-500/40 shadow-xs">
+                    VOICE AI
                   </span>
                 </div>
 
                 <div className="relative z-10 mb-2 sm:mb-2.5">
-                  <div className="w-8 h-8 sm:w-8.5 sm:h-8.5 rounded-full bg-pink-950/80 border border-pink-500/60 flex items-center justify-center text-pink-400 shrink-0 shadow-[0_0_12px_rgba(236,72,153,0.3)]">
-                    <Mic className="w-4 h-4 text-pink-400" />
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-pink-950/80 border border-pink-500/50 flex items-center justify-center text-pink-400 shrink-0 shadow-[0_0_12px_rgba(236,72,153,0.25)] group-hover:scale-105 transition-transform">
+                    <Mic className="w-4 h-4 sm:w-5 sm:h-5 text-pink-400" />
                   </div>
                 </div>
 
@@ -1378,13 +1416,13 @@ export default function App() {
                     <span className="truncate">{appLanguage === 'hi' ? 'वॉयस ट्यूटर' : 'Voice Tutor'}</span>
                     <span className="text-pink-400 shrink-0 text-xs sm:text-sm">🎙️</span>
                   </h4>
-                  <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium leading-tight truncate">
+                  <p className="text-[10.5px] sm:text-[11px] text-slate-300 font-medium leading-tight truncate">
                     {appLanguage === 'hi' ? 'बोलकर तुरंत पूछें व सुनें' : 'Live Voice Q&A Tutor'}
                   </p>
                 </div>
               </motion.button>
 
-              {/* 2. PDF & BOOK SCANNER LAUNCHER (NEON PURPLE BORDER) */}
+              {/* 2. PDF & BOOK SCANNER LAUNCHER */}
               <motion.button
                 whileHover={{ y: -3, scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
@@ -1392,18 +1430,21 @@ export default function App() {
                   playUiSound(uiCustomization.audioFeedback);
                   setActiveTab('pdfScanner');
                 }}
-                className="p-3.5 sm:p-4 rounded-2xl border-2 border-purple-500/90 hover:border-purple-400 shadow-[0_0_18px_rgba(168,85,247,0.35)] bg-slate-950/85 hover:bg-slate-950 text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-all duration-200 min-h-[104px] sm:min-h-[114px]"
+                className="p-3.5 sm:p-4 rounded-2xl border border-purple-500/50 hover:border-purple-400 shadow-[0_4px_20px_rgba(168,85,247,0.18)] bg-[#0c1220]/90 hover:bg-[#12192e] backdrop-blur-xl text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-all duration-200 min-h-[112px] sm:min-h-[120px]"
               >
+                {/* Subtle Ambient Glow */}
+                <div className="absolute -top-10 -right-10 w-24 h-24 bg-purple-500/10 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/20 transition-all" />
+
                 {/* Sleek Micro-Pill Badge in Top-Right Corner */}
-                <div className="absolute top-2.5 right-2.5 z-10">
-                  <span className="text-[7px] font-black tracking-widest uppercase bg-purple-950/90 text-purple-300 px-1.5 py-0.5 rounded-full border border-purple-500/40 shadow-xs">
+                <div className="absolute top-3 right-3 z-10">
+                  <span className="text-[7.5px] sm:text-[8px] font-black tracking-widest uppercase bg-purple-950/90 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/40 shadow-xs">
                     SCANNER
                   </span>
                 </div>
 
                 <div className="relative z-10 mb-2 sm:mb-2.5">
-                  <div className="w-8 h-8 sm:w-8.5 sm:h-8.5 rounded-full bg-purple-950/80 border border-purple-500/60 flex items-center justify-center text-purple-400 shrink-0 shadow-[0_0_12px_rgba(168,85,247,0.3)]">
-                    <FileText className="w-4 h-4 text-purple-400" />
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-950/80 border border-purple-500/50 flex items-center justify-center text-purple-400 shrink-0 shadow-[0_0_12px_rgba(168,85,247,0.25)] group-hover:scale-105 transition-transform">
+                    <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" />
                   </div>
                 </div>
 
@@ -1412,8 +1453,8 @@ export default function App() {
                     <span className="truncate">{appLanguage === 'hi' ? 'PDF स्कैनर' : 'PDF Scanner'}</span>
                     <span className="text-purple-400 shrink-0 text-xs sm:text-sm">📑</span>
                   </h4>
-                  <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium leading-tight truncate">
-                    {appLanguage === 'hi' ? 'किताबें सारांश व क्विज़' : 'Summary, Flashcards & Quiz'}
+                  <p className="text-[10.5px] sm:text-[11px] text-slate-300 font-medium leading-tight truncate">
+                    {appLanguage === 'hi' ? 'किताबें सारांश व क्विज़' : 'Summary, Cards & Quiz'}
                   </p>
                 </div>
               </motion.button>
@@ -1596,8 +1637,9 @@ export default function App() {
                         playUiSound(uiCustomization.audioFeedback);
                         setActiveTab('aiTutor');
                       }}
-                      className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-cyan-400/90 hover:border-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.22)] bg-gradient-to-r from-slate-950 via-[#071d2c] to-[#042436] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
+                      className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-transparent shadow-[0_0_20px_rgba(34,211,238,0.22)] bg-gradient-to-r from-slate-950 via-[#071d2c] to-[#042436] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
                     >
+                      <NeonBorder color1="#22d3ee" color2="#0284c7" />
                       <div className="absolute inset-0 pointer-events-none opacity-40">
                         <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
                           <circle cx="10%" cy="50%" r="1.5" fill="#38bdf8" />
@@ -1640,8 +1682,9 @@ export default function App() {
                       playUiSound(uiCustomization.audioFeedback);
                       setActiveTab('imageGen');
                     }}
-                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-purple-500/90 hover:border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.22)] bg-gradient-to-r from-slate-950 via-[#18092a] to-[#290b47] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
+                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-transparent shadow-[0_0_20px_rgba(168,85,247,0.22)] bg-gradient-to-r from-slate-950 via-[#18092a] to-[#290b47] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
                   >
+                    <NeonBorder color1="#c084fc" color2="#7c3aed" />
                     <div className="absolute -top-10 -right-10 w-32 h-32 bg-purple-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/30 transition-all" />
 
                     <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
@@ -1676,8 +1719,9 @@ export default function App() {
                       playUiSound(uiCustomization.audioFeedback);
                       setActiveTab('mockExam');
                     }}
-                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-emerald-400/90 hover:border-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.22)] bg-gradient-to-r from-slate-950 via-[#051f16] to-[#043321] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
+                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-transparent shadow-[0_0_20px_rgba(52,211,153,0.22)] bg-gradient-to-r from-slate-950 via-[#051f16] to-[#043321] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
                   >
+                    <NeonBorder color1="#34d399" color2="#14b8a6" />
                     <div className="absolute -top-10 -right-10 w-32 h-32 bg-emerald-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-emerald-500/30 transition-all" />
 
                     <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
@@ -1712,8 +1756,9 @@ export default function App() {
                       playUiSound(uiCustomization.audioFeedback);
                       setActiveTab('studyDocs');
                     }}
-                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-amber-400/90 hover:border-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.22)] bg-gradient-to-r from-slate-950 via-[#221504] to-[#3a2003] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
+                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-transparent shadow-[0_0_20px_rgba(251,191,36,0.22)] bg-gradient-to-r from-slate-950 via-[#221504] to-[#3a2003] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
                   >
+                    <NeonBorder color1="#fbbf24" color2="#f97316" />
                     <div className="absolute -top-10 -right-10 w-32 h-32 bg-amber-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-amber-500/30 transition-all" />
 
                     <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
@@ -1748,8 +1793,9 @@ export default function App() {
                       playUiSound(uiCustomization.audioFeedback);
                       setActiveTab('googleWorkspace');
                     }}
-                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-indigo-500/80 hover:border-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.22)] bg-gradient-to-r from-slate-950 via-[#0e162d] to-[#121c3b] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
+                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-transparent shadow-[0_0_20px_rgba(99,102,241,0.22)] bg-gradient-to-r from-slate-950 via-[#0e162d] to-[#121c3b] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
                   >
+                    <NeonBorder color1="#818cf8" color2="#9333ea" />
                     <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-indigo-500/30 transition-all" />
 
                     <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
@@ -1789,8 +1835,9 @@ export default function App() {
                         playUiSound(uiCustomization.audioFeedback);
                         setActiveTab('aiTutor');
                       }}
-                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-emerald-400/90 hover:border-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.35)] bg-gradient-to-br from-slate-950 via-[#031d0c] to-[#011408] text-emerald-300 text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300 font-mono"
+                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-[0_0_20px_rgba(52,211,153,0.35)] bg-gradient-to-br from-slate-950 via-[#031d0c] to-[#011408] text-emerald-300 text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300 font-mono"
                     >
+                      <NeonBorder color1="#34d399" color2="#059669" />
                       <div className="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:8px_8px]" />
                       <div className="flex justify-between items-start relative z-10">
                         <div className="text-emerald-400 group-hover:scale-110 transition-transform">
@@ -1819,8 +1866,9 @@ export default function App() {
                         playUiSound(uiCustomization.audioFeedback);
                         setActiveTab('aiTutor');
                       }}
-                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-amber-500/90 hover:border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)] bg-gradient-to-br from-[#2b1e15] via-[#3a281c] to-[#1f150e] text-amber-100 text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300 font-serif"
+                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-[0_0_20px_rgba(245,158,11,0.3)] bg-gradient-to-br from-[#2b1e15] via-[#3a281c] to-[#1f150e] text-amber-100 text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300 font-serif"
                     >
+                      <NeonBorder color1="#f59e0b" color2="#d97706" />
                       <div className="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(#d97706_1px,transparent_1px)] [background-size:12px_12px]" />
                       <div className="flex justify-between items-start relative z-10">
                         <div className="text-amber-400 group-hover:scale-110 transition-transform">
@@ -1849,8 +1897,9 @@ export default function App() {
                         playUiSound(uiCustomization.audioFeedback);
                         setActiveTab('aiTutor');
                       }}
-                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-white/40 hover:border-white/70 shadow-[0_0_20px_rgba(255,255,255,0.15)] bg-gradient-to-br from-white/15 via-white/5 to-white/10 backdrop-blur-xl text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
+                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-[0_0_20px_rgba(255,255,255,0.15)] bg-gradient-to-br from-white/15 via-white/5 to-white/10 backdrop-blur-xl text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
                     >
+                      <NeonBorder color1="#ffffff" color2="#cbd5e1" />
                       <div className="flex justify-between items-start relative z-10">
                         <div className="text-white group-hover:scale-110 transition-transform">
                           <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
@@ -1878,8 +1927,9 @@ export default function App() {
                         playUiSound(uiCustomization.audioFeedback);
                         setActiveTab('aiTutor');
                       }}
-                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-cyan-400/90 hover:border-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.22)] bg-gradient-to-br from-slate-950 via-[#071d2c] to-[#042436] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
+                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-[0_0_20px_rgba(34,211,238,0.22)] bg-gradient-to-br from-slate-950 via-[#071d2c] to-[#042436] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
                     >
+                      <NeonBorder color1="#22d3ee" color2="#06b6d4" />
                       {/* Subtle cosmic particles / grid overlay */}
                       <div className="absolute inset-0 pointer-events-none opacity-40">
                         <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
@@ -1922,8 +1972,9 @@ export default function App() {
                       playUiSound(uiCustomization.audioFeedback);
                       setActiveTab('imageGen');
                     }}
-                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-purple-500/90 hover:border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.22)] bg-gradient-to-br from-slate-950 via-[#18092a] to-[#290b47] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
+                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-[0_0_20px_rgba(168,85,247,0.22)] bg-gradient-to-br from-slate-950 via-[#18092a] to-[#290b47] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
                   >
+                    <NeonBorder color1="#c084fc" color2="#a855f7" />
                     {/* Glowing purple energy wave SVG */}
                     <div className="absolute inset-0 pointer-events-none opacity-40">
                       <svg className="w-full h-full" viewBox="0 0 200 100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1963,8 +2014,9 @@ export default function App() {
                       playUiSound(uiCustomization.audioFeedback);
                       setActiveTab('mockExam');
                     }}
-                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-emerald-400/90 hover:border-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.22)] bg-gradient-to-br from-slate-950 via-[#051f16] to-[#043321] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
+                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-[0_0_20px_rgba(52,211,153,0.22)] bg-gradient-to-br from-slate-950 via-[#051f16] to-[#043321] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
                   >
+                    <NeonBorder color1="#34d399" color2="#10b981" />
                     {/* Subtle sacred geometry / wireframe lines */}
                     <div className="absolute inset-0 pointer-events-none opacity-20 flex items-center justify-center">
                       <svg className="w-40 h-40" viewBox="0 0 100 100" fill="none" stroke="#34d399" strokeWidth="0.75">
@@ -2003,8 +2055,9 @@ export default function App() {
                       playUiSound(uiCustomization.audioFeedback);
                       setActiveTab('studyDocs');
                     }}
-                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-amber-400/90 hover:border-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.22)] bg-gradient-to-br from-slate-950 via-[#221504] to-[#3a2003] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
+                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-[0_0_20px_rgba(251,191,36,0.22)] bg-gradient-to-br from-slate-950 via-[#221504] to-[#3a2003] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
                   >
+                    <NeonBorder color1="#fbbf24" color2="#f59e0b" />
                     {/* Subtle sacred geometry / star lines */}
                     <div className="absolute inset-0 pointer-events-none opacity-20 flex items-center justify-center">
                       <svg className="w-40 h-40" viewBox="0 0 100 100" fill="none" stroke="#fbbf24" strokeWidth="0.75">
@@ -2043,8 +2096,9 @@ export default function App() {
                       playUiSound(uiCustomization.audioFeedback);
                       setActiveTab('googleWorkspace');
                     }}
-                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-indigo-500/80 hover:border-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.22)] bg-gradient-to-br from-slate-950 via-[#0e162d] to-[#121c3b] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300 col-span-2 sm:col-span-1"
+                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-[0_0_20px_rgba(99,102,241,0.22)] bg-gradient-to-br from-slate-950 via-[#0e162d] to-[#121c3b] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300 col-span-2 sm:col-span-1"
                   >
+                    <NeonBorder color1="#6366f1" color2="#4f46e5" />
                     <div className="absolute inset-0 pointer-events-none opacity-20 flex items-center justify-center">
                       <svg className="w-40 h-40" viewBox="0 0 100 100" fill="none" stroke="#6366f1" strokeWidth="0.75">
                         <polygon points="50 5, 90 25, 90 75, 50 95, 10 75, 10 25" />
@@ -2078,63 +2132,71 @@ export default function App() {
               )}
             </div>
 
-              {/* ADVANCED STUDY TOOLKIT BANNER - SOPHISTICATED MATTE DESIGN */}
+              {/* ADVANCED STUDY TOOLKIT - PREMIER FEATURED HERO CARD WITH CLEAR CTA */}
               <motion.div
                 id="toolkit-banner-section"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                whileHover={{ y: -1 }}
-                className="w-full p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-slate-800/80 text-white relative overflow-hidden group"
+                whileHover={{ y: -2 }}
+                className="w-full p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-[#0c142b]/95 via-[#0e1224]/90 to-[#070b16]/95 border border-transparent text-white relative overflow-hidden shadow-[0_8px_32px_rgba(99,102,241,0.22)] group transition-all duration-300"
               >
-                {/* Quiet, deep ambient backdrop lighting */}
-                <div className="absolute -right-10 -top-10 w-48 h-48 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+                <NeonBorder color1="#6366f1" color2="#06b6d4" duration="5s" />
+                {/* Dynamic Top Ambient Laser Accent Line */}
+                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-400 via-purple-400 to-cyan-400 opacity-80" />
+                {/* Quiet deep ambient lighting */}
+                <div className="absolute -right-8 -top-8 w-44 h-44 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none group-hover:bg-indigo-500/25 transition-all" />
 
-                <div className="flex items-center justify-between relative z-10">
-                  <div className="flex items-center space-x-3.5">
-                    {/* Minimal Sparkle Badge */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+                  <div className="flex items-start space-x-3.5">
+                    {/* Glowing Sparkle Container */}
                     <motion.div
-                      whileHover={{ scale: 1.05 }}
+                      whileHover={{ scale: 1.08, rotate: 6 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => openToolkitWithTool()}
-                      className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0 shadow-xs cursor-pointer"
+                      className="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-400/50 flex items-center justify-center text-indigo-300 shrink-0 shadow-[0_0_16px_rgba(99,102,241,0.35)] cursor-pointer mt-0.5"
                     >
-                      <Sparkles className="w-5 h-5 text-indigo-400" />
+                      <Sparkles className="w-5 h-5 text-indigo-300 animate-subtle-pulse" />
                     </motion.div>
 
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 uppercase">
-                          18 ➔ ADVANCED TOOLS
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[8.5px] font-black tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase">
+                          FEATURED SUITE • 18+ TOOLS
                         </span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="flex items-center gap-1 text-[8.5px] font-bold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                          <span>ACTIVE</span>
+                        </span>
                       </div>
                       <h4 
                         onClick={() => openToolkitWithTool()}
-                        className="font-bold text-sm sm:text-base text-slate-100 mt-1 cursor-pointer hover:text-indigo-400 transition flex items-center gap-1.5"
+                        className="font-black text-base sm:text-lg text-white hover:text-indigo-300 cursor-pointer transition flex items-center gap-1.5"
                       >
                         <span>Advanced Study Toolkit</span>
                         <span className="text-amber-400">⚡</span>
                       </h4>
-                      <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed max-w-md font-medium">
-                        Scientific Calculator, Mind Maps, Mock Tests, Ambient Sounds & OCR Vision
+                      <p className="text-[11px] sm:text-xs text-slate-300 leading-relaxed max-w-md font-medium">
+                        Scientific Calculator, Mind Maps, Mock Exams, Ambient Lo-Fi & OCR Vision
                       </p>
                     </div>
                   </div>
 
-                  {/* Circular Chevron Button */}
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => openToolkitWithTool()}
-                    className="w-9 h-9 rounded-full bg-slate-950 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer shrink-0"
-                    title="Launch Toolkit"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </motion.button>
+                  {/* High-Impact Clear CTA Button */}
+                  <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                    <motion.button
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.96 }}
+                      onClick={() => openToolkitWithTool()}
+                      className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-[0_0_20px_rgba(99,102,241,0.45)] border border-indigo-400/40 flex items-center space-x-2 cursor-pointer transition active:scale-95"
+                    >
+                      <span>Launch Toolkit</span>
+                      <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+                    </motion.button>
+                  </div>
                 </div>
 
                 {/* Quick-Launch Animated Tool Chips */}
-                <div className="mt-4 pt-3.5 border-t border-slate-800/60 flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-none relative z-10">
+                <div className="mt-3.5 pt-3 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-none relative z-10">
                   {[
                     { id: 'pdf_scanner', name: '📑 PDF Scan' },
                     { id: 'voice_tutor', name: '🎙️ Voice Tutor' },
@@ -2162,7 +2224,7 @@ export default function App() {
                           openToolkitWithTool(tool.id);
                         }
                       }}
-                      className="px-2.5 py-1.5 rounded-lg bg-slate-950/60 hover:bg-slate-900 border border-slate-800/80 hover:border-slate-700/60 text-[10.5px] font-semibold text-slate-300 hover:text-white whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                      className="px-2.5 py-1.5 rounded-lg bg-[#070c18]/90 hover:bg-[#11192e] border border-slate-800/80 hover:border-indigo-500/40 text-[11px] font-semibold text-slate-200 hover:text-white whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 shadow-xs"
                     >
                       {tool.name}
                     </motion.button>
@@ -2170,29 +2232,54 @@ export default function App() {
                 </div>
               </motion.div>
 
-            {/* 4. 5-DAY STUDY STREAK - RESTRAINED ACADEMIC DESIGN */}
-            <div id="streak-card-section" className="rounded-2xl p-4 sm:p-5 border border-slate-800/80 bg-slate-900/60 text-white space-y-4 relative overflow-hidden">
-              <div className="flex items-center justify-between">
+            {/* 4. 5-DAY STUDY STREAK - PROMINENT GAMIFICATION & VISUAL PROGRESS */}
+            <div id="streak-card-section" className="rounded-2xl p-4 sm:p-5 border border-transparent bg-[#0b101d]/90 backdrop-blur-xl text-white space-y-4 relative overflow-hidden shadow-xl">
+              <NeonBorder color1="#fbbf24" color2="#ea580c" duration="6s" />
+              {/* Subtle Ambient Radial Glow */}
+              <div className="absolute -top-12 -right-12 w-40 h-40 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+
+              <div className="flex items-center justify-between relative z-10">
                 <div>
-                  <h3 className="font-semibold text-slate-200 text-xs tracking-wider uppercase flex items-center space-x-1.5">
-                    <Calendar className="w-4 h-4 text-amber-500" />
+                  <h3 className="font-extrabold text-slate-100 text-xs sm:text-sm tracking-wider uppercase flex items-center space-x-2">
+                    <span className="p-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-400">
+                      <Flame className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                    </span>
                     <span>5-DAY STUDY STREAK</span>
                   </h3>
-                  <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">Complete goals to keep momentum high</p>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-1">Complete daily goals to build unstoppable study momentum</p>
                 </div>
 
                 {/* Streak Badge Pill */}
-                <div className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs font-bold text-amber-300 flex items-center gap-2">
-                  <span className="text-sm">💎</span>
+                <div className="px-3 py-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 rounded-xl text-xs font-black text-amber-300 flex items-center gap-2 shadow-[0_0_12px_rgba(245,158,11,0.25)] shrink-0">
+                  <span className="text-base animate-pulse">🔥</span>
                   <div className="leading-tight text-right sm:text-left">
-                    <div className="font-bold text-[11px] sm:text-xs text-amber-100">Streak: {userProfile.streak}/5</div>
-                    <div className="text-[9px] font-medium text-amber-400/80 uppercase tracking-wider">Days</div>
+                    <div className="font-black text-xs text-amber-100">{userProfile.streak}/5 Days</div>
+                    <div className="text-[8.5px] font-bold text-amber-400 uppercase tracking-widest">STREAK</div>
                   </div>
                 </div>
               </div>
 
+              {/* 5-DAY PROGRESS BAR INDICATOR */}
+              <div className="space-y-1.5 relative z-10">
+                <div className="flex items-center justify-between text-[11px] font-bold">
+                  <span className="text-slate-300 flex items-center gap-1.5">
+                    <Target className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Weekly Target Progress</span>
+                  </span>
+                  <span className="text-amber-300 font-extrabold">
+                    {streakCompletedDays.filter(Boolean).length} of 5 Days Completed ({Math.round((streakCompletedDays.filter(Boolean).length / 5) * 100)}%)
+                  </span>
+                </div>
+                <div className="w-full h-2.5 bg-[#060913] border border-slate-800/90 rounded-full overflow-hidden p-0.5 relative">
+                  <div 
+                    className="h-full bg-gradient-to-r from-amber-500 via-orange-500 to-emerald-400 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(245,158,11,0.6)]"
+                    style={{ width: `${Math.max(8, (streakCompletedDays.filter(Boolean).length / 5) * 100)}%` }}
+                  />
+                </div>
+              </div>
+
               {/* DAY PILLS (5-DAY CARDS) */}
-              <div className="grid grid-cols-5 gap-1.5 sm:gap-2.5">
+              <div className="grid grid-cols-5 gap-1.5 sm:gap-2.5 relative z-10">
                 {[
                   { d: 'DAY 1', w: 'Mon' },
                   { d: 'DAY 2', w: 'Tue' },
@@ -2201,46 +2288,54 @@ export default function App() {
                   { d: 'DAY 5', w: 'Fri' }
                 ].map((item, idx) => {
                   const isDone = streakCompletedDays[idx];
-                  const isDay1 = idx === 0;
-                  const isHighlighted = isDay1 || isDone;
                   return (
                     <motion.button 
                       key={idx}
-                      whileHover={{ y: -1 }}
-                      whileTap={{ scale: 0.96 }}
+                      whileHover={{ y: -2 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={() => handleToggleDay(idx)}
-                      className={`p-2 sm:p-3 rounded-xl text-center flex flex-col items-center justify-between h-20 sm:h-24 transition-all cursor-pointer focus:outline-hidden ${
-                        isHighlighted
-                          ? 'border border-amber-500/30 bg-amber-500/10 text-amber-100'
-                          : 'border border-slate-800/80 bg-slate-950/40 hover:bg-slate-900/40 text-slate-400'
+                      className={`p-2 sm:p-3 rounded-xl text-center flex flex-col items-center justify-between h-22 sm:h-26 transition-all cursor-pointer focus:outline-hidden relative overflow-hidden ${
+                        isDone
+                          ? 'border border-amber-500/50 bg-gradient-to-b from-amber-500/20 to-amber-950/40 text-amber-100 shadow-[0_0_14px_rgba(245,158,11,0.22)]'
+                          : 'border border-slate-800/90 bg-[#070c18]/90 hover:bg-[#0c1428] text-slate-400'
                       }`}
                     >
-                      <div className={`text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider ${isHighlighted ? 'text-amber-400' : 'text-slate-500'}`}>
+                      <div className={`text-[8px] sm:text-[9px] font-black uppercase tracking-wider ${isDone ? 'text-amber-400' : 'text-slate-400'}`}>
                         {item.d}
                       </div>
-                      <div className={`font-bold text-xs sm:text-sm ${isHighlighted ? 'text-slate-100' : 'text-slate-400'}`}>
+                      <div className={`font-black text-xs sm:text-sm ${isDone ? 'text-white' : 'text-slate-300'}`}>
                         {item.w}
                       </div>
                       <div className="flex justify-center items-center">
-                        <span className="text-xs sm:text-sm">{isHighlighted ? '🔥' : '🎯'}</span>
+                        <span className={`text-base sm:text-lg transition-transform ${isDone ? 'scale-110 drop-shadow-[0_0_8px_rgba(245,158,11,0.8)]' : 'opacity-60'}`}>
+                          {isDone ? '🔥' : '🎯'}
+                        </span>
                       </div>
+                      <span className={`text-[7.5px] sm:text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                        isDone 
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
+                          : 'bg-slate-900 text-slate-400 border border-slate-800'
+                      }`}>
+                        {isDone ? 'DONE' : '+20 XP'}
+                      </span>
                     </motion.button>
                   );
                 })}
               </div>
 
-              {/* GOAL BOX */}
-              <div className="p-3.5 sm:p-4 bg-slate-950/40 border border-slate-800/80 rounded-xl flex items-center justify-between relative overflow-hidden">
-                <div className="pr-2">
-                  <div className="flex items-center space-x-1.5">
-                    <span className="text-[9px] sm:text-[10px] font-bold bg-slate-900 text-slate-300 border border-slate-800 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
-                      DAY 1 GOAL
+              {/* GOAL BOX (MISSION CARD) */}
+              <div className="p-3.5 sm:p-4 bg-[#070c18]/90 border border-slate-800/90 rounded-xl flex items-center justify-between relative overflow-hidden shadow-xs">
+                <div className="pr-2 space-y-1">
+                  <div className="flex items-center space-x-1.5 flex-wrap gap-1">
+                    <span className="text-[9px] font-black bg-slate-900 text-slate-200 border border-slate-700/80 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
+                      DAY 1 MISSION
                     </span>
-                    <span className="text-[9px] sm:text-[10px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-md">
-                      +20 XP
+                    <span className="text-[9px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <Sparkles className="w-2.5 h-2.5" />
+                      <span>+20 XP</span>
                     </span>
                   </div>
-                  <p className="font-bold text-slate-200 text-xs sm:text-sm mt-1.5 max-w-xs leading-snug">
+                  <p className="font-bold text-slate-100 text-xs sm:text-sm leading-snug">
                     Ask AI Tutor a homework question
                   </p>
                 </div>
@@ -2251,70 +2346,117 @@ export default function App() {
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
                     onClick={handleCompleteDayGoal}
-                    className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-lg font-bold text-xs sm:text-sm bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs border border-emerald-500/20 transition flex flex-col items-center justify-center leading-tight cursor-pointer"
+                    className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm shadow-md transition flex items-center space-x-1.5 cursor-pointer ${
+                      day1GoalCompleted
+                        ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                        : 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white border border-emerald-400/40 shadow-[0_0_14px_rgba(16,185,129,0.35)]'
+                    }`}
                   >
-                    <span>Task</span>
-                    <span>Complete!</span>
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    <span>{day1GoalCompleted ? 'Completed ✓' : 'Complete!'}</span>
                   </motion.button>
                 </div>
               </div>
             </div>
 
-            {/* 5. DAILY STUDY QUESTS - PREMIUM SLEEK LOOK */}
-            <div className="rounded-2xl p-4 sm:p-5 border border-slate-800/80 bg-slate-900/60 text-white space-y-4 relative overflow-hidden">
+            {/* 5. DAILY STUDY QUESTS - COMPACT SCANABLE CARDS & REFINED HEADINGS */}
+            <div className="rounded-2xl p-4 sm:p-5 border border-transparent bg-[#0b101d]/90 backdrop-blur-xl text-white space-y-3.5 relative overflow-hidden shadow-xl">
+              <NeonBorder color1="#10b981" color2="#6366f1" duration="6s" />
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold text-slate-200 text-xs tracking-wider uppercase flex items-center space-x-1.5">
-                    <Flame className="w-4 h-4 text-amber-500" />
+                  <h3 className="font-extrabold text-slate-100 text-xs sm:text-sm tracking-wider uppercase flex items-center space-x-2">
+                    <span className="p-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-400">
+                      <Target className="w-3.5 h-3.5 text-amber-400" />
+                    </span>
                     <span>DAILY STUDY QUESTS</span>
                   </h3>
-                  <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">Finish missions, gain bonus XP</p>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-1">Finish missions to claim bonus XP & level multipliers</p>
                 </div>
-                <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-300 font-bold text-[11px] sm:text-xs rounded-lg flex items-center gap-1.5">
+                <div className="px-3 py-1 bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/30 text-amber-300 font-extrabold text-[11px] sm:text-xs rounded-xl flex items-center gap-1.5 shrink-0 shadow-xs">
                   <Flame className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                  <span>Streak: 5 Days</span>
+                  <span>{quests.filter(q => q.completed).length}/{quests.length} Completed</span>
                 </div>
               </div>
 
               <div className="space-y-2.5">
-                {quests.map((q) => (
-                  <motion.div 
-                    key={q.id} 
-                    whileHover={{ y: -1 }}
-                    onClick={() => handleCompleteQuest(q.id)}
-                    className="p-3 sm:p-3.5 bg-slate-950/40 hover:bg-slate-900/40 border border-slate-800/60 rounded-xl flex items-center justify-between transition group cursor-pointer shadow-xs"
-                  >
-                    <div className="flex items-center space-x-3 pr-2">
-                      <button 
-                        className={`w-5 h-5 rounded-md flex items-center justify-center transition shrink-0 ${
-                          q.completed 
-                            ? 'bg-emerald-600 text-white' 
-                            : 'border border-slate-700 group-hover:border-slate-500'
-                        }`}
-                      >
-                        {q.completed ? <Check className="w-3 h-3 stroke-[3]" /> : null}
-                      </button>
-                      <span className={`text-xs sm:text-sm font-semibold transition ${q.completed ? 'line-through text-slate-500' : 'text-slate-300 group-hover:text-slate-100'}`}>
-                        {q.title}
+                {quests.map((q) => {
+                  const isDone = q.completed;
+                  const isAiQuest = q.id === 1 || q.title.toLowerCase().includes('ai');
+                  const isQuizQuest = q.id === 2 || q.title.toLowerCase().includes('quiz');
+                  return (
+                    <motion.div 
+                      key={q.id} 
+                      whileHover={{ y: -1 }}
+                      onClick={() => handleCompleteQuest(q.id)}
+                      className={`p-3 sm:p-3.5 rounded-xl flex items-center justify-between gap-3 transition-all duration-200 group cursor-pointer shadow-xs ${
+                        isDone 
+                          ? 'bg-[#070c18]/70 border border-slate-800/60 opacity-80' 
+                          : 'bg-[#070c18]/90 hover:bg-[#0d152a] border border-slate-800/90 hover:border-indigo-500/40'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3 pr-2 min-w-0 flex-1">
+                        {/* Interactive Checkbox */}
+                        <button 
+                          className={`w-5 h-5 sm:w-6 sm:h-6 rounded-lg flex items-center justify-center transition shrink-0 ${
+                            isDone 
+                              ? 'bg-emerald-500 text-white shadow-[0_0_10px_rgba(16,185,129,0.4)]' 
+                              : 'border border-slate-700 bg-slate-900 group-hover:border-slate-500'
+                          }`}
+                        >
+                          {isDone ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : null}
+                        </button>
+
+                        {/* Distinct Icon */}
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          isDone 
+                            ? 'bg-slate-900 text-slate-500'
+                            : isAiQuest
+                            ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
+                            : isQuizQuest
+                            ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30'
+                            : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                        }`}>
+                          {isAiQuest ? (
+                            <BrainCircuit className="w-4 h-4" />
+                          ) : isQuizQuest ? (
+                            <GraduationCap className="w-4 h-4" />
+                          ) : (
+                            <Clock className="w-4 h-4" />
+                          )}
+                        </div>
+
+                        {/* Quest Title */}
+                        <span className={`text-xs sm:text-sm font-semibold truncate transition ${
+                          isDone ? 'line-through text-slate-500' : 'text-slate-100 group-hover:text-white'
+                        }`}>
+                          {q.title}
+                        </span>
+                      </div>
+
+                      {/* Prominent XP Badge */}
+                      <span className={`text-[10px] sm:text-[11px] font-black px-2.5 py-1 rounded-lg border shrink-0 transition-all ${
+                        isDone
+                          ? 'bg-emerald-950/60 text-emerald-400 border-emerald-500/30'
+                          : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 shadow-[0_0_10px_rgba(52,211,153,0.18)]'
+                      }`}>
+                        +{q.xp} XP
                       </span>
-                    </div>
-                    <span className="text-[9.5px] sm:text-[10px] font-bold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 shrink-0">
-                      +{q.xp} XP
-                    </span>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  );
+                })}
               </div>
             </div>
 
             {/* 6. FOCUS SESSION & TIMER - SOPHISTICATED ACADEMIC */}
-            <div className="bg-slate-900/60 rounded-2xl p-4 border border-slate-800/80 space-y-3.5 backdrop-blur-xs">
+            <div className="bg-[#0b101d]/90 backdrop-blur-xl rounded-2xl p-4 sm:p-5 border border-transparent space-y-3.5 shadow-xl relative overflow-hidden">
+              <NeonBorder color1="#6366f1" color2="#06b6d4" duration="5s" />
               {/* Header: Subject Selector & Time Duration Pills */}
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="relative min-w-[130px] sm:min-w-[160px]">
                   <select
                     value={selectedSubject}
                     onChange={(e) => setSelectedSubject(e.target.value as Subject)}
-                    className="w-full appearance-none px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-bold text-slate-100 focus:outline-none focus:border-slate-700 shadow-xs pr-8 cursor-pointer"
+                    className="w-full appearance-none px-3 py-1.5 bg-[#070c18] border border-slate-800 rounded-xl text-xs font-bold text-slate-100 focus:outline-none focus:border-indigo-500/50 shadow-xs pr-8 cursor-pointer"
                   >
                     {SUBJECTS.map((s) => (
                       <option key={s} value={s} className="bg-slate-900 text-white">{s}</option>
@@ -2323,12 +2465,12 @@ export default function App() {
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
 
-                <div className="flex items-center space-x-1 p-0.5 bg-slate-950 border border-slate-800 rounded-lg">
+                <div className="flex items-center space-x-1 p-0.5 bg-[#070c18] border border-slate-800 rounded-xl">
                   {[5, 25, 50].map((mins) => (
                     <button
                       key={mins}
                       onClick={() => setDurationMinutes(mins)}
-                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition cursor-pointer ${
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
                         durationMinutes === mins
                           ? 'bg-slate-800 text-white shadow-xs'
                           : 'text-slate-400 hover:text-slate-200'
@@ -2341,17 +2483,17 @@ export default function App() {
               </div>
 
               {/* TIMER DISPLAY - LOW-PROFILE MODERN INTERFACE */}
-              <div className="py-2.5 px-4 bg-slate-950 border border-slate-800 rounded-xl text-center relative overflow-hidden flex items-center justify-between">
-                <span className="text-[9px] font-bold text-slate-400 tracking-wider uppercase">
+              <div className="py-2.5 px-4 bg-[#070c18] border border-slate-800 rounded-xl text-center relative overflow-hidden flex items-center justify-between">
+                <span className="text-[9.5px] font-black text-slate-400 tracking-wider uppercase">
                   FOCUS TIMER
                 </span>
-                <div className="text-2xl sm:text-3xl font-mono font-bold tracking-tight text-white select-none">
+                <div className="text-2xl sm:text-3xl font-mono font-black tracking-tight text-white select-none">
                   {formatTimerTime(timerSeconds)}
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={toggleTimer}
-                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500/20 text-white font-bold rounded-lg transition flex items-center space-x-1 text-[11px] cursor-pointer active:scale-95"
+                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500/20 text-white font-bold rounded-lg transition flex items-center space-x-1 text-[11px] cursor-pointer active:scale-95 shadow-xs"
                   >
                     {isTimerRunning ? <Pause className="w-2.5 h-2.5 fill-white" /> : <Play className="w-2.5 h-2.5 fill-white ml-0.5" />}
                     <span>{isTimerRunning ? 'Pause' : 'Start'}</span>
@@ -2380,14 +2522,15 @@ export default function App() {
               }).length;
 
               return (
-                <div className="bg-slate-900/60 rounded-2xl p-4 sm:p-5 border border-slate-800/80 text-white space-y-4 relative overflow-hidden">
+                <div className="bg-[#0b101d]/90 backdrop-blur-xl rounded-2xl p-4 sm:p-5 border border-transparent text-white space-y-4 relative overflow-hidden shadow-xl">
+                  <NeonBorder color1="#fbbf24" color2="#b45309" duration="6s" />
                   {/* Header */}
                   <div className="flex items-center justify-between border-b border-slate-800/60 pb-3">
                     <h3 className="font-semibold text-slate-200 text-xs tracking-wider uppercase flex items-center space-x-1.5">
                       <span className="text-sm">🎖️</span>
                       <span>{appLanguage === 'hi' ? 'शैक्षणिक पदक' : 'ACADEMIC BADGES'}</span>
                     </h3>
-                    <span className="text-[9px] font-bold bg-slate-950 text-slate-300 border border-slate-800 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
+                    <span className="text-[9px] font-bold bg-[#070c18] text-slate-300 border border-slate-800 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
                       {earnedCount} / {BADGES_CONFIG.length} {appLanguage === 'hi' ? 'अर्जित' : 'EARNED'}
                     </span>
                   </div>
@@ -2404,8 +2547,8 @@ export default function App() {
                           key={badge.id}
                           className={`relative flex flex-col items-center justify-between w-24 h-28 shrink-0 rounded-xl p-2.5 text-center transition-all duration-200 group ${
                             isEarned
-                              ? "bg-slate-950/60 border border-amber-500/20 hover:border-amber-500/30 text-amber-100"
-                              : "bg-slate-950/30 border border-slate-850/80 opacity-75 hover:opacity-100"
+                              ? "bg-[#070c18] border border-amber-500/30 hover:border-amber-500/50 text-amber-100 shadow-xs"
+                              : "bg-[#070c18]/50 border border-slate-800/80 opacity-75 hover:opacity-100"
                           }`}
                         >
                           {/* Seal Badge Header or Lock icon */}
@@ -2469,10 +2612,11 @@ export default function App() {
             })()}
 
             {/* 9. ONLINE CLASSMATES - SLEEK STUDY ROOM MEMBERS */}
-            <div className="bg-slate-900/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 text-white space-y-4 relative overflow-hidden">
+            <div className="bg-[#0b101d]/90 backdrop-blur-xl p-4 sm:p-5 rounded-2xl border border-transparent text-white space-y-4 relative overflow-hidden shadow-xl">
+              <NeonBorder color1="#6366f1" color2="#a855f7" duration="6s" />
               <div className="flex items-center justify-between border-b border-slate-800/60 pb-3">
                 <div className="flex items-center space-x-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center text-sm shadow-xs text-slate-300">
+                  <div className="w-7 h-7 rounded-lg bg-[#070c18] border border-slate-800 flex items-center justify-center text-sm shadow-xs text-slate-300">
                     🧭
                   </div>
                   <div>
@@ -2486,7 +2630,7 @@ export default function App() {
                 </div>
 
                 {/* Active Status Pill */}
-                <div className="flex items-center space-x-1.5 bg-slate-950 border border-slate-800 text-slate-300 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                <div className="flex items-center space-x-1.5 bg-[#070c18] border border-slate-800 text-slate-300 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider">
                   <span className="relative flex h-1.5 w-1.5">
                     <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                   </span>
@@ -2499,7 +2643,7 @@ export default function App() {
                 {classmates.map((peer) => (
                   <div 
                     key={peer.id} 
-                    className="p-3 bg-slate-950/40 border border-slate-850 hover:border-slate-800 rounded-xl flex items-center justify-between shadow-xs transition group"
+                    className="p-3 bg-[#070c18]/80 border border-slate-800/80 hover:border-slate-700/80 rounded-xl flex items-center justify-between shadow-xs transition group"
                   >
                     <div className="flex items-center space-x-3 min-w-0">
                       {/* Avatar container */}
@@ -2536,7 +2680,7 @@ export default function App() {
                           className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer active:scale-95 flex items-center space-x-1.5 ${
                             peer.waved
                               ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
-                              : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
+                              : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-xs'
                           }`}
                         >
                           <span className="text-xs">{peer.waved ? '📡' : '🛰️'}</span>
@@ -2554,7 +2698,8 @@ export default function App() {
             </div>
 
             {/* 10. CHIMPU'S SANCTUARY (VIRTUAL FRIEND) */}
-            <div className="bg-slate-900/60 rounded-2xl p-4 sm:p-5 border border-slate-800/80 text-white space-y-4">
+            <div className="bg-[#0b101d]/90 backdrop-blur-xl rounded-2xl p-4 sm:p-5 border border-transparent text-white space-y-4 shadow-xl relative overflow-hidden">
+              <NeonBorder color1="#10b981" color2="#14b8a6" duration="5s" />
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-slate-200 text-xs tracking-wide uppercase flex items-center space-x-1.5">
                   <Heart className="w-3.5 h-3.5 text-emerald-500" />
@@ -2565,7 +2710,7 @@ export default function App() {
                 </span>
               </div>
 
-              <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-4 text-center space-y-3 relative overflow-hidden">
+              <div className="bg-[#070c18]/90 border border-slate-800/80 rounded-xl p-4 text-center space-y-3 relative overflow-hidden">
                 <div className="w-14 h-14 bg-slate-950 rounded-xl flex items-center justify-center text-3xl mx-auto shadow-xs relative border border-slate-800">
                   🐼
                   {equippedAccessory && (
@@ -2602,7 +2747,7 @@ export default function App() {
 
               <button
                 onClick={feedBamboo}
-                className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition flex items-center justify-center space-x-1.5 cursor-pointer"
+                className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs active:scale-95"
               >
                 <span>🌿</span>
                 <span>Feed Bamboo (-15 XP)</span>
@@ -2623,7 +2768,7 @@ export default function App() {
                     <button
                       key={item.name}
                       onClick={() => buyAccessory(item)}
-                      className="p-2 bg-slate-950 border border-slate-850 hover:border-slate-700 rounded-lg text-center transition flex flex-col items-center justify-between cursor-pointer"
+                      className="p-2 bg-[#070c18] border border-slate-800 hover:border-slate-700 rounded-lg text-center transition flex flex-col items-center justify-between cursor-pointer active:scale-95"
                     >
                       <span className="text-lg mb-0.5">{item.icon}</span>
                       <span className="text-[9px] font-bold text-slate-400">{item.cost} XP</span>
@@ -2634,7 +2779,8 @@ export default function App() {
             </div>
 
             {/* STUDENT PROFILE & QUICK ACTIONS CARD */}
-            <div className="bg-slate-900/60 rounded-2xl p-4 text-white border border-slate-800/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left mt-2">
+            <div className="bg-[#0b101d]/90 backdrop-blur-xl rounded-2xl p-4 sm:p-5 text-white border border-transparent shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left mt-2 relative overflow-hidden">
+              <NeonBorder color1="#6366f1" color2="#f43f5e" duration="5s" />
               <div className="flex items-center space-x-3.5">
                 <UserAvatar
                   avatar={userProfile.avatar}
@@ -2675,7 +2821,7 @@ export default function App() {
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setShowAvatarModal(true)}
-                  className="px-3 py-1.5 bg-slate-950 hover:bg-slate-900 text-slate-200 hover:text-white rounded-lg text-xs font-bold transition border border-slate-800 flex items-center space-x-1 shrink-0 active:scale-95 cursor-pointer"
+                  className="px-3 py-1.5 bg-[#070c18] hover:bg-slate-900 text-slate-200 hover:text-white rounded-lg text-xs font-bold transition border border-slate-800 flex items-center space-x-1 shrink-0 active:scale-95 cursor-pointer"
                 >
                   <span>Avatar 🎨</span>
                 </button>
@@ -3260,7 +3406,7 @@ export default function App() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 14 }}
               transition={{ type: 'spring', stiffness: 420, damping: 30 }}
-              className="fixed bottom-14 right-2 sm:right-6 z-50 w-72 bg-slate-900/95 backdrop-blur-xl border border-slate-800 rounded-2xl shadow-2xl p-3.5 space-y-2.5"
+              className="fixed bottom-20 right-3 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 z-50 w-76 max-w-[92vw] bg-[#090f1d]/95 backdrop-blur-2xl border border-slate-700/70 rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.8)] p-4 space-y-3"
             >
               <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                 <span className="text-xs font-bold text-slate-200 flex items-center space-x-1.5">
@@ -3362,7 +3508,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* COMPACT & SLIM BOTTOM STICKY NAVIGATION BAR WITH AUTO-HIDE IN AI TUTOR MODE */}
+      {/* FULL-WIDTH ORIGINAL 5-TAB PREMIUM GLASS NAVIGATION BAR */}
       <motion.nav
         initial={false}
         animate={{
@@ -3391,87 +3537,159 @@ export default function App() {
             resetBottomNavTimer();
           }
         }}
-        className={`fixed bottom-0 left-0 right-0 z-50 bg-[#0f141d]/95 backdrop-blur-lg border-t border-slate-800/90 px-4 py-1 flex items-center justify-around shadow-[0_-4px_20px_rgba(0,0,0,0.6)] h-12 transition-colors duration-200 ${
+        className={`fixed bottom-0 left-0 right-0 z-50 bg-[#0a0f1d]/95 backdrop-blur-xl border-t border-slate-700/60 rounded-t-2xl sm:rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,0.65),0_0_20px_rgba(16,185,129,0.06)] px-2 py-1 flex items-center justify-around h-[56px] sm:h-14 transition-all duration-200 ${
           activeTab === 'aiTutor' && !isBottomNavVisible ? 'pointer-events-none' : 'pointer-events-auto'
         }`}
       >
-        {[
-          { id: 'home', icon: BookOpen },
-          { id: 'aiTutor', icon: BrainCircuit, badge: 'PRO' },
-          { id: 'toolkit', icon: Sparkles },
-          { id: 'groupChat', icon: MessageSquare },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <motion.button
-              key={tab.id}
-              whileTap={{ scale: 0.90 }}
-              onClick={() => {
-                playUiSound(uiCustomization.audioFeedback);
-                setShowMoreMenu(false);
-                if (tab.id === 'toolkit') setInitialTool(undefined);
-                setActiveTab(tab.id as any);
-                if (tab.id === 'aiTutor') {
-                  resetBottomNavTimer();
-                }
-              }}
-              className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer select-none ${
-                isActive
-                  ? 'text-emerald-400 font-black'
-                  : 'text-slate-400 hover:text-white font-medium'
-              }`}
-            >
-              {isActive && (
-                <motion.div
-                  layoutId="bottomNavIndicator"
-                  className="absolute inset-0 bg-emerald-500/15 border border-emerald-500/30 rounded-xl -z-10 shadow-[0_0_12px_rgba(52,211,153,0.25)]"
-                  transition={{ type: 'spring', stiffness: 450, damping: 32 }}
-                />
-              )}
-              <div className="relative inline-flex items-center justify-center">
-                <Icon className={`w-4 h-4 transition-transform ${isActive ? 'scale-110 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'text-slate-400'}`} />
-                {tab.badge && (
-                  <span className="absolute -top-1.5 -right-2 px-1 py-[0.5px] bg-gradient-to-r from-emerald-500 to-indigo-600 text-white text-[7px] font-black rounded-full leading-none shadow-[0_0_6px_rgba(16,185,129,0.5)] border border-emerald-300/40 z-20 tracking-tight pointer-events-none select-none">
-                    {tab.badge}
-                  </span>
-                )}
-              </div>
-              <span className="text-[9.5px] tracking-tight mt-0.5">{t(tab.id as any)}</span>
-            </motion.button>
-          );
-        })}
-
-        {/* MORE BUTTON */}
-        <motion.button
-          whileTap={{ scale: 0.90 }}
-          onClick={() => {
-            setShowMoreMenu(!showMoreMenu);
-            if (activeTab === 'aiTutor') {
-              resetBottomNavTimer();
-            }
-          }}
-          className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer select-none ${
-            showMoreMenu || ['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab)
-              ? 'text-emerald-400 font-black'
-              : 'text-slate-400 hover:text-white font-medium'
-          }`}
-        >
-          {(showMoreMenu || ['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab)) && (
-            <motion.div
-              layoutId="bottomNavIndicator"
-              className="absolute inset-0 bg-emerald-500/15 border border-emerald-500/30 rounded-xl -z-10 shadow-[0_0_12px_rgba(52,211,153,0.25)]"
-              transition={{ type: 'spring', stiffness: 450, damping: 32 }}
-            />
-          )}
-          <div className="relative">
-            <LayoutGrid className={`w-4 h-4 transition-transform ${showMoreMenu ? 'scale-110 text-emerald-400' : 'text-slate-400'}`} />
-            {['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab) && (
-              <span className="absolute -top-0.5 -right-1 w-2 h-2 bg-emerald-400 rounded-full ring-2 ring-slate-900" />
+        <div className="w-full max-w-xl mx-auto grid grid-cols-5 items-center gap-1">
+          {/* TAB 1: HOME */}
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            onClick={() => {
+              playUiSound(uiCustomization.audioFeedback);
+              setShowMoreMenu(false);
+              setActiveTab('home');
+            }}
+            className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all cursor-pointer select-none min-h-[44px] ${
+              activeTab === 'home'
+                ? 'text-emerald-400 font-bold'
+                : 'text-slate-300 hover:text-white font-medium'
+            }`}
+          >
+            {activeTab === 'home' && (
+              <motion.div
+                layoutId="bottomNavIndicator"
+                className="absolute inset-0 bg-emerald-500/18 border border-emerald-500/35 rounded-xl -z-10 shadow-[0_0_12px_rgba(52,211,153,0.25)]"
+                transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+              />
             )}
-          </div>
-          <span className="text-[9.5px] tracking-tight mt-0.5">More</span>
-        </motion.button>
+            <BookOpen className={`w-4 h-4 sm:w-[18px] sm:h-[18px] transition-transform ${activeTab === 'home' ? 'scale-110 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'text-slate-200'}`} />
+            <span className={`text-[10px] tracking-tight mt-0.5 whitespace-nowrap ${activeTab === 'home' ? 'font-bold text-emerald-400' : 'font-medium text-slate-300'}`}>
+              Home
+            </span>
+          </motion.button>
+
+          {/* TAB 2: AI TUTOR */}
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            onClick={() => {
+              playUiSound(uiCustomization.audioFeedback);
+              setShowMoreMenu(false);
+              setActiveTab('aiTutor');
+              resetBottomNavTimer();
+            }}
+            className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all cursor-pointer select-none min-h-[44px] ${
+              activeTab === 'aiTutor'
+                ? 'text-emerald-400 font-bold'
+                : 'text-slate-300 hover:text-white font-medium'
+            }`}
+          >
+            {activeTab === 'aiTutor' && (
+              <motion.div
+                layoutId="bottomNavIndicator"
+                className="absolute inset-0 bg-emerald-500/18 border border-emerald-500/35 rounded-xl -z-10 shadow-[0_0_12px_rgba(52,211,153,0.25)]"
+                transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+              />
+            )}
+            <div className="relative inline-flex items-center justify-center">
+              <BrainCircuit className={`w-4 h-4 sm:w-[18px] sm:h-[18px] transition-transform ${activeTab === 'aiTutor' ? 'scale-110 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'text-slate-200'}`} />
+              <span className="absolute -top-1.5 -right-2 px-1 py-[0.5px] bg-gradient-to-r from-emerald-500 to-indigo-600 text-white text-[7px] font-black rounded-full leading-none shadow-[0_0_6px_rgba(16,185,129,0.5)] border border-emerald-300/40 z-20 tracking-tight pointer-events-none select-none">
+                PRO
+              </span>
+            </div>
+            <span className={`text-[10px] tracking-tight mt-0.5 whitespace-nowrap ${activeTab === 'aiTutor' ? 'font-bold text-emerald-400' : 'font-medium text-slate-300'}`}>
+              AI Tutor
+            </span>
+          </motion.button>
+
+          {/* TAB 3: TOOLS */}
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            onClick={() => {
+              playUiSound(uiCustomization.audioFeedback);
+              setShowMoreMenu(false);
+              setInitialTool(undefined);
+              setActiveTab('toolkit');
+            }}
+            className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all cursor-pointer select-none min-h-[44px] ${
+              activeTab === 'toolkit'
+                ? 'text-emerald-400 font-bold'
+                : 'text-slate-300 hover:text-white font-medium'
+            }`}
+          >
+            {activeTab === 'toolkit' && (
+              <motion.div
+                layoutId="bottomNavIndicator"
+                className="absolute inset-0 bg-emerald-500/18 border border-emerald-500/35 rounded-xl -z-10 shadow-[0_0_12px_rgba(52,211,153,0.25)]"
+                transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+              />
+            )}
+            <Sparkles className={`w-4 h-4 sm:w-[18px] sm:h-[18px] transition-transform ${activeTab === 'toolkit' ? 'scale-110 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'text-slate-200'}`} />
+            <span className={`text-[10px] tracking-tight mt-0.5 whitespace-nowrap ${activeTab === 'toolkit' ? 'font-bold text-emerald-400' : 'font-medium text-slate-300'}`}>
+              Tools
+            </span>
+          </motion.button>
+
+          {/* TAB 4: STUDY ROOMS */}
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            onClick={() => {
+              playUiSound(uiCustomization.audioFeedback);
+              setShowMoreMenu(false);
+              setActiveTab('groupChat');
+            }}
+            className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all cursor-pointer select-none min-h-[44px] ${
+              activeTab === 'groupChat'
+                ? 'text-emerald-400 font-bold'
+                : 'text-slate-300 hover:text-white font-medium'
+            }`}
+          >
+            {activeTab === 'groupChat' && (
+              <motion.div
+                layoutId="bottomNavIndicator"
+                className="absolute inset-0 bg-emerald-500/18 border border-emerald-500/35 rounded-xl -z-10 shadow-[0_0_12px_rgba(52,211,153,0.25)]"
+                transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+              />
+            )}
+            <MessageSquare className={`w-4 h-4 sm:w-[18px] sm:h-[18px] transition-transform ${activeTab === 'groupChat' ? 'scale-110 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'text-slate-200'}`} />
+            <span className={`text-[10px] tracking-tight mt-0.5 whitespace-nowrap ${activeTab === 'groupChat' ? 'font-bold text-emerald-400' : 'font-medium text-slate-300'}`}>
+              Study Rooms
+            </span>
+          </motion.button>
+
+          {/* TAB 5: MORE */}
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            onClick={() => {
+              setShowMoreMenu(!showMoreMenu);
+              if (activeTab === 'aiTutor') {
+                resetBottomNavTimer();
+              }
+            }}
+            className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all cursor-pointer select-none min-h-[44px] ${
+              showMoreMenu || ['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab)
+                ? 'text-emerald-400 font-bold'
+                : 'text-slate-300 hover:text-white font-medium'
+            }`}
+          >
+            {(showMoreMenu || ['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab)) && (
+              <motion.div
+                layoutId="bottomNavIndicator"
+                className="absolute inset-0 bg-emerald-500/18 border border-emerald-500/35 rounded-xl -z-10 shadow-[0_0_12px_rgba(52,211,153,0.25)]"
+                transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+              />
+            )}
+            <div className="relative">
+              <LayoutGrid className={`w-4 h-4 sm:w-[18px] sm:h-[18px] transition-transform ${showMoreMenu ? 'scale-110 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'text-slate-200'}`} />
+              {['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab) && (
+                <span className="absolute -top-0.5 -right-1 w-2 h-2 bg-emerald-400 rounded-full ring-2 ring-slate-900 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+              )}
+            </div>
+            <span className={`text-[10px] tracking-tight mt-0.5 whitespace-nowrap ${showMoreMenu || ['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab) ? 'font-bold text-emerald-400' : 'font-medium text-slate-300'}`}>
+              More
+            </span>
+          </motion.button>
+        </div>
       </motion.nav>
 
       {/* ONBOARDING & PROFILE EDIT MODAL */}
