@@ -101,6 +101,8 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
     const container = mountRef.current;
     if (!container) return;
 
+    const isLowPowerDevice = typeof window !== 'undefined' && (!!(window as any).Capacitor || (navigator.hardwareConcurrency ?? 8) <= 4);
+
     let renderer: THREE.WebGLRenderer | null = null;
     let animationFrameId: number | null = null;
     let resizeObserver: ResizeObserver | null = null;
@@ -140,16 +142,16 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
       camera.position.set(0, 10, 68);
 
       renderer = new THREE.WebGLRenderer({
-        antialias: true,
+        antialias: !isLowPowerDevice,
         alpha: true,
         powerPreference: 'high-performance'
       });
       renderer.setClearColor(0x000000, 0); // Guarantee 100% alpha transparency
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, isLowPowerDevice ? 1 : 2));
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.2;
-      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.enabled = false;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
       container.appendChild(renderer.domElement);
@@ -178,7 +180,8 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
     // -------------------------------------------------------------------------
     // 3. BACKGROUND PARTICLES (STARS, DUST, CODE, BUBBLES, EMBERS)
     // -------------------------------------------------------------------------
-    const particleCount = theme === 'solar_system' || theme === 'cosmic_nebula' ? 2400 : 1200;
+    const baseParticleCount = theme === 'solar_system' || theme === 'cosmic_nebula' ? 2400 : 1200;
+    const particleCount = isLowPowerDevice ? Math.round(baseParticleCount * 0.6) : baseParticleCount;
     const particlePositions = new Float32Array(particleCount * 3);
     const particleColors = new Float32Array(particleCount * 3);
 

@@ -46,7 +46,7 @@ import { PdfBookScanner } from './components/PdfBookScanner';
 import { VoiceTutorModal } from './components/VoiceTutorModal';
 
 import IntegrationsHub from './components/IntegrationsHub';
-import { RealtimeMovingUniverse } from './components/RealtimeMovingUniverse';
+const RealtimeMovingUniverse = React.lazy(() => import('./components/RealtimeMovingUniverse').then(m => ({ default: m.RealtimeMovingUniverse })));
 import { TRANSLATIONS, Language } from './services/translations';
 import { playUiSound } from './services/soundEffects';
 import { 
@@ -236,6 +236,33 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [playgroundViewMode, setPlaygroundViewMode] = useState<'list' | 'grid'>('list');
   const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false);
+  const [is3DBackgroundReady, setIs3DBackgroundReady] = useState(false);
+
+  useEffect(() => {
+    let idleId: number | null = null;
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    if (typeof window !== 'undefined') {
+      if ('requestIdleCallback' in window) {
+        idleId = (window as any).requestIdleCallback(() => {
+          setIs3DBackgroundReady(true);
+        });
+      } else {
+        timeoutId = setTimeout(() => {
+          setIs3DBackgroundReady(true);
+        }, 400);
+      }
+    }
+
+    return () => {
+      if (idleId !== null && 'cancelIdleCallback' in window) {
+        (window as any).cancelIdleCallback(idleId);
+      }
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, []);
 
   // Bottom navigation auto-hide state for AI Tutor mode (auto-hides in 2s, pull-up arrow restores)
   const [isBottomNavVisible, setIsBottomNavVisible] = useState(true);
@@ -748,23 +775,6 @@ export default function App() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // --- PEERS & WAVE STATE ---
-  const [classmates, setClassmates] = useState([
-    { id: 1, name: 'Alice Johnson', avatar: '🦄', focus: 'Biology', online: true, waved: false },
-    { id: 2, name: 'Bob Smith', avatar: '🦊', focus: 'Mathematics', online: true, waved: false },
-    { id: 3, name: 'Sarah Connor', avatar: '🦉', focus: 'Physics', online: false, waved: false }
-  ]);
-
-  const handleWaveBack = (id: number) => {
-    setClassmates(prev => prev.map(c => {
-      if (c.id === id) {
-        return { ...c, waved: true };
-      }
-      return c;
-    }));
-    addXp(5);
-  };
-
   // --- CHIMPU SANCTUARY (PET) STATE ---
   const [equippedAccessory, setEquippedAccessory] = useState<string | null>(null);
 
@@ -1132,7 +1142,11 @@ export default function App() {
       <div id="app-vignette-layer" className="fixed inset-0 pointer-events-none z-0 bg-gradient-to-b from-[#060913]/90 via-[#070b16]/75 to-[#05070e]/95 backdrop-blur-[2px] transition-all duration-500" />
 
       {/* 100+ REALTIME MOVING LIVING OBJECTS & HUMAN CHARACTERS (SATELLITES, ROCKETS, WAVING ASTRONAUTS, CYBORGS, ATOMS) */}
-      <RealtimeMovingUniverse theme={uiCustomization.wallpaperAmbiance} interactive={true} />
+      {is3DBackgroundReady && (
+        <React.Suspense fallback={null}>
+          <RealtimeMovingUniverse theme={uiCustomization.wallpaperAmbiance} interactive={true} />
+        </React.Suspense>
+      )}
 
       {/* DYNAMIC OFFLINE INDICATOR PILL */}
       {isOffline && (
@@ -2610,92 +2624,6 @@ export default function App() {
                 </div>
               );
             })()}
-
-            {/* 9. ONLINE CLASSMATES - SLEEK STUDY ROOM MEMBERS */}
-            <div className="bg-[#0b101d]/90 backdrop-blur-xl p-4 sm:p-5 rounded-2xl border border-transparent text-white space-y-4 relative overflow-hidden shadow-xl">
-              <NeonBorder color1="#6366f1" color2="#a855f7" duration="6s" />
-              <div className="flex items-center justify-between border-b border-slate-800/60 pb-3">
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-[#070c18] border border-slate-800 flex items-center justify-center text-sm shadow-xs text-slate-300">
-                    🧭
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-slate-100 text-xs sm:text-sm tracking-wider uppercase flex items-center space-x-1.5">
-                      <span>CELESTIAL CREW</span>
-                    </h3>
-                    <p className="text-[8.5px] font-mono text-indigo-400 uppercase tracking-wider">
-                      STUDY NETWORK SYNC
-                    </p>
-                  </div>
-                </div>
-
-                {/* Active Status Pill */}
-                <div className="flex items-center space-x-1.5 bg-[#070c18] border border-slate-800 text-slate-300 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-                  </span>
-                  <span>{classmates.filter(c => c.online).length} IN ORBIT</span>
-                </div>
-              </div>
-
-              {/* Classmates Pod List */}
-              <div className="space-y-2">
-                {classmates.map((peer) => (
-                  <div 
-                    key={peer.id} 
-                    className="p-3 bg-[#070c18]/80 border border-slate-800/80 hover:border-slate-700/80 rounded-xl flex items-center justify-between shadow-xs transition group"
-                  >
-                    <div className="flex items-center space-x-3 min-w-0">
-                      {/* Avatar container */}
-                      <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-lg relative shrink-0 text-white">
-                        {peer.avatar}
-                        <span 
-                          className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-slate-950 flex items-center justify-center ${
-                            peer.online 
-                              ? 'bg-emerald-500' 
-                              : 'bg-slate-600'
-                          }`}
-                        >
-                          {peer.online && <span className="w-0.5 h-0.5 rounded-full bg-white animate-ping" />}
-                        </span>
-                      </div>
-
-                      {/* Crew Details */}
-                      <div className="min-w-0">
-                        <h4 className="font-bold text-xs sm:text-sm text-slate-200 flex items-center space-x-1 truncate">
-                          <span>{peer.name}</span>
-                        </h4>
-                        <p className="text-[9.5px] text-slate-400 flex items-center space-x-1.5 mt-0.5 truncate">
-                          <span className="text-indigo-400 font-semibold">FOCUS:</span>
-                          <span className="text-slate-300 truncate">{peer.focus}</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Action buttons */}
-                    <div className="shrink-0 pl-2">
-                      {peer.online ? (
-                        <button
-                          onClick={() => handleWaveBack(peer.id)}
-                          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer active:scale-95 flex items-center space-x-1.5 ${
-                            peer.waved
-                              ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
-                              : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-xs'
-                          }`}
-                        >
-                          <span className="text-xs">{peer.waved ? '📡' : '🛰️'}</span>
-                          <span className="tracking-wider">{peer.waved ? 'LINKED' : 'TRANSMIT'}</span>
-                        </button>
-                      ) : (
-                        <span className="text-[9px] font-bold text-slate-500 bg-slate-950 border border-slate-850 px-2.5 py-1 rounded-md">
-                          DORMANT
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
 
             {/* 10. CHIMPU'S SANCTUARY (VIRTUAL FRIEND) */}
             <div className="bg-[#0b101d]/90 backdrop-blur-xl rounded-2xl p-4 sm:p-5 border border-transparent text-white space-y-4 shadow-xl relative overflow-hidden">
