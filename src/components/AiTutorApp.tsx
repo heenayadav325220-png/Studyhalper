@@ -27,7 +27,6 @@ import {
   SlidersHorizontal,
   Sparkles,
   Sliders,
-  FlaskConical,
   GraduationCap,
   TrendingUp,
   Lightbulb,
@@ -36,12 +35,14 @@ import {
   Languages,
   Zap,
   HelpCircle,
-  ChevronDown,
   ChevronUp,
+  ChevronDown,
   Type,
   FolderOpen,
   Grid,
-  Menu
+  Menu,
+  Bot,
+  Clock
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -731,7 +732,7 @@ export const AiTutorApp = memo(function AiTutorApp({
   });
 
   const [activeSessionId, setActiveSessionId] = useState<string | null>(() => {
-    return getStoredValue(`ai_tutor_active_session_id_${user.uid}`, null) || null;
+    return getStoredValue(`ai_tutor_active_session_id_${user.uid}`, '') || null;
   });
 
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
@@ -1072,51 +1073,7 @@ export const AiTutorApp = memo(function AiTutorApp({
 
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
 
-  // Auto-hiding header system (slides up automatically in 2.5s, pull/click arrow down to restore)
-  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
-  const [isHeaderHoveredOrInteracting, setIsHeaderHoveredOrInteracting] = useState(false);
-  const autoHideTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const touchStartYRef = useRef<number>(0);
   const bottomTouchStartYRef = useRef<number>(0);
-
-  const resetAutoHideTimer = () => {
-    if (autoHideTimerRef.current) {
-      clearTimeout(autoHideTimerRef.current);
-      autoHideTimerRef.current = null;
-    }
-    if (!isHeaderHoveredOrInteracting && isHeaderVisible) {
-      autoHideTimerRef.current = setTimeout(() => {
-        setIsHeaderVisible(false);
-      }, 2500);
-    }
-  };
-
-  const showHeader = () => {
-    setIsHeaderVisible(true);
-    resetAutoHideTimer();
-  };
-
-  const hideHeader = () => {
-    if (autoHideTimerRef.current) {
-      clearTimeout(autoHideTimerRef.current);
-      autoHideTimerRef.current = null;
-    }
-    setIsHeaderVisible(false);
-  };
-
-  useEffect(() => {
-    if (isHeaderVisible && !isHeaderHoveredOrInteracting) {
-      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
-      autoHideTimerRef.current = setTimeout(() => {
-        setIsHeaderVisible(false);
-      }, 2500);
-    } else if (autoHideTimerRef.current) {
-      clearTimeout(autoHideTimerRef.current);
-    }
-    return () => {
-      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
-    };
-  }, [isHeaderVisible, isHeaderHoveredOrInteracting]);
 
   useEffect(() => {
     const vv = window.visualViewport;
@@ -1864,20 +1821,11 @@ export const AiTutorApp = memo(function AiTutorApp({
       className="fixed inset-0 z-50 bg-[#f8fafc] text-slate-900 flex flex-col font-sans overflow-hidden transition-[height] duration-150 ease-out"
       style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
       onTouchStart={(e) => {
-        if (!isHeaderVisible && e.touches[0].clientY < 60) {
-          touchStartYRef.current = e.touches[0].clientY;
-        }
         if (!isBottomNavVisible && e.touches[0].clientY > window.innerHeight - 80) {
           bottomTouchStartYRef.current = e.touches[0].clientY;
         }
       }}
       onTouchMove={(e) => {
-        if (!isHeaderVisible && touchStartYRef.current > 0) {
-          if (e.touches[0].clientY - touchStartYRef.current > 15) {
-            showHeader();
-            touchStartYRef.current = 0;
-          }
-        }
         if (!isBottomNavVisible && bottomTouchStartYRef.current > 0) {
           if (bottomTouchStartYRef.current - e.touches[0].clientY > 15) {
             onShowBottomNav?.();
@@ -1886,329 +1834,188 @@ export const AiTutorApp = memo(function AiTutorApp({
         }
       }}
     >
-      {/* COLLAPSIBLE TOP DETAIL BAR (SLIDES UP OUT OF VIEW) */}
-      <motion.div
-        initial={false}
-        animate={{
-          height: isHeaderVisible ? 'auto' : 0,
-          opacity: isHeaderVisible ? 1 : 0
-        }}
-        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-        className={`relative z-30 shrink-0 bg-white ${isHeaderVisible ? 'overflow-visible' : 'overflow-hidden'}`}
-        onMouseEnter={() => {
-          setIsHeaderHoveredOrInteracting(true);
-        }}
-        onMouseLeave={() => {
-          setIsHeaderHoveredOrInteracting(false);
-        }}
-        onTouchStart={() => {
-          setIsHeaderHoveredOrInteracting(true);
-          resetAutoHideTimer();
-        }}
-        onFocusCapture={() => {
-          setIsHeaderHoveredOrInteracting(true);
-        }}
-        onBlurCapture={() => {
-          setIsHeaderHoveredOrInteracting(false);
-        }}
-      >
-        <header className="bg-white/95 backdrop-blur-sm border-b border-slate-200 px-3 sm:px-5 py-2 sm:py-2.5 flex items-center justify-between shrink-0 shadow-[0_1px_2px_rgba(15,23,42,0.03)] z-10">
-          <div className="flex items-center space-x-2 sm:space-x-3">
-            <button
-              onClick={onBack}
-              className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center space-x-1 border border-slate-200 group cursor-pointer"
-              title="Back to Ascend Study"
-            >
-              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform text-slate-700" />
-              <span className="text-xs font-bold text-slate-700 hidden sm:inline">Back</span>
-            </button>
+      {/* SINGLE CLEAN TOP NAVIGATION BAR */}
+      <header className="bg-white border-b border-slate-200/90 px-3 sm:px-5 py-2 sm:py-2.5 flex items-center justify-between shrink-0 shadow-[0_1px_2px_rgba(15,23,42,0.03)] z-20 relative">
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          {/* 1. ☰ Sidebar/Menu button */}
+          <button
+            type="button"
+            onClick={() => setShowSidebar(prev => !prev)}
+            className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center justify-center cursor-pointer active:scale-95 border border-slate-200"
+            title="Toggle Study Sidebar & Chat History"
+          >
+            <Menu className="w-4 h-4 text-slate-700" />
+          </button>
 
-            <div className="flex items-center space-x-2.5">
-              <img
-                src="/favicon.svg"
-                alt="Ascend Logo"
-                className="w-8 h-8 rounded-lg shadow-sm"
-              />
+          {/* 2. ← Back button */}
+          <button
+            type="button"
+            onClick={onBack}
+            className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center justify-center cursor-pointer active:scale-95 border border-slate-200"
+            title="Back to Ascend Study"
+          >
+            <ArrowLeft className="w-4 h-4 text-slate-700" />
+          </button>
 
-              <div>
-                <div className="flex items-center space-x-2 flex-wrap">
-                  <h1 className="text-xs font-bold tracking-tight text-slate-900">
-                    ASCEND AI TUTOR
-                  </h1>
-                </div>
-                <p className="text-[9px] text-slate-500 font-medium flex items-center space-x-1">
-                  <span>Powered by Gemini AI</span>
-                </p>
-              </div>
-            </div>
-          </div>
+          {/* 3. ＋ New Chat button */}
+          <button
+            type="button"
+            onClick={handleNewChat}
+            className="p-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition flex items-center justify-center cursor-pointer active:scale-95"
+            title="Start fresh study chat"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
 
-          <div className="flex items-center space-x-2 relative" ref={topRightMenuRef}>
-            <button
-              type="button"
-              onClick={() => setShowTopRightMenu(!showTopRightMenu)}
-              className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition flex items-center justify-center cursor-pointer active:scale-95"
-              title="Menu"
-            >
-              <Grid className="w-4 h-4 text-slate-700" />
-            </button>
+        {/* 4. Features/Menu button */}
+        <div className="flex items-center space-x-2 relative" ref={topRightMenuRef}>
+          <button
+            type="button"
+            onClick={() => setShowTopRightMenu(!showTopRightMenu)}
+            className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition flex items-center justify-center cursor-pointer active:scale-95"
+            title="Features Menu"
+          >
+            <Grid className="w-4 h-4 text-slate-700" />
+          </button>
 
-            <AnimatePresence>
-              {showTopRightMenu && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                  transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-                  className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 py-3 px-3.5 space-y-3 text-slate-700"
-                >
-                  {/* Profile Card Section */}
-                  <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl flex items-center space-x-3 shadow-3xs">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white font-bold text-sm shadow-xs border border-indigo-400/20 shrink-0">
-                      {user.name ? user.name.charAt(0).toUpperCase() : 'H'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-bold text-slate-900 truncate">
-                        {user.name || 'Heena Yadav'}
-                      </div>
-                      {user.className && (
-                        <div className="text-[10px] text-indigo-600 font-semibold flex items-center space-x-1 mt-0.5">
-                          <GraduationCap className="w-3.5 h-3.5 inline shrink-0 text-indigo-500" />
-                          <span className="truncate">{user.className || 'Class 12th (Science)'}</span>
-                        </div>
-                      )}
-                      {user.schoolName && (
-                        <div className="text-[9px] text-slate-500 font-medium truncate mt-0.5">
-                          🏫 {user.schoolName || 'chhabra'}
-                        </div>
-                      )}
-                    </div>
+          <AnimatePresence>
+            {showTopRightMenu && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: -6 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: -6 }}
+                transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                className="fixed right-2 top-14 sm:absolute sm:right-0 sm:top-full sm:mt-2 w-[calc(100vw-1rem)] sm:w-72 max-w-sm bg-white border border-slate-200 rounded-2xl shadow-2xl z-[200] py-3 px-3.5 space-y-3 text-slate-700"
+              >
+                {/* Profile Card Section */}
+                <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl flex items-center space-x-3 shadow-3xs">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white font-bold text-sm shadow-xs border border-indigo-400/20 shrink-0">
+                    {user.name ? user.name.charAt(0).toUpperCase() : 'H'}
                   </div>
-
-                  <div className="w-full h-px bg-slate-100" />
-
-                  {/* Options Menu List */}
-                  <div className="space-y-1">
-                    {/* Mic Button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleVoiceInputToggle();
-                        setShowTopRightMenu(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between cursor-pointer ${
-                        isListening
-                          ? 'bg-rose-500 text-white animate-pulse shadow-xs'
-                          : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <Mic className="w-4 h-4 shrink-0" />
-                        <span>{isListening ? 'Listening...' : 'Mic'}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold text-slate-900 truncate">
+                      {user.name || 'Heena Yadav'}
+                    </div>
+                    {user.className && (
+                      <div className="text-[10px] text-indigo-600 font-semibold flex items-center space-x-1 mt-0.5">
+                        <GraduationCap className="w-3.5 h-3.5 inline shrink-0 text-indigo-500" />
+                        <span className="truncate">{user.className || 'Class 12th (Science)'}</span>
                       </div>
-                      <span className="text-[10px] opacity-75 font-semibold">
-                        {isListening ? 'ON' : 'OFF'}
-                      </span>
-                    </button>
-
-                    {/* Voice Option */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowCustomVoiceModal(true);
-                        setShowTopRightMenu(false);
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 text-slate-700 transition flex items-center space-x-2 cursor-pointer"
-                    >
-                      <Volume2 className="w-4 h-4 text-indigo-500 shrink-0" />
-                      <span>Voice</span>
-                    </button>
-
-                    {/* Study Tools Settings option */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowMoreMenu(true);
-                        setShowTopRightMenu(false);
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 text-slate-700 transition flex items-center space-x-2 cursor-pointer"
-                    >
-                      <SlidersHorizontal className="w-4 h-4 text-emerald-500 shrink-0" />
-                      <span>Study Tools</span>
-                    </button>
-
-                    {/* Exam Insights */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleSendMessage(`Give me key high-yield exam insights, formula tricks, and JEE Main / Board questions for ${selectedSubject}.`);
-                        setShowTopRightMenu(false);
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 text-slate-700 transition flex items-center space-x-2 cursor-pointer"
-                    >
-                      <Sparkles className="w-4 h-4 text-blue-500 shrink-0" />
-                      <span>Exam Insights</span>
-                    </button>
-
-                    {/* Export PDF */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (messages.length > 0 && !isExportingPdf) {
-                          handleExportPdf();
-                          setShowTopRightMenu(false);
-                        }
-                      }}
-                      disabled={messages.length === 0 || isExportingPdf}
-                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent text-slate-700 transition flex items-center space-x-2 cursor-pointer"
-                    >
-                      {isExportingPdf ? (
-                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                      ) : (
-                        <FileDown className="w-4 h-4 text-amber-500 shrink-0" />
-                      )}
-                      <span>Export PDF</span>
-                    </button>
-
-                    {/* Clear Conversation inside menu to keep header perfectly clean */}
-                    {messages.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleClearChat();
-                          setShowTopRightMenu(false);
-                        }}
-                        className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold hover:bg-rose-50 text-rose-600 transition flex items-center space-x-2 cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4 shrink-0" />
-                        <span>Clear Chat</span>
-                      </button>
+                    )}
+                    {user.schoolName && (
+                      <div className="text-[9px] text-slate-500 font-medium truncate mt-0.5">
+                        🏫 {user.schoolName || 'chhabra'}
+                      </div>
                     )}
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </header>
-      </motion.div>
+                </div>
 
-      {/* PERSISTENT STUDY TOOLBAR (ALWAYS STAYS AS HEADER, REST SLIDES UP ABOVE) */}
-      <div className="bg-white border-b border-slate-200/90 px-3 sm:px-5 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0 z-20 relative">
-        {/* Back Arrow button to go back directly from persistent header */}
-        <button
-          type="button"
-          onClick={onBack}
-          className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 text-slate-600 hover:text-slate-900 transition flex items-center justify-center cursor-pointer shrink-0 active:scale-95"
-          title="Back"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-        </button>
+                <div className="w-full h-px bg-slate-100" />
 
-        <div className="relative shrink-0">
-          <select
-            value={selectedSubject}
-            onChange={(e) => setSelectedSubject(e.target.value as Subject)}
-            className="appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs pl-8 pr-4 py-1.5 rounded-lg cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-          >
-            {SUBJECT_LIST.map((sub) => (
-              <option key={sub} value={sub} className="text-slate-900 bg-white">{sub}</option>
-            ))}
-          </select>
-          <FlaskConical className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                {/* Options Menu List */}
+                <div className="space-y-1">
+                  {/* Mic Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleVoiceInputToggle();
+                      setShowTopRightMenu(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between cursor-pointer ${
+                      isListening
+                        ? 'bg-rose-500 text-white animate-pulse shadow-xs'
+                        : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Mic className="w-4 h-4 shrink-0" />
+                      <span>{isListening ? 'Listening...' : 'Mic'}</span>
+                    </div>
+                    <span className="text-[10px] opacity-75 font-semibold">
+                      {isListening ? 'ON' : 'OFF'}
+                    </span>
+                  </button>
+
+                  {/* Voice Option */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCustomVoiceModal(true);
+                      setShowTopRightMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 text-slate-700 transition flex items-center space-x-2 cursor-pointer"
+                  >
+                    <Volume2 className="w-4 h-4 text-indigo-500 shrink-0" />
+                    <span>Voice</span>
+                  </button>
+
+                  {/* Study Tools Settings option */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMoreMenu(true);
+                      setShowTopRightMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 text-slate-700 transition flex items-center space-x-2 cursor-pointer"
+                  >
+                    <SlidersHorizontal className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span>Study Tools</span>
+                  </button>
+
+                  {/* Exam Insights */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleSendMessage(`Give me key high-yield exam insights, formula tricks, and JEE Main / Board questions for ${selectedSubject}.`);
+                      setShowTopRightMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 text-slate-700 transition flex items-center space-x-2 cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4 text-blue-500 shrink-0" />
+                    <span>Exam Insights</span>
+                  </button>
+
+                  {/* Export PDF */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (messages.length > 0 && !isExportingPdf) {
+                        handleExportPdf();
+                        setShowTopRightMenu(false);
+                      }
+                    }}
+                    disabled={messages.length === 0 || isExportingPdf}
+                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent text-slate-700 transition flex items-center space-x-2 cursor-pointer"
+                  >
+                    {isExportingPdf ? (
+                      <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                    ) : (
+                      <FileDown className="w-4 h-4 text-amber-500 shrink-0" />
+                    )}
+                    <span>Export PDF</span>
+                  </button>
+
+                  {/* Clear Chat */}
+                  {messages.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleClearChat();
+                        setShowTopRightMenu(false);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold hover:bg-rose-50 text-rose-600 transition flex items-center space-x-2 cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4 shrink-0" />
+                      <span>Clear Chat</span>
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-
-        {/* Minimal Toggle Chevron to easily roll details up/down right next to Science option */}
-        <button
-          type="button"
-          onClick={() => isHeaderVisible ? hideHeader() : showHeader()}
-          className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 text-slate-500 hover:text-slate-800 transition flex items-center justify-center cursor-pointer shrink-0 active:scale-95"
-          title={isHeaderVisible ? "Minimize top menu" : "Maximize top menu"}
-        >
-          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${isHeaderVisible ? 'rotate-180' : ''}`} />
-        </button>
-
-        <div className="relative shrink-0">
-          <select
-            value={selectedLanguage}
-            onChange={(e) => {
-              const val = e.target.value;
-              setSelectedLanguage(val);
-              setStoredValue(`ai_tutor_language_${user.uid}`, val);
-              if (onLanguageChange) {
-                const reverseMap: Record<string, string> = {
-                  'English': 'en',
-                  'Hindi': 'hi',
-                  'Hinglish': 'hinglish',
-                  'Marathi': 'marathi',
-                  'Tamil': 'tamil',
-                  'Bengali': 'bengali'
-                };
-                const code = reverseMap[val];
-                if (code) onLanguageChange(code);
-              }
-            }}
-            className="appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs pl-8 pr-4 py-1.5 rounded-lg cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-          >
-            <option value="Hinglish">Hinglish</option>
-            <option value="Hindi">हिंदी (Hindi)</option>
-            <option value="English">English</option>
-            <option value="Marathi">मराठी (Marathi)</option>
-            <option value="Tamil">தமிழ் (Tamil)</option>
-            <option value="Bengali">বাংলा (Bengali)</option>
-          </select>
-          <Languages className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
-
-        <div className="w-px h-5 bg-slate-200 shrink-0" />
-
-        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5 shrink-0">
-          {[
-            { id: 'homework' as const, label: 'Homework', icon: Zap },
-            { id: 'step' as const, label: 'Step-by-Step', icon: TrendingUp },
-            { id: 'explain' as const, label: 'Explain', icon: Lightbulb },
-            { id: 'quiz' as const, label: 'Quiz', icon: ClipboardList },
-          ].map((mode) => {
-            const Icon = mode.icon;
-            const active = tutorMode === mode.id;
-            return (
-              <button
-                key={mode.id}
-                type="button"
-                onClick={() => setTutorMode(mode.id)}
-                className={`px-2.5 py-1.5 rounded-md font-bold text-xs flex items-center space-x-1.5 transition cursor-pointer shrink-0 whitespace-nowrap active:scale-95 ${
-                  active
-                    ? 'bg-slate-900 text-white shadow-2xs'
-                    : 'text-slate-600 hover:bg-slate-200/60'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{mode.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="w-px h-5 bg-slate-200 shrink-0" />
-
-        <button
-          type="button"
-          onClick={() => handleSendMessage(`Give me key high-yield exam insights, formula tricks, and JEE Main / Board questions for ${selectedSubject}.`)}
-          className="border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 font-bold text-xs px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer shrink-0 whitespace-nowrap"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
-          <span>Exam Insights</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={handleExportPdf}
-          disabled={messages.length === 0 || isExportingPdf}
-          className="ml-auto border border-slate-200 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40 text-slate-600 font-bold text-xs px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer shrink-0 whitespace-nowrap"
-        >
-          {isExportingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
-          <span className="hidden sm:inline">Export PDF</span>
-        </button>
-      </div>
+      </header>
 
       {pdfExportSuccess && (
         <motion.div
@@ -2226,6 +2033,216 @@ export const AiTutorApp = memo(function AiTutorApp({
           </span>
         </motion.div>
       )}
+
+      {/* SIDE-BY-SIDE INTERFACE: SIDEBAR (MODES, SUBJECTS, LANGUAGES, CHAT HISTORY) + MAIN CHAT */}
+      <div className="flex-1 flex overflow-hidden relative w-full">
+        {/* MOBILE BACKDROP */}
+        {showSidebar && (
+          <div
+            onClick={() => setShowSidebar(false)}
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 lg:hidden"
+          />
+        )}
+
+        {/* SIDEBAR PANEL */}
+        <aside
+          className={`fixed lg:static top-0 bottom-0 left-0 z-50 lg:z-10 w-72 sm:w-80 bg-[#070b14] text-slate-200 border-r border-slate-800/60 flex flex-col h-full shrink-0 transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none ${
+            showSidebar ? 'translate-x-0' : '-translate-x-full lg:hidden'
+          }`}
+        >
+          {/* Header of Sidebar */}
+          <div className="px-5 py-4 border-b border-slate-800/50 flex items-center justify-between shrink-0 bg-[#070b14]">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-semibold shrink-0">
+                <Bot className="w-4.5 h-4.5" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-xs font-extrabold text-slate-100 tracking-wider uppercase">ASCEND STUDY BUDDY</h2>
+                <p className="text-[10px] text-slate-400 font-medium">AI Tutor & Study History</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowSidebar(false)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 cursor-pointer transition active:scale-95"
+              title="Close sidebar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* New Chat Button Container */}
+          <div className="px-4 py-3 border-b border-slate-800/30 shrink-0 bg-[#070b14]">
+            <button
+              type="button"
+              onClick={handleNewChat}
+              className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-md shadow-indigo-900/10 transition-all duration-200 active:scale-95 cursor-pointer"
+            >
+              <Plus className="w-4 h-4 text-indigo-100" />
+              <span>+ New Study Chat</span>
+            </button>
+          </div>
+
+          {/* Scrollable Sidebar Content */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-5 text-xs no-scrollbar bg-[#070b14]">
+            {/* FEATURE SECTION 1: TUTOR MODES */}
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
+                Study Mode / मोड
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'homework' as const, label: 'Homework', icon: Zap },
+                  { id: 'step' as const, label: 'Step Math', icon: TrendingUp },
+                  { id: 'explain' as const, label: 'Concept Explainer', icon: Lightbulb },
+                  { id: 'quiz' as const, label: 'Practice Quiz', icon: ClipboardList },
+                ].map((mode) => {
+                  const Icon = mode.icon;
+                  const active = tutorMode === mode.id;
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => setTutorMode(mode.id)}
+                      className={`p-2.5 rounded-xl border text-left transition duration-200 flex flex-col justify-between h-16 cursor-pointer active:scale-98 ${
+                        active
+                          ? 'bg-indigo-600/10 border-indigo-500 text-indigo-300 font-bold shadow-xs'
+                          : 'bg-slate-900/40 border-slate-800/50 text-slate-400 hover:text-slate-200 hover:bg-slate-900/80 hover:border-slate-700'
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-indigo-400' : 'text-slate-500'}`} />
+                      <span className="truncate text-[11px] font-medium tracking-tight mt-1">{mode.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* FEATURE SECTION 2: SUBJECTS */}
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
+                Subject / विषय चुनें
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {SUBJECT_LIST.map((sub) => {
+                  const active = selectedSubject === sub;
+                  return (
+                    <button
+                      key={sub}
+                      type="button"
+                      onClick={() => setSelectedSubject(sub)}
+                      className={`py-2 px-2.5 rounded-xl border text-left transition duration-200 flex items-center space-x-2 h-11 cursor-pointer active:scale-98 ${
+                        active
+                          ? 'bg-emerald-600/10 border-emerald-500 text-emerald-300 font-semibold shadow-xs'
+                          : 'bg-slate-900/40 border-slate-800/50 text-slate-400 hover:text-slate-200 hover:bg-slate-900/80 hover:border-slate-700'
+                      }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${active ? 'bg-emerald-400 shadow-xs shadow-emerald-500' : 'bg-slate-600'}`} />
+                      <span className="truncate text-[11px] font-medium tracking-tight">{sub}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* FEATURE SECTION 3: LANGUAGE */}
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
+                Language / भाषा
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedLanguage}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedLanguage(val);
+                    setStoredValue(`ai_tutor_language_${user.uid}`, val);
+                    if (onLanguageChange) {
+                      const reverseMap: Record<string, string> = {
+                        'English': 'en',
+                        'Hindi': 'hi',
+                        'Hinglish': 'hinglish',
+                        'Marathi': 'marathi',
+                        'Tamil': 'tamil',
+                        'Bengali': 'bengali'
+                      };
+                      const code = reverseMap[val];
+                      if (code) onLanguageChange(code);
+                    }
+                  }}
+                  className="w-full bg-slate-900/50 border border-slate-800/80 text-slate-200 text-xs font-semibold py-2.5 pl-3.5 pr-10 rounded-xl focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none appearance-none cursor-pointer transition-colors duration-200"
+                >
+                  <option value="Hinglish">Hinglish</option>
+                  <option value="Hindi">हिंदी (Hindi)</option>
+                  <option value="English">English</option>
+                  <option value="Marathi">मराठी (Marathi)</option>
+                  <option value="Tamil">தமிழ் (Tamil)</option>
+                  <option value="Bengali">বাংলा (Bengali)</option>
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-500">
+                  <ChevronDown className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+
+            {/* FEATURE SECTION 4: CHAT HISTORY */}
+            <div className="pt-3 border-t border-slate-800/40">
+              <div className="flex items-center justify-between mb-2.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
+                  <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Chat History / चैट इतिहास</span>
+                </label>
+                <span className="text-[10px] text-slate-500 font-mono bg-slate-900/60 px-2 py-0.5 rounded-full">
+                  {sessions.length} chats
+                </span>
+              </div>
+
+              {sessions.length === 0 ? (
+                <div className="p-3 rounded-xl bg-slate-900/20 border border-slate-850 text-center text-slate-500 text-[11px] leading-relaxed">
+                  No previous chats yet. Your questions and solutions will appear here!
+                </div>
+              ) : (
+                <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1 no-scrollbar">
+                  {sessions.map((s) => {
+                    const isSelected = activeSessionId === s.id;
+                    return (
+                      <div
+                        key={s.id}
+                        onClick={() => handleSelectSession(s)}
+                        className={`group p-2.5 rounded-xl border text-left transition duration-150 flex items-center justify-between cursor-pointer active:scale-98 ${
+                          isSelected
+                            ? 'bg-slate-900 border-indigo-500 text-white font-medium shadow-xs'
+                            : 'bg-slate-900/30 border-slate-800/40 text-slate-400 hover:bg-slate-900/70 hover:text-white hover:border-slate-700/60'
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0 pr-2">
+                          <div className="text-xs truncate font-semibold text-slate-200 group-hover:text-white">
+                            {s.title || 'Study Session'}
+                          </div>
+                          <div className="text-[10px] text-slate-500 flex items-center space-x-1.5 mt-0.5">
+                            <span className="text-indigo-400 font-semibold">{s.subject}</span>
+                            <span>•</span>
+                            <span>{s.timestamp}</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteSession(s.id, e)}
+                          className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/20 opacity-0 group-hover:opacity-100 transition duration-150 shrink-0 cursor-pointer"
+                          title="Delete Chat"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </aside>
+
+        {/* MAIN CHAT AREA */}
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-[#f8fafc]">
 
       <div className="flex-1 overflow-y-auto overscroll-contain scroll-smooth p-3 sm:p-5 space-y-4 max-w-4xl mx-auto w-full">
         {messages.length === 0 ? (
@@ -3925,6 +3942,8 @@ export const AiTutorApp = memo(function AiTutorApp({
           )}
         </AnimatePresence>
       </footer>
+        </div>
+      </div>
 
       <CustomVoiceModal
         isOpen={showCustomVoiceModal}

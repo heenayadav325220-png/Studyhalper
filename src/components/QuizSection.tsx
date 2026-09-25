@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   GraduationCap, 
@@ -23,11 +23,15 @@ import {
   Dna,
   BookMarked,
   History,
-  X
+  X,
+  Target,
+  Copy,
+  CheckCheck
 } from 'lucide-react';
-import { generateQuiz } from '../services/geminiService';
+import { generateQuiz, shuffleQuizQuestions } from '../services/geminiService';
 import { showToast } from './Toast';
 import { parseError, logError } from '../utils/errorHandler';
+import { playSuccessChime, triggerHaptic } from '../services/soundEffects';
 import type { Subject, MockExam, UserProfile } from '../types';
 
 interface QuizSectionProps {
@@ -111,6 +115,230 @@ const SUBJECT_CONFIGS: Array<{
   }
 ];
 
+// --- LUXURY CELEBRATION CONFETTI ENGINE (PURE 60FPS CANVAS WITH AUTO-PAUSE) ---
+const LuxuryConfettiCanvas: React.FC = () => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animId: number;
+    const width = (canvas.width = window.innerWidth);
+    const height = (canvas.height = window.innerHeight);
+
+    // Luxury palette: Royal Gold, Amber, Electric Indigo, Neon Cyan, Emerald, Rose Diamond
+    const colors = ['#fbbf24', '#f59e0b', '#6366f1', '#06b6d4', '#10b981', '#ec4899', '#ffffff', '#a855f7'];
+
+    interface Particle {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      size: number;
+      color: string;
+      rotation: number;
+      vRot: number;
+      shape: 'rect' | 'circle' | 'star';
+      opacity: number;
+      decay: number;
+    }
+
+    const particles: Particle[] = [];
+    const count = Math.min(110, Math.floor(width / 12));
+
+    for (let i = 0; i < count; i++) {
+      const speed = Math.random() * 14 + 7;
+      particles.push({
+        x: width * 0.5 + (Math.random() - 0.5) * 260,
+        y: height * 0.35,
+        vx: (Math.random() - 0.5) * 18,
+        vy: -speed,
+        size: Math.random() * 9 + 4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rotation: Math.random() * 360,
+        vRot: (Math.random() - 0.5) * 12,
+        shape: Math.random() > 0.4 ? 'rect' : Math.random() > 0.5 ? 'star' : 'circle',
+        opacity: 1,
+        decay: Math.random() * 0.0035 + 0.004
+      });
+    }
+
+    const startTime = Date.now();
+
+    const drawStar = (cx: number, cy: number, spikes: number, outerRadius: number, innerRadius: number) => {
+      let rot = (Math.PI / 2) * 3;
+      let x = cx;
+      let y = cy;
+      const step = Math.PI / spikes;
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - outerRadius);
+      for (let i = 0; i < spikes; i++) {
+        x = cx + Math.cos(rot) * outerRadius;
+        y = cy + Math.sin(rot) * outerRadius;
+        ctx.lineTo(x, y);
+        rot += step;
+
+        x = cx + Math.cos(rot) * innerRadius;
+        y = cy + Math.sin(rot) * innerRadius;
+        ctx.lineTo(x, y);
+        rot += step;
+      }
+      ctx.lineTo(cx, cy - outerRadius);
+      ctx.closePath();
+      ctx.fill();
+    };
+
+    const render = () => {
+      // Auto pause after 4.5 seconds to preserve 100% CPU and zero battery drain
+      if (Date.now() - startTime > 4500) {
+        ctx.clearRect(0, 0, width, height);
+        return;
+      }
+
+      ctx.clearRect(0, 0, width, height);
+
+      particles.forEach((p) => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.28; // gravity
+        p.vx *= 0.985; // air resistance
+        p.rotation += p.vRot;
+        p.opacity = Math.max(0, p.opacity - p.decay);
+
+        if (p.opacity <= 0) return;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate((p.rotation * Math.PI) / 180);
+        ctx.globalAlpha = p.opacity;
+        ctx.fillStyle = p.color;
+
+        if (p.shape === 'rect') {
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size * 1.6, p.size * 0.7);
+        } else if (p.shape === 'circle') {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          drawStar(0, 0, 5, p.size, p.size * 0.45);
+        }
+
+        ctx.restore();
+      });
+
+      animId = requestAnimationFrame(render);
+    };
+
+    animId = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(animId);
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="fixed inset-0 pointer-events-none z-50 w-full h-full"
+    />
+  );
+};
+
+// --- ANIMATED NUMBER COUNTER (SMOOTH EASE-OUT INTERPOLATION) ---
+const AnimatedScoreCounter: React.FC<{ value: number; duration?: number; suffix?: string; prefix?: string }> = ({
+  value,
+  duration = 1100,
+  suffix = '',
+  prefix = ''
+}) => {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    let startTimestamp: number | null = null;
+    let animId: number;
+
+    const step = (timestamp: number) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      // Cubic ease-out curve
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      setDisplayValue(Math.round(easeOut * value));
+
+      if (progress < 1) {
+        animId = requestAnimationFrame(step);
+      }
+    };
+
+    animId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animId);
+  }, [value, duration]);
+
+  return <span>{prefix}{displayValue}{suffix}</span>;
+};
+
+// --- RADIAL ACCURACY RING WITH SVG GLOW ---
+const ScoreRadialRing: React.FC<{ percentage: number; size?: number }> = ({ percentage, size = 150 }) => {
+  const strokeWidth = 10;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const targetOffset = circumference - (Math.max(0, Math.min(100, percentage)) / 100) * circumference;
+
+  return (
+    <div className="relative flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="rotate-[-90deg] overflow-visible">
+        <defs>
+          <linearGradient id="scoreRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#6366f1" />
+            <stop offset="45%" stopColor="#a855f7" />
+            <stop offset="100%" stopColor="#10b981" />
+          </linearGradient>
+          <filter id="ringAmbientGlow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="4.5" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
+
+        {/* Track Circle */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="rgba(255, 255, 255, 0.1)"
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+
+        {/* Dynamic Progress Arc */}
+        <motion.circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="url(#scoreRingGrad)"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          fill="none"
+          strokeDasharray={circumference}
+          initial={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset: targetOffset }}
+          transition={{ duration: 1.35, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
+          filter="url(#ringAmbientGlow)"
+        />
+      </svg>
+
+      {/* Center Label Display */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
+        <span className="text-3xl sm:text-4xl font-black text-white tracking-tight drop-shadow-md">
+          <AnimatedScoreCounter value={percentage} suffix="%" />
+        </span>
+        <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-slate-300 mt-0.5">
+          Accuracy
+        </span>
+      </div>
+    </div>
+  );
+};
+
 export default function QuizSection({
   user,
   onAddXp,
@@ -125,6 +353,7 @@ export default function QuizSection({
   // Setup Config
   const [selectedSubject, setSelectedSubject] = useState<Subject>('Mathematics');
   const [customTopic, setCustomTopic] = useState('Trigonometry & Formulas');
+  const [questionCount, setQuestionCount] = useState<number>(10);
   const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard'>('Medium');
   const [isTimed, setIsTimed] = useState(true);
   const [timePerQuestion] = useState(30); // 30s per question
@@ -142,6 +371,8 @@ export default function QuizSection({
   const [totalTimeTakenSec, setTotalTimeTakenSec] = useState(0);
   const [expandedExplanation, setExpandedExplanation] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [reviewFilter, setReviewFilter] = useState<'all' | 'correct' | 'incorrect'>('all');
+  const [isReportCopied, setIsReportCopied] = useState(false);
 
   // Fallback Generation or Gemini API
   const handleStartQuiz = async () => {
@@ -155,15 +386,20 @@ export default function QuizSection({
         {
           name: user.name || 'Student',
           school: user.schoolName || '',
-          className: `${user.className || 'Class 12'} - Topic: ${topicToUse}`,
-          country: 'India'
+          className: `${user.className || 'Class 12'}`,
+          country: 'India',
+          topic: topicToUse
         },
         language === 'hi' ? 'Hindi' : 'English',
-        difficulty
+        difficulty,
+        questionCount,
+        topicToUse
       );
 
       if (Array.isArray(generated) && generated.length > 0) {
-        setQuestions(generated);
+        // Defensive shuffle: guarantees random options and uniform A/B/C/D answer spread
+        const randomized = shuffleQuizQuestions(generated);
+        setQuestions(randomized);
         setCurrentIndex(0);
         setUserAnswers({});
         setIsOptionLocked(false);
@@ -203,47 +439,62 @@ export default function QuizSection({
     return () => clearInterval(timer);
   }, [viewState, isTimed, isOptionLocked, timeLeft]);
 
-  // Finish Quiz & Calculate Final Score
-  const handleFinishQuiz = useCallback(async () => {
-    const elapsedSeconds = Math.round((Date.now() - quizStartTime) / 1000);
+  // Finish Quiz & Calculate Final Score (Guaranteed Instant Screen Transition)
+  const handleFinishQuiz = useCallback((overrideAnswers?: Record<number, number>) => {
+    const finalAnswers = overrideAnswers || userAnswers;
+    const elapsedSeconds = Math.max(1, Math.round((Date.now() - (quizStartTime || Date.now())) / 1000));
     setTotalTimeTakenSec(elapsedSeconds);
 
     let correctCount = 0;
     questions.forEach((q, idx) => {
-      if (userAnswers[idx] === q.answer) {
+      if (finalAnswers[idx] === q.answer) {
         correctCount++;
       }
     });
 
-    // Calculate XP: 15 XP per correct answer + bonus for streaks + accuracy
-    const accuracy = Math.round((correctCount / questions.length) * 100);
+    const totalQuestions = Math.max(1, questions.length);
+    const accuracy = Math.round((correctCount / totalQuestions) * 100);
     let earnedXp = correctCount * 15;
     if (accuracy >= 80) earnedXp += 25;
     if (maxStreak >= 3) earnedXp += 20;
 
-    if (onAddXp) {
-      onAddXp(earnedXp);
+    // IMMEDIATE STATE TRANSITION TO GUARANTEE SCREEN SWITCH WITHOUT FREEZING
+    setViewState('results');
+    setIsOptionLocked(false);
+
+    // Audio & tactile celebration
+    try {
+      playSuccessChime();
+      triggerHaptic('success');
+    } catch {}
+
+    // Safe background awards & Firestore persistence (non-blocking)
+    try {
+      if (onAddXp) {
+        onAddXp(earnedXp);
+      }
+    } catch (e) {
+      console.warn('XP addition failed non-blockingly:', e);
     }
 
-    // Save Mock Exam
     if (onSaveMockExam) {
       const mockExamRecord: MockExam = {
         id: `exam_${Date.now()}`,
-        userId: user.uid,
+        userId: user?.uid || 'user_local_student',
         subject: selectedSubject,
         topic: customTopic || 'General Quiz',
         questionsJson: JSON.stringify(questions),
-        submittedAnswersJson: JSON.stringify(userAnswers),
+        submittedAnswersJson: JSON.stringify(finalAnswers),
         score: correctCount,
         completed: true,
         feedback: `Completed with ${accuracy}% accuracy (${correctCount}/${questions.length}) in ${elapsedSeconds}s.`,
         timestamp: new Date().toISOString()
       };
-      await onSaveMockExam(mockExamRecord);
+      Promise.resolve(onSaveMockExam(mockExamRecord)).catch((err) => {
+        console.warn('Non-blocking mock exam save error:', err);
+      });
     }
-
-    setViewState('results');
-  }, [quizStartTime, questions, userAnswers, maxStreak, onAddXp, onSaveMockExam, user.uid, selectedSubject, customTopic]);
+  }, [quizStartTime, questions, userAnswers, maxStreak, onAddXp, onSaveMockExam, user?.uid, selectedSubject, customTopic]);
 
   // Option Selection Handler
   const handleAnswerSelect = (optionIdx: number) => {
@@ -271,15 +522,15 @@ export default function QuizSection({
         setCurrentIndex((prev) => prev + 1);
         setTimeLeft(timePerQuestion);
       } else {
-        handleFinishQuiz();
+        handleFinishQuiz(updatedAnswers);
       }
     }
   };
 
   // Next Question Button
   const handleNextQuestion = () => {
-    setIsOptionLocked(false);
     if (currentIndex + 1 < questions.length) {
+      setIsOptionLocked(false);
       setCurrentIndex((prev) => prev + 1);
       setTimeLeft(timePerQuestion);
     } else {
@@ -502,9 +753,86 @@ export default function QuizSection({
                   type="text"
                   value={customTopic}
                   onChange={(e) => setCustomTopic(e.target.value)}
-                  placeholder="e.g. Organic Isomerism, Photosynthesis Light Reaction, Limits & Continuity..."
+                  placeholder="e.g. Organic Isomerism, Photosynthesis Light Reaction, Limits & Continuity, Mughal Empire..."
                   className="w-full px-4 py-3 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-600 font-medium text-slate-900 transition"
                 />
+              </div>
+            </div>
+
+            {/* 3. NUMBER OF QUESTIONS SELECTOR */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 space-y-4 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center space-x-1.5 mb-1">
+                    <Target className="w-4 h-4 text-indigo-600" />
+                    <span>3. Number of Questions ({questionCount} Selected)</span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Choose exam length. AI generates questions strictly on your topic with randomized option order.
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2 bg-indigo-50 border border-indigo-200/80 px-3 py-1.5 rounded-xl self-start sm:self-auto">
+                  <span className="text-xs font-extrabold text-indigo-900">{questionCount} Questions</span>
+                  <span className="text-[10px] text-indigo-600 font-semibold">• ~{Math.max(1, Math.round((questionCount * 30) / 60))} min</span>
+                </div>
+              </div>
+
+              {/* PRESET CHIPS (5, 10, 15, 20, 25) */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                {[
+                  { count: 5, label: '5 Questions', sub: 'Quick Blitz', tag: '⚡ 2.5 Min' },
+                  { count: 10, label: '10 Questions', sub: 'Standard Exam', tag: '🎯 5 Min' },
+                  { count: 15, label: '15 Questions', sub: 'Deep Practice', tag: '📚 7.5 Min' },
+                  { count: 20, label: '20 Questions', sub: 'Full Mock Test', tag: '🔥 10 Min' },
+                  { count: 25, label: '25 Questions', sub: 'Grand Mastery', tag: '🏆 12.5 Min' }
+                ].map((item) => {
+                  const isSelected = questionCount === item.count;
+                  return (
+                    <button
+                      key={item.count}
+                      type="button"
+                      onClick={() => setQuestionCount(item.count)}
+                      className={`p-3 rounded-xl border text-left transition flex flex-col justify-between cursor-pointer ${
+                        isSelected
+                          ? 'border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                          : 'border-slate-200 bg-slate-50/70 hover:bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs font-black ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                          {item.label}
+                        </span>
+                        {isSelected && <Check className="w-3.5 h-3.5 stroke-[3] text-white" />}
+                      </div>
+                      <div className="mt-1 flex items-center justify-between">
+                        <span className={`text-[10px] font-medium ${isSelected ? 'text-indigo-100' : 'text-slate-500'}`}>
+                          {item.sub}
+                        </span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-600'
+                        }`}>
+                          {item.tag}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* CUSTOM RANGE SLIDER */}
+              <div className="flex items-center gap-3 pt-1">
+                <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Custom Count:</span>
+                <input
+                  type="range"
+                  min="3"
+                  max="30"
+                  value={questionCount}
+                  onChange={(e) => setQuestionCount(Number(e.target.value))}
+                  className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                />
+                <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-200 min-w-[3.5rem] text-center">
+                  {questionCount} Qs
+                </span>
               </div>
             </div>
 
@@ -514,7 +842,7 @@ export default function QuizSection({
               <div className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-3 shadow-xs">
                 <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center space-x-1.5">
                   <Award className="w-4 h-4 text-amber-500" />
-                  <span>3. Difficulty Level</span>
+                  <span>4. Difficulty Level</span>
                 </h3>
                 <div className="grid grid-cols-3 gap-2">
                   {(['Easy', 'Medium', 'Hard'] as const).map((diff) => {
@@ -546,7 +874,7 @@ export default function QuizSection({
               <div className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-3 shadow-xs">
                 <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center space-x-1.5">
                   <Timer className="w-4 h-4 text-cyan-600" />
-                  <span>4. Quiz Mode</span>
+                  <span>5. Quiz Mode</span>
                 </h3>
                 <div className="flex gap-2">
                   <button
@@ -594,7 +922,7 @@ export default function QuizSection({
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
               <div className="flex items-center space-x-2 text-xs text-slate-500">
                 <Sparkles className="w-4 h-4 text-indigo-600" />
-                <span>Earn up to <strong>+75 XP</strong> with streak bonuses!</span>
+                <span>Earn up to <strong>+{questionCount * 15 + 45} XP</strong> with streak bonuses!</span>
               </div>
 
               <div className="flex items-center space-x-3 w-full sm:w-auto">
@@ -615,7 +943,7 @@ export default function QuizSection({
                   className="flex-1 sm:flex-initial px-8 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md transition flex items-center justify-center space-x-2 cursor-pointer"
                 >
                   <Play className="w-4 h-4 fill-white" />
-                  <span>Launch Practice Quiz</span>
+                  <span>Launch Practice Quiz ({questionCount} Qs)</span>
                   <ArrowRight className="w-4 h-4" />
                 </motion.button>
               </div>
@@ -650,7 +978,7 @@ export default function QuizSection({
                 Generating {selectedSubject} Quiz
               </h3>
               <p className="text-xs text-slate-500">
-                AI Tutor is formulating multiple choice questions for <strong>"{customTopic}"</strong> at {difficulty} difficulty...
+                AI Tutor is formulating {questionCount} multiple choice questions for <strong>"{customTopic}"</strong> at {difficulty} difficulty with randomized answer positions...
               </p>
             </div>
 
@@ -860,7 +1188,7 @@ export default function QuizSection({
                 </motion.div>
               )}
 
-              {/* FOOTER ACTION (NEXT QUESTION) */}
+              {/* FOOTER ACTION (NEXT QUESTION / FINISH) */}
               {isOptionLocked && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
@@ -868,13 +1196,22 @@ export default function QuizSection({
                   className="flex justify-end pt-2"
                 >
                   <button
-                    onClick={handleNextQuestion}
-                    className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md transition flex items-center space-x-2 cursor-pointer active:scale-95"
+                    type="button"
+                    onClick={() => {
+                      if (currentIndex + 1 < questions.length) {
+                        handleNextQuestion();
+                      } else {
+                        handleFinishQuiz();
+                      }
+                    }}
+                    className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-indigo-600/30 transition-all duration-200 flex items-center space-x-2.5 cursor-pointer active:scale-95 border border-indigo-400/40"
                   >
                     <span>
-                      {currentIndex + 1 < questions.length ? 'Next Question' : 'View Final Score'}
+                      {currentIndex + 1 < questions.length
+                        ? (language === 'hi' ? 'अगला प्रश्न' : 'Next Question')
+                        : (language === 'hi' ? 'अंतिम स्कोर देखें 🏆' : 'View Final Score 🏆')}
                     </span>
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-4 h-4 stroke-[2.5]" />
                   </button>
                 </motion.div>
               )}
@@ -883,183 +1220,484 @@ export default function QuizSection({
         )}
 
         {/* ========================================================================= */}
-        {/* VIEW 4: CELEBRATORY SCORECARD & ANALYTICS */}
+        {/* VIEW 4: WORLD-CLASS LUXURY CELEBRATORY SCORECARD & ANALYTICS */}
         {/* ========================================================================= */}
-        {viewState === 'results' && (
-          <motion.div
-            key="results"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="space-y-6"
-          >
-            {/* SCORE HERO CARD */}
-            <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 border border-indigo-900/40 shadow-xl text-center relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
+        {viewState === 'results' && (() => {
+          const isHindi = language === 'hi' || language === 'Hindi';
+          const totalQ = Math.max(1, questions.length);
+          const earnedXp = correctAnswersCount * 15 + (scorePercentage >= 80 ? 25 : 0) + (maxStreak >= 3 ? 20 : 0);
+          const avgPace = (totalTimeTakenSec / totalQ).toFixed(1);
+          const incorrectCount = Math.max(0, questions.length - correctAnswersCount);
 
-              <div className="relative z-10 max-w-lg mx-auto space-y-4">
-                {/* TROPHY & BADGE */}
-                <motion.div
-                  initial={{ scale: 0, rotate: -20 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ type: 'spring', damping: 12 }}
-                  className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 flex items-center justify-center text-3xl mx-auto shadow-lg shadow-amber-500/20"
+          const badgeInfo = (() => {
+            if (scorePercentage >= 90) {
+              return {
+                rank: 'S-TIER • MASTER SCHOLAR',
+                rankHi: 'एस-रैंक • विशेषज्ञ प्रवीणता 👑',
+                desc: 'Outstanding precision! You demonstrate deep mastery of core principles and problem-solving intuition.',
+                descHi: 'शानदार सटीकता! आपने इस विषय की बुनियादी और जटिल दोनों अवधारणाओं में असाधारण महारत सिद्ध की है।',
+                icon: '👑',
+                glow: 'rgba(245, 158, 11, 0.25)',
+                pill: 'bg-amber-500/20 text-amber-300 border-amber-400/40'
+              };
+            } else if (scorePercentage >= 75) {
+              return {
+                rank: 'A-TIER • HIGH PERFORMER',
+                rankHi: 'ए-रैंक • उत्कृष्ट प्रदर्शन 🚀',
+                desc: 'Excellent conceptual grasp! You solved the majority of challenges with solid reasoning and confidence.',
+                descHi: 'बेहतरीन समझ! आपने अधिकांश प्रश्नों को मजबूत तर्क और आत्मविश्वास के साथ हल किया।',
+                icon: '🚀',
+                glow: 'rgba(99, 102, 241, 0.25)',
+                pill: 'bg-indigo-500/20 text-indigo-300 border-indigo-400/40'
+              };
+            } else if (scorePercentage >= 50) {
+              return {
+                rank: 'B-TIER • SOLID PROFICIENCY',
+                rankHi: 'बी-रैंक • उत्तम समझ 🎯',
+                desc: 'Strong effort with promising intuition! Review the step-by-step notes below to master missed topics.',
+                descHi: 'सराहनीय प्रयास! छूटे हुए प्रश्नों के विश्लेषण को देखकर अपनी पकड़ को और अधिक मजबूत करें।',
+                icon: '🎯',
+                glow: 'rgba(16, 185, 129, 0.25)',
+                pill: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
+              };
+            } else {
+              return {
+                rank: 'GROWTH TIER • STEADY PROGRESS',
+                rankHi: 'ग्रोथ टियर • निरंतर प्रयास 🌱',
+                desc: 'Every challenge is an opportunity to learn. Study the concept notes below and retake for a higher score!',
+                descHi: 'हर गलती सीखने का सबसे बड़ा अवसर है। नीचे दिए गए नोट्स को पढ़ें और पुनः प्रयास करें!',
+                icon: '🌱',
+                glow: 'rgba(6, 182, 212, 0.25)',
+                pill: 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40'
+              };
+            }
+          })();
+
+          const filteredQuestions = questions.filter((q, idx) => {
+            const isCorrect = userAnswers[idx] === q.answer;
+            if (reviewFilter === 'correct') return isCorrect;
+            if (reviewFilter === 'incorrect') return !isCorrect;
+            return true;
+          });
+
+          const handleCopyReport = async () => {
+            const reportText = `🏆 ASCEND STUDY - MOCK EXAM RESULT
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+Subject: ${selectedSubject}
+Topic: ${customTopic}
+Score: ${correctAnswersCount}/${questions.length} (${scorePercentage}% Accuracy)
+Time Taken: ${totalTimeTakenSec}s (~${avgPace}s / question)
+Max Streak: ${maxStreak} 🔥
+XP Awarded: +${earnedXp} XP
+Completed on: ${new Date().toLocaleDateString()}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+Ascend Study Buddy • AI-Powered Education`;
+
+            try {
+              if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(reportText);
+                setIsReportCopied(true);
+                showToast(isHindi ? 'परीक्षा परिणाम क्लिपबोर्ड पर कॉपी किया गया! 📋' : 'Exam report copied to clipboard! 📋', 'success');
+                setTimeout(() => setIsReportCopied(false), 2500);
+              }
+            } catch {
+              showToast('Could not copy report', 'error');
+            }
+          };
+
+          return (
+            <motion.div
+              key="results"
+              initial={{ opacity: 0, scale: 0.96, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: -16 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="space-y-6 relative"
+            >
+              {/* 60FPS LUXURY CELEBRATION CONFETTI ENGINE */}
+              <LuxuryConfettiCanvas />
+
+              {/* 1. LUXURY SCORECARD HERO HEADER */}
+              <div 
+                className="bg-gradient-to-br from-[#070b16] via-[#0d162d] to-[#0a1024] text-white rounded-3xl p-6 sm:p-9 border border-indigo-500/30 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.85)] relative overflow-hidden"
+                style={{
+                  boxShadow: `0 24px 64px -12px ${badgeInfo.glow}`
+                }}
+              >
+                {/* Dynamic Ambient Laser Lighting */}
+                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-400 via-purple-400 to-emerald-400 opacity-90" />
+                <div className="absolute -top-24 -right-24 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
+
+                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 sm:gap-8">
+                  {/* Left Column: Radial Circular Gauge */}
+                  <div className="flex flex-col items-center shrink-0">
+                    <ScoreRadialRing percentage={scorePercentage} size={156} />
+                    <div className="mt-2.5 flex items-center space-x-1.5 text-xs font-bold text-slate-300">
+                      <span className="text-emerald-400 font-black">{correctAnswersCount} Correct</span>
+                      <span>•</span>
+                      <span className="text-rose-400 font-semibold">{incorrectCount} Missed</span>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Title, Rank & Narrative Assessment */}
+                  <div className="flex-1 text-center md:text-left space-y-3 max-w-xl">
+                    <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
+                      <span className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-black tracking-wider uppercase border shadow-sm ${badgeInfo.pill}`}>
+                        <span>{badgeInfo.icon}</span>
+                        <span>{isHindi ? badgeInfo.rankHi : badgeInfo.rank}</span>
+                      </span>
+
+                      <span className="px-2.5 py-1 rounded-full bg-white/10 text-slate-300 text-[10px] font-bold uppercase tracking-wider border border-white/10">
+                        {selectedSubject}
+                      </span>
+                    </div>
+
+                    <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
+                      {isHindi ? 'मॉक टेस्ट सफलतापूर्वक पूर्ण!' : 'Examination Completed!'}
+                    </h2>
+
+                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
+                      {isHindi ? (
+                        <>
+                          आपने <strong>{questions.length}</strong> में से <strong>{correctAnswersCount}</strong> प्रश्नों के सही उत्तर दिए हैं। {badgeInfo.descHi}
+                        </>
+                      ) : (
+                        <>
+                          You achieved <strong>{correctAnswersCount}</strong> out of <strong>{questions.length}</strong> correct answers ({scorePercentage}% accuracy). {badgeInfo.desc}
+                        </>
+                      )}
+                    </p>
+
+                    <div className="pt-1 flex items-center justify-center md:justify-start gap-2.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={handleCopyReport}
+                        className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 border border-white/15 text-slate-200 hover:text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer active:scale-95 shadow-sm"
+                      >
+                        {isReportCopied ? (
+                          <>
+                            <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="text-emerald-300">{isHindi ? 'कॉपी हो गया' : 'Report Copied!'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5 text-slate-300" />
+                            <span>{isHindi ? 'रिपोर्ट कॉपी करें' : 'Copy Score Report'}</span>
+                          </>
+                        )}
+                      </button>
+
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        {customTopic} • {difficulty}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. FOUR HIGH-IMPACT PERFORMANCE KPI BENTO CARDS */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                {/* CARD 1: OVERALL ACCURACY */}
+                <motion.div 
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex flex-col justify-between"
                 >
-                  🏆
+                  <div className="flex items-center justify-between text-slate-500 mb-2">
+                    <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400">
+                      {isHindi ? 'सटीकता' : 'Accuracy'}
+                    </span>
+                    <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                      <Target className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                      <AnimatedScoreCounter value={scorePercentage} suffix="%" />
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                      {correctAnswersCount} / {questions.length} {isHindi ? 'प्रश्न सही' : 'Solved Correctly'}
+                    </div>
+                  </div>
                 </motion.div>
 
-                <div>
-                  <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-white/10 text-amber-300 text-xs font-bold mb-2">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>
-                      {scorePercentage >= 90
-                        ? 'S-Rank Mastery 🌟'
-                        : scorePercentage >= 75
-                        ? 'A-Rank Scholar 🚀'
-                        : scorePercentage >= 50
-                        ? 'B-Rank Good Effort 🎯'
-                        : 'Growth Tier 🌱'}
+                {/* CARD 2: TOTAL XP REWARD */}
+                <motion.div 
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.15 }}
+                  className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between text-slate-500 mb-2">
+                    <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400">
+                      {isHindi ? 'अर्जित एक्सपी' : 'XP Awarded'}
                     </span>
-                  </div>
-                  <h2 className="text-2xl sm:text-3xl font-black text-white">
-                    Quiz Completed!
-                  </h2>
-                  <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                    You answered <strong>{correctAnswersCount}</strong> out of <strong>{questions.length}</strong> questions correctly ({scorePercentage}% accuracy).
-                  </p>
-                </div>
-
-                {/* STATS MATRIX */}
-                <div className="grid grid-cols-3 gap-2.5 pt-2">
-                  <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10">
-                    <div className="text-[10px] text-slate-400 uppercase font-semibold">XP Earned</div>
-                    <div className="text-base sm:text-lg font-black text-amber-400">
-                      +{correctAnswersCount * 15 + (scorePercentage >= 80 ? 25 : 0)} XP
+                    <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-500 flex items-center justify-center font-bold">
+                      <Sparkles className="w-4 h-4" />
                     </div>
                   </div>
-
-                  <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10">
-                    <div className="text-[10px] text-slate-400 uppercase font-semibold">Max Streak</div>
-                    <div className="text-base sm:text-lg font-black text-emerald-400">
-                      {maxStreak} 🔥
+                  <div>
+                    <div className="text-xl sm:text-2xl font-black text-amber-500 tracking-tight">
+                      <AnimatedScoreCounter value={earnedXp} prefix="+" suffix=" XP" />
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                      {scorePercentage >= 80 ? '+25 Accuracy Bonus' : 'Standard Round'}
                     </div>
                   </div>
+                </motion.div>
 
-                  <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10">
-                    <div className="text-[10px] text-slate-400 uppercase font-semibold">Time Taken</div>
-                    <div className="text-base sm:text-lg font-black text-cyan-400">
-                      {totalTimeTakenSec}s ⏱️
+                {/* CARD 3: TIME & PACE */}
+                <motion.div 
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between text-slate-500 mb-2">
+                    <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400">
+                      {isHindi ? 'समय व गति' : 'Time & Pace'}
+                    </span>
+                    <div className="w-7 h-7 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center font-bold">
+                      <Timer className="w-4 h-4" />
                     </div>
                   </div>
-                </div>
+                  <div>
+                    <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                      {totalTimeTakenSec}s
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                      ~{avgPace}s {isHindi ? 'प्रति प्रश्न औसत' : 'per question avg'}
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* CARD 4: STREAK MASTERY */}
+                <motion.div 
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.25 }}
+                  className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between text-slate-500 mb-2">
+                    <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400">
+                      {isHindi ? 'अधिकतम स्ट्रीक' : 'Max Streak'}
+                    </span>
+                    <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center font-bold">
+                      <Flame className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight flex items-center gap-1">
+                      <span>{maxStreak}</span>
+                      <span className="text-base">🔥</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                      {maxStreak >= 3 ? '+20 Streak Multiplier' : (isHindi ? 'एकाग्रता राउंड' : 'Focused Flow')}
+                    </div>
+                  </div>
+                </motion.div>
               </div>
-            </div>
 
-            {/* QUESTION BY QUESTION BREAKDOWN */}
-            <div className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 space-y-4 shadow-xs">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center space-x-1.5">
-                  <BookMarked className="w-4 h-4 text-indigo-600" />
-                  <span>Question-by-Question Review</span>
-                </h3>
-                <span className="text-xs text-slate-500 font-semibold">
-                  {correctAnswersCount}/{questions.length} Correct
-                </span>
-              </div>
+              {/* 3. QUESTION-BY-QUESTION REVIEW WITH FILTER TABS */}
+              <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 space-y-5 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wider text-slate-900 flex items-center space-x-2">
+                      <BookMarked className="w-4 h-4 text-indigo-600" />
+                      <span>{isHindi ? 'प्रश्नोत्तर विस्तृत समीक्षा' : 'Question-by-Question Review'}</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                      {isHindi 
+                        ? 'सटीक उत्तर और स्पष्टीकरण देखकर अपनी समझ मजबूत करें' 
+                        : 'Review step-by-step logic and concept explanations for every question'}
+                    </p>
+                  </div>
 
-              <div className="space-y-3">
-                {questions.map((q, idx) => {
-                  const userAnsIdx = userAnswers[idx];
-                  const isCorrect = userAnsIdx === q.answer;
-                  const isExpanded = expandedExplanation === idx;
-
-                  return (
-                    <div
-                      key={idx}
-                      className={`p-4 rounded-2xl border transition ${
-                        isCorrect
-                          ? 'border-emerald-200 bg-emerald-50/30'
-                          : 'border-rose-200 bg-rose-50/30'
+                  {/* Filter Segmented Buttons */}
+                  <div className="flex items-center bg-slate-100 p-1 rounded-xl self-start sm:self-center border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setReviewFilter('all')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        reviewFilter === 'all'
+                          ? 'bg-white text-indigo-700 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start space-x-3">
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
-                            isCorrect ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
-                          }`}>
-                            {idx + 1}
-                          </div>
-                          <div>
-                            <h4 className="text-xs sm:text-sm font-bold text-slate-900">
-                              {q.question}
-                            </h4>
-                            <div className="mt-1.5 space-y-0.5 text-xs">
-                              <div className="text-slate-600">
-                                <strong>Your Answer:</strong>{' '}
-                                <span className={isCorrect ? 'text-emerald-700 font-bold' : 'text-rose-700 font-bold'}>
-                                  {userAnsIdx !== undefined && userAnsIdx >= 0 ? q.options[userAnsIdx] : 'Timed Out / Missed'}
-                                </span>
-                              </div>
-                              {!isCorrect && (
-                                <div className="text-slate-600">
-                                  <strong>Correct Answer:</strong>{' '}
-                                  <span className="text-emerald-700 font-bold">{q.options[q.answer]}</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+                      {isHindi ? 'सभी' : 'All'} ({questions.length})
+                    </button>
 
-                        {q.explanation && (
-                          <button
-                            onClick={() => setExpandedExplanation(isExpanded ? null : idx)}
-                            className="text-indigo-600 hover:text-indigo-800 text-xs font-bold flex items-center space-x-1 shrink-0 cursor-pointer"
-                          >
-                            <span>{isExpanded ? 'Hide Note' : 'Explain'}</span>
-                            {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                          </button>
-                        )}
-                      </div>
+                    <button
+                      type="button"
+                      onClick={() => setReviewFilter('correct')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        reviewFilter === 'correct'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      {isHindi ? 'सही' : 'Correct'} ({correctAnswersCount})
+                    </button>
 
-                      {/* EXPANDED EXPLANATION */}
-                      {isExpanded && q.explanation && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          className="mt-3 pt-3 border-t border-slate-200/60 text-xs text-slate-700 leading-relaxed bg-white/60 p-3 rounded-xl"
-                        >
-                          <strong>Concept Note:</strong> {q.explanation}
-                        </motion.div>
-                      )}
+                    <button
+                      type="button"
+                      onClick={() => setReviewFilter('incorrect')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        reviewFilter === 'incorrect'
+                          ? 'bg-rose-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      {isHindi ? 'समीक्षा' : 'Review'} ({incorrectCount})
+                    </button>
+                  </div>
+                </div>
+
+                {/* Question List */}
+                <div className="space-y-3.5">
+                  {filteredQuestions.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400 text-xs font-medium">
+                      {isHindi ? 'इस फ़िल्टर में कोई प्रश्न नहीं मिला।' : 'No questions match the selected filter.'}
                     </div>
-                  );
-                })}
+                  ) : (
+                    filteredQuestions.map((q) => {
+                      const originalIdx = questions.indexOf(q);
+                      const userAnsIdx = userAnswers[originalIdx];
+                      const isCorrect = userAnsIdx === q.answer;
+                      const isExpanded = expandedExplanation === originalIdx || !isCorrect;
+
+                      return (
+                        <div
+                          key={originalIdx}
+                          className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 ${
+                            isCorrect
+                              ? 'border-emerald-200/90 bg-emerald-50/25 hover:bg-emerald-50/40'
+                              : 'border-rose-200/90 bg-rose-50/25 hover:bg-rose-50/40'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start space-x-3.5 flex-1 min-w-0">
+                              <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black shrink-0 mt-0.5 shadow-xs ${
+                                isCorrect 
+                                  ? 'bg-emerald-600 text-white' 
+                                  : 'bg-rose-600 text-white'
+                              }`}>
+                                {isCorrect ? '✓' : '✗'}
+                              </div>
+
+                              <div className="space-y-2 flex-1 min-w-0">
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                    Q{originalIdx + 1}
+                                  </span>
+                                  <span className={`text-[10px] font-bold px-2 py-0.2 rounded-full uppercase ${
+                                    isCorrect 
+                                      ? 'bg-emerald-100 text-emerald-800' 
+                                      : 'bg-rose-100 text-rose-800'
+                                  }`}>
+                                    {isCorrect ? (isHindi ? 'सही उत्तर' : 'Correct') : (isHindi ? 'सुधार आवश्यक' : 'Incorrect')}
+                                  </span>
+                                </div>
+
+                                <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
+                                  {q.question}
+                                </h4>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
+                                  {/* Student's Answer */}
+                                  <div className={`p-2.5 rounded-xl border ${
+                                    isCorrect 
+                                      ? 'bg-emerald-100/50 border-emerald-300/80 text-emerald-950' 
+                                      : 'bg-rose-100/50 border-rose-300/80 text-rose-950'
+                                  }`}>
+                                    <span className="text-[10px] font-black uppercase block tracking-wider opacity-75">
+                                      {isHindi ? 'आपका उत्तर:' : 'Your Answer:'}
+                                    </span>
+                                    <span className="font-bold text-xs mt-0.5 block">
+                                      {userAnsIdx !== undefined && userAnsIdx >= 0 
+                                        ? `${String.fromCharCode(65 + userAnsIdx)}. ${q.options[userAnsIdx]}` 
+                                        : (isHindi ? 'समय समाप्त / अनुत्तरित' : 'Timed Out / Unanswered')}
+                                    </span>
+                                  </div>
+
+                                  {/* Correct Answer (Shown if student was incorrect) */}
+                                  {!isCorrect && (
+                                    <div className="p-2.5 rounded-xl bg-emerald-100/50 border border-emerald-300/80 text-emerald-950">
+                                      <span className="text-[10px] font-black uppercase block tracking-wider text-emerald-800 opacity-75">
+                                        {isHindi ? 'सही उत्तर:' : 'Correct Solution:'}
+                                      </span>
+                                      <span className="font-bold text-xs mt-0.5 block text-emerald-900">
+                                        {String.fromCharCode(65 + q.answer)}. {q.options[q.answer]}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {q.explanation && (
+                              <button
+                                type="button"
+                                onClick={() => setExpandedExplanation(expandedExplanation === originalIdx ? null : originalIdx)}
+                                className="text-indigo-600 hover:text-indigo-800 text-xs font-bold flex items-center space-x-1 shrink-0 p-1 rounded-lg hover:bg-indigo-50 transition cursor-pointer"
+                                title="Toggle explanation"
+                              >
+                                <span className="hidden sm:inline">{isExpanded ? (isHindi ? 'छिपाएं' : 'Hide') : (isHindi ? 'विस्तार' : 'Explain')}</span>
+                                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Concept Explanation Accordion */}
+                          {isExpanded && q.explanation && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              className="mt-3.5 pt-3.5 border-t border-slate-200/70 text-xs text-slate-800 leading-relaxed bg-white/80 p-3.5 rounded-xl space-y-1 shadow-2xs"
+                            >
+                              <div className="flex items-center space-x-1.5 font-bold text-indigo-900">
+                                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>{isHindi ? 'अवधारणा और कारण:' : 'Concept Rationale:'}</span>
+                              </div>
+                              <p className="text-slate-700 pl-5">
+                                {q.explanation}
+                              </p>
+                            </motion.div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* FOOTER ACTIONS */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-              <button
-                onClick={() => setViewState('setup')}
-                className="w-full sm:w-auto px-6 py-3 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs transition cursor-pointer flex items-center justify-center space-x-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Return to Setup</span>
-              </button>
-
-              <div className="flex items-center space-x-3 w-full sm:w-auto">
+              {/* 4. FOOTER ACTION CONTROLS */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
                 <button
-                  onClick={handleStartQuiz}
-                  className="flex-1 sm:flex-initial px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-md transition flex items-center justify-center space-x-2 cursor-pointer active:scale-95"
+                  type="button"
+                  onClick={() => setViewState('setup')}
+                  className="w-full sm:w-auto px-6 py-3.5 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition cursor-pointer flex items-center justify-center space-x-2 shadow-xs active:scale-95"
                 >
-                  <RotateCcw className="w-4 h-4" />
-                  <span>Retake Topic</span>
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>{isHindi ? 'मुख्य सेटअप पर लौटें' : 'Return to Setup'}</span>
                 </button>
+
+                <div className="flex items-center space-x-3 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={handleStartQuiz}
+                    className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-xs shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-95 border border-indigo-400/30"
+                  >
+                    <RotateCcw className="w-4 h-4 stroke-[2.5]" />
+                    <span>{isHindi ? 'इस विषय का पुनः टेस्ट लें' : 'Retake This Topic'}</span>
+                  </button>
+                </div>
               </div>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          );
+        })()}
 
         {/* ========================================================================= */}
         {/* VIEW 5: PAST QUIZ HISTORY / RESULTS */}

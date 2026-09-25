@@ -225,7 +225,27 @@ const NeonBorder: React.FC<{
 };
 
 export default function App() {
-  const [appLanguage, setAppLanguage] = useState<Language>('en');
+  const [appLanguage, setAppLanguage] = useState<Language>(() => {
+    try {
+      const saved = localStorage.getItem('ascend_app_language') || localStorage.getItem('studybuddy_app_language');
+      if (saved && ['en', 'hi', 'hinglish', 'marathi', 'tamil', 'bengali'].includes(saved)) {
+        return saved as Language;
+      }
+    } catch (e) {}
+    return 'en';
+  });
+
+  const handleLanguageChange = (newLang: Language) => {
+    setAppLanguage(newLang);
+    try {
+      localStorage.setItem('ascend_app_language', newLang);
+      localStorage.setItem('studybuddy_app_language', newLang);
+    } catch {}
+    if (userProfile?.uid) {
+      updateUserProfile(userProfile.uid, { language: newLang });
+    }
+  };
+
   const [activeTab, setActiveTab] = useState<'home' | 'toolkit' | 'groupChat' | 'whiteboard' | 'mockExam' | 'studyDocs' | 'petCompanion' | 'aiTutor' | 'quiz' | 'notebook' | 'planner' | 'imageGen' | 'pdfScanner' | 'googleWorkspace'>('home');
   const [attachedWorkspaceFiles, setAttachedWorkspaceFiles] = useState<Array<{ id: string; name: string; content: string; type: "drive" | "classroom" | "sheets" }>>([]);
   const [initialTool, setInitialTool] = useState<string | undefined>(undefined);
@@ -312,14 +332,23 @@ export default function App() {
     };
   }, [activeTab, isBottomNavVisible, isBottomNavInteracting, showMoreMenu]);
 
-  // UI Self-Customization State (User editable UI, Lighting, AI Tutor box, Theme)
+  // UI Self-Customization State (User editable UI, Lighting, AI Tutor box, Theme, Background Color)
   const [uiCustomization, setUiCustomization] = useState<UiCustomization>(() => {
     try {
       const saved = localStorage.getItem('ascend_ui_customization');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
-          return { ...DEFAULT_UI_CUSTOMIZATION, ...parsed };
+          const merged = { ...DEFAULT_UI_CUSTOMIZATION, ...parsed };
+          // If previous session had old default science_chalkboard without explicit background color, migrate to pure_black (#000000)
+          if (parsed.wallpaperAmbiance === 'science_chalkboard' && !parsed.backgroundColor) {
+            merged.wallpaperAmbiance = 'pure_black';
+            merged.backgroundColor = '#000000';
+          }
+          if (!merged.backgroundColor) {
+            merged.backgroundColor = '#000000';
+          }
+          return merged;
         }
       }
     } catch (e) {
@@ -581,7 +610,9 @@ export default function App() {
             isOnboarded: onboardedState
           };
         });
-        if (profile.language) setAppLanguage(profile.language);
+        if (profile.language && !localStorage.getItem('ascend_app_language')) {
+          setAppLanguage(profile.language);
+        }
       }
     });
     return () => unsubscribe();
@@ -1201,19 +1232,32 @@ export default function App() {
   };
 
   const cornerRadius = getCardRadiusClasses();
+  const currentBgColor = uiCustomization.backgroundColor || '#000000';
+  const isPureBlack = uiCustomization.wallpaperAmbiance === 'pure_black';
 
   return (
-    <div id="main-app-container" className={`min-h-screen text-slate-100 ${getAppFontClass()} flex flex-col selection:bg-emerald-500 selection:text-white w-full max-w-full overflow-x-hidden relative bg-[#060913]`}>
+    <div 
+      id="main-app-container" 
+      className={`min-h-screen text-slate-100 ${getAppFontClass()} flex flex-col selection:bg-emerald-500 selection:text-white w-full max-w-full overflow-x-hidden relative transition-colors duration-300`}
+      style={{ backgroundColor: currentBgColor }}
+    >
       {/* DYNAMIC LIVE CUSTOM CSS INJECTED BY AI COPILOT */}
       <style id="ai-editor-live-styles">{uiCustomization.customCss || ''}</style>
       
-      {/* FULL-PAGE LIVE WALLPAPER AMBIANCE (4 MODES) WITH 15-20% REFINED VISIBILITY */}
-      {uiCustomization.wallpaperAmbiance === 'cosmic_nebula' ? (
+      {/* FULL-PAGE LIVE WALLPAPER AMBIANCE WITH DYNAMIC USER BACKGROUND */}
+      {isPureBlack ? (
+        /* Pure clean solid color (AMOLED Pitch Black or custom color) - zero scholars, zero distractions */
+        <div 
+          id="app-wallpaper-layer"
+          className="fixed inset-0 pointer-events-none z-0 transition-colors duration-300"
+          style={{ backgroundColor: currentBgColor }}
+        />
+      ) : uiCustomization.wallpaperAmbiance === 'cosmic_nebula' ? (
         <div 
           id="app-wallpaper-layer"
           className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-[0.22] transition-all duration-500"
           style={{ 
-            background: 'radial-gradient(ellipse at 50% 0%, #1e1b4b 0%, #030712 60%, #000000 100%)' 
+            background: 'radial-gradient(ellipse at 50% 0%, #1e1b4b 0%, #030712 60%, transparent 100%)' 
           }}
         >
           <div className="absolute inset-0 bg-[radial-gradient(#818cf8_1px,transparent_1px)] [background-size:24px_24px] opacity-40" />
@@ -1223,26 +1267,39 @@ export default function App() {
           id="app-wallpaper-layer"
           className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-[0.20] transition-all duration-500"
           style={{ 
-            background: 'radial-gradient(ellipse at top, #022c22 0%, #020617 80%)' 
+            background: 'radial-gradient(ellipse at top, #022c22 0%, transparent 80%)' 
           }}
         >
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#00ffcc0a_1px,transparent_1px),linear-gradient(to_bottom,#00ffcc0a_1px,transparent_1px)] [background-size:28px_28px] opacity-70" />
         </div>
       ) : uiCustomization.wallpaperAmbiance === 'deep_obsidian' ? (
-        <div id="app-wallpaper-layer" className="fixed inset-0 pointer-events-none z-0 bg-[#060913] transition-all duration-500" />
-      ) : (
-        /* science_chalkboard (default) - Refined to ~18% visibility so foreground cards stand out sharply */
+        <div id="app-wallpaper-layer" className="fixed inset-0 pointer-events-none z-0 transition-all duration-500" style={{ backgroundColor: currentBgColor }} />
+      ) : uiCustomization.wallpaperAmbiance === 'science_chalkboard' ? (
+        /* Only shown if user explicitly selected Science Lab in customization */
         <div 
           id="app-wallpaper-layer"
           className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-[0.18] transition-all duration-500"
           style={{ backgroundImage: `url('/science_bg.jpg')` }}
         />
+      ) : (
+        /* Other live wallpaper themes (solar_system, earth_forest, deep_ocean, retro_arcade, celestial_zen) - inherit user's customBgColor */
+        <div 
+          id="app-wallpaper-layer" 
+          className="fixed inset-0 pointer-events-none z-0 transition-colors duration-300"
+          style={{ backgroundColor: currentBgColor }} 
+        />
       )}
-      {/* AMBIENT CHALKBOARD VIGNETTE OVERLAY - REFINED DARK GLASSMORPHIC OVERLAY */}
-      <div id="app-vignette-layer" className="fixed inset-0 pointer-events-none z-0 bg-gradient-to-b from-[#060913]/90 via-[#070b16]/75 to-[#05070e]/95 backdrop-blur-[2px] transition-all duration-500" />
 
-      {/* 100+ REALTIME MOVING LIVING OBJECTS & HUMAN CHARACTERS (SATELLITES, ROCKETS, WAVING ASTRONAUTS, CYBORGS, ATOMS) */}
-      {is3DBackgroundReady && (
+      {/* AMBIENT VIGNETTE OVERLAY - ONLY SHOWN WHEN LIVE WALLPAPERS ARE ACTIVE */}
+      {!isPureBlack && (
+        <div 
+          id="app-vignette-layer" 
+          className="fixed inset-0 pointer-events-none z-0 bg-gradient-to-b from-black/75 via-transparent to-black/85 backdrop-blur-[1px] transition-all duration-500" 
+        />
+      )}
+
+      {/* 100+ REALTIME MOVING LIVING OBJECTS & HUMAN CHARACTERS - ONLY WHEN A LIVE WALLPAPER IS ACTIVE (NEVER ON PURE BLACK) */}
+      {is3DBackgroundReady && !isPureBlack && (
         <React.Suspense fallback={null}>
           <RealtimeMovingUniverse theme={uiCustomization.wallpaperAmbiance} interactive={true} />
         </React.Suspense>
@@ -1359,8 +1416,22 @@ export default function App() {
 
                   {/* Top-Right: Integrated Controls (Theme Toggle & Settings Side-by-Side) alongside Avatar */}
                   <div className="shrink-0 flex items-center space-x-2.5 ml-2">
-                    {/* Horizontal Controls Row: Theme Toggle & Settings Side-by-Side */}
+                    {/* Horizontal Controls Row: Language Switcher, Theme Toggle & Settings */}
                     <div className="flex items-center space-x-1.5">
+                      {/* Global Language Switcher */}
+                      <div className="flex items-center px-2 py-1 rounded-xl bg-slate-900/90 border border-slate-700/60 shadow-xs" title="App Language">
+                        <Globe className="w-3 h-3 text-indigo-400 mr-1 shrink-0" />
+                        <select
+                          value={appLanguage}
+                          onChange={(e) => handleLanguageChange(e.target.value as Language)}
+                          className="bg-transparent text-slate-200 font-bold text-[10px] focus:outline-none cursor-pointer"
+                        >
+                          <option value="en" className="bg-slate-900 text-white">EN</option>
+                          <option value="hi" className="bg-slate-900 text-white">हिंदी</option>
+                          <option value="hinglish" className="bg-slate-900 text-white">Hinglish</option>
+                        </select>
+                      </div>
+
                       {/* Global Dark Mode Switch */}
                       <div className="flex items-center px-1.5 py-1 rounded-xl bg-slate-900/90 border border-slate-700/60 shadow-xs" title="Late-Night Dark Mode">
                         <ThemeToggle variant="compact-switch" />
@@ -3498,11 +3569,7 @@ export default function App() {
                     <Globe className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                     <select
                       value={appLanguage}
-                      onChange={(e) => {
-                        const selected = e.target.value as Language;
-                        setAppLanguage(selected);
-                        updateUserProfile(userProfile.uid, { language: selected });
-                      }}
+                      onChange={(e) => handleLanguageChange(e.target.value as Language)}
                       className="bg-transparent text-slate-200 font-bold text-[11px] focus:outline-none cursor-pointer w-full"
                     >
                       <option value="en" className="bg-slate-900 text-white">English</option>

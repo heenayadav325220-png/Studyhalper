@@ -97,6 +97,11 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
   const mountRef = useRef<HTMLDivElement>(null);
   const [webGlSupported, setWebGlSupported] = React.useState(true);
 
+  // When pure_black is selected, completely skip WebGL initialization for zero distraction and 0% CPU/GPU overhead
+  if (theme === 'pure_black') {
+    return null;
+  }
+
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
@@ -120,6 +125,7 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
 
       // Thematic background fog
       const fogColors: Record<WallpaperAmbiance, number> = {
+        pure_black: 0x000000,
         solar_system: 0x020617,
         cosmic_nebula: 0x07051a,
         earth_forest: 0x021d13,

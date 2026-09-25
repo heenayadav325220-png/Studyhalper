@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
-import { FALLBACK_QUIZZES, getFallbackAnswer } from "./fallbackData";
+import { getFallbackAnswer } from "./fallbackData";
+import { checkCreatorQuestion, generateSubjectMockQuestions } from "./curriculumEngine";
 
 export let isAiQuotaExceeded = false;
 export let lastAiErrorMessage: string | null = null;
@@ -408,6 +409,13 @@ export async function getStudyAnswer(
   history?: { role: 'user' | 'model', text: string }[]
 ): Promise<string> {
   const cleanPrompt = typeof prompt === 'string' ? prompt : String(prompt || '');
+
+  // Intercept creator identity questions
+  const creatorResponse = checkCreatorQuestion(cleanPrompt, language);
+  if (creatorResponse) {
+    return creatorResponse;
+  }
+
   const cleanHistory = Array.isArray(history) 
     ? history.map(h => ({ role: h.role === 'user' ? ('user' as const) : ('model' as const), text: typeof h.text === 'string' ? h.text : String(h.text || '') }))
     : undefined;
@@ -1092,18 +1100,52 @@ export async function generateStudyDiagram(prompt: string, type?: "svg" | "image
   return null;
 }
 
+/**
+ * Fisher-Yates Option Shuffler for Quiz Questions
+ * Mathematically guarantees that correct answers are evenly and randomly
+ * distributed across options A, B, C, and D (indices 0, 1, 2, 3), eliminating any 'C' pattern.
+ */
+export function shuffleQuizQuestions(questions: any[]): any[] {
+  if (!Array.isArray(questions)) return [];
+
+  return questions.map((q) => {
+    const rawOptions = Array.isArray(q.options) && q.options.length === 4
+      ? [...q.options]
+      : ["Option A", "Option B", "Option C", "Option D"];
+
+    const origIdx = typeof q.answer === 'number' 
+      ? q.answer 
+      : (typeof q.correctOptionIndex === 'number' ? q.correctOptionIndex : 0);
+    const safeIdx = Math.max(0, Math.min(rawOptions.length - 1, origIdx));
+    const correctText = rawOptions[safeIdx];
+
+    // Modern Fisher-Yates random shuffle
+    for (let i = rawOptions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [rawOptions[i], rawOptions[j]] = [rawOptions[j], rawOptions[i]];
+    }
+
+    const newAnswerIdx = rawOptions.indexOf(correctText);
+
+    return {
+      question: q.question || q.questionText || "Question",
+      options: rawOptions,
+      answer: newAnswerIdx >= 0 ? newAnswerIdx : Math.floor(Math.random() * 4),
+      explanation: q.explanation || "Correct concept derivation."
+    };
+  });
+}
+
 export async function generateQuiz(
   subject: string, 
-  studentContext?: { name: string; school: string; className: string; country?: string }, 
+  studentContext?: { name: string; school: string; className: string; country?: string; topic?: string }, 
   language: string = "English",
-  difficulty: string = "Medium"
+  difficulty: string = "Medium",
+  questionCount: number = 10,
+  topic?: string
 ): Promise<any[]> {
-  const country = studentContext?.country || "Global";
-  const quizCacheKey = `${language}_${difficulty}`;
-  const cachedQuiz = getLocalCache("quiz", country, subject, quizCacheKey);
-  if (cachedQuiz && Array.isArray(cachedQuiz) && cachedQuiz.length > 0) {
-    return cachedQuiz;
-  }
+  const chosenTopic = (topic || studentContext?.topic || "Core Concepts").trim();
+  const numQuestions = Math.max(3, Math.min(Number(questionCount) || 10, 30));
 
   // 1. Try secure backend server route (Primary route)
   try {
@@ -1112,14 +1154,20 @@ export async function generateQuiz(
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ subject, studentContext, language, difficulty }),
+      body: JSON.stringify({ 
+        subject, 
+        topic: chosenTopic,
+        questionCount: numQuestions,
+        studentContext, 
+        language, 
+        difficulty 
+      }),
     });
 
     if (response.ok) {
       const data = await response.json();
       if (Array.isArray(data) && data.length > 0) {
-        setLocalCache("quiz", country, subject, quizCacheKey, data);
-        return data;
+        return shuffleQuizQuestions(data);
       }
     }
   } catch (error) {
@@ -1181,10 +1229,12 @@ export async function generateQuiz(
       difficultyInstruct = "The difficulty of the quiz MUST be MEDIUM. Provide a balanced mix of conceptual recall, analytical questions, and practical applications suitable for typical classroom standards.";
     }
 
-    const instructionText = `Generate a 5-question multiple choice quiz ${classText} ${syllabusInstruct} for ${subject} ${langPromptText}. ${difficultyInstruct} Return only valid JSON in the format: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}]`;
+    const instructionText = `Generate a ${numQuestions}-question multiple choice quiz on the topic "${chosenTopic}" in ${subject} ${classText} ${syllabusInstruct} ${langPromptText}. ${difficultyInstruct}
+CRITICAL: Distribute the correct answer (0, 1, 2, 3) randomly. Never make all questions option C.
+Return only valid JSON in the format: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0, "explanation": "..."}]`;
 
     const response = await callClientGeminiWithRetry(ai, {
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: instructionText,
       config: {
         responseMimeType: "application/json",
@@ -1194,19 +1244,24 @@ export async function generateQuiz(
     try {
       const parsed = cleanAndParseJson(response.text || "[]", [] as any[]);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        setLocalCache("quiz", country, subject, quizCacheKey, parsed);
-        return parsed;
+        return shuffleQuizQuestions(parsed);
       }
     } catch (e) {
       console.warn("Client quiz JSON parsing failed.", e);
     }
   } catch (clientError) {
-    console.warn("Client-side Gemini quiz generation failed. Serving local fallback quiz database.", clientError);
+    console.warn("Client-side Gemini quiz generation failed. Serving curriculum mock exam questions.", clientError);
   }
 
-  // Final guaranteed fallback
-  const langKey = (language === "Hindi" ? "Hindi" : "English") as "Hindi" | "English";
-  return FALLBACK_QUIZZES[subject]?.[langKey] || FALLBACK_QUIZZES[subject]?.["English"] || [];
+  // 3. Final guaranteed fallback with dynamic question count and random option shuffle
+  const fallbackQuestions = generateSubjectMockQuestions(
+    subject,
+    chosenTopic,
+    language === "Hindi" ? "hi" : "en",
+    numQuestions
+  );
+
+  return shuffleQuizQuestions(fallbackQuestions);
 }
 
 // Client-side flashcard cache

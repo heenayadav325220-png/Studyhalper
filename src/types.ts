@@ -163,6 +163,7 @@ export type DashboardLayoutPreset = 'tutor_first' | 'toolkit_hero' | 'quiz_first
 export type CardBorderRadius = 'curved' | 'pill' | 'sharp' | 'hexagon';
 export type NeonIntensity = 'high' | 'medium' | 'soft' | 'off';
 export type WallpaperAmbiance = 
+  | 'pure_black'
   | 'science_chalkboard' 
   | 'cosmic_nebula' 
   | 'cyber_matrix' 
@@ -185,6 +186,7 @@ export interface UiCustomization {
   neonIntensity: NeonIntensity;
   cardBorderRadius: CardBorderRadius;
   wallpaperAmbiance: WallpaperAmbiance;
+  backgroundColor?: string; // App custom background color (default: #000000)
   audioFeedback: AudioFeedback;
   leaderboardTheme?: LeaderboardTheme;
   accentColor?: string;

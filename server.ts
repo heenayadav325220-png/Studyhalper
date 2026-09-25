@@ -6,7 +6,7 @@ import { requireAuth, AuthRequest } from "./src/middleware/auth.ts";
 import { getOrCreateUser, getUserProfile, updateUserStats } from "./src/db/users.ts";
 import { getUserNotes, createNote, deleteNote, logStudySession, logMockExam } from "./src/db/notes.ts";
 import { securityHeaders, rateLimitAi, rateLimitGeneral, sanitizeInputs } from "./src/middleware/security.ts";
-import { generateCurriculumStudyAnswer, generateSubjectMockQuestions } from "./src/services/curriculumEngine.ts";
+import { generateCurriculumStudyAnswer, generateSubjectMockQuestions, checkCreatorQuestion } from "./src/services/curriculumEngine.ts";
 
 const PORT = 3000;
 
@@ -239,6 +239,13 @@ app.get("/api/health", (_req, res) => {
         return;
       }
 
+      // Check and intercept creator-related questions
+      const creatorResponse = checkCreatorQuestion(prompt, language);
+      if (creatorResponse) {
+        res.json({ text: creatorResponse });
+        return;
+      }
+
       // Check cache for text-only queries with low history depth
       const hasImages = (imageBase64 || (imagesBase64 && imagesBase64.length > 0));
       const hasHistory = Array.isArray(history) && history.length > 0;
@@ -377,24 +384,134 @@ Encourage through constructive, precise feedback rather than empty praise. Avoid
     }
   });
 
+  // API Route: AI-Powered Adaptive Quiz / Mock Exam
+  app.post("/api/gemini/quiz", rateLimitAi, async (req, res) => {
+    try {
+      const { subject, topic, studentContext, language, difficulty, questionCount } = req.body || {};
+      const numQuestions = Math.max(3, Math.min(Number(questionCount) || 10, 30));
+      const chosenTopic = (topic || studentContext?.topic || studentContext?.className?.split('Topic:')?.[1] || subject || "Core Concepts").trim();
+      
+      let langName = 'English';
+      let langCode = 'en';
+      const normLang = String(language || '').toLowerCase().trim();
+      if (normLang === 'hi' || normLang === 'hindi') {
+        langName = 'pure, standard Hindi (हिंदी in Devanagari script)';
+        langCode = 'hi';
+      } else if (normLang === 'hinglish') {
+        langName = 'friendly Hinglish (a casual conversational blend of Hindi and English written in the English/Latin alphabet, e.g. "Is reaction ka main catalyst kaun sa hai?")';
+        langCode = 'hinglish';
+      } else if (normLang === 'marathi') {
+        langName = 'Marathi (मराठी)';
+        langCode = 'marathi';
+      } else if (normLang === 'tamil') {
+        langName = 'Tamil (தமிழ்)';
+        langCode = 'tamil';
+      } else if (normLang === 'bengali') {
+        langName = 'Bengali (বাংলা)';
+        langCode = 'bengali';
+      }
+
+      const cleanSubject = subject || 'General';
+
+      const prompt = `You are the ASCEND QUIZ MASTER & ACADEMIC EXAM ENGINE.
+Generate a high-quality, authentic academic mock exam with EXACTLY ${numQuestions} multiple choice questions (MCQs) for the subject "${cleanSubject}" on the topic: "${chosenTopic}".
+
+CRITICAL REQUIREMENTS:
+1. Topic Fidelity: Every single question MUST strictly test genuine concepts, formulas, applications, or principles of "${chosenTopic}" within "${cleanSubject}".
+2. Language: The entire exam (questions, 4 options, explanations) MUST be strictly in ${langName}. If English is requested, do NOT use Hindi. If Hindi is requested, write in clean Devanagari. If Hinglish is requested, write in Latin alphabet mix.
+3. Difficulty: ${difficulty || 'Medium'}.
+4. RANDOMIZED ANSWER PLACEMENT (NO FIXED 'C' PATTERN):
+   - You MUST distribute correct answers completely randomly across all 4 positions (A, B, C, D / indices 0, 1, 2, 3).
+   - NEVER place the answer on 'C' for all or most questions. Ensure an approximately equal and unpredictable distribution of 0, 1, 2, and 3.
+
+OUTPUT FORMAT: Return STRICTLY a valid JSON array of objects. Do NOT wrap in \`\`\`json markdown blocks. Return only raw JSON.
+Each object in the array must strictly have these keys:
+- "question": string (the question text)
+- "options": array of exactly 4 strings (A, B, C, D)
+- "answer": integer index (0 for A, 1 for B, 2 for C, 3 for D)
+- "explanation": string (clear conceptual reason why this option is correct)`;
+
+      let questions: any[] = [];
+      try {
+        const text = await callGeminiWithResilience({
+          contents: prompt,
+          preferredModel: 'gemini-2.5-flash',
+          config: {
+            temperature: 0.8
+          }
+        });
+        const cleanJsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
+        const parsed = JSON.parse(cleanJsonStr);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          questions = parsed;
+        }
+      } catch (aiErr) {
+        console.warn("[AI Quiz Route] Gemini API fallback triggered:", aiErr);
+      }
+
+      if (!questions || questions.length === 0) {
+        questions = generateSubjectMockQuestions(cleanSubject, chosenTopic, langCode, numQuestions);
+      }
+
+      // CRITICAL: True Fisher-Yates Option Shuffling & Answer Re-indexing
+      // This mathematically guarantees that the correct answer is NEVER fixed to 'C' or any single letter.
+      const normalized = questions.slice(0, numQuestions).map((q: any) => {
+        const qText = q.question || q.questionText || "Question";
+        const rawOptions = Array.isArray(q.options) && q.options.length === 4 
+          ? [...q.options] 
+          : ["Option A", "Option B", "Option C", "Option D"];
+        
+        let origAnsIdx = typeof q.answer === 'number' ? q.answer : (typeof q.correctOptionIndex === 'number' ? q.correctOptionIndex : 0);
+        origAnsIdx = Math.max(0, Math.min(rawOptions.length - 1, origAnsIdx));
+        const correctAnswerText = rawOptions[origAnsIdx];
+
+        // Fisher-Yates shuffle the 4 options
+        for (let i = rawOptions.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [rawOptions[i], rawOptions[j]] = [rawOptions[j], rawOptions[i]];
+        }
+
+        const newAnsIdx = rawOptions.indexOf(correctAnswerText);
+
+        return {
+          question: qText,
+          options: rawOptions,
+          answer: newAnsIdx >= 0 ? newAnsIdx : Math.floor(Math.random() * 4),
+          explanation: q.explanation || "Correct concept application and logical derivation."
+        };
+      });
+
+      res.json(normalized);
+    } catch (err: any) {
+      console.error("[Quiz API Error]:", err);
+      const fallbackQuestions = generateSubjectMockQuestions(
+        req.body?.subject || 'Mathematics', 
+        req.body?.topic || 'Core Concepts', 
+        req.body?.language === 'hi' ? 'hi' : 'en', 
+        req.body?.questionCount || 10
+      );
+      res.json(fallbackQuestions.map((q: any) => ({
+        question: q.questionText,
+        options: q.options,
+        answer: q.correctOptionIndex,
+        explanation: q.explanation
+      })));
+    }
+  });
+
   // API Route: Generate AI Mock Exam
   app.post("/api/generate-exam", rateLimitAi, async (req, res) => {
     try {
-      const { subject, topic, language } = req.body;
+      const { subject, topic, language, questionCount } = req.body;
       if (!subject || !topic) {
         res.status(400).json({ error: "Subject and topic are required." });
         return;
       }
 
-      const cacheKey = `exam_${language || 'en'}_${subject.trim().toLowerCase()}_${topic.trim().toLowerCase()}`;
-      const cached = apiCache.get<any[]>(cacheKey);
-      if (cached) {
-        res.json({ questions: cached });
-        return;
-      }
-
-      const prompt = `Generate a highly educational mock exam with exactly 5 multiple choice questions on the subject "${subject}" and topic "${topic}".
+      const numQuestions = Math.max(3, Math.min(Number(questionCount) || 10, 30));
+      const prompt = `Generate a highly educational mock exam with exactly ${numQuestions} multiple choice questions on the subject "${subject}" and topic "${topic}".
 The entire exam must be written in the language: ${language === 'hi' ? 'Hindi (हिंदी)' : 'English'}.
+CRITICAL: Distribute the correct answer index (0, 1, 2, 3) completely RANDOMLY across questions. Never make all answers option C or repeat the same option consecutively for all questions.
 You must format your response as a valid JSON array of objects. Do not include any markdown format blocks or code wrappers like \`\`\`json. Return only the raw JSON.
 Each object in the array must strictly have these keys:
 "questionText" (string)
@@ -409,17 +526,36 @@ Each object in the array must strictly have these keys:
         questions = JSON.parse(cleanJsonStr);
       } catch {
         console.log("[AI Mock Exam] Serving structured curriculum mock exam questions for", topic);
-        questions = generateSubjectMockQuestions(subject, topic, language);
+        questions = generateSubjectMockQuestions(subject, topic, language === 'hi' ? 'hi' : 'en', numQuestions);
       }
 
-      if (Array.isArray(questions) && questions.length > 0) {
-        apiCache.set(cacheKey, questions, 120 * 60 * 1000); // 2 hr cache
-      }
+      // Shuffle options and remap correctOptionIndex
+      const randomized = (Array.isArray(questions) && questions.length > 0 ? questions : generateSubjectMockQuestions(subject, topic, language === 'hi' ? 'hi' : 'en', numQuestions))
+        .slice(0, numQuestions)
+        .map((q: any) => {
+          const rawOptions = Array.isArray(q.options) && q.options.length === 4 ? [...q.options] : ["A", "B", "C", "D"];
+          const origIdx = typeof q.correctOptionIndex === 'number' ? q.correctOptionIndex : (typeof q.answer === 'number' ? q.answer : 0);
+          const safeIdx = Math.max(0, Math.min(rawOptions.length - 1, origIdx));
+          const correctText = rawOptions[safeIdx];
 
-      res.json({ questions });
+          for (let i = rawOptions.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [rawOptions[i], rawOptions[j]] = [rawOptions[j], rawOptions[i]];
+          }
+
+          const newIdx = rawOptions.indexOf(correctText);
+          return {
+            questionText: q.questionText || q.question || "Mock Question",
+            options: rawOptions,
+            correctOptionIndex: newIdx >= 0 ? newIdx : Math.floor(Math.random() * 4),
+            explanation: q.explanation || "Correct concept application."
+          };
+        });
+
+      res.json({ questions: randomized });
     } catch {
       console.log("[AI Mock Exam] Using curriculum mock exam fallback for", req.body?.subject, req.body?.topic);
-      const fallbackQuestions = generateSubjectMockQuestions(req.body?.subject, req.body?.topic, req.body?.language);
+      const fallbackQuestions = generateSubjectMockQuestions(req.body?.subject, req.body?.topic, req.body?.language === 'hi' ? 'hi' : 'en', req.body?.questionCount || 10);
       res.json({ questions: fallbackQuestions });
     }
   });
@@ -653,6 +789,17 @@ JSON SCHEMA:
     try {
       if (!userSpokenText) {
         res.status(400).json({ error: "Spoken question text is required." });
+        return;
+      }
+
+      // Check and intercept creator-related questions
+      const creatorResponse = checkCreatorQuestion(userSpokenText, language);
+      if (creatorResponse) {
+        res.json({
+          responseText: creatorResponse,
+          speechText: creatorResponse.replace(/[#*`_~]/g, '').trim(),
+          studentName: studentContext?.name || 'Student'
+        });
         return;
       }
 

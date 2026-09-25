@@ -45,7 +45,8 @@ export const DEFAULT_UI_CUSTOMIZATION: UiCustomization = {
   dashboardLayoutPreset: 'tutor_first',
   neonIntensity: 'high',
   cardBorderRadius: 'curved',
-  wallpaperAmbiance: 'science_chalkboard',
+  wallpaperAmbiance: 'pure_black',
+  backgroundColor: '#000000',
   audioFeedback: 'cyber_synth',
   leaderboardTheme: 'default'
 };
@@ -79,6 +80,7 @@ export default function SelfCustomizeModal({
 }: SelfCustomizeModalProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('tutor');
   const [tempConfig, setTempConfig] = useState<UiCustomization>(customization);
+  const [customHexInput, setCustomHexInput] = useState<string>(customization.backgroundColor || '#000000');
 
   if (!isOpen) return null;
 
@@ -87,6 +89,10 @@ export default function SelfCustomizeModal({
     setTempConfig(next);
     onUpdate(next);
     
+    if (key === 'backgroundColor' && typeof value === 'string') {
+      setCustomHexInput(value);
+    }
+
     // Play audio feedback
     if (key === 'audioFeedback') {
       playUiSound(value as AudioFeedback);
@@ -97,6 +103,7 @@ export default function SelfCustomizeModal({
 
   const handleReset = () => {
     setTempConfig(DEFAULT_UI_CUSTOMIZATION);
+    setCustomHexInput('#000000');
     onUpdate(DEFAULT_UI_CUSTOMIZATION);
     playUiSound(DEFAULT_UI_CUSTOMIZATION.audioFeedback);
   };
@@ -372,7 +379,7 @@ export default function SelfCustomizeModal({
     }
   ];
 
-  // 8. LIVE WALLPAPER & AMBIANCE (8 RICH MODES) WITH 100+ REALTIME MOVING LIVING OBJECTS (0% LAG)
+  // 8. LIVE WALLPAPER & AMBIANCE (9 RICH MODES) WITH REALTIME MOVING LIVING OBJECTS
   const wallpaperOptions: Array<{
     id: WallpaperAmbiance;
     title: string;
@@ -380,6 +387,13 @@ export default function SelfCustomizeModal({
     icon: string;
     desc: string;
   }> = [
+    {
+      id: 'pure_black',
+      title: 'Pure Solid Color / Pitch Black',
+      badge: 'DEFAULT • 0% DISTRACTIONS',
+      icon: '⬛',
+      desc: '100% solid pitch black or custom color with zero floating scholars or moving objects. Maximum battery life & distraction-free study focus.'
+    },
     {
       id: 'science_chalkboard',
       title: 'Science Lab & Living Scholars',
@@ -1147,53 +1161,217 @@ export default function SelfCustomizeModal({
                 </div>
               )}
 
-              {/* 8. LIVE WALLPAPER & AMBIANCE (4 MODES) */}
+              {/* 8. LIVE WALLPAPER & BACKGROUND COLOR STUDIO */}
               {activeTab === 'wallpaper' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-5">
-                  {wallpaperOptions.map(wp => {
-                    const isCurrent = tempConfig.wallpaperAmbiance === wp.id;
-                    return (
-                      <motion.div
-                        key={wp.id}
-                        whileHover={{ y: -3, scale: 1.01 }}
-                        whileTap={{ scale: 0.99 }}
-                        onClick={() => handleSelect('wallpaperAmbiance', wp.id)}
-                        className={`p-5 rounded-2xl sm:rounded-3xl border-2 transition-all cursor-pointer relative overflow-hidden bg-[#24170e] flex flex-col justify-between min-h-[190px] ${
-                          isCurrent
-                            ? 'border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.45)] ring-2 ring-amber-400/50'
-                            : 'border-amber-900/50 hover:border-amber-600/70 opacity-85 hover:opacity-100'
-                        }`}
-                      >
-                        {isCurrent && (
-                          <div className="absolute top-4 right-4 px-2.5 py-1 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] uppercase tracking-wider flex items-center space-x-1 shadow-md">
-                            <Check className="w-3.5 h-3.5 stroke-[3]" />
-                            <span>ACTIVE 👑</span>
-                          </div>
-                        )}
-
+                <div className="space-y-6">
+                  {/* SECTION A: BACKGROUND COLOR CUSTOMIZER */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-[#1b120a] border border-amber-800/50 shadow-inner">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-amber-900/40">
+                      <div className="flex items-center space-x-2.5">
+                        <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                          <Palette className="w-5 h-5" />
+                        </div>
                         <div>
-                          <div className="flex items-center space-x-2.5">
-                            <span className="text-3xl">{wp.icon}</span>
-                            <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-md bg-amber-950/80 text-amber-200 border border-amber-600/40">
-                              {wp.badge}
-                            </span>
-                          </div>
-
-                          <h3 className="font-serif font-black text-base sm:text-lg text-amber-100 mt-3">
-                            {wp.title}
-                          </h3>
-                          <p className="text-xs text-amber-200/80 mt-1.5 leading-relaxed">
-                            {wp.desc}
+                          <h4 className="font-serif font-black text-amber-100 text-sm sm:text-base">
+                            {language === 'hi' ? 'ऐप पृष्ठभूमि का रंग (Background Color)' : 'App Background Color Studio'}
+                          </h4>
+                          <p className="text-[11px] text-amber-300/80">
+                            {language === 'hi' 
+                              ? 'डिफ़ॉल्ट प्योर ब्लैक (#000000) है। आप कोई सा भी रंग चुन सकते हैं।' 
+                              : 'Default is AMOLED Pure Black (#000000). You can pick any custom color.'}
                           </p>
                         </div>
+                      </div>
 
-                        <div className="mt-4 pt-3 border-t border-amber-900/40 flex items-center justify-between text-[11px] text-amber-400 font-bold">
-                          <span>Wallpaper Theme</span>
-                          <span className="underline">Click to Apply</span>
+                      {/* Current Color Indicator & Reset */}
+                      <div className="flex items-center space-x-2 shrink-0 self-start sm:self-center">
+                        <div className="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-[#24170e] border border-amber-700/60 shadow-xs">
+                          <div 
+                            className="w-4 h-4 rounded-full border border-white/40 shadow-xs" 
+                            style={{ backgroundColor: tempConfig.backgroundColor || '#000000' }}
+                          />
+                          <span className="font-mono text-xs font-bold text-amber-200">
+                            {tempConfig.backgroundColor || '#000000'}
+                          </span>
+                          {(tempConfig.backgroundColor || '#000000').toLowerCase() === '#000000' && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/30 text-amber-300 font-bold uppercase tracking-wider">
+                              {language === 'hi' ? 'डिफ़ॉल्ट' : 'DEFAULT'}
+                            </span>
+                          )}
                         </div>
-                      </motion.div>
-                    );
-                  })}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleSelect('backgroundColor', '#000000');
+                            handleSelect('wallpaperAmbiance', 'pure_black');
+                          }}
+                          className="px-2.5 py-1.5 rounded-xl bg-amber-950/80 hover:bg-amber-900 text-amber-300 hover:text-white border border-amber-700/60 text-xs font-bold transition flex items-center space-x-1 cursor-pointer"
+                          title="Reset to Default Pure Black"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span className="hidden xs:inline">{language === 'hi' ? 'प्योर ब्लैक' : 'Reset Black'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Color Swatches Presets */}
+                    <div className="mt-4">
+                      <label className="text-[11px] font-bold text-amber-400 uppercase tracking-wider block mb-2">
+                        {language === 'hi' ? 'त्वरित रंग पैलेट (Quick Presets)' : 'Curated Color Presets'}
+                      </label>
+                      <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-2">
+                        {[
+                          { hex: '#000000', label: 'AMOLED Black', hiLabel: 'प्योर ब्लैक', isDefault: true },
+                          { hex: '#ffffff', label: 'Pure White', hiLabel: 'प्योर वाइट', isLight: true },
+                          { hex: '#060913', label: 'Deep Cosmic', hiLabel: 'कॉस्मिक नेवी' },
+                          { hex: '#0f172a', label: 'Midnight Slate', hiLabel: 'स्लेट 900' },
+                          { hex: '#18181b', label: 'Zinc Charcoal', hiLabel: 'जिंक डार्क' },
+                          { hex: '#121212', label: 'Carbon 1212', hiLabel: 'चारकोल' },
+                          { hex: '#022c22', label: 'Emerald Forest', hiLabel: 'एमराल्ड हरा' },
+                          { hex: '#0c1b33', label: 'Sapphire Blue', hiLabel: 'नीला' },
+                          { hex: '#1e1035', label: 'Cosmic Violet', hiLabel: 'बैंगनी' },
+                          { hex: '#2b0b14', label: 'Crimson Dark', hiLabel: 'रूबी लाल' },
+                          { hex: '#1c120c', label: 'Royal Wood', hiLabel: 'एस्प्रेसो' },
+                          { hex: '#04232c', label: 'Cyber Teal', hiLabel: 'साइबर सियान' },
+                          { hex: '#f8fafc', label: 'Clean Slate', hiLabel: 'सॉफ्ट वाइट', isLight: true },
+                          { hex: '#fef3c7', label: 'Warm Cream', hiLabel: 'क्रीम आइवरी', isLight: true }
+                        ].map(preset => {
+                          const isSelected = (tempConfig.backgroundColor || '#000000').toLowerCase() === preset.hex.toLowerCase();
+                          return (
+                            <button
+                              key={preset.hex}
+                              type="button"
+                              onClick={() => handleSelect('backgroundColor', preset.hex)}
+                              className={`group relative p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                                isSelected
+                                  ? 'border-amber-400 bg-amber-950/60 ring-2 ring-amber-400/60 shadow-[0_0_15px_rgba(245,158,11,0.35)]'
+                                  : 'border-amber-900/50 bg-[#24170e]/80 hover:border-amber-600/70 hover:bg-[#2b1c11]'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <div 
+                                  className="w-5 h-5 rounded-lg border border-white/20 shadow-xs flex items-center justify-center shrink-0" 
+                                  style={{ backgroundColor: preset.hex }}
+                                >
+                                  {isSelected && (
+                                    <Check className={`w-3 h-3 stroke-[3] ${preset.isLight ? 'text-black' : 'text-amber-400'}`} />
+                                  )}
+                                </div>
+                                {preset.isDefault && (
+                                  <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-amber-500 text-slate-950">
+                                    DEF
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] font-semibold text-amber-200 mt-2 truncate w-full group-hover:text-amber-100">
+                                {language === 'hi' ? preset.hiLabel : preset.label}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Custom Picker & Hex Input Field */}
+                    <div className="mt-4 pt-3 border-t border-amber-900/40 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center space-x-3">
+                        <label className="text-xs text-amber-200 font-bold flex items-center space-x-1.5">
+                          <span>{language === 'hi' ? 'कस्टम रंग चुनें (Custom Color):' : 'Custom Color Wheel:'}</span>
+                        </label>
+                        <div className="relative flex items-center">
+                          <input
+                            type="color"
+                            value={tempConfig.backgroundColor || '#000000'}
+                            onChange={(e) => handleSelect('backgroundColor', e.target.value)}
+                            className="w-9 h-9 rounded-xl cursor-pointer border-2 border-amber-600/70 bg-transparent p-0.5 overflow-hidden shadow-xs hover:border-amber-400 transition"
+                            title="Open native color picker"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs text-amber-400 font-mono font-bold">HEX</span>
+                        <input
+                          type="text"
+                          value={customHexInput}
+                          maxLength={7}
+                          placeholder="#000000"
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCustomHexInput(val);
+                            if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(val)) {
+                              handleSelect('backgroundColor', val);
+                            }
+                          }}
+                          className="w-24 px-2.5 py-1 text-xs font-mono font-bold rounded-lg bg-[#24170e] border border-amber-700/60 text-amber-100 placeholder:text-amber-600/50 focus:border-amber-400 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SECTION B: LIVE 3D WALLPAPERS & UNIVERSES */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h4 className="font-serif font-black text-amber-100 text-sm sm:text-base">
+                          {language === 'hi' ? 'लाइव वॉलपेपर शैली व वातावरण (Live Wallpaper)' : 'Live Wallpaper & 3D Interactive Ambiance'}
+                        </h4>
+                        <p className="text-[11px] text-amber-300/80">
+                          {language === 'hi'
+                            ? 'प्योर सॉलिड ब्लैक (बिना किसी हलचल) चुनें या 3D लाइव यूनिवर्स चालू करें।'
+                            : 'Choose Clean Pitch Black (0 distractions) or enable live interactive 3D universes.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-5">
+                      {wallpaperOptions.map(wp => {
+                        const isCurrent = tempConfig.wallpaperAmbiance === wp.id;
+                        return (
+                          <motion.div
+                            key={wp.id}
+                            whileHover={{ y: -3, scale: 1.01 }}
+                            whileTap={{ scale: 0.99 }}
+                            onClick={() => handleSelect('wallpaperAmbiance', wp.id)}
+                            className={`p-5 rounded-2xl sm:rounded-3xl border-2 transition-all cursor-pointer relative overflow-hidden bg-[#24170e] flex flex-col justify-between min-h-[190px] ${
+                              isCurrent
+                                ? 'border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.45)] ring-2 ring-amber-400/50'
+                                : 'border-amber-900/50 hover:border-amber-600/70 opacity-85 hover:opacity-100'
+                            }`}
+                          >
+                            {isCurrent && (
+                              <div className="absolute top-4 right-4 px-2.5 py-1 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] uppercase tracking-wider flex items-center space-x-1 shadow-md">
+                                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                <span>ACTIVE 👑</span>
+                              </div>
+                            )}
+
+                            <div>
+                              <div className="flex items-center space-x-2.5">
+                                <span className="text-3xl">{wp.icon}</span>
+                                <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-md bg-amber-950/80 text-amber-200 border border-amber-600/40">
+                                  {wp.badge}
+                                </span>
+                              </div>
+
+                              <h3 className="font-serif font-black text-base sm:text-lg text-amber-100 mt-3">
+                                {wp.title}
+                              </h3>
+                              <p className="text-xs text-amber-200/80 mt-1.5 leading-relaxed">
+                                {wp.desc}
+                              </p>
+                            </div>
+
+                            <div className="mt-4 pt-3 border-t border-amber-900/40 flex items-center justify-between text-[11px] text-amber-400 font-bold">
+                              <span>{wp.id === 'pure_black' ? 'Clean Solid Mode' : 'Wallpaper Theme'}</span>
+                              <span className="underline">Click to Apply</span>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
 
