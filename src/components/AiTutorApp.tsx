@@ -40,7 +40,8 @@ import {
   ChevronUp,
   Type,
   FolderOpen,
-  Grid
+  Grid,
+  Menu
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -712,6 +713,148 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [showCustomVoiceModal, setShowCustomVoiceModal] = useState(false);
   const [showTopRightMenu, setShowTopRightMenu] = useState(false);
   const topRightMenuRef = useRef<HTMLDivElement>(null);
+
+  // --- SIDEBAR & CHAT SESSIONS HISTORY STATE & EFFECTS ---
+  interface ChatSession {
+    id: string;
+    title: string;
+    timestamp: string;
+    messages: ChatMessage[];
+    subject: string;
+  }
+
+  const [showSidebar, setShowSidebar] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 1024;
+    }
+    return true;
+  });
+
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(() => {
+    return getStoredValue(`ai_tutor_active_session_id_${user.uid}`, null) || null;
+  });
+
+  const [sessions, setSessions] = useState<ChatSession[]>(() => {
+    const saved = getStoredValue(`ai_tutor_sessions_${user.uid}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error parsing saved tutor sessions', e);
+      }
+    }
+    return [];
+  });
+
+  // Synchronize current messages with the active session in sessions list
+  useEffect(() => {
+    if (messages.length <= 1) return;
+
+    const firstUserMsg = messages.find(m => m.sender === 'user');
+    const titleText = firstUserMsg ? (firstUserMsg.text.length > 30 ? firstUserMsg.text.substring(0, 30) + '...' : firstUserMsg.text) : 'Study Session';
+
+    if (!activeSessionId) {
+      const newId = 'session_' + Date.now();
+      const newSession: ChatSession = {
+        id: newId,
+        title: titleText,
+        timestamp: new Date().toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        messages,
+        subject: selectedSubject
+      };
+      setSessions(prev => {
+        if (prev.some(s => s.id === newId)) return prev;
+        return [newSession, ...prev];
+      });
+      setActiveSessionId(newId);
+      setStoredValue(`ai_tutor_active_session_id_${user.uid}`, newId);
+    } else {
+      setSessions(prev => {
+        const index = prev.findIndex(s => s.id === activeSessionId);
+        if (index !== -1) {
+          const updated = [...prev];
+          updated[index] = {
+            ...updated[index],
+            messages,
+            title: titleText,
+            subject: selectedSubject
+          };
+          return updated;
+        } else {
+          const newSession: ChatSession = {
+            id: activeSessionId,
+            title: titleText,
+            timestamp: new Date().toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+            messages,
+            subject: selectedSubject
+          };
+          return [newSession, ...prev];
+        }
+      });
+    }
+  }, [messages, selectedSubject, user.uid, activeSessionId]);
+
+  // Persist sessions list to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(`ai_tutor_sessions_${user.uid}`, JSON.stringify(sessions));
+    } catch (e) {
+      console.error('Error saving sessions list to storage', e);
+    }
+  }, [sessions, user.uid]);
+
+  const handleSelectSession = (session: ChatSession) => {
+    setActiveSessionId(session.id);
+    setStoredValue(`ai_tutor_active_session_id_${user.uid}`, session.id);
+    setMessages(session.messages);
+    if (session.subject) {
+      setSelectedSubject(session.subject as Subject);
+    }
+    if (window.innerWidth < 1024) {
+      setShowSidebar(false);
+    }
+  };
+
+  const handleNewChat = () => {
+    const newId = 'session_' + Date.now();
+    setActiveSessionId(newId);
+    setStoredValue(`ai_tutor_active_session_id_${user.uid}`, newId);
+
+    const studentName = user.name || 'Student';
+    const studentClass = user.className || 'Class';
+    const studentSchool = user.schoolName ? ` from ${user.schoolName}` : '';
+    const studentGoal = user.targetGoal ? ` (Target: ${user.targetGoal})` : '';
+
+    const newWelcome: ChatMessage[] = [
+      {
+        id: 'welcome_' + Date.now(),
+        sender: 'ai',
+        text: `Hello **${studentName}**! 👋 I am your personal AI Study Tutor for **${studentClass}**${studentSchool}${studentGoal}.\n\nHow can I help you today? Ask me any homework question, concept explanation, or step-by-step equation solver!`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ];
+
+    setMessages(newWelcome);
+    if (window.innerWidth < 1024) {
+      setShowSidebar(false);
+    }
+  };
+
+  const handleDeleteSession = (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm('Delete this study session from your history?')) {
+      const filtered = sessions.filter(s => s.id !== sessionId);
+      setSessions(filtered);
+      if (activeSessionId === sessionId) {
+        if (filtered.length > 0) {
+          handleSelectSession(filtered[0]);
+        } else {
+          handleNewChat();
+        }
+      }
+    }
+  };
+  // ------------------------------------------------------
 
   const [suggestions, setSuggestions] = useState<AcademicSuggestion[]>(() => {
     return generateContextualSuggestions({
@@ -1751,7 +1894,7 @@ export const AiTutorApp = memo(function AiTutorApp({
           opacity: isHeaderVisible ? 1 : 0
         }}
         transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-30 shrink-0 overflow-hidden bg-white"
+        className={`relative z-30 shrink-0 bg-white ${isHeaderVisible ? 'overflow-visible' : 'overflow-hidden'}`}
         onMouseEnter={() => {
           setIsHeaderHoveredOrInteracting(true);
         }}
