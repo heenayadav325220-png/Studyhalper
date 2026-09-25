@@ -74,6 +74,7 @@ import ThemeToggle from './components/ThemeToggle';
 import QuizSection from './components/QuizSection';
 import PWAInstallBanner from './components/PWAInstallBanner';
 import { BadgeCelebrationModal } from './components/BadgeCelebrationModal';
+import { StreakCelebrationModal } from './components/StreakCelebrationModal';
 import Toast, { showToast } from './components/Toast';
 import type { 
   UserProfile, 
@@ -659,71 +660,65 @@ export default function App() {
   ];
   const [day1GoalCompleted, setDay1GoalCompleted] = useState(false);
 
-  // Automatic date-based streak validation system
+  const [activeSecondsToday, setActiveSecondsToday] = useState<number>(0);
+  const [isStreakCelebrationOpen, setIsStreakCelebrationOpen] = useState(false);
+  const lastInteractionTimeRef = useRef<number>(Date.now());
+
+  // Get device local date in YYYY-MM-DD format
+  const getLocalDateString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Initialize and check daily study seconds
   useEffect(() => {
-    // Only run if the userProfile exists and has a valid uid
     if (!userProfile || !userProfile.uid) return;
 
-    // Get device local date in YYYY-MM-DD format
-    const getLocalDateString = () => {
-      const d = new Date();
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
+    const todayStr = getLocalDateString();
+    const storedDate = localStorage.getItem(`study_seconds_date_${userProfile.uid}`);
+    
+    if (storedDate !== todayStr) {
+      localStorage.setItem(`study_seconds_date_${userProfile.uid}`, todayStr);
+      localStorage.setItem(`study_seconds_today_${userProfile.uid}`, '0');
+      setActiveSecondsToday(0);
+    } else {
+      const storedSecs = Number(localStorage.getItem(`study_seconds_today_${userProfile.uid}`) || '0');
+      setActiveSecondsToday(storedSecs);
+    }
+  }, [userProfile?.uid]);
+
+  // Window interaction listeners to track active attention and pause timer on idle
+  useEffect(() => {
+    const handleInteraction = () => {
+      lastInteractionTimeRef.current = Date.now();
     };
 
-    const todayStr = getLocalDateString();
-    const lastStreakStr = userProfile.lastStreakDate || '';
+    window.addEventListener('mousemove', handleInteraction);
+    window.addEventListener('keypress', handleInteraction);
+    window.addEventListener('touchstart', handleInteraction);
+    window.addEventListener('scroll', handleInteraction);
 
-    // If today is the same as the last streak date, the streak is already counted/handled today.
-    if (lastStreakStr === todayStr) {
-      return;
-    }
+    return () => {
+      window.removeEventListener('mousemove', handleInteraction);
+      window.removeEventListener('keypress', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+      window.removeEventListener('scroll', handleInteraction);
+    };
+  }, []);
 
-    let newStreak = 1;
-    let xpReward = 0;
-    let showPromo = false;
-
-    if (lastStreakStr !== '') {
-      // Calculate day difference between today and lastStreakDate
-      const todayDate = new Date(todayStr + 'T00:00:00');
-      const lastStreakDate = new Date(lastStreakStr + 'T00:00:00');
-      const diffTime = todayDate.getTime() - lastStreakDate.getTime();
-      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-
-      if (diffDays === 1) {
-        // Continuous streak! Increment by 1
-        newStreak = (userProfile.streak || 0) + 1;
-        xpReward = 15; // Give +15 XP for genuine streak continuation
-        showPromo = true;
-      } else if (diffDays > 1) {
-        // Gap of > 1 day. Streak broken! Reset to 1.
-        newStreak = 1;
-        xpReward = 15; // Start new streak with +15 XP too!
-        showPromo = true;
-        // Alert user that their streak was reset
-        setTimeout(() => {
-          sendRealNotification(
-            'Streak Reset! ⚠️', 
-            `You missed a study day. Your previous ${userProfile.streak || 0}-day streak has reset. Let's build a new one starting today!`
-          );
-        }, 1000);
-      } else {
-        // If somehow diffDays < 0 (system time went backwards), do nothing
-        return;
-      }
-    } else {
-      // First time setting a streak! Start at 1.
-      newStreak = 1;
-      xpReward = 15; // Give +15 XP for starting the journey!
-      showPromo = true;
-    }
-
-    // Apply the updates to state and persist to database/localStorage
+  // Trigger Streak Day Increment and 60fps Ignition Celebration Modal
+  const triggerDailyStreakCompletion = (todayStr: string) => {
     setUserProfile((prev) => {
+      if (!prev || !prev.uid) return prev;
+      
+      const newStreak = (prev.streak || 0) + 1;
+      const xpReward = 15;
       const finalXp = Math.max(0, (prev.xp || 0) + xpReward);
       const finalLevel = Math.floor(finalXp / 100) + 1;
+      
       const updatedProfile: UserProfile = {
         ...prev,
         streak: newStreak,
@@ -746,21 +741,101 @@ export default function App() {
           level: finalLevel
         });
       } catch (err) {
-        console.warn('Error syncing streak to Firestore:', err);
+        console.warn('Error syncing completed streak to Firestore:', err);
       }
 
-      if (showPromo) {
-        setTimeout(() => {
-          sendRealNotification(
-            'Streak Active! 🔥',
-            `Fantastic! Day ${newStreak} of your study streak is now active. Earned +15 XP!`
-          );
-        }, 1000);
-      }
+      // Trigger premium visual, vibration, and overlay celebration sequences
+      setTimeout(() => {
+        setIsStreakCelebrationOpen(true);
+        sendRealNotification(
+          'Streak Complete! 🔥🏆',
+          `Phenomenal effort! You spent 10 minutes studying today. Your Day ${newStreak} streak is now locked in! +15 XP earned.`
+        );
+      }, 500);
 
       return updatedProfile;
     });
-  }, [userProfile.uid]);
+  };
+
+  // Active study ticking mechanism (Updates every 1s)
+  useEffect(() => {
+    if (!userProfile || !userProfile.uid) return;
+
+    const interval = setInterval(() => {
+      // Pause if browser goes to background
+      if (document.hidden) return;
+
+      // Pause if idle on static menus (no interaction for over 1 minute)
+      const isIdle = Date.now() - lastInteractionTimeRef.current > 60000;
+      if (isIdle) return;
+
+      // Only track time during active study engagements
+      const activeStudyTabs = ['aiTutor', 'quiz', 'mockExam', 'whiteboard', 'groupChat', 'studyDocs'];
+      if (!activeStudyTabs.includes(activeTab)) return;
+
+      setActiveSecondsToday((prev) => {
+        const next = prev + 1;
+        localStorage.setItem(`study_seconds_today_${userProfile.uid}`, String(next));
+
+        const todayStr = getLocalDateString();
+        // Check if 10-minute (600s) threshold is reached AND streak not completed today yet
+        if (next === 600 && userProfile.lastStreakDate !== todayStr) {
+          triggerDailyStreakCompletion(todayStr);
+        }
+
+        return next;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [activeTab, userProfile?.uid, userProfile?.lastStreakDate]);
+
+  // Automatic daily calendar streak validation (Wipe missed days only)
+  useEffect(() => {
+    if (!userProfile || !userProfile.uid) return;
+
+    const todayStr = getLocalDateString();
+    const lastStreakStr = userProfile.lastStreakDate || '';
+
+    if (lastStreakStr === todayStr) {
+      return;
+    }
+
+    if (lastStreakStr !== '') {
+      const todayDate = new Date(todayStr + 'T00:00:00');
+      const lastStreakDate = new Date(lastStreakStr + 'T00:00:00');
+      const diffTime = todayDate.getTime() - lastStreakDate.getTime();
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays > 1) {
+        // Gap of > 1 day. Streak reset to 0 (re-initiates on completing today's focus target)
+        setUserProfile((prev) => {
+          const updatedProfile: UserProfile = {
+            ...prev,
+            streak: 0,
+          };
+          localStorage.setItem('ascend_user_profile', JSON.stringify(updatedProfile));
+          localStorage.setItem('user_profile_data', JSON.stringify(updatedProfile));
+          localStorage.setItem(`user_profile_${prev.uid}`, JSON.stringify(updatedProfile));
+
+          try {
+            updateUserProfile(prev.uid, { streak: 0 });
+          } catch (err) {
+            console.warn('Error resetting missed streak in Firestore:', err);
+          }
+
+          setTimeout(() => {
+            sendRealNotification(
+              'Streak Missed! ⚠️', 
+              `You missed your learning target yesterday. Your study streak has reset. Complete today's 10-minute focus session to start a brand new streak!`
+            );
+          }, 1000);
+
+          return updatedProfile;
+        });
+      }
+    }
+  }, [userProfile?.uid]);
 
   // --- CHIMPU SANCTUARY (PET) STATE DECLARATION ---
   const [petHappiness, setPetHappiness] = useState(85);
@@ -2423,19 +2498,66 @@ export default function App() {
               {/* Subtle Ambient Radial Glow */}
               <div className="absolute -top-12 -right-12 w-40 h-40 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
 
-              <div className="flex items-center justify-between relative z-10">
-                <div>
-                  <h3 className="font-extrabold text-slate-100 text-xs sm:text-sm tracking-wider uppercase flex items-center space-x-2">
-                    <span className="p-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-400">
-                      <Flame className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                    </span>
-                    <span>5-DAY STUDY STREAK</span>
-                  </h3>
-                  <p className="text-[11px] sm:text-xs text-slate-300 mt-1">Complete daily goals to build unstoppable study momentum</p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+                <div className="flex items-center gap-3.5">
+                  {/* Premium Circular Progress Ring SVG */}
+                  <div className="relative w-16 h-16 shrink-0 flex items-center justify-center">
+                    <svg className="w-16 h-16 transform -rotate-90">
+                      <circle
+                        cx="32"
+                        cy="32"
+                        r="28"
+                        stroke="#11192e"
+                        strokeWidth="5"
+                        fill="transparent"
+                      />
+                      <motion.circle
+                        cx="32"
+                        cy="32"
+                        r="28"
+                        stroke="url(#streakFireGrad)"
+                        strokeWidth="5"
+                        fill="transparent"
+                        strokeDasharray={2 * Math.PI * 28}
+                        initial={{ strokeDashoffset: 2 * Math.PI * 28 }}
+                        animate={{ strokeDashoffset: 2 * Math.PI * 28 - (Math.min(100, (activeSecondsToday / 600) * 100) / 100) * (2 * Math.PI * 28) }}
+                        transition={{ type: 'spring', damping: 20 }}
+                        strokeLinecap="round"
+                      />
+                      <defs>
+                        <linearGradient id="streakFireGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#fbbf24" />
+                          <stop offset="50%" stopColor="#ea580c" />
+                          <stop offset="100%" stopColor="#ef4444" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    
+                    {/* Centered Fire Badge / Icon with glow */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <Flame className={`w-5 h-5 ${activeSecondsToday >= 600 ? 'text-amber-400 fill-amber-400 filter drop-shadow-[0_0_6px_rgba(245,158,11,0.8)]' : 'text-slate-500'} transition-all duration-300`} />
+                      <span className="text-[8.5px] font-black font-mono text-amber-300 leading-none mt-0.5">
+                        {Math.min(10, Math.floor(activeSecondsToday / 60))}m
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="font-extrabold text-slate-100 text-xs sm:text-sm tracking-wider uppercase flex items-center space-x-2">
+                      <span>5-DAY STUDY STREAK</span>
+                    </h3>
+                    <p className="text-[11px] sm:text-xs text-slate-300 mt-1">
+                      {activeSecondsToday >= 600 ? (
+                        <span className="text-emerald-400 font-bold">✓ Daily target complete! Streak active! 🔥</span>
+                      ) : (
+                        <span>Study in AI Tutor, Quizzes, or Study Rooms for 10 mins today</span>
+                      )}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Streak Badge Pill */}
-                <div className="px-3 py-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 rounded-xl text-xs font-black text-amber-300 flex items-center gap-2 shadow-[0_0_12px_rgba(245,158,11,0.25)] shrink-0">
+                <div className="px-3 py-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 rounded-xl text-xs font-black text-amber-300 flex items-center gap-2 shadow-[0_0_12px_rgba(245,158,11,0.25)] shrink-0 self-start sm:self-center">
                   <span className="text-base animate-pulse">🔥</span>
                   <div className="leading-tight text-right sm:text-left">
                     <div className="font-black text-xs text-amber-100">{userProfile.streak}/5 Days</div>
@@ -2449,16 +2571,16 @@ export default function App() {
                 <div className="flex items-center justify-between text-[11px] font-bold">
                   <span className="text-slate-300 flex items-center gap-1.5">
                     <Target className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Weekly Target Progress</span>
+                    <span>Focus Target Today ({Math.floor(activeSecondsToday / 60)} / 10 mins)</span>
                   </span>
                   <span className="text-amber-300 font-extrabold">
-                    {streakCompletedDays.filter(Boolean).length} of 5 Days Completed ({Math.round((streakCompletedDays.filter(Boolean).length / 5) * 100)}%)
+                    {Math.round((activeSecondsToday / 600) * 100)}% Complete
                   </span>
                 </div>
                 <div className="w-full h-2.5 bg-[#060913] border border-slate-800/90 rounded-full overflow-hidden p-0.5 relative">
                   <div 
                     className="h-full bg-gradient-to-r from-amber-500 via-orange-500 to-emerald-400 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(245,158,11,0.6)]"
-                    style={{ width: `${Math.max(8, (streakCompletedDays.filter(Boolean).length / 5) * 100)}%` }}
+                    style={{ width: `${Math.min(100, Math.max(8, (activeSecondsToday / 600) * 100))}%` }}
                   />
                 </div>
               </div>
@@ -3863,6 +3985,15 @@ export default function App() {
 
 
 
+
+      {/* STREAK CELEBRATION MODAL OVERLAY */}
+      <StreakCelebrationModal
+        isOpen={isStreakCelebrationOpen}
+        streakCount={userProfile.streak || 1}
+        userName={userProfile.name || (appLanguage === 'hi' ? 'छात्र' : 'Student')}
+        language={appLanguage}
+        onClose={() => setIsStreakCelebrationOpen(false)}
+      />
 
       {/* BADGE CELEBRATION MODAL OVERLAY */}
       <BadgeCelebrationModal

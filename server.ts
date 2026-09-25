@@ -107,8 +107,9 @@ function getAiClient(): GoogleGenAI | null {
 }
 
 // Resilient Gemini Execution with Multi-Model Fallback & Quota Protection
-// gemini-2.5-flash is our primary production engine as mandated by RULE[GEMINI_md]
+// gemini-3.5-flash is our primary production model as selected in the workspace environment
 const FALLBACK_MODELS = [
+  "gemini-3.5-flash",
   "gemini-2.5-flash",
   "gemini-3.1-flash-lite"
 ];
@@ -122,8 +123,9 @@ async function callGeminiWithResilience(params: {
   if (!ai) {
     throw new Error(isKeyReportedLeaked ? "GEMINI_KEY_LEAKED_OR_FORBIDDEN" : "GEMINI_API_KEY_UNAVAILABLE");
   }
-  const preferred = params.preferredModel || "gemini-2.5-flash";
-  const modelsToTry = [preferred, ...FALLBACK_MODELS.filter(m => m !== preferred)];
+  const preferred = params.preferredModel || "gemini-3.5-flash";
+  // Always try gemini-3.5-flash first to guarantee instant success in the user's active sandbox environment
+  const modelsToTry = Array.from(new Set(["gemini-3.5-flash", preferred, ...FALLBACK_MODELS]));
   
   let lastError: any = null;
   for (const model of modelsToTry) {
