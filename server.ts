@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import path from "path";
 import compression from "compression";
@@ -178,9 +181,25 @@ app.use(securityHeaders);
 
 // Universal Cross-Origin and Preflight configuration
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    "https://studyhalper.vercel.app",
+    "http://localhost",
+    "http://localhost:3000",
+    "capacitor://localhost"
+  ];
+  if (origin) {
+    if (allowedOrigins.includes(origin) || origin.endsWith(".vercel.app") || origin.includes("run.app")) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+    } else {
+      res.setHeader("Access-Control-Allow-Origin", "https://studyhalper.vercel.app");
+    }
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", "https://studyhalper.vercel.app");
+  }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-gemini-quota-exceeded");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
   if (req.method === "OPTIONS") {
     res.sendStatus(204);
     return;
@@ -220,13 +239,9 @@ app.use("/api", rateLimitGeneral);
 
 // Health and System Diagnostics Endpoint
 app.get("/api/health", (_req, res) => {
-  const hasKey = Boolean(process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.API_KEY);
   res.json({ 
     status: "ok", 
-    uptime: Math.round(process.uptime()),
-    hasAiKey: hasKey,
-    memoryUsageMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-    cacheEntries: (apiCache as any).cache?.size || 0
+    uptime: Math.round(process.uptime())
   });
 });
 
