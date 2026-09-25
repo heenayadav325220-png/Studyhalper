@@ -795,14 +795,67 @@ export const AiTutorApp = memo(function AiTutorApp({
     }
   }, [messages, selectedSubject, user.uid, activeSessionId]);
 
-  // Persist sessions list to localStorage
+  // Persist sessions list to localStorage with resilient size mitigation and eviction policy
   useEffect(() => {
     try {
-      localStorage.setItem(`ai_tutor_sessions_${user.uid}`, JSON.stringify(sessions));
+      // 1. Create a safe copy of sessions to shrink its memory footprint
+      // Keep only the latest 12 sessions to prevent infinite growth
+      const trimmedSessions = sessions.slice(0, 12).map(session => {
+        // Keep only the latest 25 messages in each session to prevent infinite growth
+        const trimmedMessages = session.messages.slice(-25).map(msg => {
+          // Deep clean massive base64 images to free up megabytes of storage
+          const cleanMsg = { ...msg };
+          if (cleanMsg.image && cleanMsg.image.length > 1000) {
+            cleanMsg.image = "[Image Attached]";
+          }
+          if (cleanMsg.images && cleanMsg.images.length > 0) {
+            cleanMsg.images = cleanMsg.images.map(img => img.length > 1000 ? "[Image Attached]" : img);
+          }
+          return cleanMsg;
+        });
+
+        return {
+          ...session,
+          messages: trimmedMessages
+        };
+      });
+
+      const serialized = JSON.stringify(trimmedSessions);
+      localStorage.setItem(`ai_tutor_sessions_${user.uid}`, serialized);
     } catch (e) {
-      console.error('Error saving sessions list to storage', e);
+      console.warn('Quota warning while saving sessions list, executing emergency eviction strategy...', e);
+      try {
+        // Emergency mitigation level 1: Keep only the latest 5 sessions and completely remove all image attachments
+        const emergencySessions = sessions.slice(0, 5).map(session => {
+          const strippedMessages = session.messages.slice(-15).map(msg => {
+            const cleanMsg = { ...msg };
+            if (cleanMsg.image) cleanMsg.image = "[Image Attached]";
+            if (cleanMsg.images) cleanMsg.images = [];
+            return cleanMsg;
+          });
+          return { ...session, messages: strippedMessages };
+        });
+        localStorage.setItem(`ai_tutor_sessions_${user.uid}`, JSON.stringify(emergencySessions));
+      } catch (e2) {
+        console.error('Critical quota failure. Clearing all historical sessions to maintain normal operations.', e2);
+        try {
+          // Emergency mitigation level 2: Clear all sessions except the active one
+          const activeOnly = sessions.filter(s => s.id === activeSessionId).map(session => {
+            const strippedMessages = session.messages.slice(-10).map(msg => {
+              const cleanMsg = { ...msg };
+              if (cleanMsg.image) cleanMsg.image = "[Image Attached]";
+              if (cleanMsg.images) cleanMsg.images = [];
+              return cleanMsg;
+            });
+            return { ...session, messages: strippedMessages };
+          });
+          localStorage.setItem(`ai_tutor_sessions_${user.uid}`, JSON.stringify(activeOnly));
+        } catch (e3) {
+          console.error('Failed to write even minimal session history.', e3);
+        }
+      }
     }
-  }, [sessions, user.uid]);
+  }, [sessions, user.uid, activeSessionId]);
 
   const handleSelectSession = (session: ChatSession) => {
     setActiveSessionId(session.id);

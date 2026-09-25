@@ -514,9 +514,101 @@ export function generateSubjectMockQuestions(subject: string, topic: string, lan
  * authoritative answers based on his official profile.
  */
 export function checkCreatorQuestion(prompt: string, language: string = "English"): string | null {
-  const norm = (prompt || "").toLowerCase().trim();
+  if (!prompt) return null;
+
+  // 1. Clean the prompt by removing background workspace and student context strings prepended by the UI
+  let cleaned = prompt;
+  
+  // Remove document context block
+  cleaned = cleaned.replace(/\[Attached Document:[\s\S]*?\[Use the above attached document context to address the prompt below accurately\.\]/gi, "");
+  
+  // Remove bracketed info (e.g. [Student: Rohit Yadav ...], [Subject: Physics ...])
+  cleaned = cleaned.replace(/\[[\s\S]*?\]/g, "");
+  
+  // Remove prefix styles
+  cleaned = cleaned.replace(/Provide a strict step-by-step solution for[^:]*:/gi, "");
+  cleaned = cleaned.replace(/Explain clearly with analogies suitable for[^:]*:/gi, "");
+  cleaned = cleaned.replace(/Generate a 3-question practice quiz suitable for[^:]*:/gi, "");
+
+  // Now normalize the actual question/query asked by the user
+  const norm = cleaned.toLowerCase().trim();
   const isHi = language === "Hindi" || language === "hi" || norm.includes("hindi") || norm.includes("हिन्दी") || norm.includes("हिंदी");
   const isHinglish = language === "Hinglish" || language === "Mixed" || norm.includes("hinglish");
+
+  // Strict guard: ONLY intercept if the query is explicitly about Rohit Yadav, the creator, developer, maker, or who built/made this AI/app
+  // We do NOT want to intercept the user's name if they are named "Rohit Yadav" and are just saying general greetings or unrelated academic questions!
+  const mentionsRohitDirectly = norm.includes("rohit") || norm.includes("yadav") || norm.includes("रोहित") || norm.includes("यादव");
+  
+  // Terms representing creator/owner/founder/CEO
+  const hasCreatorTerm = (
+    norm.includes("creator") || norm.includes("developer") || norm.includes("maker") || 
+    norm.includes("owner") || norm.includes("founder") || norm.includes("ceo") || 
+    norm.includes("malik") || norm.includes("मालिक") || norm.includes("बनाया") || 
+    norm.includes("banya") || norm.includes("boss") || norm.includes("owner")
+  );
+  
+  const refersToYou = (
+    norm.includes("you") || norm.includes("your") || norm.includes("yourself") ||
+    norm.includes(" u ") || norm.includes(" ur ") ||
+    norm.includes("tutor") || norm.includes("buddy") || norm.includes("app") || norm.includes("ai") || norm.includes("bot") || 
+    norm.includes("website") || norm.includes("tool") || norm.includes("software") || norm.includes("system") || norm.includes("application") ||
+    norm.includes("tumhe") || norm.includes("aapko") || norm.includes("tujhe") || norm.includes("is app") || norm.includes("is ai") || norm.includes("is bot") ||
+    norm.includes("apko") || norm.includes("tumhe")
+  );
+
+  const asksWhoMade = (
+    norm.includes("who made") || norm.includes("who created") || norm.includes("who built") || norm.includes("who designed") || norm.includes("who developed") || norm.includes("who owns") ||
+    norm.includes("kisne banaya") || norm.includes("kaun banaya") || norm.includes("kisne design") || norm.includes("kisne develop") || norm.includes("kisne code") ||
+    norm.includes("kisne banaya hai") || norm.includes("kaun banaya hai") ||
+    norm === "तुम्हें किसने बनाया?" || norm === "तुम्हें किसने बनाया" || norm === "creator कौन है" || norm === "creator कौन है?" ||
+    norm.includes("kisne design") || norm.includes("who is founder") || norm.includes("who is ceo") || norm.includes("who is owner") ||
+    norm.includes("malik kaun") || norm.includes("kisne banya") || norm.includes("owner kaun")
+  );
+
+  let isAboutCreator = false;
+
+  // If the query specifically mentions Rohit/Yadav AND is asking "who is he", "tell me about him" or similar:
+  if (mentionsRohitDirectly) {
+    // Only intercept if we actually ask ABOUT Rohit, not if a student named Rohit is saying "hi" or general questions!
+    // Since we stripped the student metadata, any mentions of Rohit left must be from the user's actual typed query.
+    // If the query is just "rohit" or "rohit yadav" or questions about him, yes:
+    const generalGreetings = ["hi", "hello", "hey", "hola", "namaste", "pranam", "sup", "yo", "हाय", "नमस्ते", "हेलो"];
+    const isJustGreeting = generalGreetings.includes(norm);
+    if (!isJustGreeting) {
+      isAboutCreator = true;
+    }
+  } else if (hasCreatorTerm && refersToYou) {
+    isAboutCreator = true;
+  } else if (asksWhoMade && refersToYou) {
+    isAboutCreator = true;
+  } else if ((hasCreatorTerm || asksWhoMade) && norm.length < 35) {
+    isAboutCreator = true;
+  }
+
+  // Strict exception: if there is an academic subject or other known entity mentioned (e.g. "gravity", "motion", "universe"),
+  // DO NOT intercept unless they explicitly mention "rohit" or "yadav"
+  if (isAboutCreator && !mentionsRohitDirectly) {
+    const academicSubjects = [
+      "motion", "gravity", "universe", "world", "earth", "country", "india", "car", "concept", "theory", "formula", "laws", "law",
+      "cell", "biology", "physics", "chemistry", "periodic", "table", "element", "atom", "molecule", "science", "math", "calculus",
+      "derivative", "integral", "equation", "history", "war", "book", "author", "play", "movie", "song", "language", "grammar",
+      "sentence", "word", "code", "programming", "python", "javascript", "react", "html", "css", "computer", "internet", "google",
+      "facebook", "microsoft", "apple", "tesla", "spacex", "amazon", "netflix", "twitter", "electricity", "magnet", "sound", "light",
+      "energy", "work", "power", "speed", "velocity", "acceleration", "force", "mass", "weight", "friction", "heat", "temperature",
+      "pressure", "density", "volume", "area", "length", "time", "distance", "displacement", "vector", "scalar", "newton", "galileo",
+      "einstein", "darwin", "mendel", "pasteur", "curie", "tesla", "edison", "bell", "bohr", "rutheford", "dalton", "avogadro", "boyle",
+      "charles", "gay-lussac", "dalton", "graham", "henry", "raoult", "faraday", "ampere", "volt", "ohm", "joule", "watt", "hertz"
+    ];
+
+    const hasAcademicSubject = academicSubjects.some(sub => norm.includes(sub));
+    if (hasAcademicSubject) {
+      isAboutCreator = false;
+    }
+  }
+
+  if (!isAboutCreator) {
+    return null;
+  }
 
   // Key matching criteria for simple creator questions
   const matchCreatorSimple = (
@@ -526,6 +618,7 @@ export function checkCreatorQuestion(prompt: string, language: string = "English
     (norm.includes("who is") && norm.includes("creator") && (norm.includes("your") || norm.includes("app") || norm.includes("ai"))) ||
     (norm.includes("creator") && (norm.includes("who") || norm.includes("kisne")) && (norm.includes("you") || norm.includes("tutor") || norm.includes("study buddy"))) ||
     (norm.includes("app") && norm.includes("kisne") && norm.includes("banaya")) ||
+    (norm.includes("malik") || norm.includes("owner") || norm.includes("founder") || norm.includes("ceo")) ||
     (norm === "creator कौन है" || norm === "creator कौन है?" || norm === "तुम्हें किसने बनाया?" || norm === "तुम्हें किसने बनाया")
   );
 

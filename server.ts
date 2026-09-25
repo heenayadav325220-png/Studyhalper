@@ -110,8 +110,6 @@ function getAiClient(): GoogleGenAI | null {
 // gemini-2.5-flash is our primary production engine as mandated by RULE[GEMINI_md]
 const FALLBACK_MODELS = [
   "gemini-2.5-flash",
-  "gemini-3.8-flash",
-  "gemini-flash-latest",
   "gemini-3.1-flash-lite"
 ];
 

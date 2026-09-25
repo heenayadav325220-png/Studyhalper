@@ -26,13 +26,19 @@ import {
   X,
   Target,
   Copy,
-  CheckCheck
+  CheckCheck,
+  Globe
 } from 'lucide-react';
 import { generateQuiz, shuffleQuizQuestions } from '../services/geminiService';
 import { showToast } from './Toast';
 import { parseError, logError } from '../utils/errorHandler';
 import { playSuccessChime, triggerHaptic } from '../services/soundEffects';
 import type { Subject, MockExam, UserProfile } from '../types';
+import { 
+  QuizLanguage, 
+  QUIZ_LANGUAGES, 
+  getQuizText 
+} from '../services/quizTranslations';
 
 interface QuizSectionProps {
   user: UserProfile;
@@ -41,6 +47,7 @@ interface QuizSectionProps {
   savedExams?: MockExam[];
   onClose?: () => void;
   language?: string;
+  onLanguageChange?: (lang: any) => void;
 }
 
 interface QuizQuestion {
@@ -345,10 +352,33 @@ export default function QuizSection({
   onSaveMockExam,
   savedExams = [],
   onClose,
-  language = 'en'
+  language = 'en',
+  onLanguageChange
 }: QuizSectionProps) {
   // Navigation & Step State
   const [viewState, setViewState] = useState<'setup' | 'loading' | 'active' | 'results' | 'history'>('setup');
+
+  // Dynamic Quiz-specific Language Selection
+  const [quizLanguage, setQuizLanguage] = useState<QuizLanguage>(() => {
+    if (language && ['en', 'hi', 'hinglish', 'marathi', 'tamil', 'bengali'].includes(language)) {
+      return language as QuizLanguage;
+    }
+    return 'en';
+  });
+
+  // Sync quiz language with app language if app language changes
+  useEffect(() => {
+    if (language && ['en', 'hi', 'hinglish', 'marathi', 'tamil', 'bengali'].includes(language)) {
+      setQuizLanguage(language as QuizLanguage);
+    }
+  }, [language]);
+
+  const handleQuizLanguageSelect = (lang: QuizLanguage) => {
+    setQuizLanguage(lang);
+    if (onLanguageChange) {
+      onLanguageChange(lang);
+    }
+  };
 
   // Setup Config
   const [selectedSubject, setSelectedSubject] = useState<Subject>('Mathematics');
@@ -381,6 +411,17 @@ export default function QuizSection({
     setErrorMsg('');
 
     try {
+      // Map quizLanguage correctly to the string parameter for generateQuiz
+      const map: Record<QuizLanguage, string> = {
+        en: 'English',
+        hi: 'Hindi',
+        hinglish: 'Hinglish',
+        marathi: 'Marathi',
+        tamil: 'Tamil',
+        bengali: 'Bengali'
+      };
+      const langParam = map[quizLanguage] || 'English';
+
       const generated = await generateQuiz(
         selectedSubject,
         {
@@ -390,7 +431,7 @@ export default function QuizSection({
           country: 'India',
           topic: topicToUse
         },
-        language === 'hi' ? 'Hindi' : 'English',
+        langParam,
         difficulty,
         questionCount,
         topicToUse
@@ -414,8 +455,8 @@ export default function QuizSection({
     } catch (err: any) {
       logError(err, 'QUIZ_GEN');
       const parsed = parseError(err);
-      const isHindi = language === 'hi' || language === 'Hindi';
-      const msg = isHindi ? parsed.messageHindi : parsed.message;
+      const isHi = quizLanguage === 'hi';
+      const msg = isHi ? parsed.messageHindi : parsed.message;
       setErrorMsg(msg);
       showToast(msg, 'error');
       setViewState('setup');
@@ -654,15 +695,60 @@ export default function QuizSection({
               </motion.div>
             )}
 
+            {/* EXPLICIT LANGUAGE SELECTION & CONFIRMATION PANEL */}
+            <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-5 sm:p-6 border border-indigo-500/20 shadow-md space-y-4">
+              <div className="flex items-center space-x-2">
+                <Globe className="w-5 h-5 text-indigo-400 shrink-0" />
+                <div>
+                  <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider">
+                    {getQuizText('langConfirmTitle', quizLanguage)}
+                  </h3>
+                  <p className="text-[10px] sm:text-xs text-slate-300">
+                    {getQuizText('langConfirmSub', quizLanguage)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 pt-1">
+                {QUIZ_LANGUAGES.map((item) => {
+                  const isSel = quizLanguage === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleQuizLanguageSelect(item.id)}
+                      className={`py-2 px-3 rounded-2xl text-xs font-bold transition flex items-center justify-center space-x-2 border cursor-pointer ${
+                        isSel
+                          ? 'bg-indigo-600 border-indigo-400 text-white shadow-md ring-2 ring-indigo-500/40'
+                          : 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-200'
+                      }`}
+                    >
+                      <span className="text-sm">{item.flag}</span>
+                      <span>{item.nativeLabel}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Confirmation Indicator */}
+              <div className="p-3 bg-white/5 border border-white/10 rounded-2xl flex items-center space-x-2 text-[10px] sm:text-xs text-indigo-300 font-semibold">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>
+                  <strong>{getQuizText('selectedLangBadge', quizLanguage)}:</strong>{' '}
+                  {QUIZ_LANGUAGES.find(q => q.id === quizLanguage)?.label} - {QUIZ_LANGUAGES.find(q => q.id === quizLanguage)?.description}
+                </span>
+              </div>
+            </div>
+
             {/* SUBJECT PICKER CARDS */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center space-x-1.5">
                   <GraduationCap className="w-4 h-4 text-indigo-600" />
-                  <span>1. Choose Subject</span>
+                  <span>{getQuizText('stepSubject', quizLanguage)}</span>
                 </h3>
                 <span className="text-[11px] font-semibold text-slate-400">
-                  {SUBJECT_CONFIGS.length} Subjects Available
+                  {SUBJECT_CONFIGS.length} {getQuizText('subjectsAvailable', quizLanguage)}
                 </span>
               </div>
 
@@ -722,10 +808,10 @@ export default function QuizSection({
               <div>
                 <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center space-x-1.5 mb-1">
                   <BookMarked className="w-4 h-4 text-indigo-600" />
-                  <span>2. Select or Enter Topic</span>
+                  <span>{getQuizText('stepTopic', quizLanguage)}</span>
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Pick a suggested syllabus topic or type any specific chapter / formula.
+                  {getQuizText('topicSub', quizLanguage)}
                 </p>
               </div>
 
@@ -753,7 +839,7 @@ export default function QuizSection({
                   type="text"
                   value={customTopic}
                   onChange={(e) => setCustomTopic(e.target.value)}
-                  placeholder="e.g. Organic Isomerism, Photosynthesis Light Reaction, Limits & Continuity, Mughal Empire..."
+                  placeholder={getQuizText('topicPlaceholder', quizLanguage)}
                   className="w-full px-4 py-3 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-600 font-medium text-slate-900 transition"
                 />
               </div>
@@ -765,14 +851,14 @@ export default function QuizSection({
                 <div>
                   <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center space-x-1.5 mb-1">
                     <Target className="w-4 h-4 text-indigo-600" />
-                    <span>3. Number of Questions ({questionCount} Selected)</span>
+                    <span>{getQuizText('stepQuestions', quizLanguage)} ({questionCount} Selected)</span>
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Choose exam length. AI generates questions strictly on your topic with randomized option order.
+                    {getQuizText('questionsSub', quizLanguage)}
                   </p>
                 </div>
                 <div className="flex items-center space-x-2 bg-indigo-50 border border-indigo-200/80 px-3 py-1.5 rounded-xl self-start sm:self-auto">
-                  <span className="text-xs font-extrabold text-indigo-900">{questionCount} Questions</span>
+                  <span className="text-xs font-extrabold text-indigo-900">{questionCount} {getQuizText('questionOf', quizLanguage)}s</span>
                   <span className="text-[10px] text-indigo-600 font-semibold">• ~{Math.max(1, Math.round((questionCount * 30) / 60))} min</span>
                 </div>
               </div>
@@ -780,11 +866,11 @@ export default function QuizSection({
               {/* PRESET CHIPS (5, 10, 15, 20, 25) */}
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
                 {[
-                  { count: 5, label: '5 Questions', sub: 'Quick Blitz', tag: '⚡ 2.5 Min' },
-                  { count: 10, label: '10 Questions', sub: 'Standard Exam', tag: '🎯 5 Min' },
-                  { count: 15, label: '15 Questions', sub: 'Deep Practice', tag: '📚 7.5 Min' },
-                  { count: 20, label: '20 Questions', sub: 'Full Mock Test', tag: '🔥 10 Min' },
-                  { count: 25, label: '25 Questions', sub: 'Grand Mastery', tag: '🏆 12.5 Min' }
+                  { count: 5, label: quizLanguage === 'hi' ? '5 प्रश्न' : '5 Questions', sub: quizLanguage === 'hi' ? 'त्वरित अभ्यास' : 'Quick Blitz', tag: '⚡ 2.5 Min' },
+                  { count: 10, label: quizLanguage === 'hi' ? '10 प्रश्न' : '10 Questions', sub: quizLanguage === 'hi' ? 'मानक टेस्ट' : 'Standard Exam', tag: '🎯 5 Min' },
+                  { count: 15, label: quizLanguage === 'hi' ? '15 प्रश्न' : '15 Questions', sub: quizLanguage === 'hi' ? 'गहन अभ्यास' : 'Deep Practice', tag: '📚 7.5 Min' },
+                  { count: 20, label: quizLanguage === 'hi' ? '20 प्रश्न' : '20 Questions', sub: quizLanguage === 'hi' ? 'पूर्ण परीक्षा' : 'Full Mock Test', tag: '🔥 10 Min' },
+                  { count: 25, label: quizLanguage === 'hi' ? '25 प्रश्न' : '25 Questions', sub: quizLanguage === 'hi' ? 'महा योग्यता' : 'Grand Mastery', tag: '🏆 12.5 Min' }
                 ].map((item) => {
                   const isSelected = questionCount === item.count;
                   return (
@@ -821,7 +907,9 @@ export default function QuizSection({
 
               {/* CUSTOM RANGE SLIDER */}
               <div className="flex items-center gap-3 pt-1">
-                <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Custom Count:</span>
+                <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">
+                  {quizLanguage === 'hi' ? 'कस्टम संख्या:' : 'Custom Count:'}
+                </span>
                 <input
                   type="range"
                   min="3"
@@ -842,7 +930,7 @@ export default function QuizSection({
               <div className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-3 shadow-xs">
                 <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center space-x-1.5">
                   <Award className="w-4 h-4 text-amber-500" />
-                  <span>4. Difficulty Level</span>
+                  <span>{getQuizText('stepDifficulty', quizLanguage)}</span>
                 </h3>
                 <div className="grid grid-cols-3 gap-2">
                   {(['Easy', 'Medium', 'Hard'] as const).map((diff) => {
@@ -861,9 +949,9 @@ export default function QuizSection({
                             : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                         }`}
                       >
-                        {diff === 'Easy' && '🌱 Easy'}
-                        {diff === 'Medium' && '⚖️ Medium'}
-                        {diff === 'Hard' && '🔥 Hard'}
+                        {diff === 'Easy' && `🌱 ${quizLanguage === 'hi' ? 'सरल' : 'Easy'}`}
+                        {diff === 'Medium' && `⚖️ ${quizLanguage === 'hi' ? 'मध्यम' : 'Medium'}`}
+                        {diff === 'Hard' && `🔥 ${quizLanguage === 'hi' ? 'कठिन' : 'Hard'}`}
                       </button>
                     );
                   })}
@@ -874,7 +962,7 @@ export default function QuizSection({
               <div className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-3 shadow-xs">
                 <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center space-x-1.5">
                   <Timer className="w-4 h-4 text-cyan-600" />
-                  <span>5. Quiz Mode</span>
+                  <span>{getQuizText('stepMode', quizLanguage)}</span>
                 </h3>
                 <div className="flex gap-2">
                   <button
@@ -886,7 +974,7 @@ export default function QuizSection({
                     }`}
                   >
                     <Clock className="w-3.5 h-3.5 text-amber-400" />
-                    <span>30s Timed Round</span>
+                    <span>{getQuizText('timedMode', quizLanguage)}</span>
                   </button>
 
                   <button
@@ -897,12 +985,12 @@ export default function QuizSection({
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
-                    <span>🧘 Relaxed Study</span>
+                    <span>{getQuizText('relaxedMode', quizLanguage)}</span>
                   </button>
                 </div>
 
                 <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                  <span className="text-[11px] font-semibold text-slate-600">Instant Answer Analysis</span>
+                  <span className="text-[11px] font-semibold text-slate-600">{getQuizText('instantFeedbackLabel', quizLanguage)}</span>
                   <button
                     type="button"
                     onClick={() => setInstantFeedback(!instantFeedback)}
@@ -912,7 +1000,7 @@ export default function QuizSection({
                         : 'bg-slate-100 text-slate-500'
                     }`}
                   >
-                    {instantFeedback ? '✓ Enabled' : 'Off'}
+                    {instantFeedback ? getQuizText('enabled', quizLanguage) : getQuizText('off', quizLanguage)}
                   </button>
                 </div>
               </div>
@@ -922,7 +1010,13 @@ export default function QuizSection({
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
               <div className="flex items-center space-x-2 text-xs text-slate-500">
                 <Sparkles className="w-4 h-4 text-indigo-600" />
-                <span>Earn up to <strong>+{questionCount * 15 + 45} XP</strong> with streak bonuses!</span>
+                <span>
+                  {quizLanguage === 'hi' ? (
+                    <>स्ट्रीक बोनस के साथ कुल <strong>+{questionCount * 15 + 45} XP</strong> तक अर्जित करें!</>
+                  ) : (
+                    <>Earn up to <strong>+{questionCount * 15 + 45} XP</strong> with streak bonuses!</>
+                  )}
+                </span>
               </div>
 
               <div className="flex items-center space-x-3 w-full sm:w-auto">
@@ -932,7 +1026,7 @@ export default function QuizSection({
                     className="px-4 py-3 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 border border-slate-200 transition cursor-pointer flex items-center space-x-1.5"
                   >
                     <History className="w-4 h-4 text-slate-500" />
-                    <span>Past Results ({savedExams.length})</span>
+                    <span>{getQuizText('pastResults', quizLanguage)} ({savedExams.length})</span>
                   </button>
                 )}
 
@@ -943,7 +1037,7 @@ export default function QuizSection({
                   className="flex-1 sm:flex-initial px-8 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md transition flex items-center justify-center space-x-2 cursor-pointer"
                 >
                   <Play className="w-4 h-4 fill-white" />
-                  <span>Launch Practice Quiz ({questionCount} Qs)</span>
+                  <span>{getQuizText('launchQuiz', quizLanguage)} ({questionCount} Qs)</span>
                   <ArrowRight className="w-4 h-4" />
                 </motion.button>
               </div>
