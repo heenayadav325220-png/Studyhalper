@@ -42,6 +42,16 @@ jobs:
         run: |
           echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
 
+      - name: Debug Keystore Secret
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          echo "Length of secret (chars): $(echo -n "$RELEASE_KEYSTORE_BASE64" | wc -c)"
+          echo "First 20 chars: $(echo -n "$RELEASE_KEYSTORE_BASE64" | head -c 20)"
+          echo "Last 20 chars: $(echo -n "$RELEASE_KEYSTORE_BASE64" | tail -c 20)"
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > /tmp/test_decode 2>&1 || echo "DECODE FAILED"
+          ls -la /tmp/test_decode 2>/dev/null || echo "no output file created"
+
       - name: Upload Recovered Keystore
         uses: actions/upload-artifact@v4
         with:
