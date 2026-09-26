@@ -2,15 +2,110 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="google-site-verification" content="J5uPT77aQrGptxESxyxMNUiD7ZJepQ2wrv0vvI0uGDk" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content, viewport-fit=cover" />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>StudyHelper - AI Study Companion | by Rohit Yadav </title>
+    
+    <!-- Immediate theme restoration from localStorage to prevent flash of light theme -->
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('ascend_theme');
+          var isDark = saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.classList.remove('light');
+            document.documentElement.style.colorScheme = 'dark';
+            document.documentElement.setAttribute('data-theme', 'dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.classList.add('light');
+            document.documentElement.style.colorScheme = 'light';
+            document.documentElement.setAttribute('data-theme', 'light');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    
+    <!-- PWA & Mobile Web App Meta Tags -->
     <link rel="manifest" href="/manifest.json" />
-    <script type="module" crossorigin src="/assets/index-CPm6MPqE.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-Dachk7Rz.css">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
+    <meta name="theme-color" content="#4338ca" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="StudyHelper" />
+    <meta name="application-name" content="StudyHelper" />
+    <meta name="msapplication-TileColor" content="#4338ca" />
+    <meta name="msapplication-TileImage" content="/icon-192.png" />
+    
+    <!-- Search Engine Optimization (SEO) & Indexing -->
+    <!-- Google Search Console Verification -->
+    <meta name="google-site-verification" content="ZQInFL286509oXxiTfiCYAjLoQZ5SP6iYhVUUqcRgqs" />
+    <meta name="author" content="Rohit Yadav (yadavrohityadav331@gmail.com)" />
+    <meta name="creator" content="Rohit Yadav" />
+    <meta name="publisher" content="Rohit Yadav" />
+    <meta name="contact" content="yadavrohityadav331@gmail.com" />
+    <meta name="description" content="StudyHelper - AI Study Companion created by Rohit Yadav (yadavrohityadav331@gmail.com). An ultra-modern AI educational assistant featuring AI Tutor, Mock Exams, interactive toolkit, and real-time collaboration." />
+    <meta name="keywords" content="Rohit Yadav, yadavrohityadav331@gmail.com, Rohit Yadav AI, Rohit Yadav App, StudyHelper, StudyHelper Rohit Yadav, Remix Study Buddy, Rohit Yadav Developer, Rohit Yadav Study Companion, AI Tutor Rohit Yadav" />
+    <meta name="robots" content="index, follow" />
+    
+    <!-- Open Graph / Facebook / WhatsApp -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="StudyHelper - Created by Rohit Yadav" />
+    <meta property="og:description" content="AI Study Companion created by Rohit Yadav (yadavrohityadav331@gmail.com). AI tutoring, mock exams, and interactive study tools." />
+    <meta property="og:site_name" content="StudyHelper by Rohit Yadav" />
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="StudyHelper - Created by Rohit Yadav (yadavrohityadav331@gmail.com)" />
+    <meta name="twitter:description" content="AI Study Companion created by Rohit Yadav (yadavrohityadav331@gmail.com)." />
+
+    <!-- Google Structured Data (JSON-LD) for Search Ranking -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Person",
+          "name": "Rohit Yadav",
+          "email": "mailto:yadavrohityadav331@gmail.com",
+          "jobTitle": "Creator & Lead Developer",
+          "description": "Creator and Lead Developer of StudyHelper."
+        },
+        {
+          "@type": "WebApplication",
+          "name": "StudyHelper",
+          "alternateName": "StudyHelper - AI Study Companion by Rohit Yadav",
+          "applicationCategory": "EducationalApplication",
+          "operatingSystem": "All",
+          "author": {
+            "@type": "Person",
+            "name": "Rohit Yadav",
+            "email": "mailto:yadavrohityadav331@gmail.com"
+          },
+          "creator": {
+            "@type": "Person",
+            "name": "Rohit Yadav",
+            "email": "mailto:yadavrohityadav331@gmail.com"
+          },
+          "description": "StudyHelper - Ultra-modern AI study companion created by Rohit Yadav (yadavrohityadav331@gmail.com)."
+        }
+      ]
+    }
+    </script>
+    <script type="module" crossorigin src="/assets/index-HFuQMYh5.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DeQExmpC.css">
   </head>
-  <body>
-    <div id="root"></div>
+  <body class="bg-[#f8fafc] text-slate-800 min-h-screen antialiased overflow-x-hidden">
+    <div id="root" class="min-h-screen w-full overflow-x-hidden"></div>
   </body>
 </html>
-

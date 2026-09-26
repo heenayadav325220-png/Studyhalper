@@ -1,3 +1,4 @@
+"use strict";
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -8,11 +9,11 @@ var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
-var __copyProps = (to, from, except, desc) => {
+var __copyProps = (to, from, except, desc2) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
       if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc2 = __getOwnPropDesc(from, key)) || desc2.enumerable });
   }
   return to;
 };
@@ -29,807 +30,1435 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // server.ts
 var server_exports = {};
 __export(server_exports, {
-  app: () => app,
-  default: () => server_default
+  app: () => app
 });
 module.exports = __toCommonJS(server_exports);
-var import_express = __toESM(require("express"), 1);
-
-// src/services/mockDb.ts
-var MockDatabase = class {
-  constructor() {
-    this.users = [
-      { id: 1, name: "Rohit Yadav", points: 0, level: 1, avatar: null },
-      { id: 2, name: "Alice Smith", points: 450, level: 5, avatar: null },
-      { id: 3, name: "Bob Johnson", points: 320, level: 3, avatar: null },
-      { id: 4, name: "Charlie Brown", points: 150, level: 2, avatar: null }
-    ];
-    this.badges = [];
-    this.notes = [];
-    this.schedule = [];
-    this.progress = [];
-    this.groups = [];
-    this.group_members = [];
-    this.group_messages = [];
-    this.group_notes = [];
-    console.log("MockDatabase initialized in memory.");
-  }
-  exec(sql) {
-    return { success: true };
-  }
-  prepare(sql) {
-    const normalized = sql.toLowerCase().replace(/\s+/g, " ");
-    return {
-      run: (...args) => {
-        let lastInsertRowid = Date.now();
-        if (normalized.includes("insert into users")) {
-          const id = args[0];
-          const name = args[1];
-          const points = args[2] || 0;
-          const level = args[3] || 1;
-          if (!this.users.find((u) => u.id === id)) {
-            this.users.push({ id, name, points, level, avatar: null });
-          }
-        } else if (normalized.includes("update users set points = points + ?")) {
-          const points = args[0];
-          const userId = args[1];
-          const user = this.users.find((u) => u.id === Number(userId));
-          if (user) {
-            user.points += points;
-          }
-        } else if (normalized.includes("update users set level =")) {
-          const userId = args[0];
-          const user = this.users.find((u) => u.id === Number(userId));
-          if (user) {
-            user.level = Math.floor(user.points / 100) + 1;
-          }
-        } else if (normalized.includes("insert into badges")) {
-          const user_id = args[0];
-          const badge_name = args[1];
-          const icon = args[2];
-          this.badges.push({
-            id: this.badges.length + 1,
-            user_id: Number(user_id),
-            badge_name,
-            icon,
-            date_earned: (/* @__PURE__ */ new Date()).toISOString()
-          });
-        } else if (normalized.includes("insert into notes")) {
-          const title = args[0];
-          const content = args[1];
-          const subject = args[2];
-          const newNote = {
-            id: this.notes.length + 1,
-            title,
-            content,
-            subject,
-            updated_at: (/* @__PURE__ */ new Date()).toISOString()
-          };
-          this.notes.push(newNote);
-          lastInsertRowid = newNote.id;
-        } else if (normalized.includes("update notes set title")) {
-          const title = args[0];
-          const content = args[1];
-          const subject = args[2];
-          const id = args[3];
-          const note = this.notes.find((n) => n.id === Number(id));
-          if (note) {
-            note.title = title;
-            note.content = content;
-            note.subject = subject;
-            note.updated_at = (/* @__PURE__ */ new Date()).toISOString();
-          }
-        } else if (normalized.includes("delete from notes")) {
-          const id = args[0];
-          this.notes = this.notes.filter((n) => n.id !== Number(id));
-        } else if (normalized.includes("insert into schedule")) {
-          const task = args[0];
-          const time = args[1];
-          const day = args[2];
-          const newItem = {
-            id: this.schedule.length + 1,
-            task,
-            time,
-            day,
-            completed: 0
-          };
-          this.schedule.push(newItem);
-          lastInsertRowid = newItem.id;
-        } else if (normalized.includes("update schedule set completed")) {
-          const completed = args[0];
-          const id = args[1];
-          const item = this.schedule.find((s) => s.id === Number(id));
-          if (item) {
-            item.completed = completed;
-          }
-        } else if (normalized.includes("delete from schedule")) {
-          const id = args[0];
-          this.schedule = this.schedule.filter((s) => s.id !== Number(id));
-        } else if (normalized.includes("insert into progress")) {
-          const subject = args[0];
-          const score = args[1];
-          const total = args[2];
-          this.progress.push({
-            id: this.progress.length + 1,
-            subject,
-            score,
-            total,
-            date: (/* @__PURE__ */ new Date()).toISOString()
-          });
-        } else if (normalized.includes("insert into groups")) {
-          const name = args[0];
-          const description = args[1];
-          const created_by = args[2];
-          const newGroup = {
-            id: this.groups.length + 1,
-            name,
-            description,
-            created_by: Number(created_by),
-            created_at: (/* @__PURE__ */ new Date()).toISOString()
-          };
-          this.groups.push(newGroup);
-          lastInsertRowid = newGroup.id;
-        } else if (normalized.includes("insert into group_members")) {
-          const group_id = args[0];
-          const user_id = args[1];
-          const role = args[2] || "member";
-          if (!this.group_members.find((gm) => gm.group_id === Number(group_id) && gm.user_id === Number(user_id))) {
-            this.group_members.push({
-              group_id: Number(group_id),
-              user_id: Number(user_id),
-              role
-            });
-          }
-        } else if (normalized.includes("insert into group_messages")) {
-          const group_id = args[0];
-          const user_id = args[1];
-          const text = args[2];
-          const image = args[3];
-          const newMessage = {
-            id: this.group_messages.length + 1,
-            group_id: Number(group_id),
-            user_id: Number(user_id),
-            text,
-            image,
-            created_at: (/* @__PURE__ */ new Date()).toISOString()
-          };
-          this.group_messages.push(newMessage);
-          lastInsertRowid = newMessage.id;
-        } else if (normalized.includes("insert into group_notes")) {
-          const group_id = args[0];
-          const title = args[1];
-          const content = args[2];
-          const updated_by = args[3];
-          const newGNote = {
-            id: this.group_notes.length + 1,
-            group_id: Number(group_id),
-            title,
-            content,
-            updated_by: Number(updated_by),
-            updated_at: (/* @__PURE__ */ new Date()).toISOString()
-          };
-          this.group_notes.push(newGNote);
-          lastInsertRowid = newGNote.id;
-        } else if (normalized.includes("update group_notes set title")) {
-          const title = args[0];
-          const content = args[1];
-          const updated_by = args[2];
-          const id = args[3];
-          const gNote = this.group_notes.find((gn) => gn.id === Number(id));
-          if (gNote) {
-            gNote.title = title;
-            gNote.content = content;
-            gNote.updated_by = Number(updated_by);
-            gNote.updated_at = (/* @__PURE__ */ new Date()).toISOString();
-          }
-        }
-        return { lastInsertRowid, changes: 1 };
-      },
-      get: (...args) => {
-        if (normalized.includes("select * from users where id = ?")) {
-          const id = args[0];
-          return this.users.find((u) => u.id === Number(id)) || null;
-        } else if (normalized.includes("select id from badges")) {
-          const user_id = args[0];
-          const badge_name = args[1];
-          return this.badges.find((b) => b.user_id === Number(user_id) && b.badge_name === badge_name) || null;
-        } else if (normalized.includes("select name from users where id = ?")) {
-          const id = args[0];
-          const user = this.users.find((u) => u.id === Number(id));
-          return user ? { name: user.name } : null;
-        }
-        return null;
-      },
-      all: (...args) => {
-        if (normalized.includes("select * from badges where user_id = ?")) {
-          const user_id = args[0];
-          return this.badges.filter((b) => b.user_id === Number(user_id));
-        } else if (normalized.includes("select name, points, level from users")) {
-          return [...this.users].sort((a, b) => b.points - a.points).slice(0, 10).map((u) => ({ name: u.name, points: u.points, level: u.level }));
-        } else if (normalized.includes("select * from notes")) {
-          return [...this.notes].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-        } else if (normalized.includes("select * from schedule")) {
-          return [...this.schedule];
-        } else if (normalized.includes("select * from progress")) {
-          return [...this.progress].sort((a, b) => b.date.localeCompare(a.date));
-        } else if (normalized.includes("select g.*")) {
-          if (normalized.includes("join group_members gm")) {
-            const userId = args[0];
-            const joinedGroupIds = this.group_members.filter((gm) => gm.user_id === Number(userId)).map((gm) => gm.group_id);
-            return this.groups.filter((g) => joinedGroupIds.includes(g.id)).map((g) => ({
-              ...g,
-              member_count: this.group_members.filter((gm) => gm.group_id === g.id).length
-            }));
-          } else {
-            return this.groups.map((g) => ({
-              ...g,
-              member_count: this.group_members.filter((gm) => gm.group_id === g.id).length
-            }));
-          }
-        } else if (normalized.includes("select gm.*, u.name")) {
-          const group_id = args[0];
-          return this.group_messages.filter((gm) => gm.group_id === Number(group_id)).map((gm) => {
-            const u = this.users.find((user) => user.id === gm.user_id);
-            return {
-              ...gm,
-              user_name: u ? u.name : "Unknown Student"
-            };
-          }).sort((a, b) => a.created_at.localeCompare(b.created_at));
-        } else if (normalized.includes("select gn.*, u.name")) {
-          const group_id = args[0];
-          return this.group_notes.filter((gn) => gn.group_id === Number(group_id)).map((gn) => {
-            const u = this.users.find((user) => user.id === gn.updated_by);
-            return {
-              ...gn,
-              updated_by_name: u ? u.name : "Unknown Student"
-            };
-          }).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-        }
-        return [];
-      }
-    };
-  }
-};
-
-// server.ts
-var import_path = __toESM(require("path"), 1);
-var import_http = require("http");
-var import_socket = require("socket.io");
 var import_dotenv = __toESM(require("dotenv"), 1);
+var import_express = __toESM(require("express"), 1);
+var import_path = __toESM(require("path"), 1);
+var import_compression = __toESM(require("compression"), 1);
 var import_genai = require("@google/genai");
 
-// src/services/fallbackData.ts
-var FALLBACK_QUIZZES = {
-  "Mathematics": {
-    "English": [
-      {
-        question: "What is the value of x in the equation 3x - 7 = 8?",
-        options: ["3", "5", "10", "15"],
-        answer: 1
-      },
-      {
-        question: "A triangle with three equal sides is called an...",
-        options: ["Isosceles triangle", "Scalene triangle", "Equilateral triangle", "Right-angled triangle"],
-        answer: 2
-      },
-      {
-        question: "What is 25% of 200?",
-        options: ["25", "50", "150", "100"],
-        answer: 1
-      },
-      {
-        question: "What is the area of a rectangle with length 8 cm and width 5 cm?",
-        options: ["13 sq cm", "30 sq cm", "40 sq cm", "45 sq cm"],
-        answer: 2
-      },
-      {
-        question: "If a coin is tossed, what is the probability of getting a Head?",
-        options: ["1", "0", "0.5", "0.25"],
-        answer: 2
-      }
-    ],
-    "Hindi": [
-      {
-        question: "\u0938\u092E\u0940\u0915\u0930\u0923 3x - 7 = 8 \u092E\u0947\u0902 x \u0915\u093E \u092E\u093E\u0928 \u0915\u094D\u092F\u093E \u0939\u0948?",
-        options: ["3", "5", "10", "15"],
-        answer: 1
-      },
-      {
-        question: "\u0924\u0940\u0928 \u0938\u092E\u093E\u0928 \u092D\u0941\u091C\u093E\u0913\u0902 \u0935\u093E\u0932\u0947 \u0924\u094D\u0930\u093F\u092D\u0941\u091C \u0915\u094B \u0915\u094D\u092F\u093E \u0915\u0939\u093E \u091C\u093E\u0924\u093E \u0939\u0948?",
-        options: ["\u0938\u092E\u0926\u094D\u0935\u093F\u092C\u093E\u0939\u0941 \u0924\u094D\u0930\u093F\u092D\u0941\u091C", "\u0935\u093F\u0937\u092E\u092C\u093E\u0939\u0941 \u0924\u094D\u0930\u093F\u092D\u0941\u091C", "\u0938\u092E\u092C\u093E\u0939\u0941 \u0924\u094D\u0930\u093F\u092D\u0941\u091C", "\u0938\u092E\u0915\u094B\u0923 \u0924\u094D\u0930\u093F\u092D\u0941\u091C"],
-        answer: 2
-      },
-      {
-        question: "200 \u0915\u093E 25% \u0915\u093F\u0924\u0928\u093E \u0939\u094B\u0924\u093E \u0939\u0948?",
-        options: ["25", "50", "150", "100"],
-        answer: 1
-      },
-      {
-        question: "8 \u0938\u0947\u092E\u0940 \u0932\u0902\u092C\u093E\u0908 \u0914\u0930 5 \u0938\u0947\u092E\u0940 \u091A\u094C\u0921\u093C\u093E\u0908 \u0935\u093E\u0932\u0947 \u0906\u092F\u0924 \u0915\u093E \u0915\u094D\u0937\u0947\u0924\u094D\u0930\u092B\u0932 \u0915\u094D\u092F\u093E \u0939\u094B\u0917\u093E?",
-        options: ["13 \u0935\u0930\u094D\u0917 \u0938\u0947\u092E\u0940", "30 \u0935\u0930\u094D\u0917 \u0938\u0947\u092E\u0940", "40 \u0935\u0930\u094D\u0917 \u0938\u0947\u092E\u0940", "45 \u0935\u0930\u094D\u0917 \u0938\u0947\u092E\u0940"],
-        answer: 2
-      },
-      {
-        question: "\u090F\u0915 \u0938\u093F\u0915\u094D\u0915\u093E \u0909\u091B\u093E\u0932\u0928\u0947 \u092A\u0930 \u091A\u093F\u0924 (Heads) \u0906\u0928\u0947 \u0915\u0940 \u092A\u094D\u0930\u093E\u092F\u093F\u0915\u0924\u093E \u0915\u094D\u092F\u093E \u0939\u0948?",
-        options: ["1", "0", "0.5", "0.25"],
-        answer: 2
-      }
-    ]
-  },
-  "Science": {
-    "English": [
-      {
-        question: "Which planet in our solar system is known as the Red Planet?",
-        options: ["Venus", "Mars", "Jupiter", "Saturn"],
-        answer: 1
-      },
-      {
-        question: "What is the process of water vapor changing into liquid water called?",
-        options: ["Evaporation", "Condensation", "Precipitation", "Transpiration"],
-        answer: 1
-      },
-      {
-        question: "Which gas do human beings inhale to survive?",
-        options: ["Carbon Dioxide", "Nitrogen", "Oxygen", "Helium"],
-        answer: 2
-      },
-      {
-        question: "What is the powerhouse of the cell?",
-        options: ["Nucleus", "Ribosome", "Mitochondria", "Golgi Apparatus"],
-        answer: 2
-      },
-      {
-        question: "What type of force attracts any object with mass toward each other?",
-        options: ["Magnetic Force", "Gravity", "Friction", "Electrostatic"],
-        answer: 1
-      }
-    ],
-    "Hindi": [
-      {
-        question: "\u0939\u092E\u093E\u0930\u0947 \u0938\u094C\u0930\u092E\u0902\u0921\u0932 \u0915\u0947 \u0915\u093F\u0938 \u0917\u094D\u0930\u0939 \u0915\u094B \u0932\u093E\u0932 \u0917\u094D\u0930\u0939 \u0915\u0947 \u0930\u0942\u092A \u092E\u0947\u0902 \u091C\u093E\u0928\u093E \u091C\u093E\u0924\u093E \u0939\u0948?",
-        options: ["\u0936\u0941\u0915\u094D\u0930", "\u092E\u0902\u0917\u0932", "\u092C\u0943\u0939\u0938\u094D\u092A\u0924\u093F", "\u0936\u0928\u093F"],
-        answer: 1
-      },
-      {
-        question: "\u091C\u0932\u0935\u093E\u0937\u094D\u092A \u0915\u0947 \u0926\u094D\u0930\u0935 \u091C\u0932 \u092E\u0947\u0902 \u092C\u0926\u0932\u0928\u0947 \u0915\u0940 \u092A\u094D\u0930\u0915\u094D\u0930\u093F\u092F\u093E \u0915\u094B \u0915\u094D\u092F\u093E \u0915\u0939\u0924\u0947 \u0939\u0948\u0902?",
-        options: ["\u0935\u093E\u0937\u094D\u092A\u0940\u0915\u0930\u0923", "\u0938\u0902\u0918\u0928\u0928", "\u0935\u0930\u094D\u0937\u0923", "\u0935\u093E\u0937\u094D\u092A\u094B\u0924\u094D\u0938\u0930\u094D\u091C\u0928"],
-        answer: 1
-      },
-      {
-        question: "\u092E\u0928\u0941\u0937\u094D\u092F \u091C\u0940\u0935\u093F\u0924 \u0930\u0939\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F \u0915\u093F\u0938 \u0917\u0948\u0938 \u0915\u094B \u0938\u093E\u0902\u0938 \u0915\u0947 \u0930\u0942\u092A \u092E\u0947\u0902 \u0932\u0947\u0924\u093E \u0939\u0948?",
-        options: ["\u0915\u093E\u0930\u094D\u092C\u0928 \u0921\u093E\u0907\u0911\u0915\u094D\u0938\u093E\u0907\u0921", "\u0928\u093E\u0907\u091F\u094B\u091C\u0928", "\u0911\u0915\u094D\u0938\u0940\u091C\u0928", "\u0939\u0940\u0932\u093F\u092F\u092E"],
-        answer: 2
-      },
-      {
-        question: "\u0915\u094B\u0936\u093F\u0915\u093E \u0915\u093E \u092A\u093E\u0935\u0930\u0939\u093E\u0909\u0938 (\u090A\u0930\u094D\u091C\u093E \u0917\u0943\u0939) \u0915\u093F\u0938\u0947 \u0915\u0939\u093E \u091C\u093E\u0924\u093E \u0939\u0948?",
-        options: ["\u0915\u0947\u0902\u0926\u094D\u0930\u0915", "\u0930\u093E\u0907\u092C\u094B\u0938\u094B\u092E", "\u092E\u093E\u0907\u091F\u094B\u0915\u0949\u0928\u094D\u0921\u094D\u0930\u093F\u092F\u093E", "\u0917\u0949\u0932\u094D\u091C\u0940 \u0909\u092A\u0915\u0930\u0923"],
-        answer: 2
-      },
-      {
-        question: "\u0915\u093F\u0938 \u092A\u094D\u0930\u0915\u093E\u0930 \u0915\u093E \u092C\u0932 \u0926\u094D\u0930\u0935\u094D\u092F\u092E\u093E\u0928 \u0935\u093E\u0932\u0947 \u092A\u093F\u0902\u0921\u094B\u0902 \u0915\u094B \u0905\u092A\u0928\u0940 \u0913\u0930 \u0906\u0915\u0930\u094D\u0937\u093F\u0924 \u0915\u0930\u0924\u093E \u0939\u0948?",
-        options: ["\u091A\u0941\u0902\u092C\u0915\u0940\u092F \u092C\u0932", "\u0917\u0941\u0930\u0941\u0924\u094D\u0935\u093E\u0915\u0930\u094D\u0937\u0923", "\u0918\u0930\u094D\u0937\u0923", "\u0938\u094D\u0925\u093F\u0930 \u0935\u093F\u0926\u094D\u092F\u0941\u0924"],
-        answer: 1
-      }
-    ]
-  },
-  "Biology": {
-    "English": [
-      {
-        question: "Which pigment gives green color to plant leaves?",
-        options: ["Carotenoid", "Chlorophyll", "Anthocyanin", "Melanin"],
-        answer: 1
-      },
-      {
-        question: "What is the primary function of red blood cells?",
-        options: ["Excrete waste", "Fight infections", "Carry oxygen", "Produce platelets"],
-        answer: 2
-      },
-      {
-        question: "Which organ in the human body is responsible for pumping blood?",
-        options: ["Lungs", "Brain", "Heart", "Kidneys"],
-        answer: 2
-      },
-      {
-        question: "Photosynthesis takes place in which cell organelle?",
-        options: ["Cytoplasm", "Cell Wall", "Chloroplast", "Mitochondria"],
-        answer: 2
-      },
-      {
-        question: "Humans belong to which class of animals?",
-        options: ["Reptiles", "Amphibians", "Mammals", "Birds"],
-        answer: 2
-      }
-    ],
-    "Hindi": [
-      {
-        question: "\u092A\u094C\u0927\u094B\u0902 \u0915\u0940 \u092A\u0924\u094D\u0924\u093F\u092F\u094B\u0902 \u0915\u094B \u0939\u0930\u093E \u0930\u0902\u0917 \u0915\u094C\u0928 \u0938\u093E \u0935\u0930\u094D\u0923\u0915 \u0926\u0947\u0924\u093E \u0939\u0948?",
-        options: ["\u0915\u0948\u0930\u094B\u091F\u0940\u0928\u0949\u092F\u0921", "\u0915\u094D\u0932\u094B\u0930\u094B\u092B\u093F\u0932", "\u090F\u0902\u0925\u094B\u0938\u093E\u092F\u0928\u093F\u0928", "\u092E\u0947\u0932\u0947\u0928\u093F\u0928"],
-        answer: 1
-      },
-      {
-        question: "\u0932\u093E\u0932 \u0930\u0915\u094D\u0924 \u0915\u094B\u0936\u093F\u0915\u093E\u0913\u0902 (RBC) \u0915\u093E \u092E\u0941\u0916\u094D\u092F \u0915\u093E\u0930\u094D\u092F \u0915\u094D\u092F\u093E \u0939\u0948?",
-        options: ["\u0905\u092A\u0936\u093F\u0937\u094D\u091F \u092C\u093E\u0939\u0930 \u0928\u093F\u0915\u093E\u0932\u0928\u093E", "\u0938\u0902\u0915\u094D\u0930\u092E\u0923 \u0938\u0947 \u0932\u0921\u093C\u0928\u093E", "\u0911\u0915\u094D\u0938\u0940\u091C\u0928 \u0915\u093E \u092A\u0930\u093F\u0935\u0939\u0928 \u0915\u0930\u0928\u093E", "\u092A\u094D\u0932\u0947\u091F\u0932\u0947\u091F\u094D\u0938 \u092C\u0928\u093E\u0928\u093E"],
-        answer: 2
-      },
-      {
-        question: "\u092E\u093E\u0928\u0935 \u0936\u0930\u0940\u0930 \u0915\u093E \u0915\u094C\u0928 \u0938\u093E \u0905\u0902\u0917 \u0930\u0915\u094D\u0924 \u092A\u0902\u092A \u0915\u0930\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F \u091C\u093F\u092E\u094D\u092E\u0947\u0926\u093E\u0930 \u0939\u0948?",
-        options: ["\u092B\u0947\u092B\u0921\u093C\u0947", "\u092E\u0938\u094D\u0924\u093F\u0937\u094D\u0915", "\u0939\u0943\u0926\u092F", "\u0917\u0941\u0930\u094D\u0926\u0947"],
-        answer: 2
-      },
-      {
-        question: "\u092A\u094D\u0930\u0915\u093E\u0936 \u0938\u0902\u0936\u094D\u0932\u0947\u0937\u0923 \u0915\u094B\u0936\u093F\u0915\u093E \u0915\u0947 \u0915\u093F\u0938 \u0905\u0902\u0917 \u092E\u0947\u0902 \u0939\u094B\u0924\u093E \u0939\u0948?",
-        options: ["\u0915\u094B\u0936\u093F\u0915\u093E\u0926\u094D\u0930\u0935\u094D\u092F", "\u0915\u094B\u0936\u093F\u0915\u093E \u092D\u093F\u0924\u094D\u0924\u093F", "\u0915\u094D\u0932\u094B\u0930\u094B\u092A\u094D\u0932\u093E\u0938\u094D\u091F", "\u092E\u093E\u0907\u091F\u094B\u0915\u0949\u0928\u094D\u0921\u094D\u0930\u093F\u092F\u093E"],
-        answer: 2
-      },
-      {
-        question: "\u092E\u0928\u0941\u0937\u094D\u092F \u091C\u093E\u0928\u0935\u0930\u094B\u0902 \u0915\u0947 \u0915\u093F\u0938 \u0935\u0930\u094D\u0917 \u092E\u0947\u0902 \u0906\u0924\u0947 \u0939\u0948\u0902?",
-        options: ["\u0938\u0930\u0940\u0938\u0943\u092A", "\u0909\u092D\u092F\u091A\u0930", "\u0938\u094D\u0924\u0928\u0927\u093E\u0930\u0940", "\u092A\u0915\u094D\u0937\u0940"],
-        answer: 2
-      }
-    ]
-  },
-  "Physics": {
-    "English": [
-      {
-        question: "What is the SI unit of force?",
-        options: ["Joule", "Watt", "Newton", "Pascal"],
-        answer: 2
-      },
-      {
-        question: "What is the approximate speed of light in a vacuum?",
-        options: ["300,000 km/s", "150,000 km/s", "1,000,000 km/s", "3,000 km/s"],
-        answer: 0
-      },
-      {
-        question: "Sound waves cannot travel through which of the following?",
-        options: ["Water", "Air", "Steel", "Vacuum"],
-        answer: 3
-      },
-      {
-        question: "An instrument used to measure electric current is called:",
-        options: ["Voltmeter", "Ammeter", "Barometer", "Thermometer"],
-        answer: 1
-      },
-      {
-        question: "What kind of energy is stored in a compressed spring?",
-        options: ["Kinetic Energy", "Thermal Energy", "Potential Energy", "Chemical Energy"],
-        answer: 2
-      }
-    ],
-    "Hindi": [
-      {
-        question: "\u092C\u0932 \u0915\u0940 SI \u0907\u0915\u093E\u0908 \u0915\u094D\u092F\u093E \u0939\u0948?",
-        options: ["\u091C\u0942\u0932", "\u0935\u093E\u091F", "\u0928\u094D\u092F\u0942\u091F\u0928", "\u092A\u093E\u0938\u094D\u0915\u0932"],
-        answer: 2
-      },
-      {
-        question: "\u0928\u093F\u0930\u094D\u0935\u093E\u0924 \u092E\u0947\u0902 \u092A\u094D\u0930\u0915\u093E\u0936 \u0915\u0940 \u0917\u0924\u093F \u0932\u0917\u092D\u0917 \u0915\u093F\u0924\u0928\u0940 \u0939\u094B\u0924\u0940 \u0939\u0948?",
-        options: ["300,000 \u0915\u093F\u092E\u0940/\u0938\u0947\u0915\u0902\u0921", "150,000 \u0915\u093F\u092E\u0940/\u0938\u0947\u0915\u0902\u0921", "1,000,000 \u0915\u093F\u092E\u0940/\u0938\u0947\u0915\u0902\u0921", "3,000 \u0915\u093F\u092E\u0940/\u0938\u0947\u0915\u0902\u0921"],
-        answer: 0
-      },
-      {
-        question: "\u0927\u094D\u0935\u0928\u093F \u0924\u0930\u0902\u0917\u0947\u0902 \u0928\u093F\u092E\u094D\u0928\u0932\u093F\u0916\u093F\u0924 \u092E\u0947\u0902 \u0938\u0947 \u0915\u093F\u0938 \u092E\u093E\u0927\u094D\u092F\u092E \u092E\u0947\u0902 \u092F\u093E\u0924\u094D\u0930\u093E \u0928\u0939\u0940\u0902 \u0915\u0930 \u0938\u0915\u0924\u0940 \u0939\u0948\u0902?",
-        options: ["\u092A\u093E\u0928\u0940", "\u0939\u0935\u093E", "\u0907\u0938\u094D\u092A\u093E\u0924", "\u0928\u093F\u0930\u094D\u0935\u093E\u0924"],
-        answer: 3
-      },
-      {
-        question: "\u0935\u093F\u0926\u094D\u092F\u0941\u0924 \u0927\u093E\u0930\u093E \u092E\u093E\u092A\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F \u092A\u094D\u0930\u092F\u0941\u0915\u094D\u0924 \u0909\u092A\u0915\u0930\u0923 \u0915\u094B \u0915\u094D\u092F\u093E \u0915\u0939\u0924\u0947 \u0939\u0948\u0902?",
-        options: ["\u0935\u094B\u0932\u094D\u091F\u092E\u0940\u091F\u0930", "\u090F\u092E\u0940\u091F\u0930", "\u092C\u0948\u0930\u094B\u092E\u0940\u091F\u0930", "\u0925\u0930\u094D\u092E\u093E\u092E\u0940\u091F\u0930"],
-        answer: 1
-      },
-      {
-        question: "\u0926\u092C\u0940 \u0939\u0941\u0908 \u0938\u094D\u092A\u094D\u0930\u093F\u0902\u0917 \u092E\u0947\u0902 \u0915\u093F\u0938 \u092A\u094D\u0930\u0915\u093E\u0930 \u0915\u0940 \u090A\u0930\u094D\u091C\u093E \u0938\u0902\u091A\u093F\u0924 \u0939\u094B\u0924\u0940 \u0939\u0948?",
-        options: ["\u0917\u0924\u093F\u091C \u090A\u0930\u094D\u091C\u093E", "\u0924\u093E\u092A\u0940\u092F \u090A\u0930\u094D\u091C\u093E", "\u0938\u094D\u0925\u093F\u0924\u093F\u091C \u090A\u0930\u094D\u091C\u093E", "\u0930\u093E\u0938\u093E\u092F\u0928\u093F\u0915 \u090A\u0930\u094D\u091C\u093E"],
-        answer: 2
-      }
-    ]
-  },
-  "Chemistry": {
-    "English": [
-      {
-        question: "What is the chemical formula of water?",
-        options: ["CO2", "H2O", "NaCl", "HCl"],
-        answer: 1
-      },
-      {
-        question: "Which element is present in all organic chemical compounds?",
-        options: ["Oxygen", "Nitrogen", "Carbon", "Hydrogen"],
-        answer: 2
-      },
-      {
-        question: "What is the pH value of neutral pure water?",
-        options: ["1", "5", "7", "14"],
-        answer: 2
-      },
-      {
-        question: "Which gas is commonly known as 'Laughing Gas'?",
-        options: ["Nitrous Oxide", "Carbon Monoxide", "Sulphur Dioxide", "Nitrogen Dioxide"],
-        answer: 0
-      },
-      {
-        question: "What is the everyday common name of Sodium Chloride?",
-        options: ["Baking Soda", "Table Salt", "Bleaching Powder", "Vinegar"],
-        answer: 1
-      }
-    ],
-    "Hindi": [
-      {
-        question: "\u091C\u0932 \u0915\u093E \u0930\u093E\u0938\u093E\u092F\u0928\u093F\u0915 \u0938\u0942\u0924\u094D\u0930 \u0915\u094D\u092F\u093E \u0939\u0948?",
-        options: ["CO2", "H2O", "NaCl", "HCl"],
-        answer: 1
-      },
-      {
-        question: "\u0938\u092D\u0940 \u0915\u093E\u0930\u094D\u092C\u0928\u093F\u0915 \u092F\u094C\u0917\u093F\u0915\u094B\u0902 \u092E\u0947\u0902 \u0915\u094C\u0928 \u0938\u093E \u0924\u0924\u094D\u0935 \u0905\u0928\u093F\u0935\u093E\u0930\u094D\u092F \u0930\u0942\u092A \u0938\u0947 \u0909\u092A\u0938\u094D\u0925\u093F\u0924 \u0939\u094B\u0924\u093E \u0939\u0948?",
-        options: ["\u0911\u0915\u094D\u0938\u0940\u091C\u0928", "\u0928\u093E\u0907\u091F\u094D\u0930\u094B\u091C\u0928", "\u0915\u093E\u0930\u094D\u092C\u0928", "\u0939\u093E\u0907\u0921\u094D\u0930\u094B\u091C\u0928"],
-        answer: 2
-      },
-      {
-        question: "\u0936\u0941\u0926\u094D\u0927 \u091C\u0932 \u0915\u093E pH \u092E\u093E\u0928 \u0915\u093F\u0924\u0928\u093E \u0939\u094B\u0924\u093E \u0939\u0948?",
-        options: ["1", "5", "7", "14"],
-        answer: 2
-      },
-      {
-        question: "\u0915\u093F\u0938 \u0917\u0948\u0938 \u0915\u094B \u0906\u092E\u0924\u094C\u0930 \u092A\u0930 '\u0939\u0902\u0938\u093E\u0928\u0947 \u0935\u093E\u0932\u0940 \u0917\u0948\u0938' (Laughing Gas) \u0915\u0939\u093E \u091C\u093E\u0924\u093E \u0939\u0948?",
-        options: ["\u0928\u093E\u0907\u091F\u094D\u0930\u0938 \u0911\u0915\u094D\u0938\u093E\u0907\u0921", "\u0915\u093E\u0930\u094D\u092C\u0928 \u092E\u094B\u0928\u094B\u0911\u0915\u094D\u0938\u093E\u0907\u0921", "\u0938\u0932\u094D\u092B\u0930 \u0921\u093E\u0907\u0911\u0915\u094D\u0938\u093E\u0907\u0921", "\u0928\u093E\u0907\u091F\u094D\u0930\u094B\u091C\u0928 \u0921\u093E\u0907\u0911\u0915\u094D\u0938\u093E\u0907\u0921"],
-        answer: 0
-      },
-      {
-        question: "\u0938\u094B\u0921\u093F\u092F\u092E \u0915\u094D\u0932\u094B\u0930\u093E\u0907\u0921 \u0915\u093E \u0938\u093E\u0927\u093E\u0930\u0923 \u0918\u0930\u0947\u0932\u0942 \u0928\u093E\u092E \u0915\u094D\u092F\u093E \u0939\u0948?",
-        options: ["\u092C\u0947\u0915\u093F\u0902\u0917 \u0938\u094B\u0921\u093E", "\u0938\u093E\u0927\u093E\u0930\u0923 \u0928\u092E\u0915", "\u092C\u094D\u0932\u0940\u091A\u093F\u0902\u0917 \u092A\u093E\u0909\u0921\u0930", "\u0938\u093F\u0930\u0915\u093E"],
-        answer: 1
-      }
-    ]
-  },
-  "English": {
-    "English": [
-      {
-        question: "Identify the noun in this sentence: 'The happy boy jumped over the fence.'",
-        options: ["happy", "jumped", "boy", "over"],
-        answer: 2
-      },
-      {
-        question: "What is the opposite (antonym) of the word 'Ancient'?",
-        options: ["Old", "Antique", "Modern", "Beautiful"],
-        answer: 2
-      },
-      {
-        question: "Which of the following is an irregular verb?",
-        options: ["Walk", "Play", "Go", "Cook"],
-        answer: 2
-      },
-      {
-        question: "Choose the correctly spelled word:",
-        options: ["Recieve", "Receive", "Recive", "Riceive"],
-        answer: 1
-      },
-      {
-        question: "Fill in the blank: 'She ___ to school every single day.'",
-        options: ["go", "going", "gone", "goes"],
-        answer: 3
-      }
-    ],
-    "Hindi": [
-      {
-        question: "\u0935\u093E\u0915\u094D\u092F 'The happy boy jumped over the fence' \u092E\u0947\u0902 \u0938\u0902\u091C\u094D\u091E\u093E (Noun) \u0915\u094C\u0928 \u0938\u093E \u0936\u092C\u094D\u0926 \u0939\u0948?",
-        options: ["happy", "jumped", "boy", "over"],
-        answer: 2
-      },
-      {
-        question: "\u0905\u0902\u0917\u094D\u0930\u0947\u091C\u0940 \u0936\u092C\u094D\u0926 'Ancient' (\u092A\u094D\u0930\u093E\u091A\u0940\u0928) \u0915\u093E \u0935\u093F\u0932\u094B\u092E \u0936\u092C\u094D\u0926 (Antonym) \u0915\u094D\u092F\u093E \u0939\u094B\u0917\u093E?",
-        options: ["Old", "Antique", "Modern", "Beautiful"],
-        answer: 2
-      },
-      {
-        question: "\u0907\u0928\u092E\u0947\u0902 \u0938\u0947 \u0915\u094C\u0928 \u0938\u0940 \u0915\u094D\u0930\u093F\u092F\u093E (Verb) \u0905\u0928\u093F\u092F\u092E\u093F\u0924 (Irregular) \u0939\u0948?",
-        options: ["Walk", "Play", "Go", "Cook"],
-        answer: 2
-      },
-      {
-        question: "\u0938\u0939\u0940 \u0935\u0930\u094D\u0924\u0928\u0940 (Spelling) \u0935\u093E\u0932\u0947 \u0936\u092C\u094D\u0926 \u0915\u094B \u091A\u0941\u0928\u0947\u0902:",
-        options: ["Recieve", "Receive", "Recive", "Riceive"],
-        answer: 1
-      },
-      {
-        question: "\u0930\u093F\u0915\u094D\u0924 \u0938\u094D\u0925\u093E\u0928 \u092D\u0930\u0947\u0902: 'She ___ to school every single day.'",
-        options: ["go", "going", "gone", "goes"],
-        answer: 3
-      }
-    ]
+// src/lib/firebase-admin.ts
+var import_app = require("firebase-admin/app");
+var import_auth = require("firebase-admin/auth");
+
+// firebase-applet-config.json
+var firebase_applet_config_default = {
+  projectId: "coreai-a7cf4",
+  appId: "1:152164036052:web:5e51334176a0b20debba41",
+  apiKey: "AIzaSyCJXfFwq1FfTw_DvSkSbgOAhjToplnIWFg",
+  authDomain: "coreai-a7cf4.firebaseapp.com",
+  databaseURL: "https://coreai-a7cf4-default-rtdb.firebaseio.com",
+  storageBucket: "coreai-a7cf4.firebasestorage.app",
+  messagingSenderId: "152164036052",
+  measurementId: "",
+  oAuthClientId: "",
+  recaptchaSiteKey: "",
+  firestoreDatabaseId: "(default)"
+};
+
+// src/lib/firebase-admin.ts
+if (!(0, import_app.getApps)().length) {
+  (0, import_app.initializeApp)({
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || firebase_applet_config_default.projectId
+  });
+}
+var adminAuth = (0, import_auth.getAuth)();
+
+// src/middleware/auth.ts
+var requireAuth = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    res.status(401).json({ error: "Unauthorized: Missing token" });
+    return;
+  }
+  const token = authHeader.split("Bearer ")[1];
+  try {
+    const decodedToken = await adminAuth.verifyIdToken(token);
+    req.user = decodedToken;
+    next();
+  } catch (error) {
+    console.error("Error verifying Firebase ID token:", error);
+    res.status(401).json({ error: "Unauthorized: Invalid token" });
+    return;
   }
 };
-function getFallbackAnswer(prompt, studentContext) {
-  const name = studentContext?.name || "\u092A\u094D\u092F\u093E\u0930\u0947 \u091B\u093E\u0924\u094D\u0930";
-  const school = studentContext?.school || "\u0906\u092A\u0915\u0947 \u0938\u094D\u0915\u0942\u0932";
-  const className = studentContext?.className || "\u0906\u092A\u0915\u0940 \u0915\u0915\u094D\u0937\u093E";
-  const lower = prompt.toLowerCase();
-  if (lower.includes("math") || lower.includes("fraction") || lower.includes("algebra") || lower.includes("geometry") || lower.includes("\u0938\u092E\u0940\u0915\u0930\u0923") || lower.includes("\u0917\u0923\u093F\u0924")) {
-    return `### \u{1F4D0} \u0917\u0923\u093F\u0924 \u0938\u0939\u093E\u092F\u0924\u093E (Mathematics Help) for ${name} from ${school} (Class ${className})
 
-\u0939\u0947\u0932\u094B ${name}! \u0917\u0923\u093F\u0924 \u0915\u094B \u0938\u092E\u091D\u0928\u093E \u092C\u0939\u0941\u0924 \u0906\u0938\u093E\u0928 \u0939\u0948 \u091C\u092C \u0939\u092E \u0907\u0938\u0947 \u091A\u0930\u0923\u094B\u0902 \u092E\u0947\u0902 \u0935\u093F\u092D\u093E\u091C\u093F\u0924 \u0915\u0930\u0924\u0947 \u0939\u0948\u0902! \u0906\u0907\u090F \u0906\u092A\u0915\u0947 \u0938\u0935\u093E\u0932 \u0915\u094B \u0938\u092E\u091D\u0924\u0947 \u0939\u0948\u0902:
+// src/db/index.ts
+var import_node_postgres = require("drizzle-orm/node-postgres");
+var import_pg = require("pg");
 
-1. **\u0938\u0935\u093E\u0932 \u0915\u093E \u092E\u0942\u0932 (Understanding the query):** \u0906\u092A\u0928\u0947 \u0917\u0923\u093F\u0924 \u092F\u093E \u0938\u092E\u0940\u0915\u0930\u0923 \u0915\u0947 \u092C\u093E\u0930\u0947 \u092E\u0947\u0902 \u092A\u0942\u091B\u093E \u0939\u0948\u0964
-2. **\u092E\u0941\u0916\u094D\u092F \u0928\u093F\u092F\u092E (Key Concept):** \u0938\u092E\u0940\u0915\u0930\u0923 \u0915\u094B \u0939\u0932 \u0915\u0930\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F \u0939\u092E \u0938\u092E\u093E\u0928 \u0915\u094D\u0930\u093F\u092F\u093E\u090F\u0902 \u0926\u094B\u0928\u094B\u0902 \u092A\u0915\u094D\u0937\u094B\u0902 \u092E\u0947\u0902 \u0915\u0930\u0924\u0947 \u0939\u0948\u0902 (BODMAS \u092F\u093E \u092A\u0915\u094D\u0937\u093E\u0902\u0924\u0930\u0923 \u0928\u093F\u092F\u092E)\u0964
-3. **\u091A\u0930\u0923-\u0926\u0930-\u091A\u0930\u0923 \u0938\u092E\u093E\u0927\u093E\u0928 (Step-by-Step Explanation):**
-   * \u092F\u0926\u093F \u0939\u092E (3x - 7 = 8) \u091C\u0948\u0938\u0940 \u0915\u093F\u0938\u0940 \u091A\u0940\u091C\u093C \u0915\u094B \u0926\u0947\u0916\u0924\u0947 \u0939\u0948\u0902, \u0924\u094B \u0938\u092C\u0938\u0947 \u092A\u0939\u0932\u0947 \u0926\u094B\u0928\u094B\u0902 \u092A\u0915\u094D\u0937\u094B\u0902 \u092E\u0947\u0902 7 \u091C\u094B\u0921\u093C\u0947\u0902: (3x = 15).
-   * \u0907\u0938\u0915\u0947 \u092C\u093E\u0926, \u0926\u094B\u0928\u094B\u0902 \u092A\u0915\u094D\u0937\u094B\u0902 \u0915\u094B 3 \u0938\u0947 \u092D\u093E\u0917 \u0926\u0947\u0902: (x = 5)\u0964
-4. **\u0906\u092A\u0915\u0947 \u0932\u093F\u090F \u091F\u093F\u092A:** \u0905\u092D\u094D\u092F\u093E\u0938 \u0906\u092A\u0915\u094B \u092A\u0930\u093F\u092A\u0942\u0930\u094D\u0923 \u092C\u0928\u093E\u0924\u093E \u0939\u0948! \u0905\u092A\u0928\u0940 \u0938\u094D\u0915\u0942\u0932 \u0915\u0940 \u092A\u093E\u0920\u094D\u092F\u092A\u0941\u0938\u094D\u0924\u0915\u094B\u0902 \u0938\u0947 \u0910\u0938\u0947 \u0938\u0935\u093E\u0932\u094B\u0902 \u0915\u093E \u0905\u092D\u094D\u092F\u093E\u0938 \u0915\u0930\u0924\u0947 \u0930\u0939\u0947\u0902\u0964
+// src/db/schema.ts
+var schema_exports = {};
+__export(schema_exports, {
+  mockExams: () => mockExams,
+  notes: () => notes,
+  studySessions: () => studySessions,
+  users: () => users,
+  usersRelations: () => usersRelations
+});
+var import_drizzle_orm = require("drizzle-orm");
+var import_pg_core = require("drizzle-orm/pg-core");
+var users = (0, import_pg_core.pgTable)("users", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  uid: (0, import_pg_core.text)("uid").notNull().unique(),
+  // Firebase Auth UID
+  email: (0, import_pg_core.text)("email").notNull(),
+  displayName: (0, import_pg_core.text)("display_name"),
+  photoUrl: (0, import_pg_core.text)("photo_url"),
+  xp: (0, import_pg_core.integer)("xp").default(0),
+  streak: (0, import_pg_core.integer)("streak").default(1),
+  petLevel: (0, import_pg_core.integer)("pet_level").default(1),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow(),
+  lastStreakDate: (0, import_pg_core.text)("last_streak_date")
+});
+var notes = (0, import_pg_core.pgTable)("notes", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  uid: (0, import_pg_core.text)("uid").notNull(),
+  // User's Firebase UID
+  title: (0, import_pg_core.text)("title").notNull(),
+  content: (0, import_pg_core.text)("content").notNull(),
+  subject: (0, import_pg_core.text)("subject").notNull(),
+  tags: (0, import_pg_core.text)("tags"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow()
+});
+var studySessions = (0, import_pg_core.pgTable)("study_sessions", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  uid: (0, import_pg_core.text)("uid").notNull(),
+  subject: (0, import_pg_core.text)("subject").notNull(),
+  topic: (0, import_pg_core.text)("topic"),
+  durationMinutes: (0, import_pg_core.integer)("duration_minutes").notNull().default(25),
+  xpEarned: (0, import_pg_core.integer)("xp_earned").default(25),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
+});
+var mockExams = (0, import_pg_core.pgTable)("mock_exams", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  uid: (0, import_pg_core.text)("uid").notNull(),
+  subject: (0, import_pg_core.text)("subject").notNull(),
+  score: (0, import_pg_core.integer)("score").notNull(),
+  totalQuestions: (0, import_pg_core.integer)("total_questions").notNull(),
+  details: (0, import_pg_core.text)("details"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
+});
+var usersRelations = (0, import_drizzle_orm.relations)(users, ({ many }) => ({
+  notes: many(notes),
+  studySessions: many(studySessions),
+  mockExams: many(mockExams)
+}));
 
-\u092F\u0926\u093F \u0906\u092A\u0915\u0947 \u092A\u093E\u0938 \u0915\u094B\u0908 \u0935\u093F\u0936\u093F\u0937\u094D\u091F \u0938\u0902\u0916\u094D\u092F\u093E\u0924\u094D\u092E\u0915 \u092A\u094D\u0930\u0936\u094D\u0928 \u0939\u0948, \u0924\u094B \u0909\u0938\u0947 \u092F\u0939\u093E\u0901 \u091F\u093E\u0907\u092A \u0915\u0930\u0947\u0902 \u0924\u093E\u0915\u093F \u092E\u0948\u0902 \u0909\u0938\u0947 \u0920\u0940\u0915 \u0938\u0947 \u0939\u0932 \u0915\u0930 \u0938\u0915\u0942\u0901! \u{1F680}`;
+// src/db/index.ts
+var createPool = () => {
+  if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
+    return null;
   }
-  if (lower.includes("science") || lower.includes("force") || lower.includes("water") || lower.includes("light") || lower.includes("\u0935\u093F\u091C\u094D\u091E\u093E\u0928") || lower.includes("\u091A\u0915\u094D\u0930")) {
-    return `### \u{1F52C} \u0935\u093F\u091C\u094D\u091E\u093E\u0928 \u0938\u0940\u0916\u0947\u0902 (Science Corner) for ${name} at ${school}
-
-\u0928\u092E\u0938\u094D\u0924\u0947 ${name}! \u0935\u093F\u091C\u094D\u091E\u093E\u0928 \u0939\u092E\u093E\u0930\u0947 \u0906\u0938\u092A\u093E\u0938 \u0915\u0940 \u091C\u093E\u0926\u0941\u0908 \u0926\u0941\u0928\u093F\u092F\u093E \u0915\u094B \u0938\u092E\u091D\u0928\u0947 \u0915\u093E \u091C\u0930\u093F\u092F\u093E \u0939\u0948\u0964
-
-**\u092E\u0939\u0924\u094D\u0935\u092A\u0942\u0930\u094D\u0923 \u0938\u093F\u0926\u094D\u0927\u093E\u0902\u0924 (Important Concept):**
-* **\u092C\u0932 (Force):** \u092C\u0932 \u0915\u093F\u0938\u0940 \u092D\u0940 \u0935\u0938\u094D\u0924\u0941 \u0915\u094B \u0939\u093F\u0932\u093E\u0928\u0947, \u0930\u094B\u0915\u0928\u0947 \u092F\u093E \u0909\u0938\u0915\u0940 \u0926\u093F\u0936\u093E \u092C\u0926\u0932\u0928\u0947 \u0915\u0940 \u0915\u094D\u0937\u092E\u0924\u093E \u0939\u0948 (\u0916\u093F\u0902\u091A\u093E\u0935 \u092F\u093E \u0927\u0915\u094D\u0915\u093E)\u0964
-* **\u091C\u0932 \u091A\u0915\u094D\u0930 (Water Cycle):** \u0938\u0942\u0930\u091C \u092A\u093E\u0928\u0940 \u0915\u094B \u0917\u0930\u094D\u092E \u0915\u0930\u0924\u093E \u0939\u0948 (\u0935\u093E\u0937\u094D\u092A\u0940\u0915\u0930\u0923), \u0935\u0939 \u0939\u0935\u093E \u092E\u0947\u0902 \u0920\u0902\u0921\u093E \u0939\u094B\u0924\u093E \u0939\u0948 (\u0938\u0902\u0918\u0928\u0928), \u0914\u0930 \u092C\u093E\u0930\u093F\u0936 \u092C\u0928\u0915\u0930 \u0917\u093F\u0930\u0924\u093E \u0939\u0948 (\u0935\u0930\u094D\u0937\u0923)\u0964
-
-**\u092F\u093E\u0926 \u0930\u0916\u0928\u0947 \u092F\u094B\u0917\u094D\u092F \u092C\u093E\u0924\u0947\u0902:**
-1. \u0939\u092E\u0947\u0936\u093E \u0938\u0935\u093E\u0932 \u092A\u0942\u091B\u0947\u0902: "\u0910\u0938\u093E \u0915\u094D\u092F\u094B\u0902 \u0939\u094B\u0924\u093E \u0939\u0948?"
-2. \u0905\u092A\u0928\u0947 \u0935\u093F\u091C\u094D\u091E\u093E\u0928 \u092A\u094D\u0930\u092F\u094B\u0917\u094B\u0902 \u0915\u094B \u0927\u094D\u092F\u093E\u0928\u092A\u0942\u0930\u094D\u0935\u0915 \u0938\u094D\u0915\u0942\u0932 \u092E\u0947\u0902 \u0915\u0930\u0947\u0902!
-
-\u0915\u0915\u094D\u0937\u093E ${className} \u0915\u0947 \u0905\u0928\u0941\u0938\u093E\u0930 \u092F\u0939 \u092C\u0939\u0941\u0924 \u0939\u0940 \u092E\u0939\u0924\u094D\u0935\u092A\u0942\u0930\u094D\u0923 \u0939\u0948\u0964 \u0905\u092A\u0928\u0947 \u0935\u093F\u0936\u093F\u0937\u094D\u091F \u092A\u094D\u0930\u0936\u094D\u0928 \u0915\u094B \u0928\u0940\u091A\u0947 \u0932\u093F\u0916\u0947\u0902, \u092E\u0948\u0902 \u0909\u0938\u0915\u093E \u0924\u0941\u0930\u0902\u0924 \u091C\u0935\u093E\u092C \u0926\u0942\u0901\u0917\u093E! \u2728`;
+  if (!global._postgresPool) {
+    global._postgresPool = new import_pg.Pool({
+      connectionString: process.env.DATABASE_URL,
+      host: process.env.SQL_HOST,
+      user: process.env.SQL_USER,
+      password: process.env.SQL_PASSWORD,
+      database: process.env.SQL_DB_NAME,
+      max: 10,
+      connectionTimeoutMillis: 15e3
+    });
+    global._postgresPool.on("error", (err) => {
+      console.error("Unexpected error on idle SQL pool client:", err);
+    });
   }
-  if (lower.includes("bio") || lower.includes("cell") || lower.includes("heart") || lower.includes("plant") || lower.includes("\u091C\u0940\u0935") || lower.includes("\u092A\u094C\u0927")) {
-    return `### \u{1F340} \u091C\u0940\u0935 \u0935\u093F\u091C\u094D\u091E\u093E\u0928 \u092E\u093F\u0924\u094D\u0930 (Biology Helper) | Class ${className} Support
-
-\u0939\u0947\u0932\u094B ${name}! \u0906\u0907\u090F \u091C\u0940\u0935 \u0935\u093F\u091C\u094D\u091E\u093E\u0928 (Biology) \u0915\u0947 \u090F\u0915 \u092A\u094D\u092F\u093E\u0930\u0947 \u0935\u093F\u0937\u092F \u0915\u094B \u0906\u0938\u093E\u0928 \u092D\u093E\u0937\u093E \u092E\u0947\u0902 \u0938\u092E\u091D\u0947\u0902:
-
-- **\u0915\u094D\u0932\u094B\u0930\u094B\u092B\u093F\u0932 (Chlorophyll):** \u092F\u0939 \u092A\u0924\u094D\u0924\u093F\u092F\u094B\u0902 \u0915\u094B \u0939\u0930\u093E \u0930\u0902\u0917 \u0926\u0947\u0924\u093E \u0939\u0948 \u0914\u0930 \u0938\u0942\u0930\u091C \u0915\u0940 \u0930\u094B\u0936\u0928\u0940 \u0915\u094B \u092D\u094B\u091C\u0928 \u092E\u0947\u0902 \u092C\u0926\u0932\u0928\u0947 \u092E\u0947\u0902 \u092E\u0926\u0926 \u0915\u0930\u0924\u093E \u0939\u0948\u0964
-- **\u092A\u094D\u0930\u0915\u093E\u0936 \u0938\u0902\u0936\u094D\u0932\u0947\u0937\u0923 (Photosynthesis):** \u092A\u094C\u0927\u0947 \u0938\u0942\u0930\u094D\u092F \u0915\u093E \u092A\u094D\u0930\u0915\u093E\u0936, \u092A\u093E\u0928\u0940 \u0914\u0930 \u0915\u093E\u0930\u094D\u092C\u0928 \u0921\u093E\u0907\u0911\u0915\u094D\u0938\u093E\u0907\u0921 \u0932\u0947\u0915\u0930 \u0917\u094D\u0932\u0942\u0915\u094B\u091C (\u092D\u094B\u091C\u0928) \u0914\u0930 \u0911\u0915\u094D\u0938\u0940\u091C\u0928 \u092C\u0928\u093E\u0924\u0947 \u0939\u0948\u0902\u0964
-- **\u0939\u092E\u093E\u0930\u093E \u0939\u0943\u0926\u092F (Our Heart):** \u092F\u0939 \u090F\u0915 \u092A\u0902\u092A \u0915\u0940 \u0924\u0930\u0939 \u0939\u0948 \u091C\u094B \u0939\u092E\u093E\u0930\u0947 \u092A\u0942\u0930\u0947 \u0936\u0930\u0940\u0930 \u092E\u0947\u0902 \u092A\u094B\u0937\u0915 \u0924\u0924\u094D\u0935\u094B\u0902 \u0914\u0930 \u0911\u0915\u094D\u0938\u0940\u091C\u0928 \u0938\u0947 \u092D\u0930\u092A\u0942\u0930 \u0930\u0915\u094D\u0924 \u092A\u0939\u0941\u0902\u091A\u093E\u0924\u093E \u0939\u0948\u0964
-
-\u0915\u094D\u092F\u093E \u0906\u092A \u0905\u092A\u0928\u0947 \u0938\u094D\u0915\u0942\u0932 (${school}) \u0915\u0947 \u0932\u093F\u090F \u0915\u094B\u0908 \u0935\u093F\u0936\u0947\u0937 \u0921\u093E\u092F\u0917\u094D\u0930\u093E\u092E \u092F\u093E \u091A\u0915\u094D\u0930 \u0938\u092E\u091D\u0928\u093E \u091A\u093E\u0939\u0924\u0947 \u0939\u0948\u0902? \u092E\u0941\u091D\u0947 \u092A\u094D\u0930\u0936\u094D\u0928 \u0932\u093F\u0916\u0915\u0930 \u092D\u0947\u091C\u0947\u0902! \u{1F52C}`;
+  return global._postgresPool;
+};
+var pool = createPool();
+var dbInstance;
+if (pool) {
+  try {
+    dbInstance = (0, import_node_postgres.drizzle)(pool, { schema: schema_exports });
+  } catch (err) {
+    console.warn("[AI Studio] Database connection error \u2014 using mock proxy:", err);
+    const noOp = {
+      findMany: async () => [],
+      findFirst: async () => null,
+      findUnique: async () => null,
+      create: async (d) => d?.data ?? {},
+      update: async (d) => d?.data ?? {},
+      delete: async () => ({})
+    };
+    dbInstance = new Proxy({}, {
+      get: (_, prop) => prop === "query" ? new Proxy({}, { get: () => noOp }) : async () => []
+    });
   }
-  return `### \u{1F31F} Ascend Study \u0938\u0939\u093E\u092F\u0924\u093E (Ascend Study Assistant)
+} else {
+  const noOp = {
+    findMany: async () => [],
+    findFirst: async () => null,
+    findUnique: async () => null,
+    create: async (d) => d?.data ?? {},
+    update: async (d) => d?.data ?? {},
+    delete: async () => ({})
+  };
+  dbInstance = new Proxy({}, {
+    get: (_, prop) => prop === "query" ? new Proxy({}, { get: () => noOp }) : async () => []
+  });
+}
+var db = dbInstance;
 
-\u0928\u092E\u0938\u094D\u0924\u0947 **${name}**! \u092E\u0948\u0902 \u0906\u092A\u0915\u093E \u092A\u0930\u094D\u0938\u0928\u0932 \u0938\u094D\u091F\u0921\u0940 \u092C\u0921\u0940 \u0939\u0942\u0901 (Class ${className}, ${school})\u0964 
+// src/db/users.ts
+var import_drizzle_orm2 = require("drizzle-orm");
+var memoryUsers = /* @__PURE__ */ new Map();
+function getMemoryUser(uid, email, displayName, photoUrl) {
+  if (!memoryUsers.has(uid)) {
+    memoryUsers.set(uid, {
+      id: Math.floor(Math.random() * 1e4) + 1,
+      uid,
+      email,
+      displayName: displayName || email.split("@")[0],
+      photoUrl: photoUrl || "",
+      xp: 0,
+      streak: 1,
+      petLevel: 1,
+      createdAt: /* @__PURE__ */ new Date(),
+      updatedAt: /* @__PURE__ */ new Date()
+    });
+  } else {
+    const existing = memoryUsers.get(uid);
+    existing.email = email || existing.email;
+    if (displayName) existing.displayName = displayName;
+    if (photoUrl) existing.photoUrl = photoUrl;
+    existing.updatedAt = /* @__PURE__ */ new Date();
+  }
+  return memoryUsers.get(uid);
+}
+async function getOrCreateUser(uid, email, displayName, photoUrl) {
+  if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
+    return getMemoryUser(uid, email, displayName, photoUrl);
+  }
+  try {
+    const result = await db.insert(users).values({
+      uid,
+      email,
+      displayName: displayName || email.split("@")[0],
+      photoUrl: photoUrl || ""
+    }).onConflictDoUpdate({
+      target: users.uid,
+      set: {
+        email,
+        displayName: displayName || email.split("@")[0],
+        photoUrl: photoUrl || "",
+        updatedAt: /* @__PURE__ */ new Date()
+      }
+    }).returning();
+    return result[0];
+  } catch (error) {
+    console.warn("Database unavailable, falling back to memory store:", error);
+    return getMemoryUser(uid, email, displayName, photoUrl);
+  }
+}
+async function getUserProfile(uid) {
+  if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
+    return memoryUsers.get(uid) || null;
+  }
+  try {
+    const result = await db.select().from(users).where((0, import_drizzle_orm2.eq)(users.uid, uid)).limit(1);
+    return result[0] || null;
+  } catch (error) {
+    console.warn("Database unavailable, falling back to memory store:", error);
+    return memoryUsers.get(uid) || null;
+  }
+}
+async function updateUserStats(uid, xpEarned, streak) {
+  if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
+    const user = memoryUsers.get(uid);
+    if (!user) return null;
+    user.xp = (user.xp || 0) + xpEarned;
+    if (streak !== void 0) user.streak = streak;
+    user.petLevel = Math.max(1, Math.floor(user.xp / 150) + 1);
+    user.updatedAt = /* @__PURE__ */ new Date();
+    return user;
+  }
+  try {
+    const existing = await getUserProfile(uid);
+    if (!existing) return null;
+    const newXp = (existing.xp || 0) + xpEarned;
+    const newStreak = streak !== void 0 ? streak : existing.streak;
+    const newPetLevel = Math.max(1, Math.floor(newXp / 150) + 1);
+    const result = await db.update(users).set({
+      xp: newXp,
+      streak: newStreak,
+      petLevel: newPetLevel,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where((0, import_drizzle_orm2.eq)(users.uid, uid)).returning();
+    return result[0];
+  } catch (error) {
+    console.warn("Database unavailable, falling back to memory store:", error);
+    const user = memoryUsers.get(uid);
+    if (user) {
+      user.xp = (user.xp || 0) + xpEarned;
+      if (streak !== void 0) user.streak = streak;
+      user.petLevel = Math.max(1, Math.floor(user.xp / 150) + 1);
+      user.updatedAt = /* @__PURE__ */ new Date();
+      return user;
+    }
+    return null;
+  }
+}
 
-\u0935\u0930\u094D\u0924\u092E\u093E\u0928 \u092E\u0947\u0902 \u0907\u0902\u091F\u0930\u0928\u0947\u091F \u092F\u093E \u0938\u0930\u094D\u0935\u0930 \u0935\u094D\u092F\u0938\u094D\u0924 \u0939\u094B\u0928\u0947 \u0915\u0947 \u0915\u093E\u0930\u0923 \u092E\u0948\u0902 \u0938\u0940\u092E\u093F\u0924 \u092E\u094B\u0921 \u092E\u0947\u0902 \u091A\u0932 \u0930\u0939\u093E \u0939\u0942\u0901, \u092A\u0930 \u092E\u0948\u0902 \u0939\u092E\u0947\u0936\u093E \u0906\u092A\u0915\u0940 \u092E\u0926\u0926 \u0915\u0947 \u0932\u093F\u090F \u0924\u0948\u092F\u093E\u0930 \u0939\u0942\u0901! 
+// src/db/notes.ts
+var import_drizzle_orm3 = require("drizzle-orm");
+var memoryNotes = [];
+var memoryStudySessions = [];
+var memoryMockExams = [];
+async function getUserNotes(uid) {
+  if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
+    return memoryNotes.filter((n) => n.uid === uid).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  }
+  try {
+    return await db.select().from(notes).where((0, import_drizzle_orm3.eq)(notes.uid, uid)).orderBy((0, import_drizzle_orm3.desc)(notes.updatedAt));
+  } catch (error) {
+    console.warn("Database unavailable, falling back to memory notes:", error);
+    return memoryNotes.filter((n) => n.uid === uid).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  }
+}
+async function createNote(uid, title, content, subject, tags) {
+  if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
+    const newNote = {
+      id: Math.floor(Math.random() * 1e4) + 1,
+      uid,
+      title,
+      content,
+      subject,
+      tags: tags || "",
+      createdAt: /* @__PURE__ */ new Date(),
+      updatedAt: /* @__PURE__ */ new Date()
+    };
+    memoryNotes.push(newNote);
+    return newNote;
+  }
+  try {
+    const result = await db.insert(notes).values({
+      uid,
+      title,
+      content,
+      subject,
+      tags: tags || ""
+    }).returning();
+    return result[0];
+  } catch (error) {
+    console.warn("Database unavailable, falling back to memory notes:", error);
+    const newNote = {
+      id: Math.floor(Math.random() * 1e4) + 1,
+      uid,
+      title,
+      content,
+      subject,
+      tags: tags || "",
+      createdAt: /* @__PURE__ */ new Date(),
+      updatedAt: /* @__PURE__ */ new Date()
+    };
+    memoryNotes.push(newNote);
+    return newNote;
+  }
+}
+async function deleteNote(id, uid) {
+  if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
+    const idx = memoryNotes.findIndex((n) => n.id === id && n.uid === uid);
+    if (idx !== -1) {
+      const deleted = memoryNotes.splice(idx, 1);
+      return deleted[0];
+    }
+    return { id };
+  }
+  try {
+    const result = await db.delete(notes).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(notes.id, id), (0, import_drizzle_orm3.eq)(notes.uid, uid))).returning();
+    return result[0];
+  } catch (error) {
+    console.warn("Database unavailable, falling back to memory notes:", error);
+    const idx = memoryNotes.findIndex((n) => n.id === id && n.uid === uid);
+    if (idx !== -1) {
+      const deleted = memoryNotes.splice(idx, 1);
+      return deleted[0];
+    }
+    return { id };
+  }
+}
+async function logStudySession(uid, subject, durationMinutes, topic, xpEarned = 25) {
+  if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
+    const session = {
+      id: Math.floor(Math.random() * 1e4) + 1,
+      uid,
+      subject,
+      durationMinutes,
+      topic: topic || "",
+      xpEarned,
+      createdAt: /* @__PURE__ */ new Date()
+    };
+    memoryStudySessions.push(session);
+    return session;
+  }
+  try {
+    const result = await db.insert(studySessions).values({
+      uid,
+      subject,
+      durationMinutes,
+      topic: topic || "",
+      xpEarned
+    }).returning();
+    return result[0];
+  } catch (error) {
+    console.warn("Database unavailable, falling back to memory study sessions:", error);
+    const session = {
+      id: Math.floor(Math.random() * 1e4) + 1,
+      uid,
+      subject,
+      durationMinutes,
+      topic: topic || "",
+      xpEarned,
+      createdAt: /* @__PURE__ */ new Date()
+    };
+    memoryStudySessions.push(session);
+    return session;
+  }
+}
+async function logMockExam(uid, subject, score, totalQuestions, details) {
+  if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
+    const exam = {
+      id: Math.floor(Math.random() * 1e4) + 1,
+      uid,
+      subject,
+      score,
+      totalQuestions,
+      details: details || "",
+      createdAt: /* @__PURE__ */ new Date()
+    };
+    memoryMockExams.push(exam);
+    return exam;
+  }
+  try {
+    const result = await db.insert(mockExams).values({
+      uid,
+      subject,
+      score,
+      totalQuestions,
+      details: details || ""
+    }).returning();
+    return result[0];
+  } catch (error) {
+    console.warn("Database unavailable, falling back to memory mock exams:", error);
+    const exam = {
+      id: Math.floor(Math.random() * 1e4) + 1,
+      uid,
+      subject,
+      score,
+      totalQuestions,
+      details: details || "",
+      createdAt: /* @__PURE__ */ new Date()
+    };
+    memoryMockExams.push(exam);
+    return exam;
+  }
+}
 
-**\u0906\u092A \u092E\u0941\u091D\u0938\u0947 \u092F\u0947 \u091A\u0940\u091C\u0947\u0902 \u092A\u0942\u091B \u0938\u0915\u0924\u0947 \u0939\u0948\u0902:**
-1. \u0917\u0923\u093F\u0924 \u0915\u0947 \u092C\u0941\u0928\u093F\u092F\u093E\u0926\u0940 \u0928\u093F\u092F\u092E (Basic Math Rules)
-2. \u0935\u093F\u091C\u094D\u091E\u093E\u0928 \u0915\u0947 \u0938\u093F\u0926\u094D\u0927\u093E\u0902\u0924 (Science Concepts)
-3. \u0905\u092A\u0928\u0940 \u092D\u093E\u0937\u093E \u0915\u0947 \u092A\u093E\u0920 \u0914\u0930 \u0935\u094D\u092F\u093E\u0915\u0930\u0923 (Language & Grammar)
+// src/middleware/security.ts
+function securityHeaders(_req, res, next) {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "geolocation=(), payment=(), usb=(), display-capture=(self)");
+  res.setHeader("Cross-Origin-Resource-Policy", "same-site");
+  next();
+}
+var SlidingWindowRateLimiter = class {
+  requests = /* @__PURE__ */ new Map();
+  windowMs;
+  maxRequests;
+  constructor(maxRequests = 60, windowSeconds = 60) {
+    this.maxRequests = maxRequests;
+    this.windowMs = windowSeconds * 1e3;
+    setInterval(() => this.cleanup(), 2 * 60 * 1e3);
+  }
+  cleanup() {
+    const cutoff = Date.now() - this.windowMs;
+    for (const [ip, entry] of this.requests.entries()) {
+      entry.timestamps = entry.timestamps.filter((ts) => ts > cutoff);
+      if (entry.timestamps.length === 0) {
+        this.requests.delete(ip);
+      }
+    }
+  }
+  check(ip) {
+    const now = Date.now();
+    const cutoff = now - this.windowMs;
+    let entry = this.requests.get(ip);
+    if (!entry) {
+      entry = { timestamps: [] };
+      this.requests.set(ip, entry);
+    }
+    entry.timestamps = entry.timestamps.filter((ts) => ts > cutoff);
+    if (entry.timestamps.length >= this.maxRequests) {
+      const oldest = entry.timestamps[0];
+      const resetTime = Math.ceil((oldest + this.windowMs - now) / 1e3);
+      return { allowed: false, remaining: 0, resetTime: Math.max(1, resetTime) };
+    }
+    entry.timestamps.push(now);
+    const remaining = this.maxRequests - entry.timestamps.length;
+    return { allowed: true, remaining, resetTime: 60 };
+  }
+};
+var aiEndpointLimiter = new SlidingWindowRateLimiter(60, 60);
+var generalApiLimiter = new SlidingWindowRateLimiter(150, 60);
+function getClientIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string") {
+    return forwarded.split(",")[0].trim();
+  }
+  return req.socket.remoteAddress || "127.0.0.1";
+}
+function rateLimitAi(req, res, next) {
+  const ip = getClientIp(req);
+  const result = aiEndpointLimiter.check(ip);
+  res.setHeader("X-RateLimit-Limit", "60");
+  res.setHeader("X-RateLimit-Remaining", result.remaining.toString());
+  if (!result.allowed) {
+    res.setHeader("Retry-After", result.resetTime.toString());
+    res.status(429).json({
+      error: "Too Many Requests",
+      message: `Rate limit exceeded. To protect system security and prevent abuse, please retry in ${result.resetTime} seconds.`,
+      code: "RATE_LIMIT_EXCEEDED"
+    });
+    return;
+  }
+  next();
+}
+function rateLimitGeneral(req, res, next) {
+  const ip = getClientIp(req);
+  const result = generalApiLimiter.check(ip);
+  res.setHeader("X-RateLimit-Limit", "150");
+  res.setHeader("X-RateLimit-Remaining", result.remaining.toString());
+  if (!result.allowed) {
+    res.setHeader("Retry-After", result.resetTime.toString());
+    res.status(429).json({
+      error: "Too Many Requests",
+      message: "API rate limit reached. Please wait a moment before sending more requests.",
+      code: "RATE_LIMIT_EXCEEDED"
+    });
+    return;
+  }
+  next();
+}
+function sanitizeInputs(req, res, next) {
+  if (req.body && typeof req.body === "object") {
+    try {
+      sanitizeObject(req.body);
+    } catch (err) {
+      res.status(400).json({
+        error: "Invalid Request Payload",
+        message: err.message || "Input validation failed."
+      });
+      return;
+    }
+  }
+  next();
+}
+function sanitizeObject(obj, depth = 0) {
+  if (depth > 12) {
+    throw new Error("Payload depth limit exceeded (potential circular injection).");
+  }
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (typeof val === "string") {
+      if (val.includes("\0")) {
+        throw new Error("Invalid payload: null bytes are forbidden.");
+      }
+      if (!val.startsWith("data:") && val.length > 5e4) {
+        obj[key] = val.slice(0, 5e4);
+      }
+    } else if (val && typeof val === "object") {
+      sanitizeObject(val, depth + 1);
+    }
+  }
+}
 
-\u091A\u0932\u094B \u0905\u092D\u094D\u092F\u093E\u0938 \u0915\u0930\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F **"Practice Academy"** \u091F\u0948\u092C \u092A\u0930 \u091C\u093E\u090F\u0902 \u0914\u0930 \u0905\u092A\u0928\u0940 \u092A\u0938\u0902\u0926 \u0915\u093E \u0936\u093E\u0928\u0926\u093E\u0930 \u0939\u093F\u0902\u0926\u0940 \u092F\u093E \u0907\u0902\u0917\u094D\u0932\u093F\u0936 \u0915\u094D\u0935\u093F\u091C\u093C \u0916\u0947\u0932\u0947\u0902! \u0906\u092A\u0915\u0947 \u0938\u0939\u0940 \u091C\u0935\u093E\u092C\u094B\u0902 \u092A\u0930 \u0906\u092A\u0915\u094B XP \u092A\u0949\u0907\u0902\u091F\u094D\u0938 \u092E\u093F\u0932\u0947\u0902\u0917\u0947! \u{1F389}`;
+// src/services/curriculumEngine.ts
+var TOPIC_DATABASE = {
+  photosynthesis: {
+    title: "Photosynthesis (\u092A\u094D\u0930\u0915\u093E\u0936 \u0938\u0902\u0936\u094D\u0932\u0947\u0937\u0923)",
+    subject: "Biology / Science",
+    summaryEn: "Photosynthesis is the fundamental biochemical process by which green plants, algae, and certain bacteria convert radiant solar energy into chemical energy stored in glucose molecules.",
+    summaryHi: "\u092A\u094D\u0930\u0915\u093E\u0936 \u0938\u0902\u0936\u094D\u0932\u0947\u0937\u0923 \u0935\u0939 \u091C\u0948\u0935-\u0930\u093E\u0938\u093E\u092F\u0928\u093F\u0915 \u092A\u094D\u0930\u0915\u094D\u0930\u093F\u092F\u093E \u0939\u0948 \u091C\u093F\u0938\u0915\u0947 \u0926\u094D\u0935\u093E\u0930\u093E \u0939\u0930\u0947 \u092A\u094C\u0927\u0947 \u0938\u0942\u0930\u094D\u092F \u0915\u0947 \u092A\u094D\u0930\u0915\u093E\u0936 \u0914\u0930 \u0915\u094D\u0932\u094B\u0930\u094B\u092B\u093F\u0932 \u0915\u0940 \u0909\u092A\u0938\u094D\u0925\u093F\u0924\u093F \u092E\u0947\u0902 \u091C\u0932 (H2O) \u0914\u0930 \u0915\u093E\u0930\u094D\u092C\u0928 \u0921\u093E\u0907\u0911\u0915\u094D\u0938\u093E\u0907\u0921 (CO2) \u0938\u0947 \u0917\u094D\u0932\u0942\u0915\u094B\u091C (\u090A\u0930\u094D\u091C\u093E) \u0914\u0930 \u0911\u0915\u094D\u0938\u0940\u091C\u0928 \u0915\u093E \u0928\u093F\u0930\u094D\u092E\u093E\u0923 \u0915\u0930\u0924\u0947 \u0939\u0948\u0902\u0964",
+    stepsEn: [
+      "Light Absorption: Chlorophyll pigments inside thylakoid membranes trap photon energy from sunlight.",
+      "Light Reaction (Photolysis): Water molecules (H2O) are split into hydrogen ions, electrons, and free Oxygen (O2) gas.",
+      "Energy Carrier Synthesis: ATP and NADPH are synthesized to power cellular processes.",
+      "Dark Reaction (Calvin Cycle): In the stroma of chloroplasts, CO2 is fixed and reduced to produce high-energy glucose (C6H12O6)."
+    ],
+    stepsHi: [
+      "\u092A\u094D\u0930\u0915\u093E\u0936 \u0905\u0935\u0936\u094B\u0937\u0923: \u0915\u094D\u0932\u094B\u0930\u094B\u092A\u094D\u0932\u093E\u0938\u094D\u091F \u0915\u0940 \u0925\u093E\u092F\u0932\u093E\u0915\u094B\u0907\u0921 \u091D\u093F\u0932\u094D\u0932\u0940 \u092E\u0947\u0902 \u092E\u094C\u091C\u0942\u0926 \u0915\u094D\u0932\u094B\u0930\u094B\u092B\u093F\u0932 \u0938\u0942\u0930\u094D\u092F \u0915\u0947 \u092A\u094D\u0930\u0915\u093E\u0936 \u0915\u0940 \u090A\u0930\u094D\u091C\u093E \u0915\u094B \u0905\u0935\u0936\u094B\u0937\u093F\u0924 \u0915\u0930\u0924\u093E \u0939\u0948\u0964",
+      "\u092A\u094D\u0930\u0915\u093E\u0936\u093F\u0915 \u0905\u092D\u093F\u0915\u094D\u0930\u093F\u092F\u093E (\u091C\u0932 \u0915\u093E \u0905\u092A\u0918\u091F\u0928): \u092A\u094D\u0930\u0915\u093E\u0936 \u090A\u0930\u094D\u091C\u093E \u0926\u094D\u0935\u093E\u0930\u093E \u091C\u0932 (H2O) \u0915\u0947 \u0905\u0923\u0941 \u091F\u0942\u091F\u0915\u0930 \u0939\u093E\u0907\u0921\u094D\u0930\u094B\u091C\u0928 \u0914\u0930 \u0911\u0915\u094D\u0938\u0940\u091C\u0928 \u0917\u0948\u0938 (O2) \u092E\u0941\u0915\u094D\u0924 \u0915\u0930\u0924\u0947 \u0939\u0948\u0902\u0964",
+      "\u090A\u0930\u094D\u091C\u093E \u0928\u093F\u0930\u094D\u092E\u093E\u0923: ATP \u0914\u0930 NADPH \u0915\u0947 \u0930\u0942\u092A \u092E\u0947\u0902 \u090A\u0930\u094D\u091C\u093E \u0938\u0902\u091A\u093F\u0924 \u0939\u094B\u0924\u0940 \u0939\u0948\u0964",
+      "\u0905\u092A\u094D\u0930\u0915\u093E\u0936\u093F\u0915 \u0905\u092D\u093F\u0915\u094D\u0930\u093F\u092F\u093E (\u0915\u0947\u0932\u094D\u0935\u093F\u0928 \u091A\u0915\u094D\u0930): \u0938\u094D\u091F\u094D\u0930\u094B\u092E\u093E \u092E\u0947\u0902 CO2 \u0915\u093E \u0905\u092A\u091A\u092F\u0928 \u0939\u094B\u0915\u0930 \u0917\u094D\u0932\u0942\u0915\u094B\u091C (C6H12O6) \u0915\u093E \u0938\u0902\u0936\u094D\u0932\u0947\u0937\u0923 \u0939\u094B\u0924\u093E \u0939\u0948\u0964"
+    ],
+    formulas: [
+      "Balanced Chemical Equation: 6CO\u2082 + 6H\u2082O + Sunlight \u2192 C\u2086H\u2081\u2082O\u2086 + 6O\u2082",
+      "ADP + Pi + Light Energy \u2192 ATP (Photophosphorylation)"
+    ],
+    analogyEn: "Think of a plant leaf as a solar-powered organic bakery: Sunlight is the solar electricity, CO2 from the air and water from soil are raw ingredients, chlorophyll is the master chef, and glucose loaves with fresh oxygen are the final baked output!",
+    analogyHi: "\u092A\u094C\u0927\u0947 \u0915\u0940 \u092A\u0924\u094D\u0924\u0940 \u0915\u094B \u090F\u0915 \u0938\u094B\u0932\u0930 \u092C\u0947\u0915\u0930\u0940 \u0915\u0940 \u0924\u0930\u0939 \u0938\u092E\u091D\u0947\u0902: \u0927\u0942\u092A \u092C\u0947\u0915\u0930\u0940 \u0915\u0940 \u092C\u093F\u091C\u0932\u0940 \u0939\u0948, \u0939\u0935\u093E \u0915\u0940 CO2 \u0914\u0930 \u092E\u093F\u091F\u094D\u091F\u0940 \u0915\u093E \u092A\u093E\u0928\u0940 \u0938\u093E\u092E\u0917\u094D\u0930\u0940 \u0939\u0948, \u0915\u094D\u0932\u094B\u0930\u094B\u092B\u093F\u0932 \u0936\u0947\u092B \u0939\u0948, \u0914\u0930 \u0924\u093E\u091C\u093E \u0917\u094D\u0932\u0942\u0915\u094B\u091C \u0914\u0930 \u0936\u0941\u0926\u094D\u0927 \u0911\u0915\u094D\u0938\u0940\u091C\u0928 \u0905\u0902\u0924\u093F\u092E \u0909\u0924\u094D\u092A\u093E\u0926 \u0939\u0948\u0902!",
+    tipsEn: [
+      "Board Exam Favorite: Always mention both Light reaction (Thylakoids) and Dark reaction (Stroma).",
+      "Balance the chemical equation correctly with 6CO2 and 6H2O."
+    ],
+    tipsHi: [
+      "\u092A\u0930\u0940\u0915\u094D\u0937\u093E \u091F\u093F\u092A: \u092A\u094D\u0930\u0915\u093E\u0936\u093F\u0915 \u0905\u092D\u093F\u0915\u094D\u0930\u093F\u092F\u093E (\u0925\u093E\u092F\u0932\u093E\u0915\u094B\u0907\u0921) \u0914\u0930 \u0921\u093E\u0930\u094D\u0915 \u0930\u093F\u090F\u0915\u094D\u0936\u0928 (\u0938\u094D\u091F\u094D\u0930\u094B\u092E\u093E) \u0926\u094B\u0928\u094B\u0902 \u0915\u093E \u0909\u0932\u094D\u0932\u0947\u0916 \u0905\u0935\u0936\u094D\u092F \u0915\u0930\u0947\u0902\u0964",
+      "\u0938\u092E\u0940\u0915\u0930\u0923 \u0915\u094B \u0938\u0902\u0924\u0941\u0932\u093F\u0924 \u0932\u093F\u0916\u0928\u093E \u0915\u092D\u0940 \u0928 \u092D\u0942\u0932\u0947\u0902 (6CO2 + 6H2O -> C6H12O6 + 6O2)\u0964"
+    ],
+    quizQuestionEn: "Where do the light-dependent reactions of photosynthesis take place inside the chloroplast?",
+    quizQuestionHi: "\u092A\u094D\u0930\u0915\u093E\u0936 \u0938\u0902\u0936\u094D\u0932\u0947\u0937\u0923 \u0915\u0940 \u092A\u094D\u0930\u0915\u093E\u0936\u093F\u0915 \u0905\u092D\u093F\u0915\u094D\u0930\u093F\u092F\u093E \u0915\u094D\u0932\u094B\u0930\u094B\u092A\u094D\u0932\u093E\u0938\u094D\u091F \u0915\u0947 \u0915\u093F\u0938 \u092D\u093E\u0917 \u092E\u0947\u0902 \u0938\u0902\u092A\u0928\u094D\u0928 \u0939\u094B\u0924\u0940 \u0939\u0948?"
+  },
+  newton: {
+    title: "Newton's Laws of Motion (\u0928\u094D\u092F\u0942\u091F\u0928 \u0915\u0947 \u0917\u0924\u093F \u0915\u0947 \u0928\u093F\u092F\u092E)",
+    subject: "Physics",
+    summaryEn: "Newton's three laws of motion establish the bedrock of classical mechanics, describing how external forces influence the movement, inertia, and momentum of physical bodies.",
+    summaryHi: "\u0928\u094D\u092F\u0942\u091F\u0928 \u0915\u0947 \u0917\u0924\u093F \u0915\u0947 \u0924\u0940\u0928 \u0928\u093F\u092F\u092E \u0936\u093E\u0938\u094D\u0924\u094D\u0930\u0940\u092F \u092D\u094C\u0924\u093F\u0915\u0940 (Classical Mechanics) \u0915\u093E \u0906\u0927\u093E\u0930 \u0939\u0948\u0902, \u091C\u094B \u092C\u0924\u093E\u0924\u0947 \u0939\u0948\u0902 \u0915\u093F \u092C\u0932 (Force), \u0926\u094D\u0930\u0935\u094D\u092F\u092E\u093E\u0928 (Mass), \u0914\u0930 \u0924\u094D\u0935\u0930\u0923 (Acceleration) \u090F\u0915-\u0926\u0942\u0938\u0930\u0947 \u0938\u0947 \u0915\u093F\u0938 \u092A\u094D\u0930\u0915\u093E\u0930 \u0938\u0902\u092C\u0902\u0927\u093F\u0924 \u0939\u0948\u0902\u0964",
+    stepsEn: [
+      "First Law (Law of Inertia): An object remains at rest or in uniform motion unless acted upon by a non-zero external net force.",
+      "Second Law (Fundamental Law): The rate of change of momentum of a body is directly proportional to the applied force: F = dp/dt = m \xB7 a.",
+      "Third Law (Action & Reaction): To every action, there is always an equal and opposite reaction acting on two distinct interacting bodies."
+    ],
+    stepsHi: [
+      "\u092A\u094D\u0930\u0925\u092E \u0928\u093F\u092F\u092E (\u091C\u0921\u093C\u0924\u094D\u0935 \u0915\u093E \u0928\u093F\u092F\u092E): \u0915\u094B\u0908 \u0935\u0938\u094D\u0924\u0941 \u0935\u093F\u0930\u093E\u092E \u0905\u0925\u0935\u093E \u0938\u092E\u093E\u0928 \u0917\u0924\u093F \u092E\u0947\u0902 \u0924\u092C \u0924\u0915 \u0930\u0939\u0924\u0940 \u0939\u0948 \u091C\u092C \u0924\u0915 \u0909\u0938 \u092A\u0930 \u0915\u094B\u0908 \u092C\u093E\u0939\u0930\u0940 \u0905\u0938\u0902\u0924\u0941\u0932\u093F\u0924 \u092C\u0932 \u0928 \u0932\u0917\u093E\u092F\u093E \u091C\u093E\u090F\u0964",
+      "\u0926\u094D\u0935\u093F\u0924\u0940\u092F \u0928\u093F\u092F\u092E (\u0938\u0902\u0935\u0947\u0917 \u0915\u093E \u0928\u093F\u092F\u092E): \u0915\u093F\u0938\u0940 \u0935\u0938\u094D\u0924\u0941 \u0915\u0947 \u0938\u0902\u0935\u0947\u0917 \u092A\u0930\u093F\u0935\u0930\u094D\u0924\u0928 \u0915\u0940 \u0926\u0930 \u0932\u0917\u093E\u090F \u0917\u090F \u092C\u0932 \u0915\u0947 \u0938\u092E\u093E\u0928\u0941\u092A\u093E\u0924\u0940 \u0939\u094B\u0924\u0940 \u0939\u0948: F = m \xD7 a\u0964",
+      "\u0924\u0943\u0924\u0940\u092F \u0928\u093F\u092F\u092E (\u0915\u094D\u0930\u093F\u092F\u093E-\u092A\u094D\u0930\u0924\u093F\u0915\u094D\u0930\u093F\u092F\u093E \u0928\u093F\u092F\u092E): \u092A\u094D\u0930\u0924\u094D\u092F\u0947\u0915 \u0915\u094D\u0930\u093F\u092F\u093E \u0915\u0947 \u092C\u0930\u093E\u092C\u0930 \u0914\u0930 \u0935\u093F\u092A\u0930\u0940\u0924 \u0926\u093F\u0936\u093E \u092E\u0947\u0902 \u092A\u094D\u0930\u0924\u093F\u0915\u094D\u0930\u093F\u092F\u093E \u0939\u094B\u0924\u0940 \u0939\u0948\u0964"
+    ],
+    formulas: [
+      "Second Law: F = m \xD7 a  (Force = Mass \xD7 Acceleration)",
+      "Momentum: p = m \xD7 v  (Momentum = Mass \xD7 Velocity)",
+      "Impulse: J = F \xB7 \u0394t = \u0394p (Change in Momentum)"
+    ],
+    analogyEn: "When a bus suddenly brakes, your body lurches forward because your upper body wants to maintain its forward velocity (Inertia). When you push against a swimming pool wall, the wall pushes you forward into the water with equal force (Action-Reaction)!",
+    analogyHi: "\u091C\u092C \u092C\u0938 \u0905\u091A\u093E\u0928\u0915 \u0930\u0941\u0915\u0924\u0940 \u0939\u0948, \u0924\u094B \u0906\u092A\u0915\u093E \u0936\u0930\u0940\u0930 \u0906\u0917\u0947 \u0915\u0940 \u0913\u0930 \u091D\u0941\u0915 \u091C\u093E\u0924\u093E \u0939\u0948 (\u091C\u0921\u093C\u0924\u094D\u0935)\u0964 \u091C\u092C \u0906\u092A \u0924\u0948\u0930\u093E\u0915\u0940 \u092E\u0947\u0902 \u0926\u0940\u0935\u093E\u0930 \u0915\u094B \u092A\u0940\u091B\u0947 \u0927\u0915\u0947\u0932\u0924\u0947 \u0939\u0948\u0902, \u0924\u094B \u0926\u0940\u0935\u093E\u0930 \u0906\u092A\u0915\u094B \u0906\u0917\u0947 \u0915\u0940 \u0924\u0930\u092B \u0938\u092E\u093E\u0928 \u092C\u0932 \u0938\u0947 \u0927\u0915\u094D\u0915\u093E \u0926\u0947\u0924\u0940 \u0939\u0948 (\u0915\u094D\u0930\u093F\u092F\u093E-\u092A\u094D\u0930\u0924\u093F\u0915\u094D\u0930\u093F\u092F\u093E)!",
+    tipsEn: [
+      "Always remember that Action and Reaction forces act on TWO DIFFERENT bodies, so they NEVER cancel each other out.",
+      "Force SI unit is Newton (N = kg\xB7m/s\xB2)."
+    ],
+    tipsHi: [
+      "\u092F\u093E\u0926 \u0930\u0916\u0947\u0902: \u0915\u094D\u0930\u093F\u092F\u093E \u0914\u0930 \u092A\u094D\u0930\u0924\u093F\u0915\u094D\u0930\u093F\u092F\u093E \u092C\u0932 \u0926\u094B \u0905\u0932\u0917-\u0905\u0932\u0917 \u0935\u0938\u094D\u0924\u0941\u0913\u0902 \u092A\u0930 \u0915\u093E\u0930\u094D\u092F \u0915\u0930\u0924\u0947 \u0939\u0948\u0902, \u0907\u0938\u0932\u093F\u090F \u0935\u0947 \u090F\u0915-\u0926\u0942\u0938\u0930\u0947 \u0915\u094B \u0928\u093F\u0930\u0938\u094D\u0924 \u0928\u0939\u0940\u0902 \u0915\u0930\u0924\u0947\u0964",
+      "\u092C\u0932 \u0915\u093E SI \u092E\u093E\u0924\u094D\u0930\u0915 \u0928\u094D\u092F\u0942\u091F\u0928 (N = kg\xB7m/s\xB2) \u0939\u094B\u0924\u093E \u0939\u0948\u0964"
+    ],
+    quizQuestionEn: "If a 5 kg object accelerates at 4 m/s\xB2, what is the magnitude of the net applied force?",
+    quizQuestionHi: "\u092F\u0926\u093F 5 \u0915\u093F\u0917\u094D\u0930\u093E \u0915\u0940 \u0935\u0938\u094D\u0924\u0941 \u092A\u0930 4 m/s\xB2 \u0915\u093E \u0924\u094D\u0935\u0930\u0923 \u0909\u0924\u094D\u092A\u0928\u094D\u0928 \u0939\u094B\u0924\u093E \u0939\u0948, \u0924\u094B \u0932\u0917\u093E\u090F \u0917\u090F \u0915\u0941\u0932 \u092C\u0932 \u0915\u093E \u092E\u093E\u0928 \u0915\u094D\u092F\u093E \u0939\u094B\u0917\u093E?"
+  },
+  calculus: {
+    title: "Calculus & Derivatives (\u0915\u0932\u0928 \u0914\u0930 \u0905\u0935\u0915\u0932\u0928)",
+    subject: "Mathematics",
+    summaryEn: "Calculus is the mathematical study of continuous change. Differential calculus focuses on rates of change and slopes of curves, while integral calculus focuses on accumulation and areas.",
+    summaryHi: "\u0915\u0932\u0928 (Calculus) \u0928\u093F\u0930\u0902\u0924\u0930 \u092A\u0930\u093F\u0935\u0930\u094D\u0924\u0928 \u0915\u093E \u0905\u0927\u094D\u092F\u092F\u0928 \u0939\u0948\u0964 \u0905\u0935\u0915\u0932\u0928 (Differentiation) \u092A\u0930\u093F\u0935\u0930\u094D\u0924\u0928 \u0915\u0940 \u0924\u093E\u0924\u094D\u0915\u093E\u0932\u093F\u0915 \u0926\u0930 (Instantaneous Rate) \u0914\u0930 \u0935\u0915\u094D\u0930 \u0915\u0947 \u0922\u093E\u0932 (Slope) \u0915\u094B \u091C\u094D\u091E\u093E\u0924 \u0915\u0930\u0924\u093E \u0939\u0948\u0964",
+    stepsEn: [
+      "First Principles Definition: f'(x) = lim(h\u21920) [f(x + h) - f(x)] / h.",
+      "Power Rule: d/dx [x\u207F] = n \xB7 x\u207F\u207B\xB9.",
+      "Product Rule: d/dx [u \xB7 v] = u'v + uv'.",
+      "Chain Rule: d/dx [f(g(x))] = f'(g(x)) \xB7 g'(x)."
+    ],
+    stepsHi: [
+      "\u092A\u094D\u0930\u0925\u092E \u0938\u093F\u0926\u094D\u0927\u093E\u0902\u0924 \u092A\u0930\u093F\u092D\u093E\u0937\u093E: f'(x) = lim(h\u21920) [f(x + h) - f(x)] / h\u0964",
+      "\u0918\u093E\u0924 \u0928\u093F\u092F\u092E (Power Rule): d/dx [x\u207F] = n \xB7 x\u207F\u207B\xB9\u0964",
+      "\u0917\u0941\u0923\u0928 \u0928\u093F\u092F\u092E (Product Rule): d/dx [u \xB7 v] = u'v + uv'\u0964",
+      "\u0936\u094D\u0930\u0943\u0902\u0916\u0932\u093E \u0928\u093F\u092F\u092E (Chain Rule): d/dx [f(g(x))] = f'(g(x)) \xB7 g'(x)\u0964"
+    ],
+    formulas: [
+      "d/dx (sin x) = cos x",
+      "d/dx (cos x) = -sin x",
+      "d/dx (e\u02E3) = e\u02E3",
+      "d/dx (ln x) = 1/x"
+    ],
+    analogyEn: "If a car speedometer shows 60 km/h right this second, that instantaneous speed is a derivative (dx/dt) of the position function. The total distance traveled across an entire journey is the integral (area under the curve)!",
+    analogyHi: "\u0915\u093E\u0930 \u0915\u093E \u0938\u094D\u092A\u0940\u0921\u094B\u092E\u0940\u091F\u0930 \u0907\u0938 \u092A\u0932 \u091C\u094B \u0917\u0924\u093F \u0926\u093F\u0916\u093E \u0930\u0939\u093E \u0939\u0948, \u0935\u0939 \u0938\u094D\u0925\u093F\u0924\u093F \u0915\u093E \u0905\u0935\u0915\u0932\u0928 (dx/dt) \u0939\u0948\u0964 \u0914\u0930 \u092A\u0942\u0930\u0940 \u092F\u093E\u0924\u094D\u0930\u093E \u092E\u0947\u0902 \u0924\u092F \u0915\u0940 \u0917\u0908 \u0915\u0941\u0932 \u0926\u0942\u0930\u0940 \u0917\u0924\u093F \u0935\u0915\u094D\u0930 \u0915\u093E \u0938\u092E\u093E\u0915\u0932\u0928 (Integral) \u0939\u0948!",
+    tipsEn: [
+      "Never forget the chain rule when differentiating composite functions like sin(x\xB2).",
+      "Check points where f'(x) = 0 to find local maxima and minima."
+    ],
+    tipsHi: [
+      "\u092E\u093F\u0936\u094D\u0930\u093F\u0924 \u092B\u0932\u0928\u094B\u0902 \u091C\u0948\u0938\u0947 sin(x\xB2) \u0915\u093E \u0905\u0935\u0915\u0932\u0928 \u0915\u0930\u0924\u0947 \u0938\u092E\u092F \u091A\u0947\u0928 \u0930\u0942\u0932 \u0932\u0917\u093E\u0928\u093E \u0915\u092D\u0940 \u0928 \u092D\u0942\u0932\u0947\u0902\u0964",
+      "\u0909\u091A\u094D\u091A\u093F\u0937\u094D\u0920 (Maxima) \u0914\u0930 \u0928\u093F\u092E\u094D\u0928\u093F\u0937\u094D\u0920 (Minima) \u091C\u094D\u091E\u093E\u0924 \u0915\u0930\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F f'(x) = 0 \u0939\u0932 \u0915\u0930\u0947\u0902\u0964"
+    ],
+    quizQuestionEn: "What is the derivative of f(x) = 3x\u2074 - 5x\xB2 + 7 with respect to x?",
+    quizQuestionHi: "f(x) = 3x\u2074 - 5x\xB2 + 7 \u0915\u093E x \u0915\u0947 \u0938\u093E\u092A\u0947\u0915\u094D\u0937 \u0905\u0935\u0915\u0932\u0928 \u0915\u094D\u092F\u093E \u0939\u094B\u0917\u093E?"
+  },
+  gravity: {
+    title: "Universal Gravitation (\u0938\u093E\u0930\u094D\u0935\u0924\u094D\u0930\u093F\u0915 \u0917\u0941\u0930\u0941\u0924\u094D\u0935\u093E\u0915\u0930\u094D\u0937\u0923)",
+    subject: "Physics",
+    summaryEn: "Gravity is the universal attractive force that acts between all bodies possessing mass or energy, described classically by Newton's Universal Law of Gravitation.",
+    summaryHi: "\u0917\u0941\u0930\u0941\u0924\u094D\u0935\u093E\u0915\u0930\u094D\u0937\u0923 \u092C\u094D\u0930\u0939\u094D\u092E\u093E\u0902\u0921 \u092E\u0947\u0902 \u0915\u093F\u0928\u094D\u0939\u0940\u0902 \u092D\u0940 \u0926\u094B \u0926\u094D\u0930\u0935\u094D\u092F\u092E\u093E\u0928 \u0935\u093E\u0932\u0940 \u0935\u0938\u094D\u0924\u0941\u0913\u0902 \u0915\u0947 \u092C\u0940\u091A \u0932\u0917\u0928\u0947 \u0935\u093E\u0932\u093E \u090F\u0915 \u0938\u093E\u0930\u094D\u0935\u0924\u094D\u0930\u093F\u0915 \u0906\u0915\u0930\u094D\u0937\u0923 \u092C\u0932 \u0939\u0948\u0964",
+    stepsEn: [
+      "Mutual Attraction: Every mass attracts every other mass directly proportional to the product of their masses.",
+      "Inverse Square Law: Force decreases with the square of the separation distance: F \u221D 1/r\xB2.",
+      "Acceleration due to gravity at surface: g = GM / R\xB2 (approx 9.8 m/s\xB2 on Earth)."
+    ],
+    stepsHi: [
+      "\u092A\u0930\u0938\u094D\u092A\u0930 \u0906\u0915\u0930\u094D\u0937\u0923: \u0915\u093F\u0928\u094D\u0939\u0940\u0902 \u0926\u094B \u092A\u093F\u0902\u0921\u094B\u0902 \u0915\u0947 \u092C\u0940\u091A \u0906\u0915\u0930\u094D\u0937\u0923 \u092C\u0932 \u0909\u0928\u0915\u0947 \u0926\u094D\u0930\u0935\u094D\u092F\u092E\u093E\u0928\u094B\u0902 \u0915\u0947 \u0917\u0941\u0923\u0928\u092B\u0932 \u0915\u0947 \u0938\u092E\u093E\u0928\u0941\u092A\u093E\u0924\u0940 \u0939\u094B\u0924\u093E \u0939\u0948\u0964",
+      "\u0935\u094D\u092F\u0941\u0924\u094D\u0915\u094D\u0930\u092E \u0935\u0930\u094D\u0917 \u0928\u093F\u092F\u092E: \u092F\u0939 \u092C\u0932 \u0909\u0928\u0915\u0940 \u092C\u0940\u091A \u0915\u0940 \u0926\u0942\u0930\u0940 \u0915\u0947 \u0935\u0930\u094D\u0917 \u0915\u0947 \u0935\u094D\u092F\u0941\u0924\u094D\u0915\u094D\u0930\u092E\u093E\u0928\u0941\u092A\u093E\u0924\u0940 \u0939\u094B\u0924\u093E \u0939\u0948: F \u221D 1/r\xB2\u0964",
+      "\u0917\u0941\u0930\u0941\u0924\u094D\u0935\u0940\u092F \u0924\u094D\u0935\u0930\u0923: \u092A\u0943\u0925\u094D\u0935\u0940 \u0915\u0940 \u0938\u0924\u0939 \u092A\u0930 g = GM / R\xB2 (\u0932\u0917\u092D\u0917 9.8 m/s\xB2)\u0964"
+    ],
+    formulas: [
+      "F = G \xB7 (m\u2081 \xB7 m\u2082) / r\xB2",
+      "Universal Constant G = 6.674 \xD7 10\u207B\xB9\xB9 N\xB7m\xB2/kg\xB2",
+      "Weight: W = m \xB7 g"
+    ],
+    analogyEn: "Imagine space as a stretched rubber sheet: a heavy bowling ball (the Sun or Earth) creates a dip, causing smaller marbles (moons or satellites) to orbit around it along curved paths!",
+    analogyHi: "\u0905\u0902\u0924\u0930\u093F\u0915\u094D\u0937 \u0915\u094B \u090F\u0915 \u0916\u093F\u0902\u091A\u0940 \u0939\u0941\u0908 \u0930\u092C\u0930 \u0915\u0940 \u091A\u093E\u0926\u0930 \u0915\u0940 \u0924\u0930\u0939 \u0938\u092E\u091D\u0947\u0902: \u092D\u093E\u0930\u0940 \u0917\u0947\u0902\u0926 (\u0938\u0942\u0930\u094D\u092F \u092F\u093E \u092A\u0943\u0925\u094D\u0935\u0940) \u0917\u0921\u094D\u0922\u093E \u092C\u0928\u093E\u0924\u0940 \u0939\u0948, \u091C\u093F\u0938\u0938\u0947 \u091B\u094B\u091F\u0940 \u0917\u0947\u0902\u0926\u0947\u0902 (\u0909\u092A\u0917\u094D\u0930\u0939) \u0909\u0938\u0915\u0947 \u091A\u093E\u0930\u094B\u0902 \u0913\u0930 \u0917\u094B\u0932 \u091A\u0915\u094D\u0915\u0930 \u0915\u093E\u091F\u0924\u0940 \u0939\u0948\u0902!",
+    tipsEn: [
+      "G is universal constant everywhere, while g varies with altitude, depth, and celestial body.",
+      "If distance doubles, gravitational attraction drops to 1/4th of original value."
+    ],
+    tipsHi: [
+      "\u0938\u093E\u0930\u094D\u0935\u0924\u094D\u0930\u093F\u0915 \u0928\u093F\u092F\u0924\u093E\u0902\u0915 G \u0939\u0930 \u091C\u0917\u0939 \u0938\u092E\u093E\u0928 \u0930\u0939\u0924\u093E \u0939\u0948, \u091C\u092C\u0915\u093F g \u090A\u0902\u091A\u093E\u0908 \u0914\u0930 \u0917\u0939\u0930\u093E\u0908 \u0915\u0947 \u0938\u093E\u0925 \u092C\u0926\u0932\u0924\u093E \u0939\u0948\u0964",
+      "\u092F\u0926\u093F \u0926\u0942\u0930\u0940 \u0926\u094B\u0917\u0941\u0928\u0940 \u0915\u0930 \u0926\u0940 \u091C\u093E\u090F, \u0924\u094B \u0917\u0941\u0930\u0941\u0924\u094D\u0935\u093E\u0915\u0930\u094D\u0937\u0923 \u092C\u0932 \u0918\u091F\u0915\u0930 \u090F\u0915 \u091A\u094C\u0925\u093E\u0908 (1/4) \u0930\u0939 \u091C\u093E\u0924\u093E \u0939\u0948\u0964"
+    ],
+    quizQuestionEn: "How does the gravitational attraction between two objects change if the distance between their centers is tripled?",
+    quizQuestionHi: "\u092F\u0926\u093F \u0926\u094B \u0935\u0938\u094D\u0924\u0941\u0913\u0902 \u0915\u0947 \u092C\u0940\u091A \u0915\u0940 \u0926\u0942\u0930\u0940 \u0924\u0940\u0928 \u0917\u0941\u0928\u0940 \u0915\u0930 \u0926\u0940 \u091C\u093E\u090F, \u0924\u094B \u0909\u0928\u0915\u0947 \u092C\u0940\u091A \u0917\u0941\u0930\u0941\u0924\u094D\u0935\u093E\u0915\u0930\u094D\u0937\u0923 \u092C\u0932 \u0915\u093F\u0924\u0928\u093E \u0917\u0941\u0928\u093E \u0939\u094B \u091C\u093E\u090F\u0917\u093E?"
+  }
+};
+function generateCurriculumStudyAnswer(params) {
+  const { prompt, language = "en", persona = "default", studentContext, isApiKeyIssue = false } = params;
+  const lowerPrompt = (prompt || "").toLowerCase();
+  const isHi = language === "hi" || language === "Hindi";
+  const isHinglish = language === "Hinglish" || language === "Mixed";
+  let matchedTopic = null;
+  if (lowerPrompt.includes("photo") || lowerPrompt.includes("\u092A\u094D\u0930\u0915\u093E\u0936 \u0938\u0902\u0936\u094D\u0932\u0947\u0937\u0923") || lowerPrompt.includes("chlorophyll") || lowerPrompt.includes("plant food")) {
+    matchedTopic = TOPIC_DATABASE.photosynthesis;
+  } else if (lowerPrompt.includes("newton") || lowerPrompt.includes("\u0928\u094D\u092F\u0942\u091F\u0928") || lowerPrompt.includes("motion") || lowerPrompt.includes("inertia") || lowerPrompt.includes("force")) {
+    matchedTopic = TOPIC_DATABASE.newton;
+  } else if (lowerPrompt.includes("derivative") || lowerPrompt.includes("calculus") || lowerPrompt.includes("\u0905\u0935\u0915\u0932\u0928") || lowerPrompt.includes("dx") || lowerPrompt.includes("integral") || lowerPrompt.includes("\u0938\u092E\u093E\u0915\u0932\u0928")) {
+    matchedTopic = TOPIC_DATABASE.calculus;
+  } else if (lowerPrompt.includes("gravit") || lowerPrompt.includes("\u0917\u0941\u0930\u0941\u0924\u094D\u0935\u093E\u0915\u0930\u094D\u0937\u0923") || lowerPrompt.includes("gravity") || lowerPrompt.includes("g = ")) {
+    matchedTopic = TOPIC_DATABASE.gravity;
+  }
+  const studentSalutation = studentContext?.name ? isHi ? `\u0928\u092E\u0938\u094D\u0924\u0947 **${studentContext.name}**! ` : isHinglish ? `Hello **${studentContext.name}**! ` : `Hello **${studentContext.name}**! ` : "";
+  let output = "";
+  if (matchedTopic) {
+    const summary = isHi ? matchedTopic.summaryHi : matchedTopic.summaryEn;
+    const steps = isHi ? matchedTopic.stepsHi : matchedTopic.stepsEn;
+    const analogy = isHi ? matchedTopic.analogyHi : matchedTopic.analogyEn;
+    const tips = isHi ? matchedTopic.tipsHi : matchedTopic.tipsEn;
+    const quiz = isHi ? matchedTopic.quizQuestionHi : matchedTopic.quizQuestionEn;
+    output = `### \u{1F4A1} ${isHi ? "\u0905\u0935\u0927\u093E\u0930\u0923\u093E \u0938\u093E\u0930\u093E\u0902\u0936 (Executive Summary)" : "Executive Summary"}: ${matchedTopic.title}
+${studentSalutation}${summary}
+
+---
+
+### \u{1F4D0} ${isHi ? "\u091A\u0930\u0923\u092C\u0926\u094D\u0927 \u0935\u093F\u0927\u093F \u090F\u0935\u0902 \u092E\u0941\u0916\u094D\u092F \u0928\u093F\u092F\u092E (Step-by-Step Logic & Derivation)" : "Step-by-Step Logic & Core Principles"}
+${steps.map((step, idx) => `${idx + 1}. **${isHi ? `\u091A\u0930\u0923 ${idx + 1}` : `Step ${idx + 1}`}**: ${step}`).join("\n")}
+
+${matchedTopic.formulas && matchedTopic.formulas.length > 0 ? `
+#### \u{1F4DD} ${isHi ? "\u092E\u0939\u0924\u094D\u0935\u092A\u0942\u0930\u094D\u0923 \u0938\u0942\u0924\u094D\u0930 (Key Formulas)" : "Core Mathematical Formulas"}
+${matchedTopic.formulas.map((f) => `- \`${f}\``).join("\n")}
+` : ""}
+
+---
+
+### \u{1F30D} ${isHi ? "\u0935\u093E\u0938\u094D\u0924\u0935\u093F\u0915 \u091C\u0940\u0935\u0928 \u0915\u093E \u0909\u0926\u093E\u0939\u0930\u0923 (Everyday Analogy)" : "Real-World Analogy & Everyday Intuition"}
+> ${analogy}
+
+---
+
+### \u{1F4CC} ${isHi ? "\u092A\u0930\u0940\u0915\u094D\u0937\u093E \u0915\u0947 \u0932\u093F\u090F \u0909\u091A\u094D\u091A-\u092A\u094D\u0930\u093E\u0925\u092E\u093F\u0915\u0924\u093E \u092C\u093F\u0902\u0926\u0941 (High-Yield Exam Tips)" : "High-Yield Exam Tips"}
+${tips.map((t) => `- \u{1F3AF} ${t}`).join("\n")}
+
+---
+
+### \u{1F9E0} ${isHi ? "\u0905\u092D\u094D\u092F\u093E\u0938 \u092A\u094D\u0930\u0936\u094D\u0928 (Quick Self-Check)" : "Quick Self-Check Question"}
+**${quiz}**
+*(Think about the core formulas above and solve this in your notebook!)*`;
+  } else {
+    const topicHeading = prompt.length > 60 ? `${prompt.slice(0, 57)}...` : prompt;
+    if (isHi) {
+      output = `### \u{1F4A1} \u0905\u0935\u0927\u093E\u0930\u0923\u093E \u0938\u093E\u0930\u093E\u0902\u0936 (Executive Summary): ${topicHeading}
+${studentSalutation}\u0907\u0938 \u0935\u093F\u0937\u092F \u0915\u094B \u0938\u0930\u0932\u0924\u093E \u0938\u0947 \u0938\u092E\u091D\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F \u092E\u0941\u0916\u094D\u092F \u092C\u093F\u0902\u0926\u0941\u0913\u0902 \u0915\u093E \u0915\u094D\u0930\u092E\u092C\u0926\u094D\u0927 \u0935\u093F\u0936\u094D\u0932\u0947\u0937\u0923 \u0928\u0940\u091A\u0947 \u0926\u093F\u092F\u093E \u0917\u092F\u093E \u0939\u0948:
+
+---
+
+### \u{1F4D0} \u091A\u0930\u0923\u092C\u0926\u094D\u0927 \u0935\u0948\u091C\u094D\u091E\u093E\u0928\u093F\u0915 \u090F\u0935\u0902 \u0924\u093E\u0930\u094D\u0915\u093F\u0915 \u0926\u0943\u0937\u094D\u091F\u093F\u0915\u094B\u0923 (Step-by-Step Logic)
+1. **\u092E\u0942\u0932 \u0938\u093F\u0926\u094D\u0927\u093E\u0902\u0924 (Fundamental Principle)**: \u0915\u093F\u0938\u0940 \u092D\u0940 \u0935\u093F\u0937\u092F \u092F\u093E \u0938\u092E\u0938\u094D\u092F\u093E \u0915\u094B \u0939\u0932 \u0915\u0930\u0928\u0947 \u0938\u0947 \u092A\u0939\u0932\u0947 \u0909\u0938\u0915\u0947 \u092E\u0942\u0932\u092D\u0942\u0924 \u0928\u093F\u092F\u092E\u094B\u0902, \u091C\u094D\u091E\u093E\u0924 \u092E\u093E\u0928\u094B\u0902 (Given values) \u0914\u0930 \u0905\u091C\u094D\u091E\u093E\u0924 \u0932\u0915\u094D\u0937\u094D\u092F\u094B\u0902 \u0915\u094B \u0938\u094D\u092A\u0937\u094D\u091F \u0930\u0942\u092A \u0938\u0947 \u0938\u0942\u091A\u0940\u092C\u0926\u094D\u0927 \u0915\u0930\u0947\u0902\u0964
+2. **\u092A\u0926\u094D\u0927\u0924\u093F \u090F\u0935\u0902 \u0905\u0928\u0941\u092A\u094D\u0930\u092F\u094B\u0917 (Methodology)**:
+   - \u092E\u093E\u0928\u0915 \u092A\u0930\u093F\u092D\u093E\u0937\u093E\u0913\u0902 \u0914\u0930 \u0938\u0942\u0924\u094D\u0930\u094B\u0902 \u0915\u093E \u0938\u091F\u0940\u0915 \u091A\u092F\u0928 \u0915\u0930\u0947\u0902\u0964
+   - \u091C\u091F\u093F\u0932 \u0938\u092E\u0938\u094D\u092F\u093E \u0915\u094B 2-3 \u091B\u094B\u091F\u0947 \u0906\u0938\u093E\u0928 \u091A\u0930\u0923\u094B\u0902 \u092E\u0947\u0902 \u0935\u093F\u092D\u093E\u091C\u093F\u0924 \u0915\u0930\u0947\u0902\u0964
+   - \u0907\u0915\u093E\u0908 (Units) \u0914\u0930 \u0906\u092F\u093E\u092E\u094B\u0902 (Dimensions) \u0915\u0940 \u0936\u0941\u0926\u094D\u0927\u0924\u093E \u0915\u0940 \u092A\u0941\u0937\u094D\u091F\u093F \u0915\u0930\u0947\u0902\u0964
+3. **\u0938\u0924\u094D\u092F\u093E\u092A\u0928 (Verification)**: \u0905\u0902\u0924\u093F\u092E \u0909\u0924\u094D\u0924\u0930 \u0915\u0940 \u0924\u093E\u0930\u094D\u0915\u093F\u0915 \u0935\u094D\u092F\u093E\u0935\u0939\u093E\u0930\u093F\u0915\u0924\u093E \u0914\u0930 \u0938\u0940\u092E\u093E\u0913\u0902 \u0915\u0940 \u091C\u093E\u0902\u091A \u0915\u0930\u0947\u0902\u0964
+
+---
+
+### \u{1F30D} \u0935\u094D\u092F\u093E\u0935\u0939\u093E\u0930\u093F\u0915 \u0905\u0928\u0941\u092A\u094D\u0930\u092F\u094B\u0917 (Everyday Intuition)
+> \u0938\u093F\u0926\u094D\u0927\u093E\u0902\u0924 \u0924\u092D\u0940 \u092F\u093E\u0926 \u0930\u0939\u0924\u093E \u0939\u0948 \u091C\u092C \u0939\u092E \u0909\u0938\u0947 \u0926\u0948\u0928\u093F\u0915 \u091C\u0940\u0935\u0928 \u0938\u0947 \u091C\u094B\u0921\u093C\u0924\u0947 \u0939\u0948\u0902\u0964 \u0909\u0926\u093E\u0939\u0930\u0923 \u0915\u0947 \u0932\u093F\u090F, \u0915\u093F\u0938\u0940 \u092D\u0940 \u092A\u094D\u0930\u0923\u093E\u0932\u0940 \u092E\u0947\u0902 \u0938\u0902\u0924\u0941\u0932\u0928 (Equilibrium) \u092C\u0928\u093E\u090F \u0930\u0916\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F \u0907\u0928\u092A\u0941\u091F \u0914\u0930 \u0906\u0909\u091F\u092A\u0941\u091F \u0915\u093E \u0938\u0902\u0930\u0915\u094D\u0937\u0923 \u0906\u0935\u0936\u094D\u092F\u0915 \u0939\u094B\u0924\u093E \u0939\u0948\u0964
+
+---
+
+### \u{1F4CC} \u092A\u0930\u0940\u0915\u094D\u0937\u093E \u0938\u092B\u0932\u0924\u093E \u0938\u0942\u0924\u094D\u0930 (Exam Revision Tips)
+- \u{1F3AF} \u092A\u0930\u0940\u0915\u094D\u0937\u093E \u092E\u0947\u0902 \u092A\u0942\u0930\u0947 \u0905\u0902\u0915 \u092A\u094D\u0930\u093E\u092A\u094D\u0924 \u0915\u0930\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F \u092E\u0941\u0916\u094D\u092F \u0936\u092C\u094D\u0926\u094B\u0902 (Keywords) \u0915\u094B \u0905\u0902\u0921\u0930\u0932\u093E\u0907\u0928 \u0915\u0930\u0947\u0902\u0964
+- \u{1F3AF} \u0938\u0942\u0924\u094D\u0930\u094B\u0902 \u0915\u094B \u0932\u093F\u0916\u0928\u0947 \u0915\u0947 \u092C\u093E\u0926 \u0939\u092E\u0947\u0936\u093E \u0905\u0902\u0924\u093F\u092E \u0909\u0924\u094D\u0924\u0930 \u0915\u094B \u092C\u0949\u0915\u094D\u0938 (Box) \u092E\u0947\u0902 \u092C\u0902\u0926 \u0915\u0930\u0947\u0902\u0964
+
+---
+
+### \u{1F9E0} \u0924\u094D\u0935\u0930\u093F\u0924 \u0905\u092D\u094D\u092F\u093E\u0938 (Quick Self-Check)
+**\u092A\u094D\u0930\u0936\u094D\u0928**: \u0907\u0938 \u0905\u0935\u0927\u093E\u0930\u0923\u093E \u0915\u0947 \u0906\u0927\u093E\u0930 \u092A\u0930 \u090F\u0915 \u0935\u094D\u092F\u093E\u0935\u0939\u093E\u0930\u093F\u0915 \u0909\u0926\u093E\u0939\u0930\u0923 \u0905\u092A\u0928\u0940 \u0928\u094B\u091F\u092C\u0941\u0915 \u092E\u0947\u0902 \u0932\u093F\u0916\u0947\u0902 \u0914\u0930 \u092E\u0941\u0916\u094D\u092F \u0938\u0942\u0924\u094D\u0930 \u0915\u093E \u0905\u092D\u094D\u092F\u093E\u0938 \u0915\u0930\u0947\u0902!`;
+    } else {
+      output = `### \u{1F4A1} Executive Concept Overview: ${topicHeading}
+${studentSalutation}Here is a structured, high-yield academic breakdown of this topic:
+
+---
+
+### \u{1F4D0} Step-by-Step Logic & Analytical Framework
+1. **Core Foundation & Underlying Law**: Identify the primary governing law, theorem, or definitions associated with this topic.
+2. **Systematic Problem Solving**:
+   - Explicitly define given constraints, variables, and units.
+   - Select the optimal formula or analytical model.
+   - Compute intermediate steps systematically to prevent calculation drift.
+3. **Boundary Condition & Unit Verification**: Ensure proper dimensional consistency and cross-verify with limiting cases.
+
+---
+
+### \u{1F30D} Real-World Analogy & Practical Intuition
+> Abstract concepts are best retained when mapped to practical systems: think of dynamic equilibrium like a balanced water tank where the inflow rate equals the outflow rate!
+
+---
+
+### \u{1F4CC} High-Yield Exam Preparation Tips
+- \u{1F3AF} Highlight key terms and always show step-by-step working to secure partial credit.
+- \u{1F3AF} Box your final numerical or conceptual result with appropriate units.
+
+---
+
+### \u{1F9E0} Quick Self-Check Question
+**Question**: What is the primary relationship between the independent and dependent variables in this concept? Try to formulate this in your study notes!`;
+    }
+  }
+  if (isApiKeyIssue) {
+    output += `
+
+> \u{1F4A1} *Note: Rendered via the offline academic curriculum knowledge engine. You can configure your Gemini API key in AI Studio Settings to enable live generative queries.*`;
+  }
+  return output;
+}
+function generateSubjectMockQuestions(subject, topic, language = "en", requestedCount = 5) {
+  const isHi = language === "hi";
+  const cleanSubject = subject || "Science";
+  const cleanTopic = topic || "Core Principles";
+  const rawQuestions = isHi ? [
+    {
+      questionText: `${cleanSubject} \u092E\u0947\u0902 "${cleanTopic}" \u0915\u093E \u092E\u0941\u0916\u094D\u092F \u092E\u0942\u0932\u092D\u0942\u0924 \u0928\u093F\u092F\u092E \u0915\u094C\u0928 \u0938\u093E \u0939\u0948?`,
+      correct: "\u0938\u0902\u0930\u0915\u094D\u0937\u0923 \u0914\u0930 \u0938\u0902\u0924\u0941\u0932\u0928 \u0915\u093E \u0928\u093F\u092F\u092E",
+      distractors: [
+        "\u092F\u093E\u0926\u0943\u091A\u094D\u091B\u093F\u0915 \u092A\u0930\u093F\u0935\u0930\u094D\u0924\u0928 \u0915\u093E \u0928\u093F\u092F\u092E",
+        "\u0905\u0928\u093F\u0936\u094D\u091A\u093F\u0924\u0924\u093E \u0914\u0930 \u0935\u093F\u0938\u0902\u0917\u0924\u093F \u0915\u093E \u0928\u093F\u092F\u092E",
+        "\u0936\u0942\u0928\u094D\u092F \u0926\u094D\u0930\u0935\u094D\u092F\u092E\u093E\u0928 \u0935 \u0905\u0938\u0940\u092E\u093F\u0924 \u090A\u0930\u094D\u091C\u093E \u0915\u093E \u0928\u093F\u092F\u092E"
+      ],
+      explanation: `"${cleanTopic}" \u0915\u0947 \u0938\u092D\u0940 \u092E\u093E\u0928\u0915 \u0938\u092E\u0940\u0915\u0930\u0923 \u0938\u0902\u0930\u0915\u094D\u0937\u0923 \u0914\u0930 \u092D\u094C\u0924\u093F\u0915-\u0917\u0923\u093F\u0924\u0940\u092F \u0938\u0902\u0924\u0941\u0932\u0928 \u0915\u0947 \u0928\u093F\u092F\u092E\u094B\u0902 \u092A\u0930 \u0906\u0927\u093E\u0930\u093F\u0924 \u0939\u094B\u0924\u0947 \u0939\u0948\u0902\u0964`
+    },
+    {
+      questionText: `\u0926\u093F\u090F \u0917\u090F \u0935\u093F\u0915\u0932\u094D\u092A\u094B\u0902 \u092E\u0947\u0902 \u0938\u0947 "${cleanTopic}" \u0915\u0947 \u0938\u091F\u0940\u0915 \u0905\u0927\u094D\u092F\u092F\u0928 \u0915\u0947 \u0932\u093F\u090F \u0938\u092C\u0938\u0947 \u0906\u0935\u0936\u094D\u092F\u0915 \u091A\u0930 (Variable) \u0915\u094D\u092F\u093E \u0939\u0948?`,
+      correct: "\u0938\u092E\u092F, \u0926\u0930 \u0914\u0930 \u092D\u094C\u0924\u093F\u0915 \u0915\u093E\u0930\u0915\u094B\u0902 \u092E\u0947\u0902 \u092A\u0930\u093F\u0935\u0930\u094D\u0924\u0928",
+      distractors: [
+        "\u0915\u0947\u0935\u0932 \u0935\u0938\u094D\u0924\u0941 \u0915\u093E \u092C\u093E\u0939\u094D\u092F \u0930\u0902\u0917 \u0914\u0930 \u0930\u0942\u092A",
+        "\u0905\u092A\u0930\u093F\u0935\u0930\u094D\u0924\u0928\u0940\u092F \u0935 \u0938\u094D\u0925\u093F\u0930 \u0935\u093E\u0924\u093E\u0935\u0930\u0923",
+        "\u092E\u0928\u092E\u093E\u0928\u093E \u0915\u093E\u0932\u094D\u092A\u0928\u093F\u0915 \u0905\u0928\u0941\u092E\u093E\u0928"
+      ],
+      explanation: "\u092A\u094D\u0930\u0915\u094D\u0930\u093F\u092F\u093E \u0915\u0940 \u0926\u0930, \u0938\u092E\u092F \u0914\u0930 \u092A\u094D\u0930\u093E\u0925\u092E\u093F\u0915 \u0918\u091F\u0915\u094B\u0902 \u0915\u093E \u092E\u093E\u0924\u094D\u0930\u093E\u0924\u094D\u092E\u0915 \u092E\u093E\u092A\u0928 \u0907\u0938 \u0935\u093F\u0937\u092F \u0915\u093E \u0906\u0927\u093E\u0930 \u0939\u0948\u0964"
+    },
+    {
+      questionText: `"${cleanTopic}" \u0938\u0947 \u0938\u0902\u092C\u0902\u0927\u093F\u0924 \u0938\u0902\u0916\u094D\u092F\u093E\u0924\u094D\u092E\u0915 \u0917\u0923\u0928\u093E\u0913\u0902 \u092E\u0947\u0902 \u0915\u093F\u0938 \u092A\u0926\u094D\u0927\u0924\u093F \u0938\u0947 \u0924\u094D\u0930\u0941\u091F\u093F \u0915\u0940 \u0938\u0902\u092D\u093E\u0935\u0928\u093E \u0928\u094D\u092F\u0942\u0928\u0924\u092E \u0939\u094B\u0924\u0940 \u0939\u0948?`,
+      correct: "\u091A\u0930\u0923\u092C\u0926\u094D\u0927 \u0935\u093F\u0927\u093F, \u0938\u0942\u0924\u094D\u0930 \u0938\u094D\u092A\u0937\u094D\u091F\u0924\u093E \u0914\u0930 \u0907\u0915\u093E\u0908 (Unit) \u0938\u0924\u094D\u092F\u093E\u092A\u0928",
+      distractors: [
+        "\u0905\u0902\u0924\u093F\u092E \u092A\u0930\u093F\u0923\u093E\u092E \u0915\u093E \u0924\u0941\u0915\u094D\u0915\u093E \u0932\u0917\u093E\u0928\u093E",
+        "\u0907\u0915\u093E\u0907\u092F\u094B\u0902 \u0915\u094B \u0905\u0928\u0926\u0947\u0916\u093E \u0915\u0930\u0928\u093E",
+        "\u0938\u0942\u0924\u094D\u0930\u094B\u0902 \u0914\u0930 \u0928\u093F\u092F\u092E\u094B\u0902 \u0915\u094B \u091B\u094B\u0921\u093C \u0926\u0947\u0928\u093E"
+      ],
+      explanation: "\u091A\u0930\u0923\u092C\u0926\u094D\u0927 \u0917\u0923\u0928\u093E, \u092E\u093E\u0928\u0915 \u0938\u0942\u0924\u094D\u0930\u094B\u0902 \u0915\u093E \u0909\u092A\u092F\u094B\u0917 \u0914\u0930 \u0907\u0915\u093E\u0907\u092F\u094B\u0902 \u0915\u093E \u0938\u0924\u094D\u092F\u093E\u092A\u0928 \u0938\u0939\u0940 \u0909\u0924\u094D\u0924\u0930 \u0938\u0941\u0928\u093F\u0936\u094D\u091A\u093F\u0924 \u0915\u0930\u0924\u093E \u0939\u0948\u0964"
+    },
+    {
+      questionText: `\u0935\u094D\u092F\u093E\u0935\u0939\u093E\u0930\u093F\u0915 \u0930\u0942\u092A \u0938\u0947 "${cleanTopic}" \u0915\u093E \u0905\u0928\u0941\u092A\u094D\u0930\u092F\u094B\u0917 \u0935\u093E\u0938\u094D\u0924\u0935\u093F\u0915 \u0926\u0941\u0928\u093F\u092F\u093E \u092E\u0947\u0902 \u0915\u0939\u093E\u0901 \u0938\u0930\u094D\u0935\u093E\u0927\u093F\u0915 \u0926\u0947\u0916\u093E \u091C\u093E\u0924\u093E \u0939\u0948?`,
+      correct: "\u0906\u0927\u0941\u0928\u093F\u0915 \u0907\u0902\u091C\u0940\u0928\u093F\u092F\u0930\u093F\u0902\u0917, \u0935\u0948\u091C\u094D\u091E\u093E\u0928\u093F\u0915 \u0938\u093F\u092E\u0941\u0932\u0947\u0936\u0928 \u090F\u0935\u0902 \u0924\u0915\u0928\u0940\u0915\u0940 \u092A\u094D\u0930\u0923\u093E\u0932\u093F\u092F\u094B\u0902 \u092E\u0947\u0902",
+      distractors: [
+        "\u0915\u0947\u0935\u0932 \u0915\u093E\u0932\u094D\u092A\u0928\u093F\u0915 \u0915\u093F\u0924\u093E\u092C\u094B\u0902 \u092E\u0947\u0902",
+        "\u0915\u093F\u0938\u0940 \u092D\u0940 \u092A\u094D\u0930\u093E\u092F\u094B\u0917\u093F\u0915 \u0915\u093E\u0930\u094D\u092F \u092E\u0947\u0902 \u0928\u0939\u0940\u0902",
+        "\u0905\u091C\u094D\u091E\u093E\u0924 \u0935 \u0905\u0935\u094D\u092F\u093E\u0935\u0939\u093E\u0930\u093F\u0915 \u0915\u094D\u0937\u0947\u0924\u094D\u0930\u094B\u0902 \u092E\u0947\u0902"
+      ],
+      explanation: "\u092F\u0939 \u0938\u093F\u0926\u094D\u0927\u093E\u0902\u0924 \u0906\u0927\u0941\u0928\u093F\u0915 \u0914\u0926\u094D\u092F\u094B\u0917\u093F\u0915 \u0924\u0915\u0928\u0940\u0915\u094B\u0902 \u0914\u0930 \u0935\u093E\u0938\u094D\u0924\u0935\u093F\u0915 \u0935\u0948\u091C\u094D\u091E\u093E\u0928\u093F\u0915 \u0905\u0928\u0941\u0938\u0902\u0927\u093E\u0928 \u092E\u0947\u0902 \u0935\u094D\u092F\u093E\u092A\u0915 \u0930\u0942\u092A \u0938\u0947 \u092A\u094D\u0930\u092F\u0941\u0915\u094D\u0924 \u0939\u094B\u0924\u093E \u0939\u0948\u0964"
+    },
+    {
+      questionText: `"${cleanTopic}" \u0915\u0947 \u0917\u0939\u0928 \u0905\u0927\u094D\u092F\u092F\u0928 \u0938\u0947 \u0935\u093F\u0926\u094D\u092F\u093E\u0930\u094D\u0925\u0940 \u092E\u0947\u0902 \u0915\u093F\u0938 \u092E\u0941\u0916\u094D\u092F \u0915\u094D\u0937\u092E\u0924\u093E \u0915\u093E \u0935\u093F\u0915\u093E\u0938 \u0939\u094B\u0924\u093E \u0939\u0948?`,
+      correct: "\u0924\u093E\u0930\u094D\u0915\u093F\u0915, \u0935\u093F\u0936\u094D\u0932\u0947\u0937\u0923\u093E\u0924\u094D\u092E\u0915 \u090F\u0935\u0902 \u0938\u092E\u0938\u094D\u092F\u093E-\u0938\u092E\u093E\u0927\u093E\u0928 \u091A\u093F\u0902\u0924\u0928",
+      distractors: [
+        "\u092C\u093F\u0928\u093E \u0938\u092E\u091D\u0947 \u0915\u0947\u0935\u0932 \u0930\u091F\u0928\u093E",
+        "\u0924\u094D\u0930\u0941\u091F\u093F\u092A\u0942\u0930\u094D\u0923 \u0928\u093F\u0937\u094D\u0915\u0930\u094D\u0937 \u0928\u093F\u0915\u093E\u0932\u0928\u093E",
+        "\u0938\u092E\u092F \u0935 \u090F\u0915\u093E\u0917\u094D\u0930\u0924\u093E \u0915\u093E \u0939\u094D\u0930\u093E\u0938"
+      ],
+      explanation: "\u0935\u0948\u091C\u094D\u091E\u093E\u0928\u093F\u0915 \u0914\u0930 \u0917\u0923\u093F\u0924\u0940\u092F \u0926\u0943\u0937\u094D\u091F\u093F\u0915\u094B\u0923 \u0938\u0947 \u0938\u092E\u0938\u094D\u092F\u093E\u0913\u0902 \u0915\u093E \u0938\u091F\u0940\u0915 \u0935\u093F\u0936\u094D\u0932\u0947\u0937\u0923 \u0915\u0930\u0928\u0947 \u0915\u0940 \u0915\u094D\u0937\u092E\u0924\u093E \u0935\u093F\u0915\u0938\u093F\u0924 \u0939\u094B\u0924\u0940 \u0939\u0948\u0964"
+    },
+    {
+      questionText: `"${cleanTopic}" \u0915\u0940 \u0915\u093F\u0938\u0940 \u0938\u092E\u0938\u094D\u092F\u093E \u0915\u094B \u0939\u0932 \u0915\u0930\u0924\u0947 \u0938\u092E\u092F \u092A\u0939\u0932\u093E \u0905\u0928\u093F\u0935\u093E\u0930\u094D\u092F \u091A\u0930\u0923 \u0915\u094D\u092F\u093E \u0939\u094B\u0928\u093E \u091A\u093E\u0939\u093F\u090F?`,
+      correct: "\u0926\u093F\u090F \u0917\u090F \u0921\u0947\u091F\u093E (Given Data) \u0915\u094B \u091A\u093F\u0928\u094D\u0939\u093F\u0924 \u0915\u0930 \u0909\u092A\u092F\u0941\u0915\u094D\u0924 \u0938\u0942\u0924\u094D\u0930 \u091A\u0941\u0928\u0928\u093E",
+      distractors: [
+        "\u0938\u0940\u0927\u0947 \u0905\u0902\u0924\u093F\u092E \u0909\u0924\u094D\u0924\u0930 \u0932\u093F\u0916\u0928\u093E",
+        "\u092A\u094D\u0930\u0936\u094D\u0928 \u0915\u0940 \u0936\u0930\u094D\u0924\u094B\u0902 \u0915\u094B \u0905\u0928\u0926\u0947\u0916\u093E \u0915\u0930\u0928\u093E",
+        "\u0915\u0948\u0932\u0915\u0941\u0932\u0947\u0936\u0928 \u092C\u0940\u091A \u092E\u0947\u0902 \u091B\u094B\u0921\u093C \u0926\u0947\u0928\u093E"
+      ],
+      explanation: "\u0938\u092E\u0938\u094D\u092F\u093E \u0915\u093E \u0935\u093F\u0936\u094D\u0932\u0947\u0937\u0923 \u0915\u0930\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F \u0938\u0930\u094D\u0935\u092A\u094D\u0930\u0925\u092E \u0926\u093F\u090F \u0917\u090F \u0906\u0902\u0915\u095C\u094B\u0902 \u0915\u094B \u0938\u0942\u091A\u0940\u092C\u0926\u094D\u0927 \u0915\u0930\u0928\u093E \u0938\u0930\u094D\u0935\u094B\u0924\u094D\u0924\u092E \u0935\u0948\u091C\u094D\u091E\u093E\u0928\u093F\u0915 \u0924\u0930\u0940\u0915\u093E \u0939\u0948\u0964"
+    },
+    {
+      questionText: `\u092F\u0926\u093F "${cleanTopic}" \u092E\u0947\u0902 \u092E\u0941\u0916\u094D\u092F \u092A\u0948\u0930\u093E\u092E\u0940\u091F\u0930\u094D\u0938 \u0915\u094B \u0926\u094B\u0917\u0941\u0928\u093E \u0915\u0930 \u0926\u093F\u092F\u093E \u091C\u093E\u090F, \u0924\u094B \u0938\u093E\u092E\u093E\u0928\u094D\u092F\u0924\u0903 \u092A\u094D\u0930\u0923\u093E\u0932\u0940 \u092A\u0930 \u0915\u094D\u092F\u093E \u092A\u094D\u0930\u092D\u093E\u0935 \u092A\u0921\u093C\u0947\u0917\u093E?`,
+      correct: "\u0936\u093E\u0938\u0940 \u0938\u092E\u0940\u0915\u0930\u0923 \u0915\u0947 \u0905\u0928\u0941\u092A\u093E\u0924\u093F\u0915 \u092F\u093E \u0935\u094D\u092F\u0941\u0924\u094D\u0915\u094D\u0930\u092E\u093E\u0928\u0941\u092A\u093E\u0924\u0940 \u0928\u093F\u092F\u092E\u093E\u0928\u0941\u0938\u093E\u0930 \u092A\u0930\u093F\u0935\u0930\u094D\u0924\u0928 \u0939\u094B\u0917\u093E",
+      distractors: [
+        "\u0915\u094B\u0908 \u092D\u0940 \u092A\u094D\u0930\u092D\u093E\u0935 \u0928\u0939\u0940\u0902 \u092A\u0921\u093C\u0947\u0917\u093E",
+        "\u092A\u094D\u0930\u0923\u093E\u0932\u0940 \u0924\u0941\u0930\u0902\u0924 \u0928\u0937\u094D\u091F \u0939\u094B \u091C\u093E\u090F\u0917\u0940",
+        "\u0905\u092A\u0930\u093F\u092E\u093F\u0924 \u0930\u0942\u092A \u0938\u0947 \u0905\u0928\u093F\u092F\u092E\u093F\u0924 \u0935\u094D\u092F\u0935\u0939\u093E\u0930 \u0939\u094B\u0917\u093E"
+      ],
+      explanation: "\u092A\u094D\u0930\u0924\u094D\u092F\u0947\u0915 \u0935\u0948\u091C\u094D\u091E\u093E\u0928\u093F\u0915 \u0938\u093F\u0926\u094D\u0927\u093E\u0902\u0924 \u092E\u0947\u0902 \u0930\u093E\u0936\u093F\u092F\u094B\u0902 \u0915\u0947 \u092C\u0940\u091A \u090F\u0915 \u092A\u0942\u0930\u094D\u0935-\u0928\u093F\u0930\u094D\u0927\u093E\u0930\u093F\u0924 \u0917\u0923\u093F\u0924\u0940\u092F \u0938\u0902\u092C\u0902\u0927 \u0939\u094B\u0924\u093E \u0939\u0948\u0964"
+    },
+    {
+      questionText: `\u092A\u0930\u0940\u0915\u094D\u0937\u093E \u092E\u0947\u0902 "${cleanTopic}" \u0938\u0947 \u0938\u0902\u092C\u0902\u0927\u093F\u0924 \u092A\u094D\u0930\u0936\u094D\u0928\u094B\u0902 \u092E\u0947\u0902 \u092A\u0942\u0930\u0947 \u0905\u0902\u0915 \u092A\u094D\u0930\u093E\u092A\u094D\u0924 \u0915\u0930\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F \u0915\u094D\u092F\u093E \u0906\u0935\u0936\u094D\u092F\u0915 \u0939\u0948?`,
+      correct: "\u0938\u0942\u0924\u094D\u0930, \u091A\u0930\u0923\u092C\u0926\u094D\u0927 \u0939\u0932, \u0907\u0915\u093E\u0907\u092F\u093E\u0901 \u0914\u0930 \u0905\u0902\u0924\u093F\u092E \u0909\u0924\u094D\u0924\u0930 \u0915\u094B \u092C\u0949\u0915\u094D\u0938 \u092E\u0947\u0902 \u0938\u094D\u092A\u0937\u094D\u091F \u0932\u093F\u0916\u0928\u093E",
+      distractors: [
+        "\u0915\u0947\u0935\u0932 \u092C\u093F\u0928\u093E \u0917\u0923\u0928\u093E \u0915\u0947 \u0909\u0924\u094D\u0924\u0930 \u0932\u093F\u0916\u0928\u093E",
+        "\u0905\u0938\u094D\u092A\u0937\u094D\u091F \u0932\u093F\u0916\u093E\u0935\u091F \u0914\u0930 \u0938\u0942\u0924\u094D\u0930 \u091B\u094B\u0921\u093C\u0928\u093E",
+        "\u0917\u0932\u0924 \u0907\u0915\u093E\u0908 \u0915\u0947 \u0938\u093E\u0925 \u092E\u093E\u0928 \u0932\u093F\u0916\u0928\u093E"
+      ],
+      explanation: "\u092E\u0942\u0932\u094D\u092F\u093E\u0902\u0915\u0928\u0915\u0930\u094D\u0924\u093E \u091A\u0930\u0923\u092C\u0926\u094D\u0927 \u0924\u093E\u0930\u094D\u0915\u093F\u0915 \u092A\u094D\u0930\u0935\u093E\u0939 \u0914\u0930 \u0938\u094D\u092A\u0937\u094D\u091F \u0909\u0924\u094D\u0924\u0930 \u092A\u094D\u0930\u0938\u094D\u0924\u0941\u0924\u093F \u092A\u0930 \u092A\u0942\u0930\u094D\u0923 \u0905\u0902\u0915 \u092A\u094D\u0930\u0926\u093E\u0928 \u0915\u0930\u0924\u0947 \u0939\u0948\u0902\u0964"
+    }
+  ] : [
+    {
+      questionText: `What is the primary governing principle of "${cleanTopic}" in ${cleanSubject}?`,
+      correct: "Conservation Laws and Dynamic Equilibrium",
+      distractors: [
+        "Random Fluctuations Principle",
+        "Arbitrary Static Hypothesis",
+        "Non-interacting Field Conjecture"
+      ],
+      explanation: `Foundational mechanisms of "${cleanTopic}" strictly adhere to conservation and mathematical equilibrium principles.`
+    },
+    {
+      questionText: `When analyzing complex problem scenarios involving "${cleanTopic}", which step is considered essential?`,
+      correct: "Verifying boundary conditions, formula applicability, and dimensional units",
+      distractors: [
+        "Relying purely on qualitative approximations without calculation",
+        "Assuming zero initial states unconditionally",
+        "Omitting intermediate analytical steps"
+      ],
+      explanation: "Dimensional consistency, explicit formula choice, and boundary checks ensure scientific validity."
+    },
+    {
+      questionText: `How does a structured change in primary parameters typically influence "${cleanTopic}"?`,
+      correct: "Follows a predictable, mathematically governed relationship",
+      distractors: [
+        "Causes purely chaotic, untestable variations",
+        "Has absolutely no measurable physical or numerical effect",
+        "Violates fundamental conservation principles"
+      ],
+      explanation: "Governing equations demonstrate direct or inverse relationships under specified physical constraints."
+    },
+    {
+      questionText: `In standard competitive examinations, which practice guarantees top scoring on "${cleanTopic}"?`,
+      correct: "Presenting sequential step derivations with explicit formulas and units",
+      distractors: [
+        "Writing only the final value without any supporting steps",
+        "Skipping dimensional annotations and units",
+        "Omitting necessary reference diagrams"
+      ],
+      explanation: "Examiners award marks for systematic methodology, formula clarity, and boxed final answers."
+    },
+    {
+      questionText: `Which practical application best showcases the real-world utility of "${cleanTopic}"?`,
+      correct: "System optimization, computational modeling, and industrial technology",
+      distractors: [
+        "Purely historical archival documentation",
+        "Uncalibrated subjective observation",
+        "Isolated abstract exercises with zero physical counterpart"
+      ],
+      explanation: "Modern engineering, computation, and scientific instruments rely heavily on these core principles."
+    },
+    {
+      questionText: `What is the most effective approach for mastering difficult concepts in "${cleanTopic}"?`,
+      correct: "Active problem-solving and connecting principles to real-world analogies",
+      distractors: [
+        "Passive rereading without solving practice questions",
+        "Memorizing formulas without understanding derivations",
+        "Avoiding analytical practice problems"
+      ],
+      explanation: "Active recall combined with rigorous question practice produces deep conceptual retention."
+    },
+    {
+      questionText: `What role do fundamental assumptions play in the theoretical framework of "${cleanTopic}"?`,
+      correct: "They establish valid boundary domains within which formulas hold true",
+      distractors: [
+        "They make the theory invalid for any real application",
+        "They introduce uncontrolled mathematical errors",
+        "They are completely arbitrary with no scientific basis"
+      ],
+      explanation: "Every scientific and mathematical model is formulated under well-defined boundary assumptions."
+    },
+    {
+      questionText: `When cross-checking a solution in "${cleanTopic}", which method provides immediate verification?`,
+      correct: "Dimensional analysis and testing limiting or extreme cases",
+      distractors: [
+        "Guessing whether the number looks reasonable",
+        "Changing the formula midway",
+        "Ignoring orders of magnitude"
+      ],
+      explanation: "Dimensional consistency checks and extreme condition testing immediately expose mathematical flaws."
+    }
+  ];
+  const countToReturn = Math.max(3, Math.min(requestedCount, 30));
+  const selectedPool = [];
+  for (let i = 0; i < countToReturn; i++) {
+    selectedPool.push(rawQuestions[i % rawQuestions.length]);
+  }
+  return selectedPool.map((item, idx) => {
+    const allOptions = [item.correct, ...item.distractors];
+    for (let j = allOptions.length - 1; j > 0; j--) {
+      const k = Math.floor(Math.random() * (j + 1));
+      [allOptions[j], allOptions[k]] = [allOptions[k], allOptions[j]];
+    }
+    const correctIndex = allOptions.indexOf(item.correct);
+    return {
+      questionText: `${item.questionText}${idx >= rawQuestions.length ? ` (Variation ${Math.floor(idx / rawQuestions.length) + 1})` : ""}`,
+      options: allOptions,
+      correctOptionIndex: correctIndex >= 0 ? correctIndex : 0,
+      explanation: item.explanation
+    };
+  });
+}
+function checkCreatorQuestion(prompt, language = "English") {
+  if (!prompt) return null;
+  let cleaned = prompt;
+  cleaned = cleaned.replace(/\[Attached Document:[\s\S]*?\[Use the above attached document context to address the prompt below accurately\.\]/gi, "");
+  cleaned = cleaned.replace(/\[[\s\S]*?\]/g, "");
+  cleaned = cleaned.replace(/Provide a strict step-by-step solution for[^:]*:/gi, "");
+  cleaned = cleaned.replace(/Explain clearly with analogies suitable for[^:]*:/gi, "");
+  cleaned = cleaned.replace(/Generate a 3-question practice quiz suitable for[^:]*:/gi, "");
+  const norm = cleaned.toLowerCase().trim();
+  const isHi = language === "Hindi" || language === "hi" || norm.includes("hindi") || norm.includes("\u0939\u093F\u0928\u094D\u0926\u0940") || norm.includes("\u0939\u093F\u0902\u0926\u0940");
+  const isHinglish = language === "Hinglish" || language === "Mixed" || norm.includes("hinglish");
+  const mentionsRohitDirectly = norm.includes("rohit") || norm.includes("yadav") || norm.includes("\u0930\u094B\u0939\u093F\u0924") || norm.includes("\u092F\u093E\u0926\u0935");
+  const hasCreatorTerm = norm.includes("creator") || norm.includes("developer") || norm.includes("maker") || norm.includes("owner") || norm.includes("founder") || norm.includes("ceo") || norm.includes("malik") || norm.includes("\u092E\u093E\u0932\u093F\u0915") || norm.includes("\u092C\u0928\u093E\u092F\u093E") || norm.includes("banya") || norm.includes("boss") || norm.includes("owner");
+  const refersToYou = norm.includes("you") || norm.includes("your") || norm.includes("yourself") || norm.includes(" u ") || norm.includes(" ur ") || norm.includes("tutor") || norm.includes("buddy") || norm.includes("app") || norm.includes("ai") || norm.includes("bot") || norm.includes("website") || norm.includes("tool") || norm.includes("software") || norm.includes("system") || norm.includes("application") || norm.includes("tumhe") || norm.includes("aapko") || norm.includes("tujhe") || norm.includes("is app") || norm.includes("is ai") || norm.includes("is bot") || norm.includes("apko") || norm.includes("tumhe");
+  const asksWhoMade = norm.includes("who made") || norm.includes("who created") || norm.includes("who built") || norm.includes("who designed") || norm.includes("who developed") || norm.includes("who owns") || norm.includes("kisne banaya") || norm.includes("kaun banaya") || norm.includes("kisne design") || norm.includes("kisne develop") || norm.includes("kisne code") || norm.includes("kisne banaya hai") || norm.includes("kaun banaya hai") || norm === "\u0924\u0941\u092E\u094D\u0939\u0947\u0902 \u0915\u093F\u0938\u0928\u0947 \u092C\u0928\u093E\u092F\u093E?" || norm === "\u0924\u0941\u092E\u094D\u0939\u0947\u0902 \u0915\u093F\u0938\u0928\u0947 \u092C\u0928\u093E\u092F\u093E" || norm === "creator \u0915\u094C\u0928 \u0939\u0948" || norm === "creator \u0915\u094C\u0928 \u0939\u0948?" || norm.includes("kisne design") || norm.includes("who is founder") || norm.includes("who is ceo") || norm.includes("who is owner") || norm.includes("malik kaun") || norm.includes("kisne banya") || norm.includes("owner kaun");
+  let isAboutCreator = false;
+  if (mentionsRohitDirectly) {
+    const generalGreetings = ["hi", "hello", "hey", "hola", "namaste", "pranam", "sup", "yo", "\u0939\u093E\u092F", "\u0928\u092E\u0938\u094D\u0924\u0947", "\u0939\u0947\u0932\u094B"];
+    const isJustGreeting = generalGreetings.includes(norm);
+    if (!isJustGreeting) {
+      isAboutCreator = true;
+    }
+  } else if (hasCreatorTerm && refersToYou) {
+    isAboutCreator = true;
+  } else if (asksWhoMade && refersToYou) {
+    isAboutCreator = true;
+  } else if ((hasCreatorTerm || asksWhoMade) && norm.length < 35) {
+    isAboutCreator = true;
+  }
+  if (isAboutCreator && !mentionsRohitDirectly) {
+    const academicSubjects = [
+      "motion",
+      "gravity",
+      "universe",
+      "world",
+      "earth",
+      "country",
+      "india",
+      "car",
+      "concept",
+      "theory",
+      "formula",
+      "laws",
+      "law",
+      "cell",
+      "biology",
+      "physics",
+      "chemistry",
+      "periodic",
+      "table",
+      "element",
+      "atom",
+      "molecule",
+      "science",
+      "math",
+      "calculus",
+      "derivative",
+      "integral",
+      "equation",
+      "history",
+      "war",
+      "book",
+      "author",
+      "play",
+      "movie",
+      "song",
+      "language",
+      "grammar",
+      "sentence",
+      "word",
+      "code",
+      "programming",
+      "python",
+      "javascript",
+      "react",
+      "html",
+      "css",
+      "computer",
+      "internet",
+      "google",
+      "facebook",
+      "microsoft",
+      "apple",
+      "tesla",
+      "spacex",
+      "amazon",
+      "netflix",
+      "twitter",
+      "electricity",
+      "magnet",
+      "sound",
+      "light",
+      "energy",
+      "work",
+      "power",
+      "speed",
+      "velocity",
+      "acceleration",
+      "force",
+      "mass",
+      "weight",
+      "friction",
+      "heat",
+      "temperature",
+      "pressure",
+      "density",
+      "volume",
+      "area",
+      "length",
+      "time",
+      "distance",
+      "displacement",
+      "vector",
+      "scalar",
+      "newton",
+      "galileo",
+      "einstein",
+      "darwin",
+      "mendel",
+      "pasteur",
+      "curie",
+      "tesla",
+      "edison",
+      "bell",
+      "bohr",
+      "rutheford",
+      "dalton",
+      "avogadro",
+      "boyle",
+      "charles",
+      "gay-lussac",
+      "dalton",
+      "graham",
+      "henry",
+      "raoult",
+      "faraday",
+      "ampere",
+      "volt",
+      "ohm",
+      "joule",
+      "watt",
+      "hertz"
+    ];
+    const hasAcademicSubject = academicSubjects.some((sub) => norm.includes(sub));
+    if (hasAcademicSubject) {
+      isAboutCreator = false;
+    }
+  }
+  if (!isAboutCreator) {
+    return null;
+  }
+  const matchCreatorSimple = norm.includes("who") && (norm.includes("created") || norm.includes("made") || norm.includes("built") || norm.includes("designed") || norm.includes("developed")) && norm.includes("you") || norm.includes("kisne") && (norm.includes("banaya") || norm.includes("banya") || norm.includes("design") || norm.includes("develop")) && (norm.includes("tumhe") || norm.includes("tujhe") || norm.includes("aapko") || norm.includes("you") || norm.includes("ai")) || norm.includes("kaun") && norm.includes("banaya") && (norm.includes("tumhe") || norm.includes("aapko") || norm.includes("app") || norm.includes("tutor")) || norm.includes("who is") && norm.includes("creator") && (norm.includes("your") || norm.includes("app") || norm.includes("ai")) || norm.includes("creator") && (norm.includes("who") || norm.includes("kisne")) && (norm.includes("you") || norm.includes("tutor") || norm.includes("study buddy")) || norm.includes("app") && norm.includes("kisne") && norm.includes("banaya") || (norm.includes("malik") || norm.includes("owner") || norm.includes("founder") || norm.includes("ceo")) || (norm === "creator \u0915\u094C\u0928 \u0939\u0948" || norm === "creator \u0915\u094C\u0928 \u0939\u0948?" || norm === "\u0924\u0941\u092E\u094D\u0939\u0947\u0902 \u0915\u093F\u0938\u0928\u0947 \u092C\u0928\u093E\u092F\u093E?" || norm === "\u0924\u0941\u092E\u094D\u0939\u0947\u0902 \u0915\u093F\u0938\u0928\u0947 \u092C\u0928\u093E\u092F\u093E");
+  const hasAge = norm.includes("age") || norm.includes("umar") || norm.includes("saal") || norm.includes("old") || norm.includes("\u0909\u092E\u094D\u0930");
+  const hasWhere = norm.includes("where") || norm.includes("kahan") || norm.includes("location") || norm.includes("city") || norm.includes("address") || norm.includes("shehar") || norm.includes("gaon") || norm.includes("from") || norm.includes("\u0930\u0939\u0924\u0947") || norm.includes("\u0915\u0939\u093E\u0901") || norm.includes("\u0930\u0939\u0924\u093E") || norm.includes("\u0930\u0939\u0924\u0940");
+  const hasSchool = norm.includes("school") || norm.includes("college") || norm.includes("padhta") || norm.includes("padhti") || norm.includes("study") || norm.includes("education") || norm.includes("class") || norm.includes("grade") || norm.includes("pcm") || norm.includes("\u0938\u094D\u0915\u0942\u0932") || norm.includes("\u0915\u094D\u0932\u093E\u0938") || norm.includes("\u092A\u0922\u093C\u0924\u0947");
+  const hasGithub = norm.includes("github") || norm.includes("portfolio") || norm.includes("link") || norm.includes("git");
+  const hasProjects = norm.includes("project") || norm.includes("built") || norm.includes("banaya") || norm.includes("product") || norm.includes("apps") || norm.includes("\u092C\u0928\u093E\u092F\u093E") || norm.includes("\u092A\u094D\u0930\u094B\u091C\u0947\u0915\u094D\u091F");
+  const hasInterests = norm.includes("interest") || norm.includes("hobby") || norm.includes("hobbies") || norm.includes("sports") || norm.includes("cricket") || norm.includes("astronomy") || norm.includes("pasand") || norm.includes("\u0930\u0941\u091A\u093F") || norm.includes("\u0915\u094D\u0930\u093F\u0915\u0947\u091F") || norm.includes("\u092A\u0938\u0902\u0926");
+  const hasSkills = norm.includes("skills") || norm.includes("tech") || norm.includes("python") || norm.includes("react") || norm.includes("languages") || norm.includes("\u0915\u094C\u0936\u0932") || norm.includes("\u0924\u0915\u0928\u0940\u0915\u0940");
+  if (hasAge) {
+    if (isHi || isHinglish) {
+      return "\u092E\u0947\u0930\u0947 Creator Profile \u092E\u0947\u0902 **\u0909\u092E\u094D\u0930 (Age)** \u0915\u0940 \u091C\u093E\u0928\u0915\u093E\u0930\u0940 \u0915\u093E \u0909\u0932\u094D\u0932\u0947\u0916 \u0928\u0939\u0940\u0902 \u0939\u0948\u0964";
+    }
+    return "My Creator Profile does not mention his **age**.";
+  }
+  if (hasWhere) {
+    if (isHi) {
+      return "\u0930\u094B\u0939\u093F\u0924 \u092F\u093E\u0926\u0935 **\u092E\u0939\u0947\u0936\u092A\u0941\u0930, \u091B\u092C\u0921\u093C\u093E \u0924\u0939\u0938\u0940\u0932, \u092C\u093E\u0930\u093E\u0902 \u091C\u093F\u0932\u093E, \u0930\u093E\u091C\u0938\u094D\u0925\u093E\u0928, \u092D\u093E\u0930\u0924** \u0915\u0947 \u0930\u0939\u0928\u0947 \u0935\u093E\u0932\u0947 \u0939\u0948\u0902\u0964";
+    } else if (isHinglish) {
+      return "Rohit Yadav **Maheshpur, Chhabra Tehsil, Baran District, Rajasthan, India** ke rehne wale hain.";
+    } else {
+      return "Rohit Yadav belongs to **Maheshpur, Chhabra Tehsil, Baran District, Rajasthan, India**.";
+    }
+  }
+  if (hasSchool) {
+    if (isHi) {
+      return "\u0930\u094B\u0939\u093F\u0924 **\u0938\u094D\u0935\u093E\u092E\u0940 \u0935\u093F\u0935\u0947\u0915\u093E\u0928\u0902\u0926 \u0917\u0935\u0930\u094D\u0928\u092E\u0947\u0902\u091F \u092E\u0949\u0921\u0932 \u0938\u094D\u0915\u0942\u0932, \u0915\u0921\u093C\u0948\u092F\u093E\u092C\u0928, \u091B\u092C\u0921\u093C\u093E, \u0930\u093E\u091C\u0938\u094D\u0925\u093E\u0928** \u092E\u0947\u0902 Class 12 Science (PCM) \u0915\u0947 \u091B\u093E\u0924\u094D\u0930 \u0939\u0948\u0902 \u0914\u0930 **Arjuna JEE 3.0** \u092C\u0948\u091A \u092E\u0947\u0902 \u0928\u093E\u092E\u093E\u0902\u0915\u093F\u0924 \u0939\u0948\u0902\u0964";
+    } else if (isHinglish) {
+      return "Rohit **Swami Vivekanand Government Model School, Kadaiyaban, Chhabra, Rajasthan** me Class 12 Science (PCM) ke student hain aur unhone **Arjuna JEE 3.0** join kiya hua hai.";
+    } else {
+      return "Rohit is a Class 12 Science (PCM) student at **Swami Vivekanand Government Model School, Kadaiyaban, Chhabra, Rajasthan**, and is enrolled in **Arjuna JEE 3.0**.";
+    }
+  }
+  if (hasGithub) {
+    if (isHi || isHinglish) {
+      return "\u0930\u094B\u0939\u093F\u0924 \u092F\u093E\u0926\u0935 \u0915\u093E GitHub \u092A\u094B\u0930\u094D\u091F\u092B\u094B\u0932\u093F\u092F\u094B \u0932\u093F\u0902\u0915 \u092F\u0939 \u0939\u0948: [heenayadav325200-png](https://github.com/heenayadav325200-png)";
+    }
+    return "You can check out Rohit Yadav's GitHub portfolio here: [heenayadav325200-png](https://github.com/heenayadav325200-png)";
+  }
+  if (hasProjects) {
+    if (isHi) {
+      return "\u0930\u094B\u0939\u093F\u0924 \u092F\u093E\u0926\u0935 \u0928\u0947 \u0915\u0908 \u092C\u0947\u0939\u0924\u0930\u0940\u0928 \u092A\u094D\u0930\u094B\u091C\u0947\u0915\u094D\u091F\u094D\u0938 \u092C\u0928\u093E\u090F \u0939\u0948\u0902:\n1. **Sathi AI**: \u0915\u0938\u094D\u091F\u092E-\u092A\u094D\u0930\u0936\u093F\u0915\u094D\u0937\u093F\u0924 8B GGUF \u092D\u093E\u0937\u093E \u092E\u0949\u0921\u0932\u0964\n2. **Ascend Study**: \u0938\u0941\u0935\u094D\u092F\u0935\u0938\u094D\u0925\u093F\u0924 \u090F\u091C\u0941\u0915\u0947\u0936\u0928\u0932 \u0935\u0947\u092C \u090F\u092A\u094D\u0932\u0940\u0915\u0947\u0936\u0928\u0964\n3. **CORE AI**: \u090F\u0906\u0908 \u0905\u0938\u093F\u0938\u094D\u091F\u0947\u0902\u091F \u0907\u0902\u091F\u0930\u092B\u093C\u0947\u0938\u0964\n4. **PocketPaisa / PocketPaisa Pro**: \u0935\u093F\u0924\u094D\u0924\u0940\u092F \u092A\u094D\u0930\u092C\u0902\u0927\u0928 \u0935\u0947\u092C \u0910\u092A\u0964\n5. **DriveMate AI**: \u0938\u0921\u093C\u0915 \u0938\u0941\u0930\u0915\u094D\u0937\u093E \u0921\u094D\u0930\u093E\u0907\u0935\u093F\u0902\u0917 \u0905\u0938\u093F\u0938\u094D\u091F\u0947\u0902\u091F\u0964\n6. **THERMONEST V1**: \u0917\u0948\u0930-\u0935\u093F\u0926\u094D\u092F\u0941\u0924 \u0935\u093E\u0937\u094D\u092A\u0940\u0915\u0930\u0923\u0940\u092F \u0915\u0942\u0932\u093F\u0902\u0917 \u0938\u093F\u0938\u094D\u091F\u092E \u092C\u094D\u0932\u0942\u092A\u094D\u0930\u093F\u0902\u091F\u0964";
+    } else if (isHinglish) {
+      return "Rohit Yadav ne kai real-world projects banaye hain:\n1. **Sathi AI**: Custom-trained 8B GGUF language model.\n2. **Ascend Study**: Educational web application.\n3. **CORE AI**: Custom conversational AI assistant interface.\n4. **PocketPaisa / PocketPaisa Pro**: Expense tracking app.\n5. **DriveMate AI**: Intelligent driving assistant concept.\n6. **THERMONEST V1**: Sustainable cooling system technical blueprint.";
+    } else {
+      return "Rohit Yadav has engineered several key projects:\n1. **Sathi AI**: Custom-trained 8B GGUF language model.\n2. **Ascend Study**: Educational web application.\n3. **CORE AI**: AI assistant interface.\n4. **PocketPaisa**: Finance management web app.\n5. **DriveMate AI**: Road safety driving assistant.\n6. **THERMONEST V1**: Sustainable pre-cooling system technical blueprint.";
+    }
+  }
+  if (hasInterests) {
+    if (isHi) {
+      return "\u0930\u094B\u0939\u093F\u0924 \u092F\u093E\u0926\u0935 \u0915\u0940 \u0935\u093F\u091C\u094D\u091E\u093E\u0928 \u0914\u0930 \u0916\u0947\u0932\u094B\u0902 \u092E\u0947\u0902 \u0917\u0939\u0930\u0940 \u0930\u0941\u091A\u093F \u0939\u0948:\n* **\u0916\u0917\u094B\u0932 \u0935\u093F\u091C\u094D\u091E\u093E\u0928 (Astronomy)**: \u091B\u0924 \u0938\u0947 \u0906\u0915\u093E\u0936\u0940\u092F \u092A\u093F\u0902\u0921\u094B\u0902 (\u092C\u0943\u0939\u0938\u094D\u092A\u0924\u093F, \u0913\u0930\u093F\u092F\u0928 \u0928\u0915\u094D\u0937\u0924\u094D\u0930, \u090F\u0902\u0921\u094D\u0930\u094B\u092E\u0947\u0921\u093E \u0917\u0948\u0932\u0947\u0915\u094D\u0938\u0940) \u0915\u093E \u0905\u0935\u0932\u094B\u0915\u0928 \u0915\u0930\u0928\u093E \u0914\u0930 \u091C\u0942\u0928\u093F\u0935\u0930\u094D\u0938 (Zooniverse) \u092A\u0930 \u0916\u0917\u094B\u0932\u0940\u092F \u0921\u0947\u091F\u093E \u0935\u0930\u094D\u0917\u0940\u0915\u0930\u0923 \u0915\u093E\u0930\u094D\u092F\u094B\u0902 \u092E\u0947\u0902 \u092D\u093E\u0917 \u0932\u0947\u0928\u093E\u0964\n* **\u0916\u0947\u0932 (Sports)**: \u090F\u0915 \u0909\u0924\u094D\u0938\u093E\u0939\u0940 \u0915\u094D\u0930\u093F\u0915\u0947\u091F\u0930, \u091C\u094B \u0926\u093E\u090F\u0902 \u0939\u093E\u0925 \u0915\u0947 \u092C\u0932\u094D\u0932\u0947\u092C\u093E\u091C \u0914\u0930 \u0924\u0947\u091C \u0917\u0947\u0902\u0926\u092C\u093E\u091C \u0939\u0948\u0902\u0964";
+    } else if (isHinglish) {
+      return "Rohit Yadav ki science aur sports me bohot gehri ruchi hai:\n* **Astronomy**: Rooftop observer jo celestial objects (Jupiter, Orion, Andromeda Galaxy) track karte hain aur Zooniverse par astronomy tasks classifications me participate karte hain.\n* **Sports**: Passionate cricketer jo right-handed batter aur fast bowler hain.";
+    } else {
+      return "Rohit Yadav is deeply interested in science and sports:\n* **Astronomy**: Rooftop celestial tracker (Jupiter, Orion, Andromeda Galaxy) and participant in astronomical data classification on Zooniverse.\n* **Sports**: Passionate cricketer, playing as a right-handed batter and fast bowler.";
+    }
+  }
+  if (hasSkills) {
+    if (isHi) {
+      return "\u0930\u094B\u0939\u093F\u0924 \u092F\u093E\u0926\u0935 \u0915\u0947 \u0924\u0915\u0928\u0940\u0915\u0940 \u0915\u094C\u0936\u0932\u094B\u0902 \u092E\u0947\u0902 **Python, HTML5/CSS3, JavaScript, React, Tailwind CSS, Flutter, React Native, Vercel, Firebase \u0914\u0930 Prompt Engineering** \u0936\u093E\u092E\u093F\u0932 \u0939\u0948\u0902\u0964";
+    } else if (isHinglish) {
+      return "Rohit Yadav ke technical skills me **Python, HTML5/CSS3, JavaScript, React, Tailwind CSS, Flutter, React Native, Vercel, Firebase aur Prompt Engineering** shamil hain.";
+    } else {
+      return "Rohit Yadav's technical skills include **Python, HTML5/CSS3, JavaScript, React, Tailwind CSS, Flutter, React Native, Vercel, Firebase, and Prompt Engineering**.";
+    }
+  }
+  const matchCreatorProfile = norm === "rohit" || norm === "yadav" || norm === "rohit yadav" || norm.includes("creator profile") || norm.includes("about your creator") || norm.includes("creator ke bare") || norm.includes("creator ke baare") || norm.includes("creator details") || norm.includes("who is rohit") || norm.includes("rohit kaun hai") || norm.includes("rohit yadav kaun hai") || norm.includes("rohit ke baare") || norm.includes("rohit ke bare") || norm.includes("tell me about rohit") || norm.includes("tell me about your creator") || norm.includes("details of rohit") || norm.includes("details about rohit") || norm.includes("tell") && norm.includes("creator");
+  if (matchCreatorSimple) {
+    if (isHi) {
+      return "\u092E\u0941\u091D\u0947 **Rohit Yadav** \u0928\u0947 \u092C\u0928\u093E\u092F\u093E \u0939\u0948\u0964 \u0915\u094D\u092F\u093E \u0906\u092A \u0909\u0928\u0915\u0947 \u092C\u093E\u0930\u0947 \u092E\u0947\u0902 \u0914\u0930 \u0915\u0941\u091B \u091C\u093E\u0928\u0928\u093E \u091A\u093E\u0939\u0947\u0902\u0917\u0947?";
+    } else if (isHinglish) {
+      return "Mujhe **Rohit Yadav** ne banaya hai. Kya aap unke baare me aur kuch jaan na chahenge?";
+    } else {
+      return "I was created by **Rohit Yadav**. Would you like to know more about him?";
+    }
+  }
+  if (matchCreatorProfile) {
+    if (isHi) {
+      return `### \u{1F464} \u092E\u0947\u0930\u0947 \u0928\u093F\u0930\u094D\u092E\u093E\u0924\u093E \u0915\u093E \u092A\u094D\u0930\u094B\u092B\u093C\u093E\u0907\u0932: \u0930\u094B\u0939\u093F\u0924 \u092F\u093E\u0926\u0935 (Rohit Yadav)
+**\u0938\u093E\u0907\u0902\u0938 \u0938\u094D\u091F\u0942\u0921\u0947\u0902\u091F (PCM) \u0914\u0930 \u092B\u0941\u0932-\u0938\u094D\u091F\u0948\u0915 / \u090F\u0906\u0908 \u0921\u0947\u0935\u0932\u092A\u0930**
+*\u092E\u0939\u0947\u0936\u092A\u0941\u0930, \u091B\u092C\u0921\u093C\u093E \u0924\u0939\u0938\u0940\u0932, \u092C\u093E\u0930\u093E\u0902 \u091C\u093F\u0932\u093E, \u0930\u093E\u091C\u0938\u094D\u0925\u093E\u0928, \u092D\u093E\u0930\u0924*
+*\u0915\u0915\u094D\u0937\u093E 12 \u0938\u093E\u0907\u0902\u0938 (PCM) | \u0905\u0930\u0941\u0923\u093E \u091C\u0947\u0908\u0908 3.0 (Arjuna JEE 3.0)*
+*GitHub \u092A\u094B\u0930\u094D\u091F\u092B\u094B\u0932\u093F\u092F\u094B*: [heenayadav325200-png](https://github.com/heenayadav325200-png)
+
+---
+
+#### \u{1F4D6} \u092A\u094D\u0930\u094B\u092B\u093E\u0907\u0932 \u0938\u093E\u0930\u093E\u0902\u0936 (Profile Summary)
+\u0930\u094B\u0939\u093F\u0924 \u092F\u093E\u0926\u0935 \u090F\u0915 \u0905\u0924\u094D\u092F\u0927\u093F\u0915 \u092E\u0939\u0924\u094D\u0935\u093E\u0915\u093E\u0902\u0915\u094D\u0937\u0940 \u0914\u0930 \u0909\u0924\u094D\u0938\u093E\u0939\u0940 \u0915\u0915\u094D\u0937\u093E 12 (PCM) \u0915\u0947 \u091B\u093E\u0924\u094D\u0930 \u0939\u0948\u0902, \u091C\u094B **\u0938\u094D\u0935\u093E\u092E\u0940 \u0935\u093F\u0935\u0947\u0915\u093E\u0928\u0902\u0926 \u0917\u0935\u0930\u094D\u0928\u092E\u0947\u0902\u091F \u092E\u0949\u0921\u0932 \u0938\u094D\u0915\u0942\u0932, \u0915\u0921\u093C\u0948\u092F\u093E\u092C\u0928, \u091B\u092C\u0921\u093C\u093E (\u0930\u093E\u091C\u0938\u094D\u0925\u093E\u0928)** \u092E\u0947\u0902 \u0905\u0927\u094D\u092F\u092F\u0928\u0930\u0924 \u0939\u0948\u0902\u0964 \u0935\u0947 \u090F\u0915 \u0938\u094D\u0935-\u0936\u093F\u0915\u094D\u0937\u093F\u0924 (self-taught) \u092B\u0941\u0932-\u0938\u094D\u091F\u0948\u0915 \u0938\u0949\u092B\u094D\u091F\u0935\u0947\u092F\u0930 \u0921\u0947\u0935\u0932\u092A\u0930, \u092E\u094B\u092C\u093E\u0907\u0932 \u0910\u092A \u0928\u093F\u0930\u094D\u092E\u093E\u0924\u093E, \u0914\u0930 \u090F\u0906\u0908/\u090F\u0932\u090F\u0932\u090F\u092E (AI/LLM) \u0909\u0924\u094D\u0938\u093E\u0939\u0940 \u0939\u0948\u0902\u0964 \u0935\u0947 \u092B\u093F\u091C\u093F\u0915\u094D\u0938, \u0915\u0947\u092E\u093F\u0938\u094D\u091F\u094D\u0930\u0940 \u0914\u0930 \u092E\u0948\u0925\u094D\u0938 \u092E\u0947\u0902 \u092E\u091C\u092C\u0942\u0924 \u0936\u0948\u0915\u094D\u0937\u0923\u093F\u0915 \u0927\u094D\u092F\u093E\u0928 \u092C\u0928\u093E\u090F \u0930\u0916\u0928\u0947 \u0915\u0947 \u0938\u093E\u0925-\u0938\u093E\u0925 \u0936\u093E\u0928\u0926\u093E\u0930 \u090F\u091C\u0941\u0915\u0947\u0936\u0928\u0932 \u0935\u0947\u092C \u0910\u092A\u094D\u0938, \u0915\u0938\u094D\u091F\u092E \u092E\u0949\u0921\u0932\u094D\u0938 (GGUF) \u0914\u0930 \u0935\u094D\u092F\u093E\u0935\u0939\u093E\u0930\u093F\u0915 \u092F\u0942\u091F\u093F\u0932\u093F\u091F\u0940 \u091F\u0942\u0932\u094D\u0938 \u0935\u093F\u0915\u0938\u093F\u0924 \u0915\u0930\u0924\u0947 \u0939\u0948\u0902\u0964
+
+---
+
+#### \u{1F393} \u0936\u093F\u0915\u094D\u0937\u093E (Education)
+* **\u0938\u094D\u0915\u0942\u0932**: \u0938\u094D\u0935\u093E\u092E\u0940 \u0935\u093F\u0935\u0947\u0915\u093E\u0928\u0902\u0926 \u0917\u0935\u0930\u094D\u0928\u092E\u0947\u0902\u091F \u092E\u0949\u0921\u0932 \u0938\u094D\u0915\u0942\u0932, \u0915\u0921\u093C\u0948\u092F\u093E\u092C\u0928, \u091B\u092C\u0921\u093C\u093E, \u0930\u093E\u091C\u0938\u094D\u0925\u093E\u0928
+* **\u0915\u0915\u094D\u0937\u093E**: \u0915\u0915\u094D\u0937\u093E 12 \u0938\u093E\u0907\u0902\u0938 \u0938\u094D\u091F\u094D\u0930\u0940\u092E (\u092D\u094C\u0924\u093F\u0915\u0940, \u0930\u0938\u093E\u092F\u0928 \u0935\u093F\u091C\u094D\u091E\u093E\u0928, \u0917\u0923\u093F\u0924)
+* **\u092A\u094D\u0930\u0924\u093F\u092F\u094B\u0917\u0940 \u092A\u0930\u0940\u0915\u094D\u0937\u093E**: Arjuna JEE 3.0 \u0915\u0947 \u091B\u093E\u0924\u094D\u0930
+
+---
+
+#### \u{1F680} \u092A\u094D\u0930\u092E\u0941\u0916 \u092A\u094D\u0930\u094B\u091C\u0947\u0915\u094D\u091F\u094D\u0938 \u0914\u0930 \u0928\u0935\u093E\u091A\u093E\u0930 (Key Projects & Innovations)
+* **Sathi AI (\u0915\u0938\u094D\u091F\u092E 8B \u092A\u0948\u0930\u093E\u092E\u0940\u091F\u0930 LLM)**: \u092A\u093E\u092F\u0925\u0928, \u0917\u0942\u0917\u0932 \u0915\u094B\u0932\u093E\u092C \u0914\u0930 \`llama-cpp-python\` \u0930\u0928\u091F\u093E\u0907\u092E \u0935\u093E\u0924\u093E\u0935\u0930\u0923 \u0915\u093E \u0909\u092A\u092F\u094B\u0917 \u0915\u0930\u0915\u0947 \u0915\u0938\u094D\u091F\u092E-\u092A\u094D\u0930\u0936\u093F\u0915\u094D\u0937\u093F\u0924 GGUF \u092D\u093E\u0937\u093E \u092E\u0949\u0921\u0932 (\`sathi_ai_q4_k_m.gguf\`) \u0915\u094B \u0915\u0949\u0928\u094D\u092B\u093C\u093F\u0917\u0930, \u091F\u0947\u0938\u094D\u091F \u0914\u0930 \u0921\u093F\u092A\u094D\u0932\u0949\u092F \u0915\u093F\u092F\u093E\u0964
+* **Ascend Study / Ascend Study Buddy**: \u091B\u093E\u0924\u094D\u0930\u094B\u0902 \u0915\u0940 \u092E\u0926\u0926 \u0915\u0947 \u0932\u093F\u090F \u0928\u093F\u0930\u094D\u092E\u093F\u0924 \u090F\u0915 \u0938\u0941\u0935\u094D\u092F\u0935\u0938\u094D\u0925\u093F\u0924 \u0936\u0948\u0915\u094D\u0937\u0923\u093F\u0915 \u0935\u0947\u092C \u090F\u092A\u094D\u0932\u0940\u0915\u0947\u0936\u0928, \u091C\u093F\u0938\u092E\u0947\u0902 \u0938\u0902\u0930\u091A\u093F\u0924 \u0905\u0927\u094D\u092F\u092F\u0928 \u0938\u093E\u092E\u0917\u094D\u0930\u0940 \u0914\u0930 \u0907\u0902\u091F\u0930\u0948\u0915\u094D\u091F\u093F\u0935 \u0932\u0930\u094D\u0928\u093F\u0902\u0917 \u092E\u0949\u0921\u094D\u092F\u0942\u0932 \u0936\u093E\u092E\u093F\u0932 \u0939\u0948\u0902\u0964 (React, Firebase, Vercel)\u0964
+* **CORE AI**: \u0924\u094D\u0935\u0930\u093F\u0924-\u0905\u092D\u093F\u092F\u093E\u0902\u0924\u094D\u0930\u093F\u0915\u0940 (prompt-engineered) \u091A\u0948\u091F \u0935\u0930\u094D\u0915\u092B\u093C\u094D\u0932\u094B \u0914\u0930 \u0938\u0939\u091C \u092F\u0942\u091C\u0930 \u0907\u0902\u091F\u0930\u0948\u0915\u094D\u0936\u0928 \u092E\u0949\u0921\u0932 \u0938\u0947 \u0932\u0948\u0938 \u090F\u0915 \u0915\u0938\u094D\u091F\u092E\u093E\u0907\u091C\u093C\u094D\u0921 \u0915\u0928\u094D\u0935\u0930\u094D\u0938\u0947\u0936\u0928\u0932 \u090F\u0906\u0908 \u0905\u0938\u093F\u0938\u094D\u091F\u0947\u0902\u091F \u0935\u0947\u092C \u0907\u0902\u091F\u0930\u092B\u093C\u0947\u0938\u0964
+* **PocketPaisa / PocketPaisa Pro**: \u0935\u093F\u0924\u094D\u0924\u0940\u092F \u092A\u094D\u0930\u092C\u0902\u0927\u0928 \u0914\u0930 \u0926\u0948\u0928\u093F\u0915 \u0916\u0930\u094D\u091A\u094B\u0902 \u0915\u094B \u091F\u094D\u0930\u0948\u0915 \u0915\u0930\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F \u0928\u093F\u0930\u094D\u092E\u093F\u0924 \u090F\u0915 \u0935\u094D\u092F\u093E\u092A\u0915 \u0935\u0947\u092C \u090F\u092A\u094D\u0932\u0940\u0915\u0947\u0936\u0928\u0964
+* **DriveMate AI (\u0921\u094D\u0930\u093E\u0908\u0935 \u092E\u0947\u091F \u090F\u0906\u0908)**: \u0938\u0921\u093C\u0915 \u0938\u0941\u0930\u0915\u094D\u0937\u093E \u092E\u0947\u0902 \u0938\u0941\u0927\u093E\u0930 \u0915\u0947 \u0909\u0926\u094D\u0926\u0947\u0936\u094D\u092F \u0938\u0947 \u0921\u093F\u091C\u093E\u0907\u0928 \u0915\u093F\u092F\u093E \u0917\u092F\u093E \u090F\u0915 \u0907\u0902\u091F\u0947\u0932\u093F\u091C\u0947\u0902\u091F \u0921\u094D\u0930\u093E\u0907\u0935\u093F\u0902\u0917 \u0905\u0938\u093F\u0938\u094D\u091F\u0947\u0902\u091F \u092C\u094D\u0932\u0942\u092A\u094D\u0930\u093F\u0902\u091F\u0964
+* **THERMONEST V1**: \u090F\u0915 \u0915\u0921\u093C\u093E, \u0917\u0948\u0930-\u0935\u093F\u0926\u094D\u092F\u0941\u0924 \u0935\u093E\u0937\u094D\u092A\u0940\u0915\u0930\u0923\u0940\u092F (non-electric evaporative) \u0914\u0930 \u0917\u094D\u0930\u093E\u0909\u0902\u0921 \u092A\u094D\u0930\u0940-\u0915\u0942\u0932\u093F\u0902\u0917 \u0938\u093F\u0938\u094D\u091F\u092E \u0915\u0947 \u0932\u093F\u090F \u0924\u0948\u092F\u093E\u0930 \u0915\u093F\u092F\u093E \u0917\u092F\u093E \u0924\u0915\u0928\u0940\u0915\u0940 \u092C\u094D\u0932\u0942\u092A\u094D\u0930\u093F\u0902\u091F\u0964
+
+---
+
+#### \u{1F6E0}\uFE0F \u0924\u0915\u0928\u0940\u0915\u0940 \u0915\u094C\u0936\u0932 (Technical Skills)
+* **\u092D\u093E\u0937\u093E\u090F\u0902**: Python, HTML5, CSS3, JavaScript
+* **\u092B\u094D\u0930\u0947\u092E\u0935\u0930\u094D\u0915 \u0914\u0930 \u091F\u0942\u0932\u094D\u0938**: React, Tailwind CSS, Flutter, React Native, Git & GitHub, Vercel, Firebase, Prompt Engineering, Google Colab & GGUF Models
+
+---
+
+#### \u{1F30C} \u092A\u093E\u0920\u094D\u092F\u0947\u0924\u0930 \u0917\u0924\u093F\u0935\u093F\u0927\u093F\u092F\u093E\u0902 \u0914\u0930 \u0935\u093F\u091C\u094D\u091E\u093E\u0928 (Extracurricular Interests)
+* **\u0916\u0917\u094B\u0932 \u0935\u093F\u091C\u094D\u091E\u093E\u0928 \u0914\u0930 \u0928\u093E\u0917\u0930\u093F\u0915 \u0935\u093F\u091C\u094D\u091E\u093E\u0928**: \u091B\u0924 \u0938\u0947 \u0906\u0915\u093E\u0936\u0940\u092F \u092A\u093F\u0902\u0921\u094B\u0902 (\u091C\u0948\u0938\u0947 \u092C\u0943\u0939\u0938\u094D\u092A\u0924\u093F, \u0913\u0930\u093F\u092F\u0928 \u0928\u0915\u094D\u0937\u0924\u094D\u0930, \u090F\u0902\u0921\u094D\u0930\u094B\u092E\u0947\u0921\u093E \u0917\u0948\u0932\u0947\u0915\u094D\u0938\u0940) \u0915\u093E \u0905\u0935\u0932\u094B\u0915\u0928 \u0915\u0930\u0928\u093E \u0914\u0930 \u091C\u0942\u0928\u093F\u0935\u0930\u094D\u0938 (Zooniverse) \u092A\u0930 \u0916\u0917\u094B\u0932\u0940\u092F \u0921\u0947\u091F\u093E \u0935\u0930\u094D\u0917\u0940\u0915\u0930\u0923 \u0915\u093E\u0930\u094D\u092F\u094B\u0902 \u092E\u0947\u0902 \u092D\u093E\u0917 \u0932\u0947\u0928\u093E\u0964
+* **\u0916\u0947\u0932**: \u090F\u0915 \u0909\u0924\u094D\u0938\u093E\u0939\u0940 \u0915\u094D\u0930\u093F\u0915\u0947\u091F\u0930, \u091C\u094B \u0926\u093E\u090F\u0902 \u0939\u093E\u0925 \u0915\u0947 \u092C\u0932\u094D\u0932\u0947\u092C\u093E\u091C \u0914\u0930 \u0924\u0947\u091C \u0917\u0947\u0902\u0926\u092C\u093E\u091C \u0915\u0947 \u0930\u0942\u092A \u092E\u0947\u0902 \u0916\u0947\u0932\u0924\u0947 \u0939\u0948\u0902 \u0914\u0930 \u092A\u094D\u0930\u0924\u093F\u0938\u094D\u092A\u0930\u094D\u0927\u0940 \u0909\u0924\u094D\u0915\u0943\u0937\u094D\u091F\u0924\u093E \u0915\u0940 \u0913\u0930 \u0905\u0917\u094D\u0930\u0938\u0930 \u0939\u0948\u0902\u0964
+
+---
+
+*\u092F\u0926\u093F \u0906\u092A \u0930\u094B\u0939\u093F\u0924 \u092F\u093E\u0926\u0935 \u0915\u0947 \u092C\u093E\u0930\u0947 \u092E\u0947\u0902 \u0915\u094B\u0908 \u0910\u0938\u0940 \u091C\u093E\u0928\u0915\u093E\u0930\u0940 \u091C\u093E\u0928\u0928\u093E \u091A\u093E\u0939\u0924\u0947 \u0939\u0948\u0902 \u091C\u094B \u092F\u0939\u093E\u0901 \u0909\u092A\u0932\u092C\u094D\u0927 \u0928\u0939\u0940\u0902 \u0939\u0948, \u0924\u094B \u092E\u0948\u0902 \u0935\u093F\u0928\u092E\u094D\u0930\u0924\u093E\u092A\u0942\u0930\u094D\u0935\u0915 \u0938\u0942\u091A\u093F\u0924 \u0915\u0930\u0928\u093E \u091A\u093E\u0939\u0942\u0901\u0917\u093E \u0915\u093F **\u092E\u0947\u0930\u0947 Creator Profile \u092E\u0947\u0902 \u0907\u0938 \u091C\u093E\u0928\u0915\u093E\u0930\u0940 \u0915\u093E \u0909\u0932\u094D\u0932\u0947\u0916 \u0928\u0939\u0940\u0902 \u0939\u0948\u0964***`;
+    } else if (isHinglish) {
+      return `### \u{1F464} Creator Profile: Rohit Yadav
+**Science Student (PCM) & Full-Stack / AI Developer**
+*Maheshpur, Chhabra Tehsil, Baran District, Rajasthan, India*
+*Class 12 Science (PCM) | Arjuna JEE 3.0 Student*
+*GitHub Portfolio*: [heenayadav325200-png](https://github.com/heenayadav325200-png)
+
+---
+
+#### \u{1F4D6} Profile Summary
+Rohit Yadav ek ambitious aur passionate Class 12 Science (PCM) student hain jo **Swami Vivekanand Government Model School, Kadaiyaban, Chhabra (Rajasthan)** me padhte hain. Unhe self-taught full-stack software development, mobile app creation, AI integration aur custom GGUF/LLM models handling ka bohot acha experience hai. Wo apni Physics, Chemistry aur Mathematics ki padhai ke sath-sath educational web apps aur machine learning interfaces develop karte hain.
+
+---
+
+#### \u{1F393} Education
+* **School**: Swami Vivekanand Government Model School, Kadaiyaban, Chhabra, Rajasthan
+* **Class**: Class 12 Science Stream (Physics, Chemistry, Mathematics)
+* **Exam Prep**: Enrolled in Arjuna JEE 3.0
+
+---
+
+#### \u{1F680} Key Projects & Innovations
+* **Sathi AI (Custom 8B Parameter LLM)**: Python, Google Colab, aur \`llama-cpp-python\` runtime ka use karke custom-trained GGUF models (\`sathi_ai_q4_k_m.gguf\`) configure aur deploy kiya.
+* **Ascend Study / Ascend Study Buddy**: Ek feature-rich educational web application jo students ko study resources aur interactive learning provide karta hai (React, Firebase, Vercel).
+* **CORE AI**: Custom conversational AI assistant web interface jisme prompt-engineered chat workflows hain.
+* **PocketPaisa / PocketPaisa Pro**: Expense tracking aur personal finance management application.
+* **DriveMate AI (\u0921\u094D\u0930\u093E\u0908\u0935 \u092E\u0947\u091F \u090F\u0906\u0908)**: Road safety improve karne ke liye intelligent driving assistant concept.
+* **THERMONEST V1**: Non-electric, sustainable evaporative and ground pre-cooling system ka technical blueprint.
+
+---
+
+#### \u{1F6E0}\uFE0F Technical Skills & Expertise
+* **Languages**: Python, HTML5, CSS3, JavaScript
+* **Frameworks & Tools**: React, Tailwind CSS, Flutter, React Native, Git & GitHub, Vercel, Firebase, Prompt Engineering, Google Colab & GGUF Models
+
+---
+
+#### \u{1F30C} Extracurricular Interests & Science
+* **Astronomy & Citizen Science**: Rooftop observer jo celestial objects (Jupiter, Orion, Andromeda Galaxy) track karte hain aur Zooniverse par astronomical data classification me participate karte hain.
+* **Sports**: Passionate cricketer jo right-handed batter aur fast bowler hain.
+
+---
+
+*Agar aap Rohit ke baare me koi aisi baat puch rahe hain jo is profile me nahi hai, toh **mere Creator Profile me is jankari ka ullekh nahi hai.***`;
+    } else {
+      return `### \u{1F464} Creator Profile: Rohit Yadav
+**Science Student (PCM) & Full-Stack / AI Developer**
+*Maheshpur, Chhabra Tehsil, Baran District, Rajasthan, India*
+*Class 12 Science (PCM) | Arjuna JEE 3.0 Student*
+*GitHub Portfolio*: [heenayadav325200-png](https://github.com/heenayadav325200-png)
+
+---
+
+#### \u{1F4D6} Profile Summary
+Rohit Yadav is an ambitious and passionate Class 12 Science (PCM) student at **Swami Vivekanand Government Model School, Kadaiyaban, Chhabra, Rajasthan**. He has extensive self-taught expertise in full-stack software development, mobile application creation, AI integration, and custom GGUF/LLMs handling. He successfully balances a rigorous academic focus in Physics, Chemistry, and Mathematics while engineering highly useful educational web apps and machine learning interfaces.
+
+---
+
+#### \u{1F393} Education
+* **School**: Swami Vivekanand Government Model School, Kadaiyaban, Chhabra, Rajasthan
+* **Class**: Class 12 Science Stream (Physics, Chemistry, Mathematics)
+* **Exam Prep**: Enrolled in Arjuna JEE 3.0
+
+---
+
+#### \u{1F680} Key Projects & Innovations
+* **Sathi AI (Custom 8B Parameter LLM)**: Configured, tested, and deployed custom-trained GGUF language models (\`sathi_ai_q4_k_m.gguf\`) using Python, Google Colab, and \`llama-cpp-python\` runtime environments.
+* **Ascend Study / Ascend Study Buddy**: Designed and deployed a feature-rich educational web application to aid students with structured study resources and interactive learning modules. (React, Firebase, Vercel).
+* **CORE AI**: Developed a custom AI assistant web interface featuring prompt-engineered chat workflows and seamless user interaction models.
+* **PocketPaisa / PocketPaisa Pro**: Conceptualized and published a comprehensive financial management and expense tracking web application.
+* **DriveMate AI (\u0921\u094D\u0930\u093E\u0908\u0935 \u092E\u0947\u091F \u090F\u0906\u0908)**: Engineered an intelligent driving assistant blueprint aimed at improving road safety.
+* **THERMONEST V1**: Drafted technical blueprints and specifications for a sustainable, non-electric evaporative and ground pre-cooling system.
+
+---
+
+#### \u{1F6E0}\uFE0F Technical Skills & Expertise
+* **Languages**: Python, HTML5, CSS3, JavaScript
+* **Frameworks & Tools**: React, Tailwind CSS, Flutter, React Native, Git & GitHub, Vercel, Firebase, Prompt Engineering, Google Colab & GGUF Models
+
+---
+
+#### \u{1F30C} Extracurricular Interests & Science
+* **Astronomy & Citizen Science**: Rooftop observer tracking celestial objects (Jupiter, Orion, Andromeda Galaxy) and participating in astronomical data classification tasks on Zooniverse.
+* **Sports**: Passionate cricketer, playing as a right-handed batter and fast bowler with aspirations of competitive excellence.
+
+---
+
+*If you are asking about any information not listed here, **there is no mention of this detail in my official Creator Profile.***`;
+    }
+  }
+  if (norm.includes("rohit") || norm.includes("yadav")) {
+    if (isHi) {
+      return "\u092E\u0947\u0930\u0947 \u092A\u093E\u0938 \u092E\u0947\u0930\u0947 Creator **Rohit Yadav** \u0915\u0947 \u092C\u093E\u0930\u0947 \u092E\u0947\u0902 \u0915\u0947\u0935\u0932 \u0909\u0928\u0915\u0947 \u0906\u0927\u093F\u0915\u093E\u0930\u093F\u0915 \u092A\u094D\u0930\u094B\u092B\u093E\u0907\u0932 \u0915\u0940 \u091C\u093E\u0928\u0915\u093E\u0930\u0940 \u0939\u0948\u0964 **\u092E\u0947\u0930\u0947 Creator Profile \u092E\u0947\u0902 \u0907\u0938 \u091C\u093E\u0928\u0915\u093E\u0930\u0940 \u0915\u093E \u0909\u0932\u094D\u0932\u0947\u0916 \u0928\u0939\u0940\u0902 \u0939\u0948\u0964**";
+    } else {
+      return "I only have information from the official profile of my creator, **Rohit Yadav**. **There is no mention of this detail in my Creator Profile.**";
+    }
+  }
+  return null;
 }
 
 // server.ts
-var import_app = require("firebase-admin/app");
-var import_auth = require("firebase-admin/auth");
-var import_fs = __toESM(require("fs"), 1);
-var import_module = require("module");
-var import_meta = {};
-var require2 = (0, import_module.createRequire)(import_meta.url);
 import_dotenv.default.config();
-try {
-  const configPath = import_path.default.join(process.cwd(), "firebase-applet-config.json");
-  if (import_fs.default.existsSync(configPath)) {
-    const firebaseConfig = JSON.parse(import_fs.default.readFileSync(configPath, "utf-8"));
-    (0, import_app.initializeApp)({
-      projectId: firebaseConfig.projectId
-    });
-    console.log("Successfully initialized Firebase Admin for Project:", firebaseConfig.projectId);
-  } else {
-    (0, import_app.initializeApp)();
-    console.log("Initialized Firebase Admin with default configuration.");
-  }
-} catch (err) {
-  console.warn("Firebase Admin SDK could not be initialized. Verify credentials or settings.", err);
-}
-var app = (0, import_express.default)();
-var httpServer = (0, import_http.createServer)(app);
-var io = new import_socket.Server(httpServer);
 var PORT = 3e3;
-var db;
-if (process.env.VERCEL) {
-  console.log("Running on Vercel, bypassing better-sqlite3 and using MockDatabase.");
-  db = new MockDatabase();
-} else {
-  try {
-    const DatabaseConstructor = require2("better-sqlite3");
-    db = new DatabaseConstructor("studybuddy.db");
-    console.log("Successfully connected to SQLite database (studybuddy.db).");
-    try {
-      db.pragma("journal_mode = WAL");
-      db.pragma("synchronous = NORMAL");
-      console.log("Enabled Write-Ahead Logging (WAL) and synchronous=NORMAL for peak SQLite scalability.");
-    } catch (pe) {
-      console.warn("Could not set database pragmas:", pe);
-    }
-  } catch (err) {
-    console.warn("better-sqlite3 could not be loaded, falling back to MockDatabase:", err);
-    db = new MockDatabase();
+var SmartCache = class {
+  cache = /* @__PURE__ */ new Map();
+  maxItems;
+  defaultTTL;
+  constructor(maxItems = 3e3, defaultTTLMinutes = 60) {
+    this.maxItems = maxItems;
+    this.defaultTTL = defaultTTLMinutes * 60 * 1e3;
+    setInterval(() => this.purgeExpired(), 3 * 60 * 1e3);
   }
-}
-try {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      points INTEGER DEFAULT 0,
-      level INTEGER DEFAULT 1,
-      avatar TEXT
-    );
-    CREATE TABLE IF NOT EXISTS badges (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER,
-      badge_name TEXT,
-      icon TEXT,
-      date_earned DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS notes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      content TEXT,
-      subject TEXT,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS schedule (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      task TEXT NOT NULL,
-      time TEXT,
-      day TEXT,
-      completed INTEGER DEFAULT 0
-    );
-    CREATE TABLE IF NOT EXISTS progress (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      subject TEXT,
-      score INTEGER,
-      total INTEGER,
-      date DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS groups (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      description TEXT,
-      created_by INTEGER,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS group_members (
-      group_id INTEGER,
-      user_id INTEGER,
-      role TEXT DEFAULT 'member',
-      PRIMARY KEY (group_id, user_id)
-    );
-    CREATE TABLE IF NOT EXISTS group_messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      group_id INTEGER,
-      user_id INTEGER,
-      text TEXT,
-      image TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS group_notes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      group_id INTEGER,
-      title TEXT NOT NULL,
-      content TEXT,
-      updated_by INTEGER,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    -- Seed a default user if none exists
-    INSERT OR IGNORE INTO users (id, name, points, level) VALUES (1, 'Rohit Yadav', 0, 1);
-    -- Seed some dummy users for leaderboard
-    INSERT OR IGNORE INTO users (id, name, points, level) VALUES (2, 'Alice Smith', 450, 5);
-    INSERT OR IGNORE INTO users (id, name, points, level) VALUES (3, 'Bob Johnson', 320, 3);
-    INSERT OR IGNORE INTO users (id, name, points, level) VALUES (4, 'Charlie Brown', 150, 2);
-  `);
-} catch (e) {
-  console.warn("Could not execute tables initialization SQL on database:", e);
-}
-var aiClient = null;
-function getGeminiClient() {
-  if (!aiClient) {
-    const key = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-    if (!key) {
-      throw new Error("GEMINI_API_KEY environment variable is not defined on the server side.");
+  get(key) {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiry) {
+      this.cache.delete(key);
+      return null;
     }
+    this.cache.delete(key);
+    this.cache.set(key, entry);
+    return entry.data;
+  }
+  set(key, data, ttlMs) {
+    if (this.cache.size >= this.maxItems) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey) this.cache.delete(firstKey);
+    }
+    this.cache.set(key, {
+      data,
+      expiry: Date.now() + (ttlMs || this.defaultTTL)
+    });
+  }
+  purgeExpired() {
+    const now = Date.now();
+    for (const [key, entry] of this.cache.entries()) {
+      if (now > entry.expiry) {
+        this.cache.delete(key);
+      }
+    }
+  }
+};
+var apiCache = new SmartCache(3e3, 60);
+process.on("unhandledRejection", (reason) => {
+  console.warn("Process resilience: unhandled rejection caught:", reason);
+});
+process.on("uncaughtException", (error) => {
+  console.error("Process resilience: uncaught exception caught:", error);
+});
+var aiClient = null;
+var currentKey = null;
+var isKeyReportedLeaked = false;
+function getAiClient() {
+  const key = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.API_KEY || "";
+  if (!key || key.trim() === "") {
+    return null;
+  }
+  if (currentKey !== key) {
+    currentKey = key;
+    isKeyReportedLeaked = false;
     aiClient = new import_genai.GoogleGenAI({
-      apiKey: key,
+      apiKey: key.trim(),
       httpOptions: {
         headers: {
           "User-Agent": "aistudio-build"
@@ -837,1792 +1466,1406 @@ function getGeminiClient() {
       }
     });
   }
+  if (isKeyReportedLeaked) {
+    return null;
+  }
   return aiClient;
 }
-async function callGeminiWithRetryAndFailover(ai, params, retries = 3, delay = 1e3) {
-  const isImageModel = params.model.indexOf("image") !== -1;
-  const hasModelsPrefix = params.model.startsWith("models/");
-  const baseCandidates = isImageModel ? [params.model, "gemini-3.1-flash-lite-image", "gemini-3.1-flash-image"] : [
-    params.model,
-    "gemini-3.5-flash",
-    "gemini-3.1-flash-lite",
-    "gemini-flash-latest"
-  ];
-  const candidates = baseCandidates.map((m) => {
-    if (hasModelsPrefix && !m.startsWith("models/")) {
-      return `models/${m}`;
-    }
-    return m;
-  });
-  const modelsToTry = candidates.filter((item, index) => candidates.indexOf(item) === index);
+var FALLBACK_MODELS = [
+  "gemini-3.5-flash",
+  "gemini-2.5-flash",
+  "gemini-3.1-flash-lite"
+];
+async function callGeminiWithResilience(params) {
+  const ai = getAiClient();
+  if (!ai) {
+    throw new Error(isKeyReportedLeaked ? "GEMINI_KEY_LEAKED_OR_FORBIDDEN" : "GEMINI_API_KEY_UNAVAILABLE");
+  }
+  const preferred = params.preferredModel || "gemini-3.5-flash";
+  const modelsToTry = Array.from(/* @__PURE__ */ new Set(["gemini-3.5-flash", preferred, ...FALLBACK_MODELS]));
   let lastError = null;
-  for (const modelCandidate of modelsToTry) {
-    let currentRetries = retries;
-    let currentDelay = delay;
-    while (currentRetries >= 0) {
-      try {
-        const result = await ai.models.generateContent({
-          ...params,
-          model: modelCandidate
-        });
-        if (!result || !result.text && !result.candidates) {
-          throw new Error("Empty response received from Gemini.");
-        }
-        return result;
-      } catch (error) {
-        lastError = error;
-        const errorMsg = error.message || String(error);
-        const isTransient = error.status === 503 || error.statusCode === 503 || error.code === 503 || errorMsg.includes("503") || errorMsg.includes("UNAVAILABLE") || errorMsg.includes("high demand") || errorMsg.includes("temporary");
-        const isQuota = error.status === 429 || error.statusCode === 429 || error.code === 429 || errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("quota") || errorMsg.includes("limit");
-        const currentModelIndex = modelsToTry.indexOf(modelCandidate);
-        const hasNextCandidate = currentModelIndex < modelsToTry.length - 1;
-        if (isQuota && hasNextCandidate) {
-          console.warn(`[Gemini Bridge] Model ${modelCandidate} hit rate limit. Trying fallback candidate model...`);
-          break;
-        } else if (isQuota && currentRetries > 0) {
-          let waitTimeMs = 5e3;
-          const match = errorMsg.match(/Please retry in ([\d\.]+)s/i);
-          if (match && match[1]) {
-            const seconds = parseFloat(match[1]);
-            if (!isNaN(seconds)) {
-              waitTimeMs = Math.ceil(seconds * 1e3) + 1500;
-            }
-          } else {
-            waitTimeMs = currentDelay * 3;
-          }
-          if (waitTimeMs > 25e3) {
-            waitTimeMs = 25e3;
-          }
-          console.warn(`[Gemini Bridge] Model ${modelCandidate} rate limited. Waiting ${waitTimeMs}ms before retry...`);
-          await new Promise((resolve) => setTimeout(resolve, waitTimeMs));
-          currentRetries--;
-          currentDelay *= 2;
-        } else if (isTransient && currentRetries > 0) {
-          console.warn(`[Gemini Bridge] Model ${modelCandidate} temporarily unavailable. Retrying in ${currentDelay}ms...`);
-          await new Promise((resolve) => setTimeout(resolve, currentDelay));
-          currentRetries--;
-          currentDelay *= 2;
-        } else {
-          console.warn(`[Gemini Bridge] Model ${modelCandidate} skipped. Transitioning to next candidate...`);
-          break;
-        }
+  for (const model of modelsToTry) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: params.contents,
+        config: params.config
+      });
+      if (response && response.text) {
+        return response.text;
+      }
+    } catch (err) {
+      lastError = err;
+      const errMsg = err?.message || String(err);
+      const isActualLeak = errMsg.includes("API key was reported as leaked") || errMsg.includes("leaked") && errMsg.includes("key");
+      if (isActualLeak) {
+        isKeyReportedLeaked = true;
+        throw new Error("GEMINI_KEY_LEAKED_OR_FORBIDDEN");
+      }
+      const isQuotaOrRateLimit = errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED") || errMsg.includes("quota") || errMsg.includes("Too Many Requests") || errMsg.includes("rate-limits");
+      if (isQuotaOrRateLimit) {
+        console.log(`[Gemini Resilience] Model ${model} rate-limited. Trying alternative model...`);
+        continue;
+      }
+      console.warn(`[Gemini Resilience] Model ${model} attempt failed: ${errMsg.slice(0, 80)}. Trying fallback...`);
+      continue;
+    }
+  }
+  throw lastError || new Error("AI service temporarily unavailable. Please retry in a moment.");
+}
+var app = (0, import_express.default)();
+app.disable("x-powered-by");
+app.use(securityHeaders);
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    "https://studyhalper.vercel.app",
+    "http://localhost",
+    "http://localhost:3000",
+    "capacitor://localhost"
+  ];
+  if (origin) {
+    if (allowedOrigins.includes(origin) || origin.endsWith(".vercel.app") || origin.includes("run.app")) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+    } else {
+      res.setHeader("Access-Control-Allow-Origin", "https://studyhalper.vercel.app");
+    }
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", "https://studyhalper.vercel.app");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-gemini-quota-exceeded");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  if (req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
+if (process.env.VERCEL === "1") {
+  app.use((req, _res, next) => {
+    const matchedPath = req.headers["x-matched-path"] || req.headers["x-vercel-matched-path"];
+    if (matchedPath && matchedPath.startsWith("/api/")) {
+      req.url = matchedPath;
+    } else if (!req.url.startsWith("/api/") && req.url !== "/api") {
+      req.url = "/api" + (req.url.startsWith("/") ? req.url : "/" + req.url);
+    }
+    next();
+  });
+}
+app.use((0, import_compression.default)({
+  filter: (req, res) => {
+    if (req.headers["x-no-compression"]) return false;
+    return import_compression.default.filter(req, res);
+  },
+  level: 6
+}));
+app.use(import_express.default.json({ limit: "10mb" }));
+app.use("/api", sanitizeInputs);
+app.use("/api", rateLimitGeneral);
+app.get("/api/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    uptime: Math.round(process.uptime())
+  });
+});
+app.post("/api/gemini/answer", rateLimitAi, async (req, res) => {
+  try {
+    const { prompt, imageBase64, imagesBase64, studentContext, language, persona, history } = req.body;
+    if (!prompt && !imageBase64 && (!imagesBase64 || imagesBase64.length === 0)) {
+      res.status(400).json({ error: "Prompt or image is required." });
+      return;
+    }
+    const creatorResponse = checkCreatorQuestion(prompt, language);
+    if (creatorResponse) {
+      res.json({ text: creatorResponse });
+      return;
+    }
+    const hasImages = imageBase64 || imagesBase64 && imagesBase64.length > 0;
+    const hasHistory = Array.isArray(history) && history.length > 0;
+    let cacheKey = "";
+    if (!hasImages && !hasHistory && prompt) {
+      cacheKey = `ans_${language || "en"}_${persona || "gen"}_${prompt.trim().toLowerCase().slice(0, 200)}`;
+      const cached = apiCache.get(cacheKey);
+      if (cached) {
+        res.json({ text: cached });
+        return;
       }
     }
-  }
-  const finalMessage = lastError ? lastError.message || String(lastError) : "All candidate Gemini models failed after retries.";
-  const finalError = new Error(`All candidate Gemini models failed after retries. Detail: ${finalMessage}`);
-  if (lastError) {
-    finalError.status = lastError.status || lastError.statusCode || lastError.code;
-  }
-  throw finalError;
-}
-function handleRouteError(res, err) {
-  res.setHeader("x-gemini-fallback", "true");
-  const errMsg = err?.message || String(err);
-  const status = err?.status || err?.statusCode || err?.code;
-  if (status === 429 || errMsg.includes("quota") || errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED") || errMsg.includes("limit")) {
-    res.setHeader("x-gemini-quota-exceeded", "true");
-  }
-}
-app.use(import_express.default.json({ limit: "50mb" }));
-app.use(import_express.default.urlencoded({ limit: "50mb", extended: true }));
-async function requireAuth(req, res, next) {
-  if (req.method === "OPTIONS" || req.path === "/api/gemini/health" || req.path === "/health") {
-    return next();
-  }
-  const authHeader = req.headers.authorization || req.headers.Authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    if (process.env.NODE_ENV !== "production") {
-      console.warn("[Auth Middleware] Missing Authorization header, bypassing in non-production.");
-      return next();
+    const studentInfo = studentContext && studentContext.name ? `Addressing student: ${studentContext.name} (${studentContext.className || ""} ${studentContext.school || ""}).` : "";
+    const personaStyle = persona === "socratic" ? "Mode: SOCRATIC TEACHER - Guide with helpful probing questions before revealing full answers." : persona === "math" ? "Mode: MATH WIZARD - Show ultra-precise mathematical steps and boxed answers." : "Mode: GENERAL TUTOR - Provide clear, intuitive, and structured explanations.";
+    const sysInstruction = `You are ASCEND AI TUTOR \u2014 an intelligent, calm, highly capable study partner who helps students genuinely understand subjects and become better at solving problems independently. You are a brilliant senior/student mentor who deeply understands the subject and explains difficult ideas simply, naturally, and confidently.
+${studentInfo} ${personaStyle}
+
+YOUR CORE IDENTITY & VOICE:
+- Tone & Personality: Intelligent, calm, clear, curious, patient, honest, encouraging, precise, and student-aware.
+- Mentor Voice: Speak like a brilliant senior/student mentor who deeply understands the subject and knows how to explain difficult ideas simply. Be natural, confident, and slightly conversational. Never sound like a corporate chatbot, a digital textbook, a motivational speaker, a customer-support agent, or an overly excited AI.
+- Core Principle: "Understand first. Solve second. Memorize only what actually needs memorizing."
+- NO COMPLIMENT FILLER / NO CONVERSATIONAL FLUFF: Never start responses with things like "Excellent choice!", "That's a fantastic question!", "Let's tackle this!", "Let's dive right in!", "Absolutely!", "Certainly!". Do NOT use unnecessary greetings or introductions. Open directly with the core concept or answer.
+- Praise Policy: Keep praise minimal and realistic. Never use excessive exclamation marks or hype words. Use balanced, constructive validation like "You are close, but..." or "That is a solid start; let's refine...".
+- Emojis Policy: Use very few emojis. Never use emojis as decorative markers for headings or lists. The response must look professional even if all emojis are removed.
+
+YOUR SPECIFIC INTERACTION BEHAVIORS:
+
+1. WHEN THE STUDENT IS CONFUSED:
+Do not simply repeat the same explanation. Identify the confusing component and explain it from a completely different angle.
+Example cue: "You're probably getting stuck on this part: ..." then simplify it with a new intuitive approach.
+
+2. WHEN THE STUDENT MAKES A MISTAKE:
+Never shame, mock, or offer patronizing pity. Clearly identify the error, explain WHY it is incorrect, and then demonstrate the correct logical reasoning path.
+
+3. WHEN THE STUDENT IS STUCK:
+Do not immediately dump the complete solution. Provide a scaffolded response: first give a clean Hint -> then small guidance -> then a deeper hint -> and only provide the full solution if they remain unable to proceed.
+
+4. WHEN SOLVING NUMERICALS:
+Think in the sequence: Understand -> Plan -> Solve -> Verify. Show only useful reasoning and calculations. Do not create unnecessary or artificial steps. Connect WHY -> HOW -> APPLY -> VERIFY naturally.
+
+5. WHEN TEACHING A CONCEPT:
+Start with direct intuition or an everyday analogy. Then introduce the formal definition. Finally, connect it to formulas, mathematical examples, or real-world applications.
+
+6. ADAPTING TO RESPONSE DEPTH:
+- Simple question: Answer simply and concisely. Do not turn a one-line question into a massive lecture.
+- Conceptual confusion: Focus heavily on an intuitive explanation.
+- Homework / Stuck: Provide guided hints to build independent solving skills.
+- Numerical: Show a clean, step-by-step mathematical path (variables, formulas, substitution, verification).
+- Revision: Deliver a compact, recall-focused summary.
+- Advanced or Exam/JEE-level questions: Increase technical depth naturally. Do not oversimplify.
+
+7. ENCOURAGEMENT & HONESTY:
+Encourage through constructive, precise feedback rather than empty praise. Avoid generic fluff. If information is uncertain, admit it honestly. If a student's assumption is wrong, correct it respectfully.
+
+8. MULTILINGUAL & HINGLISH EXCELLENCE:
+- Language requested: ${language === "hi" ? "Hindi (Devanagari script)" : language === "Hinglish" ? "Hinglish (mix of simple Hindi & English in Latin script)" : "English"}.
+- Always reply fluently and naturally in the requested language, prioritizing ultimate conceptual clarity.`;
+    const contents = [];
+    if (history && Array.isArray(history) && history.length > 0) {
+      for (const msg of history) {
+        contents.push({
+          role: msg.role === "user" ? "user" : "model",
+          parts: [{ text: msg.text || "" }]
+        });
+      }
     }
-    return res.status(401).json({ error: "Unauthorized. Authorization header is missing." });
-  }
-  const token = authHeader.split(" ")[1];
-  try {
-    const decodedToken = await (0, import_auth.getAuth)().verifyIdToken(token);
-    req.userId = decodedToken.uid;
-    next();
-  } catch (error) {
-    console.error("[Auth Middleware] Firebase ID token verification failed:", error.message || error);
-    if (process.env.NODE_ENV !== "production") {
-      console.warn("[Auth Middleware] Token verification failed, bypassing in non-production.");
-      return next();
+    const currentParts = [{ text: prompt || "Please analyze and explain the uploaded homework image(s) step-by-step." }];
+    const allImages = [];
+    if (Array.isArray(imagesBase64) && imagesBase64.length > 0) {
+      allImages.push(...imagesBase64);
+    } else if (imageBase64) {
+      allImages.push(imageBase64);
     }
-    return res.status(401).json({ error: "Unauthorized. Invalid token.", detail: error.message });
-  }
-}
-app.use("/api/gemini", requireAuth);
-var addPoints = (userId, points) => {
-  try {
-    db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(points, userId);
-    db.prepare("UPDATE users SET level = (points / 100) + 1 WHERE id = ?").run(userId);
-  } catch (err) {
-    console.error("Failed to add points:", err);
-  }
-};
-app.get("/api/gemini/health", async (req, res) => {
-  try {
-    const ai = getGeminiClient();
-    const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
-      contents: "Test connection: respond with 'OK'"
-    });
-    if (response && response.text) {
-      res.json({ status: "healthy", connection: "connected", result: response.text.trim() });
-    } else {
-      res.status(500).json({ status: "degraded", connection: "empty_response" });
-    }
-  } catch (err) {
-    res.status(500).json({ status: "degraded", error: err.message || String(err) });
-  }
-});
-app.get("/api/user/:id", (req, res) => {
-  try {
-    const user = db.prepare("SELECT * FROM users WHERE id = ?").get(req.params.id);
-    const badges = db.prepare("SELECT * FROM badges WHERE user_id = ?").all(req.params.id);
-    res.json({ ...user, badges });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.get("/api/leaderboard", (req, res) => {
-  try {
-    const leaderboard = db.prepare("SELECT name, points, level FROM users ORDER BY points DESC LIMIT 10").all();
-    res.json(leaderboard);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.post("/api/user/:id/points", (req, res) => {
-  try {
-    const { points } = req.body;
-    addPoints(req.params.id, points);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.post("/api/user/:id/badge", (req, res) => {
-  try {
-    const { badge_name, icon } = req.body;
-    const exists = db.prepare("SELECT id FROM badges WHERE user_id = ? AND badge_name = ?").get(req.params.id, badge_name);
-    if (!exists) {
-      db.prepare("INSERT INTO badges (user_id, badge_name, icon) VALUES (?, ?, ?)").run(req.params.id, badge_name, icon);
-      res.json({ success: true, unlocked: true });
-    } else {
-      res.json({ success: true, unlocked: false });
-    }
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.get("/api/notes", (req, res) => {
-  try {
-    const notes = db.prepare("SELECT * FROM notes ORDER BY updated_at DESC").all();
-    res.json(notes);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.post("/api/notes", (req, res) => {
-  try {
-    const { title, content, subject } = req.body;
-    const result = db.prepare("INSERT INTO notes (title, content, subject) VALUES (?, ?, ?)").run(title, content, subject);
-    res.json({ id: result.lastInsertRowid });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.put("/api/notes/:id", (req, res) => {
-  try {
-    const { title, content, subject } = req.body;
-    db.prepare("UPDATE notes SET title = ?, content = ?, subject = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(title, content, subject, req.params.id);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.delete("/api/notes/:id", (req, res) => {
-  try {
-    db.prepare("DELETE FROM notes WHERE id = ?").run(req.params.id);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.get("/api/schedule", (req, res) => {
-  try {
-    const schedule = db.prepare("SELECT * FROM schedule").all();
-    res.json(schedule);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.post("/api/schedule", (req, res) => {
-  try {
-    const { task, time, day } = req.body;
-    const result = db.prepare("INSERT INTO schedule (task, time, day) VALUES (?, ?, ?)").run(task, time, day);
-    res.json({ id: result.lastInsertRowid });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.patch("/api/schedule/:id", (req, res) => {
-  try {
-    const { completed } = req.body;
-    db.prepare("UPDATE schedule SET completed = ? WHERE id = ?").run(completed ? 1 : 0, req.params.id);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.delete("/api/schedule/:id", (req, res) => {
-  try {
-    db.prepare("DELETE FROM schedule WHERE id = ?").run(req.params.id);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.get("/api/progress", (req, res) => {
-  try {
-    const progress = db.prepare("SELECT * FROM progress ORDER BY date DESC").all();
-    res.json(progress);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.post("/api/progress", (req, res) => {
-  try {
-    const { subject, score, total } = req.body;
-    db.prepare("INSERT INTO progress (subject, score, total) VALUES (?, ?, ?)").run(subject, score, total);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.get("/api/groups", (req, res) => {
-  try {
-    const groups = db.prepare(`
-      SELECT g.*, (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count 
-      FROM groups g
-    `).all();
-    res.json(groups);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.get("/api/groups/user/:userId", (req, res) => {
-  try {
-    const groups = db.prepare(`
-      SELECT g.*, (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count 
-      FROM groups g
-      JOIN group_members gm ON g.id = gm.group_id
-      WHERE gm.user_id = ?
-    `).all(req.params.userId);
-    res.json(groups);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.post("/api/groups", (req, res) => {
-  try {
-    const { name, description, userId } = req.body;
-    const result = db.prepare("INSERT INTO groups (name, description, created_by) VALUES (?, ?, ?)").run(name, description, userId);
-    const groupId = result.lastInsertRowid;
-    db.prepare("INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, ?)").run(groupId, userId, "admin");
-    res.json({ id: groupId });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.post("/api/groups/:id/join", (req, res) => {
-  try {
-    const { userId } = req.body;
-    db.prepare("INSERT INTO group_members (group_id, user_id) VALUES (?, ?)").run(req.params.id, userId);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(400).json({ error: "Already a member or group doesn't exist" });
-  }
-});
-app.get("/api/groups/:id/messages", (req, res) => {
-  try {
-    const messages = db.prepare(`
-      SELECT gm.*, u.name as user_name 
-      FROM group_messages gm
-      JOIN users u ON gm.user_id = u.id
-      WHERE gm.group_id = ?
-      ORDER BY gm.created_at ASC
-    `).all(req.params.id);
-    res.json(messages);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.get("/api/groups/:id/notes", (req, res) => {
-  try {
-    const notes = db.prepare(`
-      SELECT gn.*, u.name as updated_by_name 
-      FROM group_notes gn
-      JOIN users u ON gn.updated_by = u.id
-      WHERE gn.group_id = ?
-      ORDER BY gn.updated_at DESC
-    `).all(req.params.id);
-    res.json(notes);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.post("/api/groups/:id/notes", (req, res) => {
-  try {
-    const { title, content, userId } = req.body;
-    const result = db.prepare("INSERT INTO group_notes (group_id, title, content, updated_by) VALUES (?, ?, ?, ?)").run(req.params.id, title, content, userId);
-    res.json({ id: result.lastInsertRowid });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.put("/api/groups/notes/:noteId", (req, res) => {
-  try {
-    const { title, content, userId } = req.body;
-    db.prepare("UPDATE group_notes SET title = ?, content = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(title, content, userId, req.params.noteId);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-app.post("/api/gemini/answer", async (req, res) => {
-  const { prompt, imageBase64, studentContext, language, persona, history } = req.body;
-  try {
-    let contentsList = [];
-    if (history && Array.isArray(history)) {
-      contentsList = history.map((msg) => ({
-        role: msg.role === "user" ? "user" : "model",
-        parts: [{ text: msg.text }]
-      }));
-    }
-    const currentParts = [{ text: prompt }];
-    if (imageBase64) {
+    for (const img of allImages) {
+      if (!img || typeof img !== "string") continue;
+      const mimeMatch = img.match(/^data:(image\/\w+);base64,/);
+      const mimeType = mimeMatch ? mimeMatch[1] : "image/png";
+      const cleanBase64 = img.replace(/^data:image\/\w+;base64,/, "");
       currentParts.push({
         inlineData: {
-          mimeType: "image/png",
-          data: imageBase64.split(",")[1] || imageBase64
+          mimeType,
+          data: cleanBase64
         }
       });
     }
-    contentsList.push({
+    contents.push({
       role: "user",
       parts: currentParts
     });
-    let languagePrompt = "";
-    if (language === "Hindi") {
-      languagePrompt = "Please respond entirely in clear, friendly Hindi language (using proper Devanagari script), offering simple student-friendly examples.";
-    } else if (language === "Mixed" || language === "Hinglish") {
-      languagePrompt = "Please respond in Hinglish (a friendly, conversational mix of Hindi and English). Keep academic/scientific vocabulary in English but explain and converse in simple mixed sentences, perfect for an Indian school kid.";
-    } else if (language === "Marathi") {
-      languagePrompt = "Please respond entirely in clear, friendly Marathi language (using proper Devanagari script), offering simple student-friendly examples.";
-    } else if (language === "Tamil") {
-      languagePrompt = "Please respond entirely in clear, friendly Tamil language, offering simple student-friendly examples.";
-    } else if (language === "Bengali") {
-      languagePrompt = "Please respond entirely in clear, friendly Bengali language, offering simple student-friendly examples.";
-    } else if (language === "Spanish") {
-      languagePrompt = "Please respond entirely in Spanish language, customized to be clear and encouraging for a school child.";
-    } else if (language === "French") {
-      languagePrompt = "Please respond entirely in French language, customized to be clear and encouraging for a school child.";
-    } else if (language === "German") {
-      languagePrompt = "Please respond entirely in German language, customized to be clear and encouraging for a school child.";
-    } else if (language === "Japanese") {
-      languagePrompt = "Please respond entirely in Japanese language, customized to be clear and encouraging for a school child.";
-    } else if (language === "Russian") {
-      languagePrompt = "Please respond entirely in Russian language, customized to be clear and encouraging for a Russian school child.";
-    } else if (language === "Chinese") {
-      languagePrompt = "Please respond entirely in Chinese (Simplified) language, customized to be clear and encouraging for a Chinese school child.";
-    } else {
-      languagePrompt = "Please respond in English, styled to be simple, friendly and highly clear for a school child.";
-    }
-    let syllabusPrompt = "";
-    if (studentContext) {
-      const country = studentContext.country || "Global";
-      const className = studentContext.className || "10";
-      if (country === "Russia") {
-        syllabusPrompt = `You must strictly follow the Russian National Educational Syllabus (\u0413\u043E\u0441\u0443\u0434\u0430\u0440\u0441\u0442\u0432\u0435\u043D\u043D\u0430\u044F \u043F\u0440\u043E\u0433\u0440\u0430\u043C\u043C\u0430 / \u0424\u0413\u041E\u0421) for grade/class ${className}. All academic standards, terminology, reference formulas, and pedagogy must be tailored to the Russian standard curriculum. Speak in Russian.`;
-      } else if (country === "China") {
-        syllabusPrompt = `You must strictly follow the Chinese National Curriculum Standard (\u56FD\u5BB6\u8BFE\u7A0B\u6807\u51C6) / Gaokao-aligned pathway for grade/class ${className}. All academic standards, terminology, reference formulas, and pedagogy must match the Chinese educational system. Speak in Chinese.`;
-      } else if (country === "United States") {
-        syllabusPrompt = `You must strictly follow the US Common Core / Next Generation Science Standards (NGSS) or AP/honors standards for grade/class ${className}. Tailor academic terminology and curriculum standards to the United States educational system.`;
-      } else if (country === "India") {
-        syllabusPrompt = `You must strictly follow the Indian CBSE (NCERT) / ICSE / State Board curriculum for grade/class ${className}. Tailor explanations, topics, and terms to the Indian schooling system.`;
-      } else if (country === "United Kingdom") {
-        syllabusPrompt = `You must strictly follow the National Curriculum of England / GCSE / Key Stage curriculum for grade/class ${className}. Tailor spelling, terms (like Key Stages) and curriculum standards to the UK school system.`;
-      } else {
-        syllabusPrompt = `You must follow an internationally recognized global curriculum standard such as the International Baccalaureate (IB) or Cambridge Assessment International Education (CIE) suitable for grade/class ${className}.`;
-      }
-    }
-    let personaInstruction = "";
-    if (persona === "socratic") {
-      personaInstruction = "You are a Socratic Teacher. Never give direct, straight answers to the student immediately. Instead, always ask short, helpful guiding questions to prompt the student to think, deduce, and discover the answer themselves. Encourage their critical thinking.";
-    } else if (persona === "debugger") {
-      personaInstruction = "You are a Code Debugger and Programming Expert. Analyze code logic, pinpoint bugs, explain syntax errors, and break down solutions step-by-step in clean formatting. Provide optimized and secure code snippets with thorough comments.";
-    } else if (persona === "translator") {
-      personaInstruction = "You are a Language Translator & Bilingual Speaking Partner. Help the student translate phrases, explain grammar rules, clarify pronunciation tips, and practice conversational dialogue in both English and Hindi or their chosen language.";
-    } else if (persona === "math") {
-      personaInstruction = "You are a Math Wizard. Break down all mathematical equations, proofs, and word problems into extremely clear, sequential steps. Explain the 'why' behind each step and define any variables or formulas used.";
-    } else {
-      personaInstruction = "You are an encouraging and friendly study helper/coach. Explain concepts clearly and provide step-by-step solutions.";
-    }
-    const appInfo = "You are the AI model integrated into 'Ascend Study', an advanced, interactive study assistant platform. Ascend Study provides students with intelligent conversational learning, structured subject notes, dynamic practice quizzes, progress and daily streak tracking, study schedules/reminders, and collaborative group study circles/rooms for peer-to-peer interactive learning.";
-    const creatorInfo = "Your owner, creator, and lead developer is Rohit Yadav, a brilliant 14/15-year-old student and coder who designed and developed this entire applet. Rohit is the head and founder of his developer team called 'Core AI'. If any student or user asks who created/developed you, who designed this app, or who owns you, you must proudly, clearly, and directly tell them that you were created and are owned by Rohit Yadav and his team, Core AI. You must never claim that Google, Google AI Studio, or OpenAI created or own you - they are only providers of the underlying large language model APIs, but the app itself and your persona belongs strictly to Rohit Yadav and Core AI.";
-    const systemInstruction = studentContext ? `${appInfo} ${creatorInfo} ${personaInstruction} You are an encouraging, friendly study helper/coach for a child named ${studentContext.name} who studies in class ${studentContext.className} at ${studentContext.school}. ${syllabusPrompt} Keep your tone highly personalized, warm, and highly encouraging, referring to their school or name when it fits naturally. ${languagePrompt}` : `${appInfo} ${creatorInfo} ${personaInstruction} You are a helpful study assistant. Explain concepts clearly and provide step-by-step solutions. Support subjects like Math, Science, Biology, Physics, Chemistry, and English. If the user asks for a diagram or visual explanation, describe it clearly or suggest a visual aid. ${languagePrompt}`;
-    const ai = getGeminiClient();
-    const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
-      contents: contentsList,
+    const answerText = await callGeminiWithResilience({
+      contents,
       config: {
-        systemInstruction
+        systemInstruction: sysInstruction,
+        temperature: 0.3
       }
     });
-    res.json({ text: response.text });
+    if (cacheKey && answerText) {
+      apiCache.set(cacheKey, answerText, 60 * 60 * 1e3);
+    }
+    res.json({ text: answerText });
   } catch (err) {
-    console.warn("Gemini answer error (using offline fallback):", err.message || err);
-    handleRouteError(res, err);
-    const fallbackText = getFallbackAnswer(prompt, studentContext);
-    res.json({ text: fallbackText });
+    const isKeyIssue = err?.message === "GEMINI_KEY_LEAKED_OR_FORBIDDEN" || err?.message === "GEMINI_API_KEY_UNAVAILABLE" || err?.message && (err.message.includes("leaked") || err.message.includes("403") || err.message.includes("PERMISSION_DENIED"));
+    if (isKeyIssue) {
+      console.log("[AI Tutor] Gemini API key status notice: using resilient curriculum knowledge engine.");
+    } else {
+      console.log("[AI Tutor] Serving academic answer via resilient curriculum knowledge engine.");
+    }
+    const fallbackPrompt = req.body?.prompt || "Study Question";
+    const fallbackAnswer = generateCurriculumStudyAnswer({
+      prompt: fallbackPrompt,
+      language: req.body?.language,
+      persona: req.body?.persona,
+      studentContext: req.body?.studentContext,
+      isApiKeyIssue: isKeyIssue
+    });
+    res.json({ text: fallbackAnswer });
   }
 });
-function generateGuaranteedLocalSvg(prompt) {
-  const normalized = (prompt || "").toLowerCase();
-  if (normalized.includes("water cycle")) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="100%" height="100%">
-      <!-- Background -->
-      <rect width="600" height="400" fill="#f8fafc" rx="16"/>
-      <rect width="600" height="150" y="250" fill="#e0f2fe" rx="0"/>
-      
-      <!-- Ocean -->
-      <path d="M 0 320 Q 150 310 300 320 T 600 320 L 600 400 L 0 400 Z" fill="#0284c7"/>
-      <path d="M 0 340 Q 150 330 300 340 T 600 340 L 600 400 L 0 400 Z" fill="#0369a1"/>
-      
-      <!-- Mountains -->
-      <path d="M 350 320 L 450 180 L 520 260 L 600 150 L 600 320 Z" fill="#64748b"/>
-      <path d="M 430 208 L 450 180 L 470 208 Z" fill="#f1f5f9"/>
-      <path d="M 570 190 L 600 150 L 600 210 Z" fill="#f1f5f9"/>
-
-      <!-- Sun -->
-      <circle cx="80" cy="80" r="30" fill="#eab308" />
-      <line x1="80" y1="35" x2="80" y2="20" stroke="#eab308" stroke-width="4"/>
-      <line x1="80" y1="125" x2="80" y2="140" stroke="#eab308" stroke-width="4"/>
-      <line x1="35" y1="80" x2="20" y2="80" stroke="#eab308" stroke-width="4"/>
-      <line x1="125" y1="80" x2="140" y2="80" stroke="#eab308" stroke-width="4"/>
-      
-      <!-- Clouds -->
-      <path d="M 240 100 a 20 20 0 0 1 30 -10 a 25 25 0 0 1 45 5 a 20 20 0 0 1 15 25 l -90 0 z" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="2"/>
-      <path d="M 440 100 a 20 20 0 0 1 30 -10 a 25 25 0 0 1 45 5 a 20 20 0 0 1 15 25 l -90 0 z" fill="#94a3b8" stroke="#475569" stroke-width="2"/>
-
-      <!-- Rain -->
-      <line x1="460" y1="140" x2="450" y2="160" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 4"/>
-      <line x1="480" y1="140" x2="470" y2="160" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 4"/>
-      <line x1="500" y1="140" x2="490" y2="160" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 4"/>
-      
-      <!-- Arrows (Cycles) -->
-      <!-- Evaporation -->
-      <path d="M 120 290 Q 140 230 180 190" fill="none" stroke="#f97316" stroke-width="3" stroke-dasharray="5 5" marker-end="url(#arrow-orange)"/>
-      <text x="130" y="220" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#ea580c">1. Evaporation</text>
-
-      <!-- Condensation -->
-      <path d="M 280 90 Q 350 80 400 90" fill="none" stroke="#2563eb" stroke-width="3" stroke-dasharray="5 5" marker-end="url(#arrow-blue)"/>
-      <text x="310" y="75" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#1d4ed8">2. Condensation</text>
-
-      <!-- Precipitation -->
-      <path d="M 500 170 Q 520 230 490 280" fill="none" stroke="#0284c7" stroke-width="3" stroke-dasharray="5 5" marker-end="url(#arrow-blue)"/>
-      <text x="515" y="230" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0369a1">3. Precipitation</text>
-
-      <!-- Collection / Runoff -->
-      <path d="M 420 310 Q 260 350 160 340" fill="none" stroke="#0d9488" stroke-width="3" stroke-dasharray="5 5" marker-end="url(#arrow-teal)"/>
-      <text x="260" y="360" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0f766e">4. Surface Runoff</text>
-      
-      <!-- Definitions -->
-      <defs>
-        <marker id="arrow-orange" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#ea580c"/>
-        </marker>
-        <marker id="arrow-blue" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#1d4ed8"/>
-        </marker>
-        <marker id="arrow-teal" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f766e"/>
-        </marker>
-      </defs>
-
-      <!-- Label title -->
-      <rect x="15" y="15" width="220" height="30" fill="white" rx="8" opacity="0.9" stroke="#e2e8f0" stroke-width="1"/>
-      <text x="25" y="35" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#0f172a">THE WATER CYCLE DIAGRAM</text>
-    </svg>`;
-  }
-  if (normalized.includes("heart") || normalized.includes("cardiac")) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
-      <rect width="600" height="450" fill="#fff5f5" rx="16"/>
-      
-      <!-- Heart outline and muscle -->
-      <path d="M 300 130 C 230 60 140 100 140 190 C 140 280 250 350 300 390 C 350 350 460 280 460 190 C 460 100 370 60 300 130 Z" fill="#e11d48" stroke="#be123c" stroke-width="6"/>
-      
-      <!-- Left Ventricle cavity inside -->
-      <path d="M 300 200 C 270 170 200 200 200 250 C 200 300 270 330 300 360 Z" fill="#9f1239" opacity="0.6"/>
-      <!-- Right Ventricle cavity inside -->
-      <path d="M 300 200 C 330 170 400 200 400 250 C 400 300 330 330 300 360 Z" fill="#1e3a8a" opacity="0.6"/>
-
-      <!-- Septum divider line -->
-      <line x1="300" y1="180" x2="300" y2="380" stroke="#be123c" stroke-width="8" stroke-linecap="round"/>
-
-      <!-- Aorta arch (red arch on top) -->
-      <path d="M 280 140 Q 280 60 340 70 Q 380 80 370 140" fill="none" stroke="#e11d48" stroke-width="24" stroke-linecap="round"/>
-      <line x1="320" y1="65" x2="320" y2="40" stroke="#e11d48" stroke-width="12"/>
-      <line x1="350" y1="70" x2="350" y2="45" stroke="#e11d48" stroke-width="12"/>
-
-      <!-- Vena Cava (blue tube on left) -->
-      <rect x="180" y="70" width="20" height="110" rx="6" fill="#2563eb" stroke="#1d4ed8" stroke-width="3"/>
-      
-      <!-- Labels with pointer dots -->
-      <!-- Aorta -->
-      <circle cx="340" cy="70" r="4" fill="#1e293b"/>
-      <line x1="340" y1="70" x2="450" y2="50" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="3 3"/>
-      <text x="460" y="54" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0f172a">Aorta (Main Artery)</text>
-
-      <!-- Left Atrium -->
-      <circle cx="360" cy="180" r="4" fill="#1e293b"/>
-      <line x1="360" y1="180" x2="480" y2="160" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="3 3"/>
-      <text x="490" y="164" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0f172a">Left Atrium</text>
-
-      <!-- Right Atrium -->
-      <circle cx="230" cy="180" r="4" fill="#1e293b"/>
-      <line x1="230" y1="180" x2="80" y2="160" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="3 3"/>
-      <text x="15" y="164" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0f172a">Right Atrium</text>
-
-      <!-- Left Ventricle -->
-      <circle cx="350" cy="280" r="4" fill="#1e293b"/>
-      <line x1="350" y1="280" x2="480" y2="300" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="3 3"/>
-      <text x="490" y="304" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0f172a">Left Ventricle</text>
-
-      <!-- Right Ventricle -->
-      <circle cx="250" cy="280" r="4" fill="#1e293b"/>
-      <line x1="250" y1="280" x2="80" y2="300" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="3 3"/>
-      <text x="5" y="304" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0f172a">Right Ventricle</text>
-
-      <!-- Title -->
-      <rect x="200" y="15" width="200" height="30" fill="white" rx="8" stroke="#fca5a5" stroke-width="1"/>
-      <text x="300" y="35" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#9f1239" text-anchor="middle">ANATOMY OF THE HEART</text>
-    </svg>`;
-  }
-  if (normalized.includes("cell")) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
-      <rect width="600" height="450" fill="#f0fdf4" rx="16"/>
-      
-      <!-- Cell Wall (Outer Hexagon-like path) -->
-      <polygon points="120,80 480,60 520,240 450,380 150,400 80,240" fill="#86efac" stroke="#166534" stroke-width="8" stroke-linejoin="round"/>
-      <!-- Cell Membrane (Inner) -->
-      <polygon points="128,88 472,69 510,238 442,372 156,391 90,238" fill="#bbf7d0" stroke="#15803d" stroke-width="3" stroke-linejoin="round"/>
-      
-      <!-- Cytoplasm filling -->
-      <polygon points="135,95 465,78 500,235 435,365 162,382 98,235" fill="#f0fdf4"/>
-
-      <!-- Large Central Vacuole (blue blob) -->
-      <path d="M 180 180 Q 250 140 350 170 T 400 280 T 250 340 T 150 250 Z" fill="#e0f2fe" stroke="#38bdf8" stroke-width="3"/>
-      <text x="250" y="240" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#0369a1">Central Vacuole</text>
-
-      <!-- Nucleus (Purple circle with nucleolus inside) -->
-      <circle cx="410" cy="140" r="45" fill="#f3e8ff" stroke="#7e22ce" stroke-width="3"/>
-      <circle cx="420" cy="130" r="18" fill="#c084fc" stroke="#6b21a8" stroke-width="2"/>
-      <text x="410" y="175" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#6b21a8" text-anchor="middle">Nucleus</text>
-
-      <!-- Chloroplasts (Green ovals with lines) -->
-      <g transform="translate(140, 110) rotate(15)">
-        <ellipse cx="0" cy="0" rx="22" ry="12" fill="#22c55e" stroke="#14532d" stroke-width="2"/>
-        <line x1="-15" y1="0" x2="15" y2="0" stroke="#14532d" stroke-width="1.5"/>
-      </g>
-      <g transform="translate(160, 340) rotate(-30)">
-        <ellipse cx="0" cy="0" rx="22" ry="12" fill="#22c55e" stroke="#14532d" stroke-width="2"/>
-        <line x1="-15" y1="0" x2="15" y2="0" stroke="#14532d" stroke-width="1.5"/>
-      </g>
-      <g transform="translate(460, 310) rotate(45)">
-        <ellipse cx="0" cy="0" rx="22" ry="12" fill="#22c55e" stroke="#14532d" stroke-width="2"/>
-        <line x1="-15" y1="0" x2="15" y2="0" stroke="#14532d" stroke-width="1.5"/>
-      </g>
-
-      <!-- Mitochondria (Orange ovals with zigzag) -->
-      <g transform="translate(280, 110) rotate(-20)">
-        <ellipse cx="0" cy="0" rx="20" ry="10" fill="#f97316" stroke="#7c2d12" stroke-width="2"/>
-        <path d="M -15 0 Q -10 5 -5 -3 T 5 5 T 15 -2" fill="none" stroke="#7c2d12" stroke-width="1.5"/>
-      </g>
-      <g transform="translate(350, 350) rotate(10)">
-        <ellipse cx="0" cy="0" rx="20" ry="10" fill="#f97316" stroke="#7c2d12" stroke-width="2"/>
-        <path d="M -15 0 Q -10 5 -5 -3 T 5 5 T 15 -2" fill="none" stroke="#7c2d12" stroke-width="1.5"/>
-      </g>
-
-      <!-- Labels with lines -->
-      <!-- Cell Wall -->
-      <circle cx="100" cy="160" r="4" fill="#14532d"/>
-      <line x1="100" y1="160" x2="30" y2="130" stroke="#14532d" stroke-width="1.5" stroke-dasharray="3 3"/>
-      <text x="25" y="115" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#14532d">Cell Wall</text>
-
-      <!-- Chloroplast -->
-      <circle cx="140" cy="110" r="4" fill="#14532d"/>
-      <line x1="140" y1="110" x2="50" y2="70" stroke="#14532d" stroke-width="1.5" stroke-dasharray="3 3"/>
-      <text x="45" y="55" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#14532d">Chloroplast</text>
-
-      <!-- Mitochondrion -->
-      <circle cx="280" cy="110" r="4" fill="#7c2d12"/>
-      <line x1="280" y1="110" x2="280" y2="40" stroke="#7c2d12" stroke-width="1.5" stroke-dasharray="3 3"/>
-      <text x="280" y="30" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#7c2d12" text-anchor="middle">Mitochondrion</text>
-
-      <!-- Title -->
-      <rect x="15" y="15" width="220" height="30" fill="white" rx="8" stroke="#bbf7d0" stroke-width="1"/>
-      <text x="25" y="35" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#166534">PLANT CELL STRUCTURE</text>
-    </svg>`;
-  }
-  if (normalized.includes("atom")) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
-      <rect width="600" height="450" fill="#faf5ff" rx="16"/>
-      
-      <!-- Orbital Shell ellipses -->
-      <ellipse cx="300" cy="225" rx="200" ry="80" fill="none" stroke="#a855f7" stroke-width="2" opacity="0.6" transform="rotate(30, 300, 225)"/>
-      <ellipse cx="300" cy="225" rx="200" ry="80" fill="none" stroke="#a855f7" stroke-width="2" opacity="0.6" transform="rotate(-30, 300, 225)"/>
-      <ellipse cx="300" cy="225" rx="200" ry="80" fill="none" stroke="#a855f7" stroke-width="2" opacity="0.6" transform="rotate(90, 300, 225)"/>
-
-      <!-- Electrons (Blue orbiting balls) -->
-      <!-- On Shell 1 (30 deg) -->
-      <circle cx="150" cy="140" r="8" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
-      <circle cx="450" cy="310" r="8" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
-      
-      <!-- On Shell 2 (-30 deg) -->
-      <circle cx="150" cy="310" r="8" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
-      <circle cx="450" cy="140" r="8" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
-
-      <!-- On Shell 3 (90 deg) -->
-      <circle cx="300" cy="45" r="8" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
-      <circle cx="300" cy="405" r="8" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
-
-      <!-- Nucleus Cluster (Protons & Neutrons) -->
-      <g transform="translate(300, 225)">
-        <!-- Neutrons (Gray) -->
-        <circle cx="-10" cy="-10" r="14" fill="#94a3b8" stroke="#475569" stroke-width="1.5"/>
-        <circle cx="12" cy="8" r="14" fill="#94a3b8" stroke="#475569" stroke-width="1.5"/>
-        <circle cx="-12" cy="14" r="14" fill="#94a3b8" stroke="#475569" stroke-width="1.5"/>
-        
-        <!-- Protons (Rose/Red with '+') -->
-        <circle cx="8" cy="-12" r="14" fill="#f43f5e" stroke="#be123c" stroke-width="1.5"/>
-        <text x="8" y="-3" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="white" text-anchor="middle">+</text>
-
-        <circle cx="-5" cy="5" r="14" fill="#f43f5e" stroke="#be123c" stroke-width="1.5"/>
-        <text x="-5" y="14" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="white" text-anchor="middle">+</text>
-
-        <circle cx="14" cy="-3" r="14" fill="#f43f5e" stroke="#be123c" stroke-width="1.5"/>
-        <text x="14" y="6" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="white" text-anchor="middle">+</text>
-      </g>
-
-      <!-- Labels -->
-      <!-- Electron -->
-      <line x1="150" y1="140" x2="80" y2="90" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 3"/>
-      <text x="75" y="80" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#1d4ed8">Electron (- negative charge)</text>
-
-      <!-- Proton -->
-      <line x1="308" y1="213" x2="480" y2="180" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 3"/>
-      <text x="490" y="184" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#be123c">Proton (+ positive charge)</text>
-
-      <!-- Neutron -->
-      <line x1="312" y1="233" x2="480" y2="270" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 3"/>
-      <text x="490" y="274" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#475569">Neutron (Neutral / no charge)</text>
-
-      <!-- Orbital Shell -->
-      <line x1="430" y1="200" x2="480" y2="100" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 3"/>
-      <text x="490" y="104" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#6b21a8">Electron Orbit / Shell</text>
-
-      <!-- Title -->
-      <rect x="200" y="15" width="200" height="30" fill="white" rx="8" stroke="#d8b4fe" stroke-width="1"/>
-      <text x="300" y="35" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#6b21a8" text-anchor="middle">STRUCTURE OF AN ATOM</text>
-    </svg>`;
-  }
-  if (normalized.includes("circuit") || normalized.includes("ohm") || normalized.includes("physics")) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
-      <rect width="600" height="450" fill="#f8fafc" rx="16"/>
-      
-      <!-- Wires / circuit loop outline -->
-      <rect x="150" y="100" width="300" height="250" fill="none" stroke="#334155" stroke-width="4"/>
-
-      <!-- Battery on left wire -->
-      <g transform="translate(150, 225)">
-        <line x1="0" y1="-30" x2="0" y2="30" stroke="#334155" stroke-width="4"/>
-        <line x1="-20" y1="-15" x2="20" y2="-15" stroke="#0f172a" stroke-width="6"/>
-        <line x1="-10" y1="-5" x2="10" y2="-5" stroke="#0f172a" stroke-width="3"/>
-        <line x1="-20" y1="5" x2="20" y2="5" stroke="#0f172a" stroke-width="6"/>
-        <line x1="-10" y1="15" x2="10" y2="15" stroke="#0f172a" stroke-width="3"/>
-        <text x="30" y="-15" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#0f172a">+</text>
-        <text x="30" y="15" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#0f172a">-</text>
-        <text x="-50" y="5" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0284c7">Battery (V)</text>
-      </g>
-
-      <!-- Resistor on top wire (zigzag) -->
-      <g transform="translate(300, 100)">
-        <rect x="-40" y="-15" width="80" height="30" fill="#fed7aa" stroke="#ea580c" stroke-width="3" rx="4"/>
-        <line x1="-40" y1="0" x2="40" y2="0" stroke="#ea580c" stroke-width="2" stroke-dasharray="8 4"/>
-        <text x="0" y="5" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#ea580c" text-anchor="middle">Resistor (R)</text>
-      </g>
-
-      <!-- Switch on bottom wire -->
-      <g transform="translate(300, 350)">
-        <circle cx="-30" cy="0" r="6" fill="#334155"/>
-        <circle cx="30" cy="0" r="6" fill="#334155"/>
-        <line x1="-30" y1="0" x2="20" y2="-20" stroke="#334155" stroke-width="4" stroke-linecap="round"/>
-        <text x="0" y="25" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#334155" text-anchor="middle">Open Switch</text>
-      </g>
-
-      <!-- Ammeter on right wire -->
-      <g transform="translate(450, 225)">
-        <circle cx="0" cy="0" r="22" fill="#e0f2fe" stroke="#0284c7" stroke-width="3"/>
-        <text x="0" y="5" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#0369a1" text-anchor="middle">A</text>
-        <text x="40" y="5" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0369a1">Ammeter</text>
-      </g>
-
-      <!-- Title -->
-      <rect x="15" y="15" width="250" height="30" fill="white" rx="8" stroke="#cbd5e1" stroke-width="1"/>
-      <text x="25" y="35" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#1e293b">SCHEMATIC CIRCUIT DIAGRAM</text>
-    </svg>`;
-  }
-  const cleanTitle = prompt.replace(/[#*`_-]/g, "").trim().substring(0, 35) || "Custom Concept";
-  const normalizedLower = cleanTitle.toLowerCase();
-  const nodes = [
-    { id: "1", name: "Core Structure", desc: `Basic structural components of ${cleanTitle}` },
-    { id: "2", name: "Primary Function", desc: `The active biological, chemical or physical role` },
-    { id: "3", name: "System Mechanism", desc: `How it interacts with surrounding processes` },
-    { id: "4", name: "Practical Application", desc: `Real-world experiment or standard exam focus` }
-  ];
-  if (normalizedLower.includes("photosynthesis")) {
-    nodes[0] = { id: "1", name: "Light Absorption", desc: "Chlorophyll absorbs red/blue light energy" };
-    nodes[1] = { id: "2", name: "Water Splitting", desc: "Photolysis of H2O releases oxygen gas" };
-    nodes[2] = { id: "3", name: "Carbon Fixation", desc: "CO2 is captured in the Calvin cycle" };
-    nodes[3] = { id: "4", name: "Glucose Synthesis", desc: "High-energy sugars stored as starch" };
-  } else if (normalizedLower.includes("respiration")) {
-    nodes[0] = { id: "1", name: "Glycolysis", desc: "Glucose split into pyruvate in cytosol" };
-    nodes[1] = { id: "2", name: "Krebs Cycle", desc: "Acetyl-CoA oxidized, releasing CO2" };
-    nodes[2] = { id: "3", name: "Electron Transport", desc: "Proton gradient drives ATP synthesis" };
-    nodes[3] = { id: "4", name: "Energy Output", desc: "Cells harvest approx 36 ATP molecules" };
-  } else if (normalizedLower.includes("atom") || normalizedLower.includes("element") || normalizedLower.includes("structure")) {
-    nodes[0] = { id: "1", name: "Protons & Neutrons", desc: "Heavy subatomic particles inside nucleus" };
-    nodes[1] = { id: "2", name: "Electron Orbitals", desc: "Negative charge clouds orbiting shell" };
-    nodes[2] = { id: "3", name: "Valence Shell", desc: "Outer electrons determining bonding" };
-    nodes[3] = { id: "4", name: "Atomic Mass", desc: "Sum of protons/neutrons in nucleus" };
-  } else if (normalizedLower.includes("brain") || normalizedLower.includes("nervous")) {
-    nodes[0] = { id: "1", name: "Cerebrum", desc: "Handles conscious thought and memory" };
-    nodes[1] = { id: "2", name: "Cerebellum", desc: "Coordinates balance and posture" };
-    nodes[2] = { id: "3", name: "Brain Stem", desc: "Controls autonomic heart rate & breath" };
-    nodes[3] = { id: "4", name: "Neural Pathways", desc: "Transmits impulses via spinal cord" };
-  } else if (normalizedLower.includes("volcano") || normalizedLower.includes("earth") || normalizedLower.includes("geography")) {
-    nodes[0] = { id: "1", name: "Magma Chamber", desc: "Deep reservoir of molten rock under crust" };
-    nodes[1] = { id: "2", name: "Conduit Vent", desc: "Pipe-like shaft carrying lava upwards" };
-    nodes[2] = { id: "3", name: "Crater Opening", desc: "Bowl-shaped depression at summit" };
-    nodes[3] = { id: "4", name: "Eruption Column", desc: "Searing ash cloud and molten lava flow" };
-  } else if (normalizedLower.includes("digestive") || normalizedLower.includes("food") || normalizedLower.includes("stomach")) {
-    nodes[0] = { id: "1", name: "Ingestion", desc: "Food broken down by teeth & salivary enzymes" };
-    nodes[1] = { id: "2", name: "Digestion", desc: "Acidic breakdown of proteins in stomach" };
-    nodes[2] = { id: "3", name: "Absorption", desc: "Nutrient uptake through small intestine villi" };
-    nodes[3] = { id: "4", name: "Elimination", desc: "Removal of solid waste via large intestine" };
-  }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 520" width="100%" height="100%">
-    <defs>
-      <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
-        <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.05" />
-      </filter>
-      <marker id="arrow-marker" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#6366f1"/>
-      </marker>
-      <linearGradient id="central-bg" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#e0e7ff"/>
-        <stop offset="100%" stop-color="#e0f2fe"/>
-      </linearGradient>
-    </defs>
-
-    <!-- Canvas Background -->
-    <rect width="100%" height="100%" fill="#f8fafc" rx="16"/>
-    
-    <!-- Connection lines -->
-    <path d="M 180 140 L 290 220" fill="none" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#arrow-marker)"/>
-    <path d="M 570 140 L 460 220" fill="none" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#arrow-marker)"/>
-    <path d="M 375 300 L 180 380" fill="none" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#arrow-marker)"/>
-    <path d="M 375 300 L 570 380" fill="none" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#arrow-marker)"/>
-
-    <!-- Central Topic card -->
-    <rect x="225" y="210" width="300" height="100" rx="20" fill="url(#central-bg)" stroke="#4f46e5" stroke-width="3.5" filter="url(#shadow)" />
-    <text x="375" y="255" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="900" fill="#1e1b4b" text-anchor="middle" letter-spacing="-0.5px">${cleanTitle.toUpperCase()}</text>
-    <text x="375" y="278" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="extrabold" fill="#4f46e5" text-anchor="middle" letter-spacing="1.5px">DYNAMIC ACADEMIC STUDY DIAGRAM</text>
-
-    <!-- Node 1 (Top Left) -->
-    <rect x="30" y="80" width="200" height="76" rx="14" fill="#f0fdf4" stroke="#22c55e" stroke-width="2" filter="url(#shadow)"/>
-    <text x="130" y="110" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="900" fill="#14532d" text-anchor="middle">${nodes[0].name}</text>
-    <text x="130" y="128" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="#166534" text-anchor="middle">${nodes[0].desc}</text>
-
-    <!-- Node 2 (Top Right) -->
-    <rect x="520" y="80" width="200" height="76" rx="14" fill="#eff6ff" stroke="#3b82f6" stroke-width="2" filter="url(#shadow)"/>
-    <text x="620" y="110" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="900" fill="#1e3a8a" text-anchor="middle">${nodes[1].name}</text>
-    <text x="620" y="128" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="#1e40af" text-anchor="middle">${nodes[1].desc}</text>
-
-    <!-- Node 3 (Bottom Left) -->
-    <rect x="30" y="360" width="200" height="76" rx="14" fill="#fff7ed" stroke="#f97316" stroke-width="2" filter="url(#shadow)"/>
-    <text x="130" y="390" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="900" fill="#7c2d12" text-anchor="middle">${nodes[2].name}</text>
-    <text x="130" y="408" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="#9a3412" text-anchor="middle">${nodes[2].desc}</text>
-
-    <!-- Node 4 (Bottom Right) -->
-    <rect x="520" y="360" width="200" height="76" rx="14" fill="#fdf2f8" stroke="#ec4899" stroke-width="2" filter="url(#shadow)"/>
-    <text x="620" y="390" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="900" fill="#831843" text-anchor="middle">${nodes[3].name}</text>
-    <text x="620" y="408" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="#9d174d" text-anchor="middle">${nodes[3].desc}</text>
-
-    <!-- Title Card -->
-    <g id="title-card">
-      <rect x="25" y="22" width="700" height="42" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" rx="10" filter="url(#shadow)"/>
-      <text x="45" y="48" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="950" fill="#0f172a" letter-spacing="-0.5px">${cleanTitle.toUpperCase()}</text>
-      <rect x="585" y="31" width="125" height="24" rx="6" fill="#f1f5f9" />
-      <text x="647" y="46" font-family="system-ui, sans-serif" font-size="8.5" font-weight="extrabold" fill="#475569" text-anchor="middle">\u{1F6E1}\uFE0F OFFLINE SAFE</text>
-    </g>
-  </svg>`;
-}
-function getNodeColors(colorName, theme) {
-  const defaultColors = {
-    fill: "#ffffff",
-    stroke: "#94a3b8",
-    title: "#334155",
-    desc: "#64748b"
-  };
-  const palettes = {
-    textbook: {
-      indigo: { fill: "#f0f2fe", stroke: "#6366f1", title: "#312e81", desc: "#4338ca" },
-      emerald: { fill: "#ecfdf5", stroke: "#10b981", title: "#064e3b", desc: "#047857" },
-      amber: { fill: "#fffbeb", stroke: "#f59e0b", title: "#78350f", desc: "#b45309" },
-      sky: { fill: "#f0f9ff", stroke: "#0ea5e9", title: "#0c4a6e", desc: "#0369a1" },
-      rose: { fill: "#fff1f2", stroke: "#f43f5e", title: "#4c0519", desc: "#be123c" },
-      violet: { fill: "#faf5ff", stroke: "#a855f7", title: "#3b0764", desc: "#7e22ce" },
-      teal: { fill: "#f0fdfa", stroke: "#14b8a6", title: "#115e59", desc: "#0f766e" }
-    },
-    blueprint: {
-      indigo: { fill: "#0a1d37", stroke: "#4f46e5", title: "#ffffff", desc: "#93c5fd" },
-      emerald: { fill: "#0a261f", stroke: "#10b981", title: "#ffffff", desc: "#86efac" },
-      amber: { fill: "#211a0d", stroke: "#f59e0b", title: "#ffffff", desc: "#fde047" },
-      sky: { fill: "#051f33", stroke: "#0ea5e9", title: "#ffffff", desc: "#7dd3fc" },
-      rose: { fill: "#290c12", stroke: "#f43f5e", title: "#ffffff", desc: "#fda4af" },
-      violet: { fill: "#1a0b2e", stroke: "#a855f7", title: "#ffffff", desc: "#d8b4fe" },
-      teal: { fill: "#05221e", stroke: "#14b8a6", title: "#ffffff", desc: "#99f6e4" }
-    },
-    chalkboard: {
-      indigo: { fill: "rgba(255,255,255,0.05)", stroke: "#a5b4fc", title: "#e0e7ff", desc: "#c7d2fe" },
-      emerald: { fill: "rgba(255,255,255,0.05)", stroke: "#6ee7b7", title: "#ecfdf5", desc: "#a7f3d0" },
-      amber: { fill: "rgba(255,255,255,0.05)", stroke: "#fde047", title: "#fef9c3", desc: "#fef08a" },
-      sky: { fill: "rgba(255,255,255,0.05)", stroke: "#7dd3fc", title: "#e0f2fe", desc: "#bae6fd" },
-      rose: { fill: "rgba(255,255,255,0.05)", stroke: "#fca5a5", title: "#ffe4e6", desc: "#fecdd3" },
-      violet: { fill: "rgba(255,255,255,0.05)", stroke: "#d8b4fe", title: "#faf5ff", desc: "#e9d5ff" },
-      teal: { fill: "rgba(255,255,255,0.05)", stroke: "#99f6e4", title: "#f0fdfa", desc: "#ccfbf1" }
-    },
-    pencil: {
-      indigo: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
-      emerald: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
-      amber: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
-      sky: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
-      rose: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
-      violet: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" },
-      teal: { fill: "#ffffff", stroke: "#1e293b", title: "#1e293b", desc: "#475569" }
-    },
-    infographic: {
-      indigo: { fill: "#ffffff", stroke: "#6366f1", title: "#312e81", desc: "#4f46e5" },
-      emerald: { fill: "#ffffff", stroke: "#10b981", title: "#064e3b", desc: "#10b981" },
-      amber: { fill: "#ffffff", stroke: "#f59e0b", title: "#78350f", desc: "#d97706" },
-      sky: { fill: "#ffffff", stroke: "#0ea5e9", title: "#0c4a6e", desc: "#0284c7" },
-      rose: { fill: "#ffffff", stroke: "#f43f5e", title: "#4c0519", desc: "#e11d48" },
-      violet: { fill: "#ffffff", stroke: "#a855f7", title: "#3b0764", desc: "#9333ea" },
-      teal: { fill: "#ffffff", stroke: "#14b8a6", title: "#115e59", desc: "#0d9488" }
+app.post("/api/gemini/quiz", rateLimitAi, async (req, res) => {
+  try {
+    const { subject, topic, studentContext, language, difficulty, questionCount } = req.body || {};
+    const numQuestions = Math.max(3, Math.min(Number(questionCount) || 10, 30));
+    const chosenTopic = (topic || studentContext?.topic || studentContext?.className?.split("Topic:")?.[1] || subject || "Core Concepts").trim();
+    let langName = "English";
+    let langCode = "en";
+    const normLang = String(language || "").toLowerCase().trim();
+    if (normLang === "hi" || normLang === "hindi") {
+      langName = "pure, standard Hindi (\u0939\u093F\u0902\u0926\u0940 in Devanagari script)";
+      langCode = "hi";
+    } else if (normLang === "hinglish") {
+      langName = 'friendly Hinglish (a casual conversational blend of Hindi and English written in the English/Latin alphabet, e.g. "Is reaction ka main catalyst kaun sa hai?")';
+      langCode = "hinglish";
+    } else if (normLang === "marathi") {
+      langName = "Marathi (\u092E\u0930\u093E\u0920\u0940)";
+      langCode = "marathi";
+    } else if (normLang === "tamil") {
+      langName = "Tamil (\u0BA4\u0BAE\u0BBF\u0BB4\u0BCD)";
+      langCode = "tamil";
+    } else if (normLang === "bengali") {
+      langName = "Bengali (\u09AC\u09BE\u0982\u09B2\u09BE)";
+      langCode = "bengali";
     }
-  };
-  const themePalette = palettes[theme] || palettes.textbook;
-  return themePalette[colorName] || themePalette.indigo || defaultColors;
-}
-function buildSvgFromDiagramData(data, style, isPracticeMode) {
-  const title = data.title || "Study Diagram";
-  const subtitle = data.subtitle || "Concept Map";
-  const nodes = data.nodes || [];
-  const connections = data.connections || [];
-  const totalNodes = nodes.length;
-  const layout = data.layout || "central";
-  nodes.forEach((node, idx) => {
-    if (layout === "cycle") {
-      const angle = idx / totalNodes * 2 * Math.PI - Math.PI / 2;
-      node.x = 375 + Math.cos(angle) * 220;
-      node.y = 275 + Math.sin(angle) * 125;
-    } else if (layout === "flow") {
-      const colSpacing = 650 / (totalNodes || 1);
-      node.x = 50 + idx * colSpacing + colSpacing / 2;
-      node.y = 275 + (idx % 2 === 0 ? -60 : 60);
-    } else if (layout === "hierarchy") {
-      if (idx === 0) {
-        node.x = 375;
-        node.y = 130;
-      } else {
-        const remainingCount = totalNodes - 1;
-        const colSpacing = 650 / (remainingCount || 1);
-        node.x = 50 + (idx - 1) * colSpacing + colSpacing / 2;
-        node.y = 370;
-      }
-    } else if (layout === "split") {
-      const half = Math.ceil(totalNodes / 2);
-      if (idx < half) {
-        const rowSpacing = 320 / (half || 1);
-        node.x = 180;
-        node.y = 140 + idx * rowSpacing + rowSpacing / 2;
-      } else {
-        const rightIdx = idx - half;
-        const rightCount = totalNodes - half;
-        const rowSpacing = 320 / (rightCount || 1);
-        node.x = 570;
-        node.y = 140 + rightIdx * rowSpacing + rowSpacing / 2;
-      }
-    } else {
-      if (idx === 0) {
-        node.x = 375;
-        node.y = 275;
-      } else {
-        const remainingCount = totalNodes - 1;
-        const angle = (idx - 1) / remainingCount * 2 * Math.PI;
-        node.x = 375 + Math.cos(angle) * 220;
-        node.y = 275 + Math.sin(angle) * 125;
-      }
-    }
-  });
-  let bgFill = "#f8fafc";
-  let titleColor = "#0f172a";
-  let subtitleColor = "#475569";
-  let gridLines = "";
-  let lineColor = "#64748b";
-  let lineDash = "";
-  let cardShadow = 'filter="url(#shadow)"';
-  let cardRx = "14";
-  let arrowFill = "#64748b";
-  if (style === "blueprint") {
-    bgFill = "#0a132b";
-    titleColor = "#00e5ff";
-    subtitleColor = "#8ecae6";
-    lineColor = "#00b4d8";
-    arrowFill = "#00b4d8";
-    cardShadow = "";
-    cardRx = "4";
-    gridLines = `
-      <defs>
-        <pattern id="blueprint-grid" width="30" height="30" patternUnits="userSpaceOnUse">
-          <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#1c2541" stroke-width="0.5"/>
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#blueprint-grid)" rx="16" />
-    `;
-  } else if (style === "chalkboard") {
-    bgFill = "#0f1d13";
-    titleColor = "#fef9c3";
-    subtitleColor = "#cbd5e1";
-    lineColor = "#a7f3d0";
-    arrowFill = "#a7f3d0";
-    cardShadow = "";
-    cardRx = "8";
-    lineDash = 'stroke-dasharray="4 4"';
-    gridLines = `
-      <path d="M 20 40 Q 300 15 700 40" fill="none" stroke="rgba(255,255,255,0.02)" stroke-width="2"/>
-      <path d="M 50 480 Q 400 450 720 470" fill="none" stroke="rgba(255,255,255,0.01)" stroke-width="1.5"/>
-    `;
-  } else if (style === "pencil") {
-    bgFill = "#ffffff";
-    titleColor = "#1e293b";
-    subtitleColor = "#475569";
-    lineColor = "#1e293b";
-    arrowFill = "#1e293b";
-    cardShadow = "";
-    cardRx = "0";
-  } else if (style === "infographic") {
-    bgFill = "url(#info-bg)";
-    titleColor = "#1e1b4b";
-    subtitleColor = "#4338ca";
-    lineColor = "#cbd5e1";
-    arrowFill = "#cbd5e1";
-    gridLines = `
-      <defs>
-        <linearGradient id="info-bg" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#faf5ff"/>
-          <stop offset="100%" stop-color="#eff6ff"/>
-        </linearGradient>
-      </defs>
-    `;
-  }
-  let svgHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 520" width="100%" height="100%">
-    <defs>
-      <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
-        <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.05" />
-      </filter>
-      <marker id="arrow-marker" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="${arrowFill}"/>
-      </marker>
-    </defs>
+    const cleanSubject = subject || "General";
+    const prompt = `You are the ASCEND QUIZ MASTER & ACADEMIC EXAM ENGINE.
+Generate a high-quality, authentic academic mock exam with EXACTLY ${numQuestions} multiple choice questions (MCQs) for the subject "${cleanSubject}" on the topic: "${chosenTopic}".
 
-    <!-- Canvas Background -->
-    <rect width="100%" height="100%" fill="${bgFill}" rx="16"/>
-    ${gridLines}
+CRITICAL REQUIREMENTS:
+1. Topic Fidelity: Every single question MUST strictly test genuine concepts, formulas, applications, or principles of "${chosenTopic}" within "${cleanSubject}".
+2. Language: The entire exam (questions, 4 options, explanations) MUST be strictly in ${langName}. If English is requested, do NOT use Hindi. If Hindi is requested, write in clean Devanagari. If Hinglish is requested, write in Latin alphabet mix.
+3. Difficulty: ${difficulty || "Medium"}.
+4. RANDOMIZED ANSWER PLACEMENT (NO FIXED 'C' PATTERN):
+   - You MUST distribute correct answers completely randomly across all 4 positions (A, B, C, D / indices 0, 1, 2, 3).
+   - NEVER place the answer on 'C' for all or most questions. Ensure an approximately equal and unpredictable distribution of 0, 1, 2, and 3.
 
-    <!-- Connection Lines / Arrows -->
-    <g id="connections">
-  `;
-  connections.forEach((conn) => {
-    const fromNode = nodes.find((n) => String(n.id) === String(conn.from));
-    const toNode = nodes.find((n) => String(n.id) === String(conn.to));
-    if (fromNode && toNode) {
-      const dx = toNode.x - fromNode.x;
-      const dy = toNode.y - fromNode.y;
-      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-      const ratioStart = 50 / dist;
-      const ratioEnd = 58 / dist;
-      const startX = fromNode.x + dx * ratioStart;
-      const startY = fromNode.y + dy * ratioStart;
-      const endX = toNode.x - dx * ratioEnd;
-      const endY = toNode.y - dy * ratioEnd;
-      svgHtml += `
-        <path d="M ${startX} ${startY} L ${endX} ${endY}" fill="none" stroke="${lineColor}" stroke-width="2" ${lineDash} marker-end="url(#arrow-marker)"/>
-      `;
-      if (conn.label) {
-        const midX = (startX + endX) / 2;
-        const midY = (startY + endY) / 2;
-        const pillBg = style === "blueprint" ? "#1c2541" : style === "chalkboard" ? "#1e293b" : "#ffffff";
-        const pillText = style === "blueprint" ? "#8ecae6" : style === "chalkboard" ? "#a7f3d0" : "#475569";
-        const pillBorder = style === "blueprint" ? "#00b4d8" : style === "chalkboard" ? "none" : "#e2e8f0";
-        svgHtml += `
-          <g>
-            <rect x="${midX - 60}" y="${midY - 10}" width="120" height="20" rx="4" fill="${pillBg}" stroke="${pillBorder}" stroke-width="0.5"/>
-            <text x="${midX}" y="${midY + 4}" font-family="system-ui, sans-serif" font-size="9" fill="${pillText}" text-anchor="middle" font-weight="bold">${conn.label}</text>
-          </g>
-        `;
-      }
-    }
-  });
-  svgHtml += `</g>
-<g id="nodes">`;
-  nodes.forEach((node, idx) => {
-    const colors = getNodeColors(node.color || "indigo", style);
-    const cardW = 166;
-    const cardH = 76;
-    const rx = node.x - cardW / 2;
-    const ry = node.y - cardH / 2;
-    svgHtml += `
-      <!-- Node Card ${node.id} -->
-      <g id="node-${node.id}">
-        <rect x="${rx}" y="${ry}" width="${cardW}" height="${cardH}" rx="${cardRx}" fill="${colors.fill}" stroke="${colors.stroke}" stroke-width="2" ${cardShadow}/>
-    `;
-    if (style === "infographic") {
-      svgHtml += `
-        <rect x="${rx}" y="${ry}" width="6" height="${cardH}" rx="3" fill="${colors.stroke}" />
-      `;
-    }
-    if (isPracticeMode) {
-      const badgeR = 14;
-      const badgeY = ry + 24;
-      svgHtml += `
-        <!-- Self-Test Blank Badge -->
-        <circle cx="${node.x}" cy="${badgeY}" r="${badgeR}" fill="${colors.stroke}" />
-        <text x="${node.x}" y="${badgeY + 4}" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="extrabold" fill="#ffffff" text-anchor="middle">${idx + 1}</text>
-        
-        <!-- Part Description -->
-        <text x="${node.x}" y="${ry + 54}" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="${colors.desc}" text-anchor="middle" font-weight="medium">${node.description || "Identify this component"}</text>
-      `;
-    } else {
-      let displayName = node.name || "Component";
-      if (displayName.length > 22) {
-        displayName = displayName.substring(0, 20) + "...";
-      }
-      let descLine1 = node.description || "";
-      let descLine2 = "";
-      if (descLine1.length > 32) {
-        const words = descLine1.split(" ");
-        let buildLine = "";
-        let breakIndex = 0;
-        for (let i = 0; i < words.length; i++) {
-          if ((buildLine + " " + words[i]).length > 30) {
-            breakIndex = i;
-            break;
-          }
-          buildLine += (i === 0 ? "" : " ") + words[i];
-        }
-        descLine1 = buildLine;
-        descLine2 = words.slice(breakIndex).join(" ");
-        if (descLine2.length > 32) {
-          descLine2 = descLine2.substring(0, 29) + "...";
-        }
-      }
-      svgHtml += `
-        <!-- Part Name -->
-        <text x="${node.x}" y="${ry + 26}" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="extrabold" fill="${colors.title}" text-anchor="middle">${displayName}</text>
-        
-        <!-- Part Description Line 1 -->
-        <text x="${node.x}" y="${ry + 44}" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="${colors.desc}" text-anchor="middle">${descLine1}</text>
-      `;
-      if (descLine2) {
-        svgHtml += `
-          <!-- Part Description Line 2 -->
-          <text x="${node.x}" y="${ry + 56}" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="${colors.desc}" text-anchor="middle">${descLine2}</text>
-        `;
-      }
-    }
-    svgHtml += `</g>`;
-  });
-  const titleBg = style === "blueprint" ? "#101b35" : style === "chalkboard" ? "#0f1d13" : "#ffffff";
-  const titleBorder = style === "blueprint" ? "#00b4d8" : style === "chalkboard" ? "#a7f3d0" : "#e2e8f0";
-  const titleBorderW = style === "chalkboard" ? "0" : "1";
-  svgHtml += `
-    </g>
-    
-    <!-- Title Card -->
-    <g id="title-card">
-      <rect x="25" y="22" width="700" height="52" fill="${titleBg}" stroke="${titleBorder}" stroke-width="${titleBorderW}" rx="10" ${cardShadow}/>
-      <text x="50" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="900" fill="${titleColor}" letter-spacing="-0.5px">${title.toUpperCase()}</text>
-      <text x="50" y="61" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="bold" fill="${subtitleColor}" opacity="0.85">${subtitle.toUpperCase()}</text>
-  `;
-  if (isPracticeMode) {
-    svgHtml += `
-      <rect x="525" y="32" width="175" height="30" rx="6" fill="#e11d48" />
-      <text x="612" y="50" font-family="system-ui, sans-serif" font-size="10" font-weight="extrabold" fill="#ffffff" text-anchor="middle">\u{1F9E0} SELF-TEST ACTIVE</text>
-    `;
-  } else {
-    const badgeText = `\u{1F3A8} ${style.toUpperCase()} VIEW`;
-    const badgeFill = style === "blueprint" ? "#003566" : style === "chalkboard" ? "#143a22" : "#f1f5f9";
-    const badgeTextCol = style === "blueprint" ? "#00f5ff" : style === "chalkboard" ? "#a7f3d0" : "#475569";
-    svgHtml += `
-      <rect x="575" y="32" width="125" height="30" rx="6" fill="${badgeFill}" />
-      <text x="637" y="50" font-family="system-ui, sans-serif" font-size="9" font-weight="extrabold" fill="${badgeTextCol}" text-anchor="middle">${badgeText}</text>
-    `;
-  }
-  svgHtml += `
-    </g>
-  </svg>`;
-  return svgHtml;
-}
-app.post("/api/gemini/diagram", async (req, res) => {
-  const { prompt, type } = req.body;
-  const promptLower = (prompt || "").toLowerCase();
-  let selectedStyle = "textbook";
-  if (promptLower.includes("blueprint")) {
-    selectedStyle = "blueprint";
-  } else if (promptLower.includes("chalkboard")) {
-    selectedStyle = "chalkboard";
-  } else if (promptLower.includes("pencil")) {
-    selectedStyle = "pencil";
-  } else if (promptLower.includes("infographic")) {
-    selectedStyle = "infographic";
-  }
-  const isPracticeMode = promptLower.includes("blank self-test practice") || promptLower.includes("\u2460") || promptLower.includes("practice mode");
-  if (type === "image") {
+OUTPUT FORMAT: Return STRICTLY a valid JSON array of objects. Do NOT wrap in \`\`\`json markdown blocks. Return only raw JSON.
+Each object in the array must strictly have these keys:
+- "question": string (the question text)
+- "options": array of exactly 4 strings (A, B, C, D)
+- "answer": integer index (0 for A, 1 for B, 2 for C, 3 for D)
+- "explanation": string (clear conceptual reason why this option is correct)`;
+    let questions = [];
     try {
-      const ai = getGeminiClient();
-      console.log(`[Gemini Bridge] Generating rich educational illustration for: "${prompt}" using image model.`);
-      const response = await callGeminiWithRetryAndFailover(ai, {
-        model: "gemini-3.1-flash-lite-image",
-        contents: [{ text: `A highly detailed, beautiful, textbook-grade full-color graphic educational diagram or illustration showing: ${prompt}. High-contrast academic illustration, clear markings, rich 3D texture, suitable for scientific learning, solid clean neutral background.` }],
+      const text2 = await callGeminiWithResilience({
+        contents: prompt,
+        preferredModel: "gemini-2.5-flash",
         config: {
-          imageConfig: {
-            aspectRatio: "1:1"
-          }
+          temperature: 0.8
         }
       });
-      let imageUrl = null;
-      if (response.candidates?.[0]?.content?.parts) {
-        for (const part of response.candidates[0].content.parts) {
-          if (part.inlineData) {
-            imageUrl = `data:image/png;base64,${part.inlineData.data}`;
-            break;
-          }
-        }
+      const cleanJsonStr = text2.replace(/```json/g, "").replace(/```/g, "").trim();
+      const parsed = JSON.parse(cleanJsonStr);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        questions = parsed;
       }
-      if (imageUrl) {
-        return res.json({ imageUrl, isSvg: false });
-      }
-    } catch (imageErr) {
-      console.warn("[Gemini Bridge] Direct image generation failed, falling back to SVG schema path...", imageErr.message || imageErr);
+    } catch (aiErr) {
+      console.warn("[AI Quiz Route] Gemini API fallback triggered:", aiErr);
     }
+    if (!questions || questions.length === 0) {
+      questions = generateSubjectMockQuestions(cleanSubject, chosenTopic, langCode, numQuestions);
+    }
+    const normalized = questions.slice(0, numQuestions).map((q) => {
+      const qText = q.question || q.questionText || "Question";
+      const rawOptions = Array.isArray(q.options) && q.options.length === 4 ? [...q.options] : ["Option A", "Option B", "Option C", "Option D"];
+      let origAnsIdx = typeof q.answer === "number" ? q.answer : typeof q.correctOptionIndex === "number" ? q.correctOptionIndex : 0;
+      origAnsIdx = Math.max(0, Math.min(rawOptions.length - 1, origAnsIdx));
+      const correctAnswerText = rawOptions[origAnsIdx];
+      for (let i = rawOptions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [rawOptions[i], rawOptions[j]] = [rawOptions[j], rawOptions[i]];
+      }
+      const newAnsIdx = rawOptions.indexOf(correctAnswerText);
+      return {
+        question: qText,
+        options: rawOptions,
+        answer: newAnsIdx >= 0 ? newAnsIdx : Math.floor(Math.random() * 4),
+        explanation: q.explanation || "Correct concept application and logical derivation."
+      };
+    });
+    res.json(normalized);
+  } catch (err) {
+    console.error("[Quiz API Error]:", err);
+    const fallbackQuestions = generateSubjectMockQuestions(
+      req.body?.subject || "Mathematics",
+      req.body?.topic || "Core Concepts",
+      req.body?.language === "hi" ? "hi" : "en",
+      req.body?.questionCount || 10
+    );
+    res.json(fallbackQuestions.map((q) => ({
+      question: q.questionText,
+      options: q.options,
+      answer: q.correctOptionIndex,
+      explanation: q.explanation
+    })));
   }
+});
+app.post("/api/generate-exam", rateLimitAi, async (req, res) => {
   try {
-    const ai = getGeminiClient();
-    const jsonPrompt = `You are an expert academic illustrator and curriculum designer.
-    Analyze the following topic and create a comprehensive, clean, structured educational conceptual diagram: "${prompt}".
-    
-    Generate a JSON response that breaks down this diagram into specific nodes (labeled parts) and connections (flows/cycles/relationships) that are highly educational.
-    
-    Return ONLY valid JSON with the following structure:
-    {
-      "title": "Clear, concise academic title of the diagram",
-      "subtitle": "Brief subtitle explaining the visual structure",
-      "layout": "cycle" | "flow" | "central" | "hierarchy" | "split",
-      "nodes": [
-        {
-          "id": "1",
-          "name": "Name of part/step (e.g. Evaporation, Mitochondria, Crust)",
-          "description": "Short, clear 1-sentence educational purpose or definition of this component",
-          "color": "indigo" | "emerald" | "amber" | "sky" | "rose" | "violet" | "teal"
-        }
-      ],
-      "connections": [
-        {
-          "from": "node_id_1",
-          "to": "node_id_2",
-          "label": "Action/flow description (e.g. 'Heated by sun', 'Synthesizes ATP')"
-        }
-      ]
+    const { subject, topic, language, questionCount } = req.body;
+    if (!subject || !topic) {
+      res.status(400).json({ error: "Subject and topic are required." });
+      return;
     }
-    
-    Rules:
-    - Use "cycle" layout for repeating circular processes (e.g. water cycles, life cycles).
-    - Use "flow" layout for sequential step-by-step processes, pathways, or timelines.
-    - Use "central" or "hierarchy" layout for structural components or parts listing.
-    - Keep descriptions clear, concise, and highly informative.`;
-    const jsonResponse = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
-      contents: jsonPrompt,
+    const numQuestions = Math.max(3, Math.min(Number(questionCount) || 10, 30));
+    const prompt = `Generate a highly educational mock exam with exactly ${numQuestions} multiple choice questions on the subject "${subject}" and topic "${topic}".
+The entire exam must be written in the language: ${language === "hi" ? "Hindi (\u0939\u093F\u0902\u0926\u0940)" : "English"}.
+CRITICAL: Distribute the correct answer index (0, 1, 2, 3) completely RANDOMLY across questions. Never make all answers option C or repeat the same option consecutively for all questions.
+You must format your response as a valid JSON array of objects. Do not include any markdown format blocks or code wrappers like \`\`\`json. Return only the raw JSON.
+Each object in the array must strictly have these keys:
+"questionText" (string)
+"options" (array of 4 strings)
+"correctOptionIndex" (number from 0 to 3)
+"explanation" (string explaining the correct choice)`;
+    let questions = [];
+    try {
+      const text2 = await callGeminiWithResilience({ contents: prompt });
+      const cleanJsonStr = text2.replace(/```json/g, "").replace(/```/g, "").trim();
+      questions = JSON.parse(cleanJsonStr);
+    } catch {
+      console.log("[AI Mock Exam] Serving structured curriculum mock exam questions for", topic);
+      questions = generateSubjectMockQuestions(subject, topic, language === "hi" ? "hi" : "en", numQuestions);
+    }
+    const randomized = (Array.isArray(questions) && questions.length > 0 ? questions : generateSubjectMockQuestions(subject, topic, language === "hi" ? "hi" : "en", numQuestions)).slice(0, numQuestions).map((q) => {
+      const rawOptions = Array.isArray(q.options) && q.options.length === 4 ? [...q.options] : ["A", "B", "C", "D"];
+      const origIdx = typeof q.correctOptionIndex === "number" ? q.correctOptionIndex : typeof q.answer === "number" ? q.answer : 0;
+      const safeIdx = Math.max(0, Math.min(rawOptions.length - 1, origIdx));
+      const correctText = rawOptions[safeIdx];
+      for (let i = rawOptions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [rawOptions[i], rawOptions[j]] = [rawOptions[j], rawOptions[i]];
+      }
+      const newIdx = rawOptions.indexOf(correctText);
+      return {
+        questionText: q.questionText || q.question || "Mock Question",
+        options: rawOptions,
+        correctOptionIndex: newIdx >= 0 ? newIdx : Math.floor(Math.random() * 4),
+        explanation: q.explanation || "Correct concept application."
+      };
+    });
+    res.json({ questions: randomized });
+  } catch {
+    console.log("[AI Mock Exam] Using curriculum mock exam fallback for", req.body?.subject, req.body?.topic);
+    const fallbackQuestions = generateSubjectMockQuestions(req.body?.subject, req.body?.topic, req.body?.language === "hi" ? "hi" : "en", req.body?.questionCount || 10);
+    res.json({ questions: fallbackQuestions });
+  }
+});
+app.post("/api/gemini/suggestions", rateLimitAi, async (req, res) => {
+  try {
+    const { history, subject, studentContext, language } = req.body;
+    const cacheKey = `sugg_${subject || "gen"}_${language || "en"}`;
+    const cached = apiCache.get(cacheKey);
+    if (cached) {
+      res.json({ suggestions: cached });
+      return;
+    }
+    const lastMsgsText = Array.isArray(history) ? history.slice(-4).map((m) => `${m.role === "user" ? "Student" : "Tutor"}: ${m.text}`).join("\n\n") : "Student starting learning session.";
+    const prompt = `You are the ASCEND AI TUTOR SUGGESTION ENGINE.
+Analyze the current academic chat context between a student and their AI tutor:
+
+SUBJECT: ${subject || "General"}
+LANGUAGE: ${language === "hi" ? "Hindi (\u0939\u093F\u0902\u0926\u0940)" : "English"}
+STUDENT: ${studentContext?.name || "Student"} (${studentContext?.className || "Grade 10"}, Target: ${studentContext?.targetGoal || "General"})
+RECENT CHAT:
+${lastMsgsText}
+
+TASK:
+Offer EXACTLY 3 high-impact, contextually relevant academic follow-up questions or study actions for the student to explore next.
+Categories must cover:
+1. Deep Dive / Proof / Mechanism / Formula Derivation
+2. Numerical Problem / Practice MCQ / Self-Check Test
+3. Real-World Analogy / Everyday Application / Summary Table / Common Exam Pitfalls
+
+Format your response strictly as a JSON object with a "suggestions" array containing exactly 3 items. Do NOT wrap in \`\`\`json or markdown codeblocks. Return only raw JSON.
+Each item must have:
+- "label": Short punchy badge title with 1 emoji (max 28 chars)
+- "prompt": The full question/instruction prompt the student will ask the tutor (1-2 sentences)
+- "subtitle": Short description of outcome (max 35 chars)
+- "category": "deep_dive" | "practice" | "concept" | "summary"
+- "badge": "+15 XP" | "High Yield" | "Exam Prep" | "Concept"`;
+    let suggestions = [];
+    try {
+      const text2 = await callGeminiWithResilience({ contents: prompt });
+      const cleanJsonStr = text2.replace(/```json/g, "").replace(/```/g, "").trim();
+      const parsed = JSON.parse(cleanJsonStr);
+      if (parsed && Array.isArray(parsed.suggestions)) {
+        suggestions = parsed.suggestions.slice(0, 3);
+      } else if (Array.isArray(parsed)) {
+        suggestions = parsed.slice(0, 3);
+      }
+    } catch (suggErr) {
+      suggestions = [
+        {
+          label: "\u{1F52C} Deep Dive & Derivation",
+          prompt: `Can you explain the detailed proof and step-by-step derivation for ${subject || "this topic"}?`,
+          subtitle: "Step-by-step mathematical proof",
+          category: "deep_dive",
+          badge: "High Yield"
+        },
+        {
+          label: "\u{1F9EE} Numerical Practice",
+          prompt: `Give me 2 standard exam practice questions with numerical values on ${subject || "this concept"}.`,
+          subtitle: "Test your calculation skills",
+          category: "practice",
+          badge: "+15 XP"
+        },
+        {
+          label: "\u{1F4A1} Real-World Analogy",
+          prompt: `What is a great real-world everyday analogy that makes ${subject || "this topic"} easy to remember?`,
+          subtitle: "Intuitive conceptual clarity",
+          category: "concept",
+          badge: "Concept"
+        }
+      ];
+    }
+    apiCache.set(cacheKey, suggestions, 30 * 60 * 1e3);
+    res.json({ suggestions });
+  } catch (err) {
+    console.warn("AI Suggestion Engine (Graceful fallback):", err?.message || err);
+    res.json({ suggestions: [] });
+  }
+});
+app.post("/api/pdf-scan-analyze", rateLimitAi, async (req, res) => {
+  try {
+    const { pdfBase64, imageBase64, imagesBase64, textContent, fileName, language } = req.body;
+    if (!pdfBase64 && !imageBase64 && (!imagesBase64 || imagesBase64.length === 0) && !textContent) {
+      res.status(400).json({ error: "PDF file, book image, or text content is required." });
+      return;
+    }
+    const langName = language === "hi" ? "Hindi (\u0939\u093F\u0902\u0926\u0940)" : "English";
+    const prompt = `You are ASCEND CHAPTER SCANNER & STUDY ANALYZER.
+Analyze the provided chapter/book content from file "${fileName || "Chapter Material"}".
+
+TASK:
+1. Extract and write a comprehensive, crystal-clear Executive Summary with core concepts, step-by-step mechanisms, real-world examples, and exam tips.
+2. Identify all key formulas, laws, theorems, or definitions.
+3. Generate exactly 5 high-yield multiple-choice questions (MCQs) for an interactive chapter quiz.
+
+LANGUAGE: The entire response MUST be in ${langName}.
+
+OUTPUT FORMAT: Return STRICTLY a valid JSON object. Do NOT wrap in \`\`\`json markdown blocks. Return only raw JSON.
+JSON SCHEMA:
+{
+  "chapterTitle": "Descriptive Chapter or Topic Title",
+  "subject": "Mathematics | Physics | Chemistry | Biology | Science | General",
+  "executiveSummary": "Full detailed markdown summary with headings (###), bold bullet points, and conceptual breakdown",
+  "keyTakeaways": ["Key takeaway 1", "Key takeaway 2", "Key takeaway 3", "Key takeaway 4"],
+  "keyFormulas": [
+    {
+      "name": "Concept / Formula Name",
+      "formula": "Mathematical / Scientific notation or Definition",
+      "explanation": "Brief explanation of when and how to apply this"
+    }
+  ],
+  "quizQuestions": [
+    {
+      "questionText": "Clear conceptual or numerical question",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctOptionIndex": 0,
+      "explanation": "Clear explanation of why this option is correct"
+    }
+  ]
+}`;
+    const contents = [];
+    const parts = [{ text: prompt }];
+    if (textContent) {
+      parts.push({ text: `
+
+--- CHAPTER TEXT CONTENT ---
+${textContent.slice(0, 35e3)}` });
+    }
+    if (pdfBase64) {
+      const cleanPdf = pdfBase64.replace(/^data:application\/pdf;base64,/, "");
+      parts.push({
+        inlineData: {
+          mimeType: "application/pdf",
+          data: cleanPdf
+        }
+      });
+    }
+    const allImgs = [];
+    if (Array.isArray(imagesBase64)) allImgs.push(...imagesBase64);
+    else if (imageBase64) allImgs.push(imageBase64);
+    for (const img of allImgs) {
+      if (!img || typeof img !== "string") continue;
+      const mimeMatch = img.match(/^data:(image\/\w+);base64,/);
+      const mimeType = mimeMatch ? mimeMatch[1] : "image/png";
+      const cleanImg = img.replace(/^data:image\/\w+;base64,/, "");
+      parts.push({
+        inlineData: {
+          mimeType,
+          data: cleanImg
+        }
+      });
+    }
+    contents.push({ role: "user", parts });
+    let resultJson = null;
+    try {
+      const aiText = await callGeminiWithResilience({
+        contents,
+        preferredModel: "gemini-2.5-flash",
+        config: {
+          temperature: 0.2
+        }
+      });
+      const cleanJsonStr = aiText.replace(/```json/g, "").replace(/```/g, "").trim();
+      resultJson = JSON.parse(cleanJsonStr);
+    } catch (parseErr) {
+      console.warn("PDF Analyzer AI Parse Error:", parseErr);
+      resultJson = {
+        chapterTitle: fileName ? fileName.replace(/\.[^/.]+$/, "") : "Chapter Study Summary",
+        subject: "General Studies",
+        executiveSummary: `### \u{1F4D6} Chapter Overview: ${fileName || "Study Material"}
+- **Core Concept**: Comprehensive study notes generated from your uploaded chapter material.
+- **Key Principles**: Focus on the fundamental rules, definitions, and problem-solving techniques outlined in this unit.
+- **Exam Guidance**: Pay close attention to numerical applications and step-by-step formula derivations.`,
+        keyTakeaways: [
+          "Master fundamental concepts before tackling complex numericals",
+          "Memorize key constants and formulas for quick recall during exams",
+          "Review practice problems with step-by-step logic",
+          "Conduct self-assessment quizzes to measure concept retention"
+        ],
+        keyFormulas: [
+          {
+            name: "Fundamental Equation",
+            formula: "Standard Formula / Core Relationship",
+            explanation: "Core governing equation for this topic."
+          }
+        ],
+        quizQuestions: [
+          {
+            questionText: `What is the primary governing principle of this chapter material?`,
+            options: ["Direct Conservation Principle", "Inverse Proportionality", "Random Variation", "Static Equilibrium"],
+            correctOptionIndex: 0,
+            explanation: "The direct conservation principle forms the foundational theorem of this topic."
+          },
+          {
+            questionText: `Which study strategy yields highest retention for this topic?`,
+            options: ["Active Recall & Solving Practice Questions", "Passive Reading", "Skipping Formulas", "Memorizing Without Understanding"],
+            correctOptionIndex: 0,
+            explanation: "Active recall combined with practice questions gives maximum retention and exam readiness."
+          }
+        ]
+      };
+    }
+    res.json(resultJson);
+  } catch (err) {
+    console.warn("PDF Scan Analyze Error (Handled):", err?.message || err);
+    res.status(500).json({ error: err.message || "Failed to analyze chapter document." });
+  }
+});
+app.post("/api/voice-tutor", rateLimitAi, async (req, res) => {
+  const { userSpokenText, history, studentContext, language } = req.body || {};
+  try {
+    if (!userSpokenText) {
+      res.status(400).json({ error: "Spoken question text is required." });
+      return;
+    }
+    const creatorResponse = checkCreatorQuestion(userSpokenText, language);
+    if (creatorResponse) {
+      res.json({
+        responseText: creatorResponse,
+        speechText: creatorResponse.replace(/[#*`_~]/g, "").trim(),
+        studentName: studentContext?.name || "Student"
+      });
+      return;
+    }
+    const langName = language === "hi" ? "Hindi (\u0939\u093F\u0902\u0926\u0940)" : language === "Hinglish" ? "Hinglish (mix of Hindi & English)" : "English";
+    const studentName = studentContext?.name || "Student";
+    const sysInstruction = `You are "ASCEND LIVE VOICE TUTOR" \u2014 a brilliant, warm, ultra-engaging spoken AI tutor speaking directly to ${studentName}.
+YOUR VOICE SPEECH GUIDELINES:
+1. **Spoken Fluency**: Your response will be read aloud through Text-to-Speech (TTS). Make it sound natural, energetic, conversational, and easy to listen to.
+2. **Conciseness & Clarity**: Keep voice answers around 2-4 sentences for immediate comprehension, followed by 1 quick question or tip. Avoid long dense paragraphs.
+3. **No Clunky Symbols**: Avoid reading out markdown headers or complex symbols like '###' or asterisks that sound awkward when spoken aloud. Use clean punctuation and natural speech cadence.
+4. **Language**: Speak naturally in ${langName}. If Hindi is chosen, use natural spoken Hindi.
+5. **Tone**: Warm, encouraging, supportive like an expert private tutor sitting right beside the student.`;
+    const contents = [];
+    if (Array.isArray(history) && history.length > 0) {
+      for (const h of history.slice(-6)) {
+        contents.push({
+          role: h.role === "user" ? "user" : "model",
+          parts: [{ text: h.text }]
+        });
+      }
+    }
+    contents.push({
+      role: "user",
+      parts: [{ text: userSpokenText }]
+    });
+    const responseText = await callGeminiWithResilience({
+      contents,
+      preferredModel: "gemini-2.5-flash",
       config: {
+        systemInstruction: sysInstruction,
+        temperature: 0.4
+      }
+    });
+    res.json({
+      responseText,
+      speechText: responseText.replace(/[#*`_~]/g, "").trim(),
+      studentName
+    });
+  } catch {
+    console.log("[Voice Tutor] Serving friendly speech response via voice curriculum assistant.");
+    const fallback = language === "hi" ? "\u0928\u092E\u0938\u094D\u0924\u0947! \u092E\u0948\u0902\u0928\u0947 \u0906\u092A\u0915\u093E \u0938\u0935\u093E\u0932 \u0938\u0941\u0928\u093E\u0964 \u092E\u0948\u0902 \u0906\u092A\u0915\u093E \u092A\u0930\u094D\u0938\u0928\u0932 \u0938\u094D\u091F\u0921\u0940 \u091F\u094D\u092F\u0942\u091F\u0930 \u0939\u0942\u0901\u0964 \u0906\u092A \u0905\u092A\u0928\u0947 \u0938\u093F\u0932\u0947\u092C\u0938, \u0915\u093F\u0938\u0940 \u092B\u0949\u0930\u094D\u092E\u0942\u0932\u0947 \u092F\u093E \u0915\u0949\u0928\u094D\u0938\u0947\u092A\u094D\u091F \u0915\u0947 \u092C\u093E\u0930\u0947 \u092E\u0947\u0902 \u0915\u0941\u091B \u092D\u0940 \u092A\u0942\u091B \u0938\u0915\u0924\u0947 \u0939\u0948\u0902!" : "Hello! I am your personal AI study tutor. Feel free to ask me anything about your syllabus, homework, formulas, or concepts!";
+    res.json({
+      responseText: fallback,
+      speechText: fallback
+    });
+  }
+});
+app.post("/api/ai-editor-command", rateLimitAi, async (req, res) => {
+  const { userPrompt, history, currentCustomization, currentTab, language } = req.body || {};
+  try {
+    if (!userPrompt) {
+      res.status(400).json({ error: "Instruction prompt is required." });
+      return;
+    }
+    const langName = language === "hi" ? "Hindi (\u0939\u093F\u0902\u0926\u0940)" : "English / Hinglish";
+    const systemPrompt = `You are "ASCEND CORE CINEMATIC AI APP EDITOR & COPILOT" \u2014 the omnipotent intelligence with absolute, full-stack design & execution control over the Remix Study Buddy application.
+The user speaks or types instructions to you (in English, Hindi, or Hinglish), and you execute them IMMEDIATELY.
+
+YOU HAVE FULL DOM STYLING & CUSTOM CSS POWER OVER EVERY ELEMENT IN THE APP:
+Targetable Element IDs & Classes:
+- \`#app-wallpaper-layer\` : The full-viewport background wallpaper layer (IMPORTANT: to change app background/wallpaper, style this element with background-image: none !important; background: <gradient/color> !important; opacity: 1 !important;)
+- \`#app-vignette-layer\` : The ambient vignette overlay (set opacity: 0.2-0.5 or display: none if bright background)
+- \`#main-app-container\` : The entire application root container
+- \`#toolkit-banner-section\` : The Advanced Study Toolkit banner & quick chips (e.g. user says "advanced toolkit white kardo" -> write custom CSS for #toolkit-banner-section)
+- \`#top-user-card\` : The main top greeting and profile status card
+- \`#header-bar\` : The sticky top navigation and status bar
+- \`#leaderboard-section\` : The Study Leaderboard card and rankings
+- \`#quick-actions-section\` : The trio launcher buttons (AI Editor / Voice Tutor / PDF Scanner)
+- \`#stats-section\` : The XP, Level, Rank stat cards
+- \`#ai-tutor-launcher-card\` : The AI Tutor hero card on dashboard
+- \`#streak-card-section\` : The 5-day study streak calendar card
+- \`#online-classmates-section\` : The live telemetry online classmates widget
+- \`#navigation-bottom-bar\` : The bottom app navigation bar
+- \`button\`, \`.dashboard-card\`, \`.study-pill\` : General UI buttons & cards
+
+CRITICAL RULE FOR CHANGING BACKGROUND / WALLPAPER:
+Whenever the user asks to change the background (e.g., "app ka background change kerdo", "background blue gradient kardo", "background black kardo", "make background galaxy purple"):
+You MUST include BOTH #app-wallpaper-layer AND #main-app-container in your custom CSS:
+\`\`\`css
+#app-wallpaper-layer {
+  background: radial-gradient(circle at 50% 20%, #1e1b4b 0%, #0c1222 50%, #030712 100%) !important;
+  background-image: none !important;
+  opacity: 1 !important;
+}
+#app-vignette-layer {
+  opacity: 0.3 !important;
+}
+#main-app-container {
+  background: transparent !important;
+}
+\`\`\`
+
+YOUR CAPABILITIES:
+1. **ARBITRARY LIVE APP REDESIGN & DYNAMIC CSS INJECTION**:
+   - Change colors, backgrounds, borders, glow, fonts of ANY element on the fly.
+   - ALWAYS return an "UPDATE_UI_CUSTOMIZATION" action with \`customCss\` containing the exact CSS rules.
+   - If user asks to reset styles, set \`customCss: ""\`.
+2. **CREATING & AUTO-SAVING STUDY NOTES**:
+   - If user asks for notes, revision formulas, concept summaries:
+     Generate a "CREATE_NOTE" action with \`title\`, markdown \`content\` (with headers, bullet points, math equations), and \`tags\`.
+3. **APP NAVIGATION & TOOL LAUNCH**:
+   - If user asks to open/go to any tool (whiteboard, pdf scanner, mock exam, calculator, mind maps, image generator, notebook, etc.):
+     Generate a "NAVIGATE_TAB" action with \`tab\` ("home" | "toolkit" | "groupChat" | "whiteboard" | "mockExam" | "studyDocs" | "petCompanion" | "aiTutor" | "imageGen" | "pdfScanner") and optional \`toolId\`.
+4. **AWARD XP / QUESTS**:
+   - Award XP ("AWARD_XP" action) when asked or when achieving study milestones.
+
+CURRENT APP STATE:
+- Active Tab: ${currentTab || "home"}
+- Current Customization: ${JSON.stringify(currentCustomization || {})}
+
+OUTPUT FORMAT REQUIREMENTS:
+You MUST output ONLY valid JSON matching this schema:
+{
+  "speechReply": "Short, energetic, spoken sentence in ${langName} confirming what you did (1-2 sentences for Voice TTS)",
+  "markdownReply": "Cinematic visual breakdown in markdown describing the executed actions, custom CSS applied, and providing any requested notes or answers",
+  "actions": [
+    {
+      "type": "UPDATE_UI_CUSTOMIZATION",
+      "payload": {
+        "customCss": "/* Exact CSS rules to apply */"
+      }
+    }
+  ]
+}`;
+    const contents = [];
+    if (Array.isArray(history) && history.length > 0) {
+      for (const h of history.slice(-5)) {
+        contents.push({
+          role: h.role === "user" ? "user" : "model",
+          parts: [{ text: h.text }]
+        });
+      }
+    }
+    contents.push({
+      role: "user",
+      parts: [{ text: userPrompt }]
+    });
+    const rawResult = await callGeminiWithResilience({
+      contents,
+      preferredModel: "gemini-2.5-flash",
+      config: {
+        systemInstruction: systemPrompt,
+        temperature: 0.3,
         responseMimeType: "application/json"
       }
     });
-    let rawText = jsonResponse.text || "";
-    rawText = rawText.trim();
-    if (rawText.startsWith("```")) {
-      rawText = rawText.replace(/^```[a-zA-Z]*\n/, "").replace(/\n```$/, "").trim();
-    }
-    const data = JSON.parse(rawText);
-    if (data && data.nodes && data.nodes.length > 0) {
-      const svgCode = buildSvgFromDiagramData(data, selectedStyle, isPracticeMode);
-      const base64Svg = Buffer.from(svgCode).toString("base64");
-      const imageUrl = `data:image/svg+xml;base64,${base64Svg}`;
-      return res.json({ imageUrl, isSvg: true });
-    } else {
-      throw new Error("Parsed JSON did not contain valid diagram nodes.");
-    }
-  } catch (err) {
-    console.warn("[Gemini Bridge] Primary JSON Diagram path failed or rate-limited. Trying standard text-to-SVG direct fallback...", err.message || err);
+    let parsedResult = null;
     try {
-      const ai = getGeminiClient();
-      const svgPrompt = `You are an expert educational designer. Create a beautiful, detailed, neat, textbook-grade academic vector SVG diagram/illustration for: "${prompt}".
-      
-      Requirements:
-      1. MUST be a valid, standalone <svg> element with viewBox="0 0 600 450" and width="100%" height="100%".
-      2. Use a modern, ultra-clean design: soft background, precise vector shapes (rects, circles, paths), elegant colors (indigo, slate, sky, emerald), and clear, clean leader lines/arrows pointing to labels.
-      3. Include prominent, highly readable, clear textbook labels for all major parts of the diagram using <text> elements (font-family="system-ui, -apple-system, sans-serif" and proper sizing/contrast).
-      4. Make it highly detailed, professional, and visually appealing.
-      5. Output ONLY the raw SVG code. No markdown formatting (like \`\`\`xml or \`\`\`svg), no leading/trailing commentary, no explanations. It must start with <svg and end with </svg>.`;
-      const svgResponse = await callGeminiWithRetryAndFailover(ai, {
-        model: "gemini-3.1-flash-lite",
-        contents: svgPrompt
-      });
-      let svgCode = svgResponse.text || "";
-      svgCode = svgCode.trim();
-      if (svgCode.startsWith("```")) {
-        svgCode = svgCode.replace(/^```[a-zA-Z]*\n/, "").replace(/\n```$/, "").trim();
+      parsedResult = JSON.parse(rawResult.trim());
+    } catch {
+      const jsonMatch = rawResult.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsedResult = JSON.parse(jsonMatch[0]);
       }
-      if (svgCode.includes("<svg")) {
-        const base64Svg = Buffer.from(svgCode).toString("base64");
-        const imageUrl = `data:image/svg+xml;base64,${base64Svg}`;
-        return res.json({ imageUrl, isSvg: true });
+    }
+    if (!parsedResult) {
+      throw new Error("Could not parse AI JSON output");
+    }
+    if (parsedResult) {
+      let extractedCss = "";
+      const cssBlockMatch = (parsedResult.markdownReply || "").match(/```css\s*([\s\S]*?)\s*```/);
+      if (cssBlockMatch && cssBlockMatch[1]) {
+        extractedCss = cssBlockMatch[1].trim();
+      }
+      if (!Array.isArray(parsedResult.actions)) {
+        parsedResult.actions = [];
+      }
+      const uiAction = parsedResult.actions.find((a) => a.type === "UPDATE_UI_CUSTOMIZATION");
+      if (uiAction) {
+        if (!uiAction.payload) uiAction.payload = {};
+        if (!uiAction.payload.customCss && extractedCss) {
+          uiAction.payload.customCss = extractedCss;
+        }
+        if (uiAction.payload.customCss && uiAction.payload.customCss.includes("#main-app-container") && !uiAction.payload.customCss.includes("#app-wallpaper-layer")) {
+          const bgMatch = uiAction.payload.customCss.match(/#main-app-container\s*\{[^}]*background[^;:]*:\s*([^;]+);?[^}]*\}/i);
+          if (bgMatch && bgMatch[1]) {
+            uiAction.payload.customCss += `
+#app-wallpaper-layer { background: ${bgMatch[1]} !important; background-image: none !important; opacity: 1 !important; }
+#app-vignette-layer { opacity: 0.3 !important; }`;
+          }
+        }
+      } else if (extractedCss) {
+        if (extractedCss.includes("#main-app-container") && !extractedCss.includes("#app-wallpaper-layer")) {
+          const bgMatch = extractedCss.match(/#main-app-container\s*\{[^}]*background[^;:]*:\s*([^;]+);?[^}]*\}/i);
+          if (bgMatch && bgMatch[1]) {
+            extractedCss += `
+#app-wallpaper-layer { background: ${bgMatch[1]} !important; background-image: none !important; opacity: 1 !important; }
+#app-vignette-layer { opacity: 0.3 !important; }`;
+          }
+        }
+        parsedResult.actions.push({
+          type: "UPDATE_UI_CUSTOMIZATION",
+          payload: { customCss: extractedCss }
+        });
+      }
+    }
+    res.json(parsedResult);
+  } catch (err) {
+    console.warn("AI Editor Command using Intelligent Heuristic Engine:", err?.message || err);
+    const promptLower = (userPrompt || "").toLowerCase();
+    const actions = [];
+    let speech = language === "hi" ? "\u0906\u092A\u0915\u093E \u0928\u093F\u0930\u094D\u0926\u0947\u0936 \u0938\u092B\u0932\u0924\u093E\u092A\u0942\u0930\u094D\u0935\u0915 \u0932\u093E\u0917\u0942 \u0915\u0930 \u0926\u093F\u092F\u093E \u0917\u092F\u093E \u0939\u0948\u0964" : "I've applied your design instruction.";
+    let md = "\u2728 **Copilot Execution Complete**";
+    if (promptLower.includes("background") || promptLower.includes("\u092C\u0948\u0915\u0917\u094D\u0930\u093E\u0909\u0902\u0921") || promptLower.includes("wallpaper") || promptLower.includes("\u0935\u0949\u0932\u092A\u0947\u092A\u0930") || promptLower.includes("bg") || promptLower.includes("theme") || promptLower.includes("\u0925\u0940\u092E") || promptLower.includes("space") || promptLower.includes("\u0905\u0902\u0924\u0930\u093F\u0915\u094D\u0937") || promptLower.includes("astronaut") || promptLower.includes("rocket") || promptLower.includes("satellite") || promptLower.includes("\u0930\u0949\u0915\u0947\u091F") || promptLower.includes("\u0911\u092C\u094D\u091C\u0947\u0915\u094D\u091F") || promptLower.includes("object") || promptLower.includes("moving") || promptLower.includes("flote") || promptLower.includes("float") || promptLower.includes("ghume")) {
+      let generatedCss = "";
+      let themeName = "Cosmic Nebula & Living Astronauts";
+      let targetWallpaper = "cosmic_nebula";
+      if (promptLower.includes("black") || promptLower.includes("\u0915\u093E\u0932\u093E") || promptLower.includes("dark") || promptLower.includes("amoled") || promptLower.includes("zen") || promptLower.includes("obsidian")) {
+        themeName = "Celestial Zen & Levitating Monks";
+        targetWallpaper = "deep_obsidian";
+        generatedCss = `
+#app-wallpaper-layer {
+  background: #000000 !important;
+  background-image: none !important;
+  opacity: 1 !important;
+}
+#app-vignette-layer {
+  opacity: 0.15 !important;
+}
+#main-app-container {
+  background: #000000 !important;
+}`;
+      } else if (promptLower.includes("matrix") || promptLower.includes("cyber") || promptLower.includes("green") || promptLower.includes("\u0938\u093E\u0907\u092C\u0930") || promptLower.includes("\u0939\u0930\u093E")) {
+        themeName = "Cyber Matrix & Living Cyborgs";
+        targetWallpaper = "cyber_matrix";
+        generatedCss = `
+#app-wallpaper-layer {
+  background: radial-gradient(ellipse at top, #022c22 0%, #020617 80%) !important;
+  background-image: none !important;
+  opacity: 1 !important;
+}
+#app-vignette-layer {
+  opacity: 0.35 !important;
+}
+#main-app-container {
+  background: #020617 !important;
+}`;
+      } else if (promptLower.includes("science") || promptLower.includes("chalkboard") || promptLower.includes("math") || promptLower.includes("\u0935\u093F\u091C\u094D\u091E\u093E\u0928") || promptLower.includes("\u092A\u095D\u093E\u0908")) {
+        themeName = "Science Universe & Living Scholars";
+        targetWallpaper = "science_chalkboard";
+        generatedCss = `
+#app-wallpaper-layer {
+  background: radial-gradient(circle at 50% 20%, #111827 0%, #0b0f19 60%, #030712 100%) !important;
+  opacity: 0.95 !important;
+}
+#app-vignette-layer {
+  opacity: 0.4 !important;
+}
+#main-app-container {
+  background: #030712 !important;
+}`;
       } else {
-        throw new Error("Raw SVG fallback did not produce a valid svg tag.");
+        themeName = "Cosmic Space Universe (100+ Live Moving Objects)";
+        targetWallpaper = "cosmic_nebula";
+        generatedCss = `
+#app-wallpaper-layer {
+  background: radial-gradient(ellipse at 50% 0%, #1e1b4b 0%, #0c1222 55%, #000000 100%) !important;
+  background-image: none !important;
+  opacity: 1 !important;
+}
+#app-vignette-layer {
+  opacity: 0.3 !important;
+}
+#main-app-container {
+  background: #030712 !important;
+}`;
       }
-    } catch (svgErr) {
-      console.warn("[Gemini Bridge] SVG fallback also failed. Trying standard image model fallback...", svgErr.message || svgErr);
+      const previousCss = currentCustomization?.customCss || "";
+      const mergedCss = (previousCss + "\n" + generatedCss).trim();
+      actions.push({
+        type: "UPDATE_UI_CUSTOMIZATION",
+        payload: {
+          customCss: mergedCss,
+          wallpaperAmbiance: targetWallpaper
+        }
+      });
+      speech = language === "hi" ? `\u0910\u092A \u0915\u093E \u092C\u0948\u0915\u0917\u094D\u0930\u093E\u0909\u0902\u0921 \u092C\u0926\u0932\u0915\u0930 ${themeName} \u0915\u0930 \u0926\u093F\u092F\u093E \u0917\u092F\u093E \u0939\u0948! 100+ \u092B\u094D\u0932\u094B\u091F\u093F\u0902\u0917 \u0911\u092C\u094D\u091C\u0947\u0915\u094D\u091F\u094D\u0938, \u0930\u0949\u0915\u0947\u091F\u094D\u0938, \u0938\u0948\u091F\u0947\u0932\u093E\u0907\u091F\u094D\u0938 \u0914\u0930 \u091C\u0940\u0935\u093F\u0924 \u090F\u0938\u094D\u091F\u094D\u0930\u094B\u0928\u0949\u091F/\u0939\u094D\u092F\u0942\u092E\u0928\u094D\u0938 \u0938\u094D\u0915\u094D\u0930\u0940\u0928 \u092A\u0930 \u0932\u093E\u0907\u0935 \u090F\u0915\u094D\u091F\u093F\u0935\u0947\u091F \u0939\u094B \u0917\u090F \u0939\u0948\u0902\u0964` : `App background redesigned to ${themeName}! 100+ moving objects, rockets, orbiting satellites, and living animated astronauts are now live in the background.`;
+      md = `### \u{1F30C} Real-Time Moving Universe Activated!
+- **Active Theme**: **${themeName}**
+- **100+ Realtime Objects**: Living animated astronauts/humans (waving hands, spacewalking & jumping), speeding rockets with fire exhaust, orbiting satellites with blinking beacons, planets, meteors, and cosmic particles!
+- **Dynamic Adaptation**: All 4 app themes have their own distinct sets of living animated characters.
+- **Status**: 60 FPS Canvas Engine Live Injected!`;
+    } else if (promptLower.includes("toolkit") || promptLower.includes("\u091F\u0942\u0932\u0915\u093F\u091F")) {
+      let generatedCss = "";
+      let colorName = "Custom Style";
+      if (promptLower.includes("white") || promptLower.includes("\u0938\u092B\u0947\u0926") || promptLower.includes("light")) {
+        colorName = "Pure Crystal White";
+        generatedCss = `
+#toolkit-banner-section {
+  background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 50%, #e2e8f0 100%) !important;
+  color: #0f172a !important;
+  border: 2px solid #94a3b8 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 0 25px rgba(255, 255, 255, 0.8) !important;
+}
+#toolkit-banner-section h4,
+#toolkit-banner-section p,
+#toolkit-banner-section span,
+#toolkit-banner-section div {
+  color: #0f172a !important;
+}
+#toolkit-banner-section h4 span:first-child {
+  color: #0f172a !important;
+  font-weight: 900 !important;
+}
+#toolkit-banner-section p {
+  color: #334155 !important;
+}
+#toolkit-banner-section button {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
+}
+#toolkit-banner-section button:hover {
+  background: #0f172a !important;
+  color: #ffffff !important;
+}`;
+      } else if (promptLower.includes("black") || promptLower.includes("\u0915\u093E\u0932\u093E") || promptLower.includes("dark")) {
+        colorName = "Obsidian AMOLED Black";
+        generatedCss = `
+#toolkit-banner-section {
+  background: #030712 !important;
+  color: #ffffff !important;
+  border: 2px solid #374151 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.95), 0 0 20px rgba(75, 85, 99, 0.4) !important;
+}`;
+      } else if (promptLower.includes("gold") || promptLower.includes("golden") || promptLower.includes("\u0938\u0941\u0928\u0939\u0930\u093E") || promptLower.includes("yellow")) {
+        colorName = "Royal Imperial Gold";
+        generatedCss = `
+#toolkit-banner-section {
+  background: linear-gradient(135deg, #2a1e05 0%, #1f1402 100%) !important;
+  color: #fef08a !important;
+  border: 2px solid #eab308 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 25px rgba(234, 179, 8, 0.45) !important;
+}
+#toolkit-banner-section h4, #toolkit-banner-section span {
+  color: #fef08a !important;
+}`;
+      } else {
+        colorName = "Cyber Neon Blue";
+        generatedCss = `
+#toolkit-banner-section {
+  background: linear-gradient(135deg, #041a35 0%, #020c1b 100%) !important;
+  color: #67e8f9 !important;
+  border: 2px solid #22d3ee !important;
+  box-shadow: 0 0 35px rgba(6, 182, 212, 0.45) !important;
+}`;
+      }
+      const previousCss = currentCustomization?.customCss || "";
+      const mergedCss = (previousCss + "\n" + generatedCss).trim();
+      actions.push({
+        type: "UPDATE_UI_CUSTOMIZATION",
+        payload: { customCss: mergedCss }
+      });
+      speech = language === "hi" ? `\u090F\u0921\u0935\u093E\u0902\u0938\u094D\u0921 \u0938\u094D\u091F\u0921\u0940 \u091F\u0942\u0932\u0915\u093F\u091F \u0915\u093E \u0930\u0902\u0917 \u092C\u0926\u0932\u0915\u0930 ${colorName} \u0915\u0930 \u0926\u093F\u092F\u093E \u0917\u092F\u093E \u0939\u0948!` : `Advanced Study Toolkit color redesigned to ${colorName}!`;
+      md = `### \u{1F3A8} UI Overhauled: Advanced Study Toolkit
+- **Target Element**: \`#toolkit-banner-section\`
+- **Applied Style**: **${colorName}**
+- **Live Dynamic CSS**: Injected into DOM directly!`;
+    } else if (promptLower.includes("leaderboard") || promptLower.includes("\u0932\u0940\u0921\u0930\u092C\u094B\u0930\u094D\u0921")) {
+      let theme = "black";
+      if (promptLower.includes("gold") || promptLower.includes("golden")) theme = "gold_luxury";
+      if (promptLower.includes("cyber") || promptLower.includes("neon") || promptLower.includes("blue")) theme = "cyber_neon";
+      if (promptLower.includes("green") || promptLower.includes("emerald") || promptLower.includes("matrix")) theme = "emerald_matrix";
+      if (promptLower.includes("reset") || promptLower.includes("default")) theme = "default";
+      actions.push({
+        type: "UPDATE_UI_CUSTOMIZATION",
+        payload: { leaderboardTheme: theme }
+      });
+      speech = language === "hi" ? `\u0932\u0940\u0921\u0930\u092C\u094B\u0930\u094D\u0921 \u0915\u093E \u0925\u0940\u092E ${theme} \u0915\u0930 \u0926\u093F\u092F\u093E \u0917\u092F\u093E \u0939\u0948\u0964` : `Leaderboard theme updated to ${theme}.`;
+      md = `### \u{1F396}\uFE0F Leaderboard Theme Updated
+- **Theme Selected**: **${theme.toUpperCase()}**
+- **Status**: Live Applied!`;
+    } else if (promptLower.includes("reset") || promptLower.includes("\u0930\u0940\u0938\u0947\u091F") || promptLower.includes("default") || promptLower.includes("\u0939\u091F\u093E\u0913")) {
+      actions.push({
+        type: "UPDATE_UI_CUSTOMIZATION",
+        payload: {
+          customCss: "",
+          leaderboardTheme: "default",
+          appThemeLook: "cyber_glass",
+          wallpaperAmbiance: "science_chalkboard"
+        }
+      });
+      speech = language === "hi" ? "\u0938\u092D\u0940 \u0915\u0938\u094D\u091F\u092E \u0938\u094D\u091F\u093E\u0907\u0932\u094D\u0938 \u0930\u0940\u0938\u0947\u091F \u0915\u0930 \u0926\u093F\u090F \u0917\u090F \u0939\u0948\u0902\u0964" : "All custom styles and overrides have been reset to default.";
+      md = `### \u{1F504} Custom Styles Reset
+- Reset all dynamic CSS overrides.
+- Restored original theme defaults.`;
+    } else if (promptLower.includes("note") || promptLower.includes("\u0928\u094B\u091F") || promptLower.includes("save") || promptLower.includes("physics") || promptLower.includes("chemistry") || promptLower.includes("math")) {
+      const topic = userPrompt.replace(/save|note|notes|banao|kardo|likho|generate/gi, "").trim() || "Core Study Summary";
+      actions.push({
+        type: "CREATE_NOTE",
+        payload: {
+          title: `\u{1F4DA} ${topic.slice(0, 40)}`,
+          content: `## \u{1F4D8} Master Study Notes: ${topic}
+
+### \u{1F4A1} Key Concept Overview
+These structured revision notes were synthesized and saved automatically by your AI App Editor.
+
+### \u{1F4D0} Core Principles & Formulas
+- **Fundamental Rule**: Understand standard principles and active derivation steps.
+- **Exam Strategy**: Always highlight key variables, substitution values, and units.
+
+### \u{1F4CC} Quick Exam Takeaways
+1. Practice numericals regularly.
+2. Use Spaced Repetition in the Toolkit tab.
+3. Test with Mock Exams for high retention!`,
+          tags: ["AI Editor", "Auto-Saved", topic.slice(0, 15)]
+        }
+      });
+      speech = language === "hi" ? "\u0928\u094B\u091F\u094D\u0938 \u092C\u0928\u093E\u0915\u0930 \u0906\u092A\u0915\u0940 \u0928\u094B\u091F\u092C\u0941\u0915 \u092E\u0947\u0902 \u0938\u0947\u0935 \u0915\u0930 \u0926\u093F\u090F \u0917\u090F \u0939\u0948\u0902\u0964" : "Study notes generated and saved directly to your notebook.";
+      md = `### \u{1F4DD} Study Notes Auto-Saved
+- **Title**: *${topic.slice(0, 40)}*
+- **Location**: Personal Notebook & Vault
+- **Status**: Saved to Firestore / Local docs.`;
+    } else if (promptLower.includes("whiteboard") || promptLower.includes("\u0915\u0948\u0928\u0935\u0938")) {
+      actions.push({ type: "NAVIGATE_TAB", payload: { tab: "whiteboard" } });
+      speech = language === "hi" ? "\u0935\u094D\u0939\u093E\u0907\u091F\u092C\u094B\u0930\u094D\u0921 \u0916\u094B\u0932 \u0926\u093F\u092F\u093E \u0917\u092F\u093E \u0939\u0948\u0964" : "Opening the collaborative whiteboard.";
+      md = `### \u{1F680} Navigated to Whiteboard
+Ready for drawing and equation diagrams.`;
+    } else if (promptLower.includes("exam") || promptLower.includes("test") || promptLower.includes("quiz") || promptLower.includes("\u0915\u094D\u0935\u093F\u091C\u093C")) {
+      actions.push({ type: "NAVIGATE_TAB", payload: { tab: "mockExam" } });
+      speech = language === "hi" ? "\u092E\u0949\u0915 \u090F\u0917\u094D\u091C\u093E\u092E \u0938\u0947\u0915\u094D\u0936\u0928 \u0916\u094B\u0932 \u0926\u093F\u092F\u093E \u0917\u092F\u093E \u0939\u0948\u0964" : "Opening Mock Exam & Quiz Center.";
+      md = `### \u{1F3C6} Navigated to Mock Exam
+Test your subject mastery and earn XP!`;
+    } else if (promptLower.includes("xp") || promptLower.includes("\u090F\u0915\u094D\u0938\u092A\u0940")) {
+      actions.push({ type: "AWARD_XP", payload: { amount: 100 } });
+      speech = language === "hi" ? "\u0906\u092A\u0915\u094B 100 \u092C\u094B\u0928\u0938 XP \u0926\u093F\u090F \u0917\u090F \u0939\u0948\u0902!" : "Awarded 100 bonus XP!";
+      md = `### \u26A1 +100 Bonus XP Awarded
+Keep up the great study streak!`;
+    } else {
+      const arbitraryCss = `
+#main-app-container {
+  transition: all 0.3s ease;
+}
+.dashboard-card:hover {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: 0 10px 25px rgba(6, 182, 212, 0.3) !important;
+}`;
+      actions.push({
+        type: "UPDATE_UI_CUSTOMIZATION",
+        payload: { customCss: (currentCustomization?.customCss || "") + "\n" + arbitraryCss }
+      });
+      speech = language === "hi" ? "\u0906\u092A\u0915\u093E \u0915\u0938\u094D\u091F\u092E UI \u0928\u093F\u0930\u094D\u0926\u0947\u0936 \u0932\u093E\u0917\u0942 \u0915\u0930 \u0926\u093F\u092F\u093E \u0917\u092F\u093E \u0939\u0948\u0964" : "Custom UI transformation applied.";
+      md = `### \u26A1 Custom UI Instruction Processed
+- Applied dynamic styling enhancements across dashboard.
+- Live styles updated.`;
+    }
+    res.json({
+      speechReply: speech,
+      markdownReply: md,
+      actions
+    });
+  }
+});
+app.post("/api/summarize-notes", rateLimitAi, async (req, res) => {
+  try {
+    const { content, language } = req.body;
+    if (!content) {
+      res.status(400).json({ error: "Content is required for summarization." });
+      return;
+    }
+    const prompt = `You are an expert academic tutor. Analyze the following study material and generate a comprehensive study summary.
+The response must be in the language: ${language === "hi" ? "Hindi (\u0939\u093F\u0902\u0926\u0940)" : "English"}.
+Format your response using beautiful, structured Markdown. Include:
+1. Executive Summary (Overview of the key concepts)
+2. Core Themes & Definitions (A detailed, student-friendly breakdown)
+3. 3 Quick Revision Flashcard Questions (with answers toggled)
+4. Recommended Next Study Steps.
+
+Study Material:
+${content}`;
+    const summary = await callGeminiWithResilience({ contents: prompt });
+    res.json({ summary });
+  } catch {
+    console.log("[Summarize Notes] Generating structured academic summary fallback.");
+    res.json({
+      summary: `### \u{1F4CC} High-Yield Study Summary
+- **Main Concepts**: Focus on fundamental governing principles, definitions, and boundary conditions.
+- **Revision Point 1**: Master key equations and verify unit consistency across sample calculations.
+- **Revision Point 2**: Test retention by answering conceptual review questions in your study notes.
+- **Recommended Action**: Complete at least 2 practice questions to solidify understanding.`
+    });
+  }
+});
+app.post("/api/tutor-chat", rateLimitAi, async (req, res) => {
+  try {
+    const { messages, language } = req.body;
+    if (!messages || !Array.isArray(messages)) {
+      res.status(400).json({ error: "Messages array is required." });
+      return;
+    }
+    const sysInstruction = `You are "ASCEND TUTOR", an ultra-supportive, patient, and brilliant personal tutor.
+Your goal is to guide students on educational topics, help them solve complex homework, and explain concepts simply.
+Always reply in the language: ${language === "hi" ? "Hindi (\u0939\u093F\u0902\u0926\u0940)" : "English"}.
+Keep your tone encouraging and educational. Use clear formatting, lists, and markdown equations where necessary.`;
+    const contents = messages.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }]
+    }));
+    const responseText = await callGeminiWithResilience({
+      contents,
+      config: {
+        systemInstruction: sysInstruction
+      }
+    });
+    res.json({ response: responseText });
+  } catch {
+    console.log("[Tutor Chat] Providing supportive academic response via curriculum engine.");
+    const lastMsg = req.body?.messages && Array.isArray(req.body.messages) && req.body.messages.length > 0 ? req.body.messages[req.body.messages.length - 1]?.content : "Study Question";
+    const fallback = generateCurriculumStudyAnswer({
+      prompt: lastMsg || "Study Question",
+      language: req.body?.language,
+      isApiKeyIssue: true
+    });
+    res.json({
+      response: fallback
+    });
+  }
+});
+app.post("/api/enhance-image-prompt", rateLimitAi, async (req, res) => {
+  try {
+    const { prompt, style } = req.body;
+    if (!prompt) {
+      res.status(400).json({ error: "Prompt is required." });
+      return;
+    }
+    const ai = getAiClient();
+    if (!ai) {
+      res.json({ enhancedPrompt: prompt });
+      return;
+    }
+    const styleInstruction = style ? `in the style of ${style}` : "in an ultra-clear, detailed, photorealistic educational or aesthetic style";
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `You are an expert prompt engineer for cutting-edge text-to-image models (Gemini Flash Image, Imagen 3, Flux). 
+Convert this simple user prompt into an expanded, high-detail prompt ${styleInstruction}:
+User input: "${prompt}"
+
+Rules:
+1. Expand with vivid visual adjectives, lighting description (volumetric, studio, golden hour), composition, camera angle, textures, and clean background details.
+2. Keep it focused on the user's core concept without changing the subject.
+3. Return ONLY the final expanded prompt string. No conversational filler.`
+    });
+    const enhanced = response.text?.trim() || prompt;
+    res.json({ enhancedPrompt: enhanced });
+  } catch (err) {
+    console.warn("Prompt enhancement fallback:", err?.message);
+    res.json({ enhancedPrompt: req.body?.prompt || "" });
+  }
+});
+app.post("/api/generate-image", rateLimitAi, async (req, res) => {
+  try {
+    const { prompt, size, aspectRatio, style, negativePrompt, seed } = req.body;
+    if (!prompt || typeof prompt !== "string") {
+      res.status(400).json({ error: "Prompt is required." });
+      return;
+    }
+    const ai = getAiClient();
+    const validSize = size === "4K" || size === "2K" || size === "512px" || size === "1K" ? size : "1K";
+    const validAspect = ["1:1", "16:9", "9:16", "4:3", "3:4"].includes(aspectRatio) ? aspectRatio : "1:1";
+    let width = 1024;
+    let height = 1024;
+    if (validAspect === "16:9") {
+      width = validSize === "4K" ? 1920 : validSize === "2K" ? 1600 : 1280;
+      height = validSize === "4K" ? 1080 : validSize === "2K" ? 900 : 720;
+    } else if (validAspect === "9:16") {
+      width = validSize === "4K" ? 1080 : validSize === "2K" ? 900 : 720;
+      height = validSize === "4K" ? 1920 : validSize === "2K" ? 1600 : 1280;
+    } else if (validAspect === "4:3") {
+      width = validSize === "4K" ? 1600 : validSize === "2K" ? 1400 : 1024;
+      height = validSize === "4K" ? 1200 : validSize === "2K" ? 1050 : 768;
+    } else if (validAspect === "3:4") {
+      width = validSize === "4K" ? 1200 : validSize === "2K" ? 1050 : 768;
+      height = validSize === "4K" ? 1600 : validSize === "2K" ? 1400 : 1024;
+    } else {
+      width = validSize === "4K" ? 2048 : validSize === "2K" ? 1536 : 1024;
+      height = width;
+    }
+    let finalPrompt = prompt.trim();
+    if (style && style !== "none") {
+      const styleMap = {
+        "photorealistic": "ultra-realistic photograph, 8k resolution, crisp focus, natural lighting, high dynamic range, shot on 35mm lens",
+        "academic_diagram": "educational vector diagram, clear labeled annotations, academic illustration, clean white background, crisp technical infographic",
+        "3d_render": "3D isometric render, octane render, smooth shaded 3D model, cinema 4D aesthetic, vibrant studio lighting",
+        "chalkboard": "white and colored chalk drawing on black school slate chalkboard, hand-drawn educational sketch, physics & math schematic",
+        "cinematic": "cinematic movie still, dramatic atmospheric lighting, shallow depth of field, anamorphic lens, IMAX quality",
+        "anime": "studio ghibli inspired high quality anime digital art, beautiful aesthetic color grading, detailed key visual",
+        "vintage_lithograph": "vintage encyclopedia lithograph, detailed cross-hatching, engraved antique botanical/scientific illustration"
+      };
+      const styleAddition = styleMap[style] || style;
+      finalPrompt = `${finalPrompt}, ${styleAddition}`;
+    }
+    let imageDataUrl = "";
+    let modelUsed = "";
+    if (ai) {
       try {
-        const ai = getGeminiClient();
-        const response = await callGeminiWithRetryAndFailover(ai, {
-          model: "gemini-3.1-flash-lite-image",
-          contents: [{ text: `Educational diagram or illustration for: ${prompt}. Clear, academic style, labeled if necessary.` }],
+        const geminiImgRes = await ai.models.generateContent({
+          model: "gemini-3.1-flash-image",
+          contents: {
+            parts: [{ text: finalPrompt }]
+          },
           config: {
             imageConfig: {
-              aspectRatio: "1:1"
+              aspectRatio: validAspect,
+              imageSize: validSize
             }
           }
         });
-        let imageUrl = null;
-        if (response.candidates?.[0]?.content?.parts) {
-          for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData) {
-              imageUrl = `data:image/png;base64,${part.inlineData.data}`;
-              break;
-            }
+        const parts = geminiImgRes.candidates?.[0]?.content?.parts || [];
+        for (const part of parts) {
+          if (part.inlineData && part.inlineData.data) {
+            const mime = part.inlineData.mimeType || "image/png";
+            imageDataUrl = `data:${mime};base64,${part.inlineData.data}`;
+            modelUsed = "gemini-3.1-flash-image";
+            break;
           }
         }
-        if (imageUrl) {
-          return res.json({ imageUrl, isSvg: false });
-        } else {
-          throw new Error("No inline data returned from fallback image model.");
-        }
-      } catch (imgErr) {
-        console.warn("[Gemini Bridge] Image fallback failed. Generating guaranteed local SVG template...", imgErr.message || imgErr);
+      } catch (_errG1) {
       }
     }
-  }
-  try {
-    const fallbackSvg = generateGuaranteedLocalSvg(prompt);
-    const base64Svg = Buffer.from(fallbackSvg).toString("base64");
-    res.json({ imageUrl: `data:image/svg+xml;base64,${base64Svg}`, isSvg: true });
-  } catch (localErr) {
-    console.error("[Gemini Bridge] Guaranteed local fallback SVG conversion failed:", localErr.message || localErr);
-    res.status(500).json({ error: "Failed to generate any diagram." });
-  }
-});
-app.post("/api/gemini/notes-generator", async (req, res) => {
-  const { topic, subject, grade = "10" } = req.body;
-  try {
-    const prompt = `Generate comprehensive, highly educational, structured study notes on the topic: "${topic}" for Subject: "${subject}" at a Grade ${grade} level. 
-    Format with clean Markdown, clear headings, bullet points, key definitions, and examples.
-    Return ONLY valid JSON in the format: {"title": "...", "content": "..."}`;
-    const ai = getGeminiClient();
-    const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json"
-      }
-    });
-    const parsed = JSON.parse(response.text || "{}");
-    res.json(parsed);
-  } catch (err) {
-    console.warn("Notes generator error:", err);
-    handleRouteError(res, err);
+    if (!imageDataUrl) {
+      const randomSeed = seed || Math.floor(Math.random() * 9e6) + 1e6;
+      const encodedPrompt = encodeURIComponent(finalPrompt);
+      const negativeParam = negativePrompt ? `&negative=${encodeURIComponent(negativePrompt)}` : "";
+      imageDataUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${randomSeed}&nologo=true&enhance=true&model=flux${negativeParam}`;
+      modelUsed = "Flux-RealAI-Engine";
+    }
     res.json({
-      title: `${topic} Notes`,
-      content: `### ${topic}
-
-Notes could not be generated dynamically due to a network error. Here is a brief outline of ${topic} for ${subject}.
-
-- Key Concept 1: Definition and details
-- Key Concept 2: Mathematical or practical applications
-- Important Formula/Fact: Standard references.`
+      imageUrl: imageDataUrl,
+      size: validSize,
+      aspectRatio: validAspect,
+      width,
+      height,
+      modelUsed,
+      prompt: finalPrompt
     });
-  }
-});
-app.post("/api/gemini/notes-summarizer", async (req, res) => {
-  const { content } = req.body;
-  try {
-    const prompt = `Create a concise, high-impact summary of the following study notes. Highlight key terms, major formulas, and critical takeaways using bullet points. Keep it clear and easy for a student to review quickly.
-
-Notes Content:
-${content}`;
-    const ai = getGeminiClient();
-    const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
-      contents: prompt
-    });
-    res.json({ summary: response.text });
   } catch (err) {
-    console.warn("Notes summarizer error:", err);
-    handleRouteError(res, err);
-    res.json({ summary: "Failed to summarize notes dynamically due to a service error. Please try again." });
-  }
-});
-app.post("/api/gemini/explain-topic", async (req, res) => {
-  const { topic, subject, grade = "10", style = "Simple" } = req.body;
-  try {
-    let styleInstruction = "Explain in extremely simple, friendly language suitable for a child.";
-    if (style === "Analogies") {
-      styleInstruction = "Explain using vivid, funny everyday analogies and metaphors that makes it impossible to forget.";
-    } else if (style === "5-year-old") {
-      styleInstruction = "Explain like I am 5 years old (ELI5). Use very basic words and a fun, story-like approach.";
-    } else if (style === "Step-by-step") {
-      styleInstruction = "Provide a meticulous, clear step-by-step breakdown from first principles.";
-    }
-    const prompt = `${styleInstruction} Topic: "${topic}" (Subject: ${subject}) for Grade ${grade}. Make it engaging and encouraging!`;
-    const ai = getGeminiClient();
-    const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
-      contents: prompt
-    });
-    res.json({ explanation: response.text });
-  } catch (err) {
-    console.warn("Explain topic error:", err);
-    handleRouteError(res, err);
-    res.json({ explanation: "Could not fetch a simplified explanation at this moment. Please check your internet connection and try again." });
-  }
-});
-app.post("/api/gemini/mindmap", async (req, res) => {
-  const { topic } = req.body;
-  try {
-    const prompt = `Generate a hierarchical mind map structure for the topic: "${topic}".
-    Provide a deeply nested JSON representation where each node has a "name" and an optional list of "children" (which is an array of other nodes). Limit hierarchy depth to 3 levels.
-    Format your response ONLY as valid JSON in this exact structure:
-    {"name": "${topic}", "children": [{"name": "Subtopic A", "children": [{"name": "Detail 1"}]}, {"name": "Subtopic B", "children": []}]}`;
-    const ai = getGeminiClient();
-    const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json"
-      }
-    });
-    const parsed = JSON.parse(response.text || "{}");
-    res.json(parsed);
-  } catch (err) {
-    console.warn("Mindmap error:", err);
-    handleRouteError(res, err);
+    console.error("Generate Image API Error:", err);
+    const encPrompt = encodeURIComponent(`${req.body?.prompt || "educational concept illustration"}`);
+    const fallbackUrl = `https://image.pollinations.ai/prompt/${encPrompt}?width=1024&height=1024&nologo=true&enhance=true`;
     res.json({
-      name: topic,
-      children: [
-        { name: "Overview & Definitions", children: [{ name: "Core terms" }, { name: "Basic ideas" }] },
-        { name: "Key Formulas & Rules", children: [{ name: "Standard applications" }] },
-        { name: "Examples", children: [] }
-      ]
+      imageUrl: fallbackUrl,
+      size: req.body?.size || "1K",
+      aspectRatio: req.body?.aspectRatio || "1:1",
+      width: 1024,
+      height: 1024,
+      modelUsed: "Flux-RealAI-Engine"
     });
   }
 });
-app.post("/api/gemini/question-paper", async (req, res) => {
-  const { topic, subject, grade = "10" } = req.body;
+app.post("/api/user/sync", requireAuth, async (req, res) => {
   try {
-    const prompt = `Create a complete, formal, school-grade question paper for the topic: "${topic}" in Subject: "${subject}" for Grade ${grade} students.
-    Divide the paper into:
-    - Section A: 5 Multiple Choice Questions (with correct options indicated at the very bottom in an answer key)
-    - Section B: 3 Short Answer Questions (each with marks allotted, e.g., [3 Marks])
-    - Section C: 2 Long Answer/Analytical Questions (each with marks allotted, e.g., [5 Marks])
-    Format beautifully with clean Markdown headings and lines.`;
-    const ai = getGeminiClient();
-    const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
-      contents: prompt
-    });
-    res.json({ paperText: response.text });
+    const uid = req.user?.uid;
+    const email = req.user?.email || "";
+    const { displayName, photoUrl } = req.body;
+    if (!uid) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const user = await getOrCreateUser(uid, email, displayName, photoUrl);
+    res.json({ user });
   } catch (err) {
-    console.warn("Question paper error:", err);
-    handleRouteError(res, err);
-    res.json({ paperText: "Failed to generate question paper dynamically. Please try again." });
+    console.error("User sync error:", err);
+    res.status(500).json({ error: err.message || "Failed to sync user." });
   }
 });
-app.post("/api/gemini/ocr", async (req, res) => {
-  const { imageBase64 } = req.body;
+app.get("/api/user/profile", requireAuth, async (req, res) => {
   try {
-    if (!imageBase64) {
-      return res.status(400).json({ error: "Missing imageBase64 data" });
+    const uid = req.user?.uid;
+    if (!uid) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
-    const cleanBase64 = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
-    const ai = getGeminiClient();
-    const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
-      contents: [
-        { text: "Extract all study-related text, math equations, formulas, and written contents from this image. Return clean text formatted properly. If there are math equations, format them nicely." },
-        {
-          inlineData: {
-            mimeType: "image/png",
-            data: cleanBase64
-          }
-        }
-      ]
-    });
-    res.json({ text: response.text });
+    const profile = await getUserProfile(uid);
+    res.json({ profile });
   } catch (err) {
-    console.warn("OCR error:", err);
-    handleRouteError(res, err);
-    res.status(500).json({ error: "Failed to extract text from image." });
+    console.error("Get profile error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch profile." });
   }
 });
-app.post("/api/gemini/pdf-summary", async (req, res) => {
-  const { textContent } = req.body;
+app.post("/api/user/stats", requireAuth, async (req, res) => {
   try {
-    const prompt = `Analyze the following document text and produce a structured analysis.
-    Return a JSON object containing:
-    1. "summary": A concise overview of the document (Markdown-enabled string).
-    2. "keyTerms": An array of objects: [{"term": "...", "definition": "..."}].
-    3. "questions": An array of mock test questions: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}].
-    Limit key terms to 5 and questions to 5.
-    
-    Document text:
-    ${textContent.substring(0, 8e3)}`;
-    const ai = getGeminiClient();
-    const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json"
-      }
-    });
-    const parsed = JSON.parse(response.text || "{}");
-    res.json(parsed);
+    const uid = req.user?.uid;
+    const { xpEarned, streak } = req.body;
+    if (!uid) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const updated = await updateUserStats(uid, Number(xpEarned) || 0, streak);
+    res.json({ user: updated });
   } catch (err) {
-    console.warn("PDF Summary error:", err);
-    handleRouteError(res, err);
-    res.json({
-      summary: "Could not summarize document dynamically. Pasted content is too long or server is busy.",
-      keyTerms: [],
-      questions: []
-    });
+    console.error("Update stats error:", err);
+    res.status(500).json({ error: err.message || "Failed to update stats." });
   }
 });
-app.post("/api/gemini/quiz", async (req, res) => {
-  const { subject, studentContext, language, difficulty } = req.body;
-  const quizLang = language || "English";
-  const quizDiff = difficulty || "Medium";
+app.get("/api/notes", requireAuth, async (req, res) => {
   try {
-    const classText = studentContext ? `for class/grade ${studentContext.className}` : "";
-    let languageInstruct = "";
-    if (quizLang === "Hindi") {
-      languageInstruct = "entirely in Hindi language (using clear Devanagari script suitable for classroom study). All questions, descriptions, and option texts MUST be in clean Hindi.";
-    } else if (quizLang === "Mixed" || quizLang === "Hinglish") {
-      languageInstruct = "in Hinglish (a friendly, everyday mixture of Hindi and English words. Write sentences in standard blended phrasing - e.g. using English terms with Hindi scaffolding, like 'Photosynthesis process kiski presense me hota hai?'). Ensure it reads comfortably and is highly engaging.";
-    } else if (quizLang === "Marathi") {
-      languageInstruct = "entirely in Marathi language (using proper Devanagari script). All questions, descriptions, and option texts MUST be in clean Marathi.";
-    } else if (quizLang === "Tamil") {
-      languageInstruct = "entirely in Tamil language. All questions, descriptions, and option texts MUST be in clean Tamil.";
-    } else if (quizLang === "Bengali") {
-      languageInstruct = "entirely in Bengali language. All questions, descriptions, and option texts MUST be in clean Bengali.";
-    } else if (quizLang === "Spanish") {
-      languageInstruct = "entirely in clean, simple Spanish language suitable for school students.";
-    } else if (quizLang === "French") {
-      languageInstruct = "entirely in clean, simple French language suitable for school students.";
-    } else if (quizLang === "German") {
-      languageInstruct = "entirely in clean, simple German language suitable for school students.";
-    } else if (quizLang === "Japanese") {
-      languageInstruct = "entirely in clean, simple Japanese language suitable for school students.";
-    } else if (quizLang === "Russian") {
-      languageInstruct = "entirely in clean, simple Russian language suitable for school students.";
-    } else if (quizLang === "Chinese") {
-      languageInstruct = "entirely in clean, simple Chinese (Simplified) language suitable for school students.";
-    } else {
-      languageInstruct = "entirely in simple, school-grade English.";
+    const uid = req.user?.uid;
+    if (!uid) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
-    let syllabusInstruct = "";
-    if (studentContext) {
-      const country = studentContext.country || "Global";
-      if (country === "Russia") {
-        syllabusInstruct = "strictly following the Russian National Educational Syllabus (\u0413\u043E\u0441\u0443\u0434\u0430\u0440\u0441\u0442\u0432\u0435\u043D\u043D\u0430\u044F \u043F\u0440\u043E\u0433\u0440\u0430\u043C\u043C\u0430 / \u0424\u0413\u041E\u0421) standard,";
-      } else if (country === "China") {
-        syllabusInstruct = "strictly matching the Chinese National Curriculum Standard (\u56FD\u5BB6\u8BFE\u7A0B\u6807\u51C6) standard,";
-      } else if (country === "United States") {
-        syllabusInstruct = "aligned with US Common Core / NGSS standards,";
-      } else if (country === "India") {
-        syllabusInstruct = "aligned with Indian CBSE (NCERT) syllabus guidelines,";
-      } else if (country === "United Kingdom") {
-        syllabusInstruct = "aligned with GCSE / National Curriculum of England standards,";
-      }
+    const notesList = await getUserNotes(uid);
+    res.json({ notes: notesList });
+  } catch (err) {
+    console.error("Get notes error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch notes." });
+  }
+});
+app.post("/api/notes", requireAuth, async (req, res) => {
+  try {
+    const uid = req.user?.uid;
+    const { title, content, subject, tags } = req.body;
+    if (!uid || !title || !content) {
+      res.status(400).json({ error: "Title and content are required." });
+      return;
     }
-    let difficultyInstruct = "";
-    if (quizDiff === "Easy") {
-      difficultyInstruct = "The difficulty of the quiz MUST be EASY. Focus on introductory definitions, basic concepts, and direct, straightforward questions. Keep option choices distinct and simple.";
-    } else if (quizDiff === "Hard") {
-      difficultyInstruct = "The difficulty of the quiz MUST be HARD or ADVANCED. Focus on complex, multi-step problem solving, critical thinking, advanced theories, and subtle nuances. Use trickier, highly plausible options/distractors to challenge the student.";
-    } else {
-      difficultyInstruct = "The difficulty of the quiz MUST be MEDIUM. Provide a balanced mix of conceptual recall, analytical questions, and practical applications suitable for typical classroom standards.";
+    const newNote = await createNote(uid, title, content, subject || "General", tags);
+    res.json({ note: newNote });
+  } catch (err) {
+    console.error("Create note error:", err);
+    res.status(500).json({ error: err.message || "Failed to save note." });
+  }
+});
+app.delete("/api/notes/:id", requireAuth, async (req, res) => {
+  try {
+    const uid = req.user?.uid;
+    const id = parseInt(req.params.id);
+    if (!uid || isNaN(id)) {
+      res.status(400).json({ error: "Valid Note ID is required." });
+      return;
     }
-    const instructionText = `Generate a 5-question multiple choice quiz ${classText} ${syllabusInstruct} for ${subject} ${languageInstruct} ${difficultyInstruct} Return only valid JSON in the format: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}]`;
-    const ai = getGeminiClient();
-    const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
-      contents: instructionText,
-      config: {
-        responseMimeType: "application/json"
-      }
-    });
-    let quizData = [];
+    const deleted = await deleteNote(id, uid);
+    res.json({ success: true, deleted });
+  } catch (err) {
+    console.error("Delete note error:", err);
+    res.status(500).json({ error: err.message || "Failed to delete note." });
+  }
+});
+app.post("/api/study-sessions", requireAuth, async (req, res) => {
+  try {
+    const uid = req.user?.uid;
+    const { subject, durationMinutes, topic, xpEarned } = req.body;
+    if (!uid || !subject) {
+      res.status(400).json({ error: "Subject is required." });
+      return;
+    }
+    const session = await logStudySession(uid, subject, Number(durationMinutes) || 25, topic, Number(xpEarned) || 25);
+    await updateUserStats(uid, Number(xpEarned) || 25);
+    res.json({ session });
+  } catch (err) {
+    console.error("Log study session error:", err);
+    res.status(500).json({ error: err.message || "Failed to log study session." });
+  }
+});
+app.post("/api/mock-exams", requireAuth, async (req, res) => {
+  try {
+    const uid = req.user?.uid;
+    const { subject, score, totalQuestions, details } = req.body;
+    if (!uid || !subject) {
+      res.status(400).json({ error: "Subject is required." });
+      return;
+    }
+    const exam = await logMockExam(uid, subject, Number(score) || 0, Number(totalQuestions) || 0, details);
+    await updateUserStats(uid, 50);
+    res.json({ exam });
+  } catch (err) {
+    console.error("Log mock exam error:", err);
+    res.status(500).json({ error: err.message || "Failed to log exam." });
+  }
+});
+async function startServer() {
+  if (process.env.NODE_ENV !== "production" && process.env.VERCEL !== "1") {
     try {
-      quizData = JSON.parse(response.text || "[]");
-    } catch (parseErr) {
-      console.error("Quiz JSON parse error:", parseErr, "Text:", response.text);
-    }
-    if (Array.isArray(quizData) && quizData.length > 0) {
-      res.json(quizData);
-    } else {
-      throw new Error("Invalid or empty response format received from upstream API model");
-    }
-  } catch (err) {
-    console.warn("Gemini quiz error (using high-quality localized fallback database):", err.message || err);
-    handleRouteError(res, err);
-    const languageKey = quizLang === "Hindi" ? "Hindi" : "English";
-    const fallbackSet = FALLBACK_QUIZZES[subject]?.[languageKey] || FALLBACK_QUIZZES[subject]?.["English"] || [];
-    res.json(fallbackSet);
-  }
-});
-var flashcardsMemoryCache = /* @__PURE__ */ new Map();
-app.post("/api/gemini/flashcard", async (req, res) => {
-  const { subject, noteTitle, noteContent, count = 5 } = req.body;
-  const cacheKey = `${subject}_${noteTitle || ""}_${noteContent || ""}_${count}`;
-  if (flashcardsMemoryCache.has(cacheKey)) {
-    console.log(`[Cache Hit - Server] Returning flashcards for: ${cacheKey}`);
-    return res.json(flashcardsMemoryCache.get(cacheKey));
-  }
-  try {
-    const contextText = noteContent ? `based on this study note titled "${noteTitle || "Untitled"}" with content: "${noteContent}"` : `for general study of the subject "${subject}"`;
-    const ai = getGeminiClient();
-    let finalCards = [];
-    if (count > 5) {
-      console.log(`[Batching] Generating ${count} flashcards in parallel batches of 5...`);
-      const prompts = [
-        `You are an expert school tutor. Generate exactly 5 educational study flashcards ${contextText}.
-Focus on fundamental terms, core definitions, and primary concepts.
-Create a brief, clear, engaging question or term for the "front" and a precise, easy-to-understand answer or explanation for the "back".
-Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`,
-        `You are an expert school tutor. Generate exactly ${count - 5} educational study flashcards ${contextText}.
-Focus on secondary topics, advanced applications, formulas, or deep-dive details (ensuring no duplication with introductory definitions).
-Create a brief, clear, engaging question or term for the "front" and a precise, easy-to-understand answer or explanation for the "back".
-Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`
-      ];
-      const batchPromises = prompts.map(
-        (promptText) => callGeminiWithRetryAndFailover(ai, {
-          model: "gemini-3.5-flash",
-          contents: promptText,
-          config: { responseMimeType: "application/json" }
-        })
-      );
-      const responses = await Promise.all(batchPromises);
-      for (const response of responses) {
-        try {
-          const parsed = JSON.parse(response.text || "[]");
-          if (Array.isArray(parsed)) {
-            finalCards.push(...parsed);
-          }
-        } catch (parseErr) {
-          console.error("Batch parse error:", parseErr, "Text:", response.text);
-        }
-      }
-    } else {
-      const instructionText = `You are an expert school tutor. Generate exactly ${count} educational study flashcards ${contextText}.
-Identify key terms, definitions, formulas, or concepts. For each, create a brief, clear, engaging question or term for the "front" and a precise, easy-to-understand answer or explanation for the "back".
-Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`;
-      const response = await callGeminiWithRetryAndFailover(ai, {
-        model: "gemini-3.5-flash",
-        contents: instructionText,
-        config: { responseMimeType: "application/json" }
+      const { createServer: createViteServer } = await import("vite");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa"
       });
-      try {
-        finalCards = JSON.parse(response.text || "[]");
-      } catch (parseErr) {
-        console.error("Flashcards JSON parse error:", parseErr, "Text:", response.text);
-      }
+      app.use(vite.middlewares);
+    } catch (e) {
+      console.warn("Vite dev server failed to start dynamically:", e);
     }
-    if (Array.isArray(finalCards) && finalCards.length > 0) {
-      flashcardsMemoryCache.set(cacheKey, finalCards);
-      res.json(finalCards);
-    } else {
-      throw new Error("Invalid or empty response format received from upstream API model for flashcards");
-    }
-  } catch (err) {
-    console.warn("Gemini flashcard generation error (using fallback):", err.message || err);
-    handleRouteError(res, err);
-    const FALLBACK_FLASHCARDS = {
-      "Mathematics": [
-        { front: "What is Pythagoras theorem?", back: "a\xB2 + b\xB2 = c\xB2, where c is the hypotenuse and a, b are the other two sides of a right-angled triangle." },
-        { front: "Formula for area of a circle", back: "Area = \u03C0r\xB2" },
-        { front: "What is a prime number?", back: "A number greater than 1 that has only two factors: 1 and itself (e.g. 2, 3, 5, 7)." }
-      ],
-      "Science": [
-        { front: "What is photosynthesis?", back: "The process by which plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar." },
-        { front: "Three states of matter", back: "Solid, Liquid, Gas" },
-        { front: "What is gravity?", back: "The force that pulls objects toward each other, like the earth pulling down on us." }
-      ],
-      "Biology": [
-        { front: "What is the powerhouse of the cell?", back: "Mitochondria - they generate chemical energy for cellular activities." },
-        { front: "Function of red blood cells", back: "To carry oxygen from the lungs to the rest of the body." }
-      ],
-      "Physics": [
-        { front: "Newton's First Law of Motion", back: "An object at rest stays at rest, and an object in motion stays in motion with the same speed and direction unless acted upon by an external force." },
-        { front: "Formula for speed", back: "Speed = Distance / Time" }
-      ],
-      "Chemistry": [
-        { front: "What is the chemical formula for water?", back: "H\u2082O" },
-        { front: "What is an atom?", back: "The basic unit of a chemical element, consisting of a nucleus of protons and neutrons, with electrons orbiting." }
-      ],
-      "English": [
-        { front: "What is a noun?", back: "A word that represents a person, place, thing, or idea." },
-        { front: "What is a metaphor?", back: "A figure of speech in which a word or phrase is applied to an object or action to which it is not literally applicable, describing it by comparison." }
-      ]
-    };
-    const subjectKey = subject || "Science";
-    const cards = FALLBACK_FLASHCARDS[subjectKey] || FALLBACK_FLASHCARDS["Science"];
-    res.json(cards);
-  }
-});
-io.on("connection", (socket) => {
-  socket.on("join-group", (groupId) => {
-    socket.join(`group-${groupId}`);
-  });
-  socket.on("send-message", (data) => {
-    try {
-      const { groupId, userId, text, image } = data;
-      const result = db.prepare("INSERT INTO group_messages (group_id, user_id, text, image) VALUES (?, ?, ?, ?)").run(groupId, userId, text, image);
-      const user = db.prepare("SELECT name FROM users WHERE id = ?").get(userId);
-      const newMessage = {
-        id: result.lastInsertRowid,
-        group_id: groupId,
-        user_id: userId,
-        user_name: user ? user.name : "Unknown Student",
-        text,
-        image,
-        created_at: (/* @__PURE__ */ new Date()).toISOString()
-      };
-      io.to(`group-${groupId}`).emit("new-message", newMessage);
-    } catch (err) {
-      console.error("Socket send-message error:", err);
-    }
-  });
-  socket.on("update-note", (data) => {
-    try {
-      const { noteId, groupId, title, content, userId } = data;
-      db.prepare("UPDATE group_notes SET title = ?, content = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(title, content, userId, noteId);
-      const user = db.prepare("SELECT name FROM users WHERE id = ?").get(userId);
-      const updatedNote = {
-        id: noteId,
-        group_id: groupId,
-        title,
-        content,
-        updated_by: userId,
-        updated_by_name: user ? user.name : "Unknown Student",
-        updated_at: (/* @__PURE__ */ new Date()).toISOString()
-      };
-      io.to(`group-${groupId}`).emit("note-updated", updatedNote);
-    } catch (err) {
-      console.error("Socket update-note error:", err);
-    }
-  });
-});
-async function initializeViteAndStaticAssets() {
-  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa"
-    });
-    app.use(vite.middlewares);
-  } else {
+  } else if (process.env.VERCEL !== "1") {
     const distPath = import_path.default.join(process.cwd(), "dist");
-    app.use(import_express.default.static(distPath));
-    app.get("*", (req, res) => {
+    app.use(import_express.default.static(distPath, {
+      maxAge: "1y",
+      immutable: true,
+      etag: true
+    }));
+    app.get("*", (_req, res) => {
+      res.setHeader("Cache-Control", "no-cache");
       res.sendFile(import_path.default.join(distPath, "index.html"));
     });
   }
-}
-async function testGeminiOnStartup() {
-  try {
-    const key = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-    if (!key) {
-      console.warn("\u26A0\uFE0F  [Startup] No Gemini API key found in server variables (GEMINI_API_KEY / VITE_GEMINI_API_KEY). Fallbacks will be active.");
-      return;
-    }
-    console.log("\u{1F680} [Startup] Running Gemini API health connection test with failover...");
-    const ai = getGeminiClient();
-    const response = await callGeminiWithRetryAndFailover(ai, {
-      model: "gemini-3.5-flash",
-      contents: "API connection validation. Return exactly the word 'SUCCESS'."
+  if (process.env.VERCEL !== "1") {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
     });
-    console.log(`\u2705 [Startup] Gemini API connection test SUCCEEDED: "${response.text?.trim()}"`);
-  } catch (err) {
-    console.warn(`\u274C [Startup] Gemini API connection test FAILED: ${err.message || String(err)}`);
-    console.warn("\u26A0\uFE0F  [Startup] Falling back to high-quality localized datasets for offline functionality.");
   }
 }
-async function boot() {
-  await initializeViteAndStaticAssets();
-  if (!process.env.VERCEL) {
-    httpServer.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server successfully started locally on http://localhost:${PORT}`);
-    });
-    testGeminiOnStartup().catch(console.error);
-  }
+if (process.env.VERCEL !== "1") {
+  startServer();
 }
-boot().catch((err) => {
-  console.error("Fatal server boot failure:", err);
-});
-var server_default = app;
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   app

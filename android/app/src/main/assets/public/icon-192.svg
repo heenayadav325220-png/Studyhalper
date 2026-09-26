@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    <linearGradient id="bgGrad192" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#312e81" />
+      <stop offset="50%" stop-color="#4338ca" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+    <linearGradient id="capGrad192" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#e0e7ff" />
+    </linearGradient>
+    <linearGradient id="tasselGrad192" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#fbbf24" />
+    </linearGradient>
+  </defs>
+
+  <rect width="192" height="192" rx="42" fill="url(#bgGrad192)" />
+  <rect x="3" y="3" width="186" height="186" rx="39" fill="none" stroke="#6366f1" stroke-width="2" stroke-opacity="0.4" />
+
+  <!-- Graduation Cap -->
+  <g transform="translate(0, 5)">
+    <!-- Mortarboard Top -->
+    <path d="M96 45 L156 75 L96 105 L36 75 Z" fill="url(#capGrad192)" />
+    <!-- Cap Underneath Base -->
+    <path d="M60 88 L60 114 C60 134, 132 134, 132 114 L132 88 L96 106 Z" fill="#c7d2fe" />
+    <!-- Tassel -->
+    <path d="M142 78 Q155 92 153 110" fill="none" stroke="url(#tasselGrad192)" stroke-width="4" stroke-linecap="round" />
+    <circle cx="153" cy="115" r="6" fill="url(#tasselGrad192)" />
+    <!-- Spark -->
+    <path d="M96 62 Q96 75 88 75 Q96 75 96 88 Q96 75 104 75 Q96 75 96 62 Z" fill="#4f46e5" />
+  </g>
+
+  <text x="96" y="158" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="14" fill="#ffffff" letter-spacing="2.5">ASCEND</text>
+</svg>
