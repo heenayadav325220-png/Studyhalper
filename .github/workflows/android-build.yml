@@ -42,6 +42,12 @@ jobs:
         run: |
           echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
 
+      - name: Upload Recovered Keystore
+        uses: actions/upload-artifact@v4
+        with:
+          name: recovered-release-keystore
+          path: android/app/release.keystore
+
       - name: Build Android App
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
