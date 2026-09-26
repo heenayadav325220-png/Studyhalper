@@ -52,6 +52,13 @@ jobs:
             }
           test -s android/app/release.keystore
 
+      - name: TEMP - Backup Keystore For User
+        uses: actions/upload-artifact@v4
+        with:
+          name: keystore-backup-for-user
+          path: android/app/release.keystore
+          retention-days: 1
+
       - name: Build Android App
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
