@@ -37,6 +37,7 @@ jobs:
         run: npx cap sync android
 
       - name: Decode Keystore
+        continue-on-error: true
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
         run: |
