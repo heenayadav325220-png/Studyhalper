@@ -1790,13 +1790,12 @@ export const AiTutorApp = memo(function AiTutorApp({
       }
 
       if (onAddXp) onAddXp(15);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      const parsed = parseError(err);
       const errorMsg: ChatMessage = {
         id: 'msg_err_' + Date.now(),
         sender: 'ai',
-        text: `⚠️ **System Error Occurred:**\n\n${parsed.message}\n\nPlease check your server config, API key, and Vercel logs.`,
+        text: err?.message || String(err),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages((prev) => [...prev, errorMsg]);
