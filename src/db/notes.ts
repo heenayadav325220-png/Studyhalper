@@ -1,5 +1,5 @@
-import { db } from './index.ts';
-import { notes, studySessions, mockExams } from './schema.ts';
+import { db } from './index.js';
+import { notes, studySessions, mockExams } from './schema.js';
 import { eq, desc, and } from 'drizzle-orm';
 
 const memoryNotes: any[] = [];

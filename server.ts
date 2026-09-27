@@ -5,11 +5,11 @@ import express from "express";
 import path from "path";
 import compression from "compression";
 import { GoogleGenAI } from "@google/genai";
-import { requireAuth, AuthRequest } from "./src/middleware/auth.ts";
-import { getOrCreateUser, getUserProfile, updateUserStats } from "./src/db/users.ts";
-import { getUserNotes, createNote, deleteNote, logStudySession, logMockExam } from "./src/db/notes.ts";
-import { securityHeaders, rateLimitAi, rateLimitGeneral, sanitizeInputs } from "./src/middleware/security.ts";
-import { generateCurriculumStudyAnswer, generateSubjectMockQuestions, checkCreatorQuestion } from "./src/services/curriculumEngine.ts";
+import { requireAuth, AuthRequest } from "./src/middleware/auth.js";
+import { getOrCreateUser, getUserProfile, updateUserStats } from "./src/db/users.js";
+import { getUserNotes, createNote, deleteNote, logStudySession, logMockExam } from "./src/db/notes.js";
+import { securityHeaders, rateLimitAi, rateLimitGeneral, sanitizeInputs } from "./src/middleware/security.js";
+import { generateCurriculumStudyAnswer, generateSubjectMockQuestions, checkCreatorQuestion } from "./src/services/curriculumEngine.js";
 
 const PORT = 3000;
 
