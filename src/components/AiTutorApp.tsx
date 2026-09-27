@@ -91,6 +91,10 @@ interface AiTutorAppProps {
   onLanguageChange?: (lang: any) => void;
   isBottomNavVisible?: boolean;
   onShowBottomNav?: () => void;
+  prefilledPrompt?: string;
+  prefilledSubject?: Subject;
+  prefilledTopic?: string;
+  onClearPrefilled?: () => void;
 }
 
 interface ChatMessage {
@@ -597,7 +601,11 @@ export const AiTutorApp = memo(function AiTutorApp({
   globalAppLanguage,
   onLanguageChange,
   isBottomNavVisible = true,
-  onShowBottomNav
+  onShowBottomNav,
+  prefilledPrompt,
+  prefilledSubject,
+  prefilledTopic,
+  onClearPrefilled
 }: AiTutorAppProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const saved = getStoredValue(`ai_tutor_chat_${user.uid}`);
@@ -629,7 +637,23 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [inputQuery, setInputQuery] = useState(() => getStoredValue(`ai_tutor_input_draft_${user.uid}`));
   const [selectedSubject, setSelectedSubject] = useState<Subject>('Science');
   const [selectedLanguage, setSelectedLanguage] = useState<string>(() => getStoredValue(`ai_tutor_language_${user.uid}`, 'Hinglish'));
+
+  // Load prefilled recommendation context from Personal Planner
+  useEffect(() => {
+    if (prefilledPrompt) {
+      setInputQuery(prefilledPrompt);
+    }
+    if (prefilledSubject) {
+      setSelectedSubject(prefilledSubject);
+    }
+    if (prefilledPrompt || prefilledSubject || prefilledTopic) {
+      if (onClearPrefilled) {
+        onClearPrefilled();
+      }
+    }
+  }, [prefilledPrompt, prefilledSubject, prefilledTopic, onClearPrefilled]);
   const [tutorMode, setTutorMode] = useState<'homework' | 'explain' | 'step' | 'quiz'>('homework');
+  const [aiTutorSubMode, setAiTutorSubMode] = useState<string>('direct');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [savedNoteId, setSavedNoteId] = useState<string | null>(null);
@@ -1671,6 +1695,25 @@ export const AiTutorApp = memo(function AiTutorApp({
         promptContext = `${workspaceContext}${studentInfo} Explain clearly with analogies suitable for ${user.className || 'student level'}: ${effectiveQuery}`;
       } else if (tutorMode === 'quiz') {
         promptContext = `${workspaceContext}${studentInfo} Generate a 3-question practice quiz suitable for ${user.className || 'student level'}: ${effectiveQuery}`;
+      }
+
+      // Inject Cognitive Modes Prompt Instructions
+      if (aiTutorSubMode === 'teach_me') {
+        promptContext = `${promptContext}\n[TEACH ME MODE] Please explain the concepts from absolute first principles, using elegant real-world analogies, and asking 1 short checkpoint query at the end to keep me actively learning.`;
+      } else if (aiTutorSubMode === 'solve_with_me') {
+        promptContext = `${promptContext}\n[SOLVE WITH ME MODE] Do not give me the full solution immediately. Act as a supportive step-by-step mentor. Break down the solution into parts, explain the first part, ask me to solve it, and wait for my response.`;
+      } else if (aiTutorSubMode === 'give_hint') {
+        promptContext = `${promptContext}\n[GIVE HINT MODE] Please do NOT give me the solution or final answer. Just provide a subtle, helpful, guiding conceptual hint or formula suggestion to nudge me in the right direction.`;
+      } else if (aiTutorSubMode === 'check_answer') {
+        promptContext = `${promptContext}\n[CHECK MY ANSWER MODE] Evaluate my previous answer or work. Verify if it is correct, pinpoint any errors in logic or calculation, and guide me on how to refine it properly.`;
+      } else if (aiTutorSubMode === 'why_wrong') {
+        promptContext = `${promptContext}\n[WHY IS MY ANSWER WRONG MODE] Carefully audit my response. Identify whether my mistake is a Concept mistake, Formula mistake, Calculation mistake, Logic mistake, or Question misunderstanding, and explain why.`;
+      } else if (aiTutorSubMode === 'similar_question') {
+        promptContext = `${promptContext}\n[GIVE SIMILAR QUESTION MODE] Based on this academic concept, generate 1 similar practice problem for me to solve at my class level.`;
+      } else if (aiTutorSubMode === 'challenge') {
+        promptContext = `${promptContext}\n[CHALLENGE MODE] Present an advanced, non-routine, higher-order thinking (HOTS) board-exam standard conceptual challenge on this topic to test my critical thinking.`;
+      } else if (aiTutorSubMode === 'quick_revision') {
+        promptContext = `${promptContext}\n[QUICK REVISION MODE] Provide a high-yield summary table or bullet list containing: 1. Core concept, 2. Golden formulas, 3. One quick example, 4. Common student mistake to avoid.`;
       }
 
       const answer = await getStudyAnswer(promptContext, imagesToSend.length > 0 ? imagesToSend : undefined, undefined, selectedLanguage);
@@ -2945,6 +2988,37 @@ export const AiTutorApp = memo(function AiTutorApp({
               ))}
             </div>
           )}
+
+          {/* Cognitive Learning Modes Selector Chips */}
+          <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-1.5 px-0.5 mb-1.5 border-b border-slate-100/10" style={{ scrollbarWidth: 'none' }}>
+            {[
+              { id: 'direct', label: appLanguage === 'hi' ? 'सामान्य 🧑‍🏫' : 'Direct 🧑‍🏫' },
+              { id: 'teach_me', label: appLanguage === 'hi' ? 'पढ़ाएं 📖' : 'Teach Me 📖' },
+              { id: 'solve_with_me', label: appLanguage === 'hi' ? 'साथ हल करें 🤝' : 'Solve With Me 🤝' },
+              { id: 'give_hint', label: appLanguage === 'hi' ? 'संकेत दें 💡' : 'Give Hint 💡' },
+              { id: 'check_answer', label: appLanguage === 'hi' ? 'उत्तर जांचें ✍️' : 'Check Answer ✍️' },
+              { id: 'why_wrong', label: appLanguage === 'hi' ? 'गलत क्यों? ❌' : 'Why Wrong? ❌' },
+              { id: 'similar_question', label: appLanguage === 'hi' ? 'समान प्रश्न 🔁' : 'Similar Q 🔁' },
+              { id: 'challenge', label: appLanguage === 'hi' ? 'चुनौती दें ⚡' : 'Challenge Me ⚡' },
+              { id: 'quick_revision', label: appLanguage === 'hi' ? 'त्वरित दोहराव 📌' : 'Quick Revision 📌' }
+            ].map((mode) => {
+              const active = aiTutorSubMode === mode.id;
+              return (
+                <button
+                  key={mode.id}
+                  type="button"
+                  onClick={() => setAiTutorSubMode(mode.id)}
+                  className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition duration-150 whitespace-nowrap cursor-pointer shrink-0 ${
+                    active
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                  }`}
+                >
+                  {mode.label}
+                </button>
+              );
+            })}
+          </div>
 
           <div className="relative flex items-center bg-white border border-slate-250/90 hover:border-slate-350 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/15 rounded-2xl p-1 transition-all duration-200 shadow-sm">
             {/* MIC BUTTON */}

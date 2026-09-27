@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import InteractiveToolkit from './components/InteractiveToolkit';
 import AiTutorApp from './components/AiTutorApp';
+import PersonalLearningPlanner from './components/PersonalLearningPlanner';
 import ImageGenerator from './components/ImageGenerator';
 import OnboardingModal from './components/OnboardingModal';
 import AuthModal from './components/AuthModal';
@@ -250,6 +251,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'home' | 'toolkit' | 'groupChat' | 'whiteboard' | 'mockExam' | 'studyDocs' | 'petCompanion' | 'aiTutor' | 'quiz' | 'notebook' | 'planner' | 'imageGen' | 'pdfScanner' | 'googleWorkspace'>('home');
   const [attachedWorkspaceFiles, setAttachedWorkspaceFiles] = useState<Array<{ id: string; name: string; content: string; type: "drive" | "classroom" | "sheets" }>>([]);
   const [initialTool, setInitialTool] = useState<string | undefined>(undefined);
+  const [prefilledTutorPrompt, setPrefilledTutorPrompt] = useState<string | undefined>(undefined);
+  const [prefilledSubject, setPrefilledSubject] = useState<Subject | undefined>(undefined);
+  const [prefilledTopic, setPrefilledTopic] = useState<string | undefined>(undefined);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -1417,6 +1421,14 @@ export default function App() {
           }}
           isBottomNavVisible={isBottomNavVisible}
           onShowBottomNav={showBottomNav}
+          prefilledPrompt={prefilledTutorPrompt}
+          prefilledSubject={prefilledSubject}
+          prefilledTopic={prefilledTopic}
+          onClearPrefilled={() => {
+            setPrefilledTutorPrompt(undefined);
+            setPrefilledSubject(undefined);
+            setPrefilledTopic(undefined);
+          }}
         />
       ) : (
       /* MAIN CONTENT AREA - WITH pb-20 sm:pb-24 FOR FULL-WIDTH STICKY BOTTOM NAVIGATION BAR */
@@ -1642,6 +1654,22 @@ export default function App() {
                 </button>
               </div>
             )}
+
+            {/* PERSONAL AI LEARNING PLANNER & NEXT ACTIONS */}
+            <PersonalLearningPlanner
+              user={userProfile}
+              appLanguage={appLanguage}
+              onNavigateToTab={(tab, initialTool, topicName, subjectName, promptText) => {
+                setPrefilledSubject(subjectName);
+                setPrefilledTopic(topicName);
+                setPrefilledTutorPrompt(promptText);
+                if (initialTool) {
+                  setInitialTool(initialTool);
+                }
+                setActiveTab(tab);
+              }}
+              savedExams={mockExams}
+            />
 
             {/* HIGH-POWER QUICK ACTION DUO: VOICE TUTOR & PDF/BOOK SCANNER */}
             <div id="quick-actions-section" className="grid grid-cols-2 gap-3 sm:gap-3.5">
@@ -3230,6 +3258,8 @@ export default function App() {
             savedExams={mockExams}
             onClose={() => setActiveTab('home')}
             language={appLanguage}
+            prefilledSubject={prefilledSubject}
+            prefilledTopic={prefilledTopic}
           />
         )}
 

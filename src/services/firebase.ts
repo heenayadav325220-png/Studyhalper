@@ -126,6 +126,12 @@ export function getFriendlyAuthErrorMessage(errorCodeOrMessage: string, lang: st
   const code = (errorCodeOrMessage || '').toLowerCase();
   const isHindiMode = lang === 'hi' || lang === 'hinglish' || lang === 'marathi' || lang === 'tamil' || lang === 'bengali';
   
+  if (code.includes('capacitor-google-restricted')) {
+    return isHindiMode
+      ? 'एंड्रॉइड ऐप (APK) पर गूगल लॉगिन समर्थित नहीं है। कृपया ईमेल और पासवर्ड का उपयोग करें (जो 100% काम करता है!). यदि आपने पहले गूगल से साइन अप किया था, तो अपना पासवर्ड सेट करने के लिए "Forgot Password" पर क्लिक करें और तुरंत लॉग इन करें।'
+      : 'Google Login is not supported inside the Android app (APK). Please sign in using your Email & Password (which works 100%!). If you previously signed up via Google, click "Forgot Password" to create a password for your email and log in instantly.';
+  }
+
   if (code.includes('operation-not-allowed')) {
     return isHindiMode
       ? 'ईमेल/पासवर्ड प्रमाणीकरण सक्रिय हो रहा है...'
@@ -193,6 +199,20 @@ export function withTimeout<T>(promise: Promise<T>, ms: number = 3500, fallbackM
  * Sign in with Google Popup (with safe generous timeout for human interaction)
  */
 export async function signInWithGoogle(timeoutMs: number = 90000): Promise<FirebaseUser> {
+  const isNativePlatform = typeof window !== 'undefined' && (
+    !!(window as any).Capacitor || 
+    (window as any).Capacitor?.platform !== 'web' ||
+    navigator.userAgent.includes('Capacitor') ||
+    !!(window as any).Android
+  );
+
+  if (isNativePlatform) {
+    throw {
+      code: 'auth/capacitor-google-restricted',
+      message: 'Google Sign-In is not supported directly inside the Android app (APK). Please use Email & Password instead.'
+    };
+  }
+
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   const popupPromise = signInWithPopup(auth, provider).then(res => res.user);

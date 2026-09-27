@@ -106,7 +106,13 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
     const container = mountRef.current;
     if (!container) return;
 
-    const isLowPowerDevice = typeof window !== 'undefined' && (!!(window as any).Capacitor || (navigator.hardwareConcurrency ?? 8) <= 4);
+    const isLowPowerDevice = typeof window !== 'undefined' && (
+      !!(window as any).Capacitor || 
+      (window as any).Capacitor?.platform !== 'web' || 
+      navigator.userAgent.includes('Capacitor') || 
+      !!(window as any).Android || 
+      (navigator.hardwareConcurrency ?? 8) <= 4
+    );
 
     let renderer: THREE.WebGLRenderer | null = null;
     let animationFrameId: number | null = null;
@@ -1086,10 +1092,12 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
     document.addEventListener('visibilitychange', handleVisibilityChangeLocal);
 
     // -------------------------------------------------------------------------
-    // 9. REAL-TIME 60FPS ANIMATION LOOP
+    // 9. REAL-TIME 60FPS ANIMATION LOOP (FPS THROTTLED ON MOBILE TO PREVENT LAG)
     // -------------------------------------------------------------------------
     let animFrameId: number;
     const clock = new THREE.Clock();
+    let lastRenderTime = 0;
+    const renderInterval = 1000 / 24; // 24 FPS target limit on mobile devices
 
     const animate = () => {
       animFrameId = requestAnimationFrame(animate);
@@ -1098,6 +1106,15 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
 
       const delta = Math.min(clock.getDelta(), 0.1);
       const elapsedTime = clock.getElapsedTime();
+
+      if (isLowPowerDevice) {
+        const currentTime = elapsedTime * 1000;
+        const elapsedSinceLastRender = currentTime - lastRenderTime;
+        if (elapsedSinceLastRender < renderInterval) {
+          return; // Skip rendering this frame to maintain high performance and prevent lag
+        }
+        lastRenderTime = currentTime - (elapsedSinceLastRender % renderInterval);
+      }
 
       // Smooth camera interpolation (Damped Spring Inertia)
       camera.position.x += (targetCameraX - camera.position.x) * 0.04;

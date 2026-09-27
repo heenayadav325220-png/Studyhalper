@@ -30,6 +30,7 @@ import {
   Globe
 } from 'lucide-react';
 import { generateQuiz, shuffleQuizQuestions } from '../services/geminiService';
+import { PersonalLearningService } from '../services/personalLearningService';
 import { showToast } from './Toast';
 import { parseError, logError } from '../utils/errorHandler';
 import { playSuccessChime, triggerHaptic } from '../services/soundEffects';
@@ -48,6 +49,8 @@ interface QuizSectionProps {
   onClose?: () => void;
   language?: string;
   onLanguageChange?: (lang: any) => void;
+  prefilledSubject?: Subject;
+  prefilledTopic?: string;
 }
 
 interface QuizQuestion {
@@ -353,7 +356,9 @@ export default function QuizSection({
   savedExams = [],
   onClose,
   language = 'en',
-  onLanguageChange
+  onLanguageChange,
+  prefilledSubject,
+  prefilledTopic
 }: QuizSectionProps) {
   // Navigation & Step State
   const [viewState, setViewState] = useState<'setup' | 'loading' | 'active' | 'results' | 'history'>('setup');
@@ -383,11 +388,45 @@ export default function QuizSection({
   // Setup Config
   const [selectedSubject, setSelectedSubject] = useState<Subject>('Mathematics');
   const [customTopic, setCustomTopic] = useState('Trigonometry & Formulas');
+
+  // Load prefilled subject & topic from Personal Planner recommendations
+  useEffect(() => {
+    if (prefilledSubject) {
+      setSelectedSubject(prefilledSubject);
+    }
+    if (prefilledTopic) {
+      setCustomTopic(prefilledTopic);
+    }
+  }, [prefilledSubject, prefilledTopic]);
   const [questionCount, setQuestionCount] = useState<number>(10);
   const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard'>('Medium');
   const [isTimed, setIsTimed] = useState(true);
   const [timePerQuestion] = useState(30); // 30s per question
   const [instantFeedback, setInstantFeedback] = useState(true);
+
+  // Adaptive Practice: Auto adjust difficulty based on performance
+  useEffect(() => {
+    if (savedExams && savedExams.length > 0) {
+      const recent = savedExams
+        .filter((exam) => exam.subject === selectedSubject)
+        .slice(-3);
+      if (recent.length > 0) {
+        let totalScore = 0;
+        recent.forEach(e => {
+          // score is percentage (0-100) as saved in saveMockExam or check
+          totalScore += e.score;
+        });
+        const avgAccuracy = totalScore / recent.length;
+        if (avgAccuracy < 50) {
+          setDifficulty('Easy');
+        } else if (avgAccuracy >= 80) {
+          setDifficulty('Hard');
+        } else {
+          setDifficulty('Medium');
+        }
+      }
+    }
+  }, [savedExams, selectedSubject]);
 
   // Active Quiz State
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -488,8 +527,20 @@ export default function QuizSection({
 
     let correctCount = 0;
     questions.forEach((q, idx) => {
-      if (finalAnswers[idx] === q.answer) {
+      const isCorrect = finalAnswers[idx] === q.answer;
+      if (isCorrect) {
         correctCount++;
+      } else {
+        // Save to automatic mistake book
+        PersonalLearningService.addMistake(user?.uid || 'user_local_student', {
+          question: q.question,
+          options: q.options,
+          answer: q.answer,
+          explanation: q.explanation || 'Review the core concept for this problem.',
+          subject: selectedSubject,
+          topic: customTopic || 'General Quiz',
+          userAnswer: finalAnswers[idx] !== undefined ? finalAnswers[idx] : -1
+        }).catch(err => console.warn('Failed to save mistake:', err));
       }
     });
 
