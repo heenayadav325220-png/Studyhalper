@@ -110,10 +110,10 @@ function getAiClient(): GoogleGenAI | null {
 }
 
 // Resilient Gemini Execution with Multi-Model Fallback & Quota Protection
-// gemini-3.5-flash is our primary production model as selected in the workspace environment
+// gemini-2.5-flash is our primary production model as selected in the workspace environment
 const FALLBACK_MODELS = [
-  "gemini-3.5-flash",
   "gemini-2.5-flash",
+  "gemini-3.5-flash",
   "gemini-3.1-flash-lite"
 ];
 
@@ -126,9 +126,9 @@ async function callGeminiWithResilience(params: {
   if (!ai) {
     throw new Error(isKeyReportedLeaked ? "GEMINI_KEY_LEAKED_OR_FORBIDDEN" : "GEMINI_API_KEY_UNAVAILABLE");
   }
-  const preferred = params.preferredModel || "gemini-3.5-flash";
-  // Always try gemini-3.5-flash first to guarantee instant success in the user's active sandbox environment
-  const modelsToTry = Array.from(new Set(["gemini-3.5-flash", preferred, ...FALLBACK_MODELS]));
+  const preferred = params.preferredModel || "gemini-2.5-flash";
+  // Always try gemini-2.5-flash first to guarantee instant success in the user's active sandbox environment
+  const modelsToTry = Array.from(new Set(["gemini-2.5-flash", preferred, ...FALLBACK_MODELS]));
   
   let lastError: any = null;
   for (const model of modelsToTry) {
@@ -1389,7 +1389,7 @@ Ensure there is NO promotional fluff or filler greetings. Open directly with the
 
       const text = await callGeminiWithResilience({
         contents: prompt,
-        preferredModel: 'gemini-3.5-flash',
+        preferredModel: 'gemini-2.5-flash',
         config: { temperature: 0.5 }
       });
 
@@ -1440,7 +1440,7 @@ Format beautifully in Markdown. Do not include any greeting or conversational fi
 
       const text = await callGeminiWithResilience({
         contents: prompt,
-        preferredModel: 'gemini-3.5-flash',
+        preferredModel: 'gemini-2.5-flash',
         config: { temperature: 0.6 }
       });
 
@@ -1551,7 +1551,7 @@ Format nicely using standard Markdown. Include the detailed step-by-step marking
 
       const text = await callGeminiWithResilience({
         contents: prompt,
-        preferredModel: 'gemini-3.5-flash',
+        preferredModel: 'gemini-2.5-flash',
         config: { temperature: 0.5 }
       });
 
@@ -1650,7 +1650,7 @@ ${textContent.slice(0, 50000)}`;
 
       const text = await callGeminiWithResilience({
         contents: prompt,
-        preferredModel: 'gemini-3.5-flash',
+        preferredModel: 'gemini-2.5-flash',
         config: { temperature: 0.4 }
       });
 
