@@ -1611,22 +1611,8 @@ export default function App() {
 
                   {/* Top-Right: Integrated Controls (Theme Toggle & Settings Side-by-Side) alongside Avatar */}
                   <div className="shrink-0 flex items-center space-x-2.5 ml-2">
-                    {/* Horizontal Controls Row: Language Switcher, Theme Toggle & Settings */}
+                    {/* Horizontal Controls Row: Theme Toggle & Settings */}
                     <div className="flex items-center space-x-1.5">
-                      {/* Global Language Switcher */}
-                      <div className="flex items-center px-2 py-1 rounded-xl bg-slate-900/90 border border-slate-700/60 shadow-xs" title="App Language">
-                        <Globe className="w-3 h-3 text-indigo-400 mr-1 shrink-0" />
-                        <select
-                          value={appLanguage}
-                          onChange={(e) => handleLanguageChange(e.target.value as Language)}
-                          className="bg-transparent text-slate-200 font-bold text-[10px] focus:outline-none cursor-pointer"
-                        >
-                          <option value="en" className="bg-slate-900 text-white">EN</option>
-                          <option value="hi" className="bg-slate-900 text-white">हिंदी</option>
-                          <option value="hinglish" className="bg-slate-900 text-white">Hinglish</option>
-                        </select>
-                      </div>
-
                       {/* Global Dark Mode Switch */}
                       <div className="flex items-center px-1.5 py-1 rounded-xl bg-slate-900/90 border border-slate-700/60 shadow-xs" title="Late-Night Dark Mode">
                         <ThemeToggle variant="compact-switch" />
