@@ -700,14 +700,16 @@ export default function App() {
   };
 
   // --- STREAK & GOALS STATE ---
-  const completedDaysCount = Math.min(userProfile?.streak || 0, 5);
+  const currentStreak = userProfile?.streak || 0;
+  const completedDaysInCycle = currentStreak % 5 === 0 && currentStreak > 0 ? 5 : currentStreak % 5;
   const streakCompletedDays = [
-    completedDaysCount >= 1,
-    completedDaysCount >= 2,
-    completedDaysCount >= 3,
-    completedDaysCount >= 4,
-    completedDaysCount >= 5
+    completedDaysInCycle >= 1,
+    completedDaysInCycle >= 2,
+    completedDaysInCycle >= 3,
+    completedDaysInCycle >= 4,
+    completedDaysInCycle >= 5
   ];
+  const nextMilestone = Math.max(5, Math.ceil((userProfile?.streak || 1) / 5) * 5);
   const [day1GoalCompleted, setDay1GoalCompleted] = useState(false);
 
   const [activeSecondsToday, setActiveSecondsToday] = useState<number>(0);
@@ -829,7 +831,7 @@ export default function App() {
 
         const todayStr = getLocalDateString();
         // Check if 10-minute (600s) threshold is reached AND streak not completed today yet
-        if (next === 600 && userProfile.lastStreakDate !== todayStr) {
+        if (next >= 600 && userProfile.lastStreakDate !== todayStr) {
           triggerDailyStreakCompletion(todayStr);
         }
 
@@ -2666,7 +2668,7 @@ export default function App() {
 
                   <div>
                     <h3 className="font-extrabold text-slate-100 text-xs sm:text-sm tracking-wider uppercase flex items-center space-x-2">
-                      <span>5-DAY STUDY STREAK</span>
+                      <span>{nextMilestone}-DAY STUDY STREAK</span>
                     </h3>
                     <p className="text-[11px] sm:text-xs text-slate-300 mt-1">
                       {activeSecondsToday >= 600 ? (
@@ -2682,7 +2684,7 @@ export default function App() {
                 <div className="px-3 py-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 rounded-xl text-xs font-black text-amber-300 flex items-center gap-2 shadow-[0_0_12px_rgba(245,158,11,0.25)] shrink-0 self-start sm:self-center">
                   <span className="text-base animate-pulse">🔥</span>
                   <div className="leading-tight text-right sm:text-left">
-                    <div className="font-black text-xs text-amber-100">{userProfile.streak}/5 Days</div>
+                    <div className="font-black text-xs text-amber-100">{userProfile.streak}/{nextMilestone} Days</div>
                     <div className="text-[8.5px] font-bold text-amber-400 uppercase tracking-widest">STREAK</div>
                   </div>
                 </div>
@@ -2696,7 +2698,7 @@ export default function App() {
                     <span>Focus Target Today ({Math.floor(activeSecondsToday / 60)} / 10 mins)</span>
                   </span>
                   <span className="text-amber-300 font-extrabold">
-                    {Math.round((activeSecondsToday / 600) * 100)}% Complete
+                    {Math.min(100, Math.round((activeSecondsToday / 600) * 100))}% Complete
                   </span>
                 </div>
                 <div className="w-full h-2.5 bg-[#060913] border border-slate-800/90 rounded-full overflow-hidden p-0.5 relative">
@@ -2710,11 +2712,11 @@ export default function App() {
               {/* DAY PILLS (5-DAY CARDS) */}
               <div className="grid grid-cols-5 gap-1.5 sm:gap-2.5 relative z-10">
                 {[
-                  { d: 'DAY 1', w: 'Mon' },
-                  { d: 'DAY 2', w: 'Tue' },
-                  { d: 'DAY 3', w: 'Wed' },
-                  { d: 'DAY 4', w: 'Thu' },
-                  { d: 'DAY 5', w: 'Fri' }
+                  { d: `DAY ${nextMilestone - 4}`, w: 'Mon' },
+                  { d: `DAY ${nextMilestone - 3}`, w: 'Tue' },
+                  { d: `DAY ${nextMilestone - 2}`, w: 'Wed' },
+                  { d: `DAY ${nextMilestone - 1}`, w: 'Thu' },
+                  { d: `DAY ${nextMilestone}`, w: 'Fri' }
                 ].map((item, idx) => {
                   const isDone = streakCompletedDays[idx];
                   return (
