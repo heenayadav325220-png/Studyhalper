@@ -413,26 +413,11 @@ Make sure you write keywords like "PDF", "Notes", "Summary", "Formula Sheet", "P
 
       res.json({ text: answerText });
     } catch (err: any) {
-      const isKeyIssue = err?.message === "GEMINI_KEY_LEAKED_OR_FORBIDDEN" || 
-                         err?.message === "GEMINI_API_KEY_UNAVAILABLE" ||
-                         (err?.message && (err.message.includes("leaked") || err.message.includes("403") || err.message.includes("PERMISSION_DENIED")));
-      
-      if (isKeyIssue) {
-        console.log("[AI Tutor] Gemini API key status notice: using resilient curriculum knowledge engine.");
-      } else {
-        console.log("[AI Tutor] Serving academic answer via resilient curriculum knowledge engine.");
-      }
-
-      const fallbackPrompt = req.body?.prompt || "Study Question";
-      const fallbackAnswer = generateCurriculumStudyAnswer({
-        prompt: fallbackPrompt,
-        language: req.body?.language,
-        persona: req.body?.persona,
-        studentContext: req.body?.studentContext,
-        isApiKeyIssue: isKeyIssue
+      console.error("[AI Tutor] Gemini Error occurred:", err);
+      res.status(500).json({
+        error: err?.message || String(err),
+        details: err?.stack || ""
       });
-
-      res.json({ text: fallbackAnswer });
     }
   });
 
@@ -444,23 +429,17 @@ Make sure you write keywords like "PDF", "Notes", "Summary", "Formula Sheet", "P
       const chosenTopic = (topic || studentContext?.topic || studentContext?.className?.split('Topic:')?.[1] || subject || "Core Concepts").trim();
       
       let langName = 'English';
-      let langCode = 'en';
       const normLang = String(language || '').toLowerCase().trim();
       if (normLang === 'hi' || normLang === 'hindi') {
         langName = 'pure, standard Hindi (हिंदी in Devanagari script)';
-        langCode = 'hi';
       } else if (normLang === 'hinglish') {
         langName = 'friendly Hinglish (a casual conversational blend of Hindi and English written in the English/Latin alphabet, e.g. "Is reaction ka main catalyst kaun sa hai?")';
-        langCode = 'hinglish';
       } else if (normLang === 'marathi') {
         langName = 'Marathi (मराठी)';
-        langCode = 'marathi';
       } else if (normLang === 'tamil') {
         langName = 'Tamil (தமிழ்)';
-        langCode = 'tamil';
       } else if (normLang === 'bengali') {
         langName = 'Bengali (বাংলা)';
-        langCode = 'bengali';
       }
 
       const cleanSubject = subject || 'General';
@@ -484,25 +463,21 @@ Each object in the array must strictly have these keys:
 - "explanation": string (clear conceptual reason why this option is correct)`;
 
       let questions: any[] = [];
-      try {
-        const text = await callGeminiWithResilience({
-          contents: prompt,
-          preferredModel: 'gemini-2.5-flash',
-          config: {
-            temperature: 0.8
-          }
-        });
-        const cleanJsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
-        const parsed = JSON.parse(cleanJsonStr);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          questions = parsed;
+      const text = await callGeminiWithResilience({
+        contents: prompt,
+        preferredModel: 'gemini-2.5-flash',
+        config: {
+          temperature: 0.8
         }
-      } catch (aiErr) {
-        console.warn("[AI Quiz Route] Gemini API fallback triggered:", aiErr);
+      });
+      const cleanJsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
+      const parsed = JSON.parse(cleanJsonStr);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        questions = parsed;
       }
 
       if (!questions || questions.length === 0) {
-        questions = generateSubjectMockQuestions(cleanSubject, chosenTopic, langCode, numQuestions);
+        throw new Error("Failed to generate questions. Please try again.");
       }
 
       // CRITICAL: True Fisher-Yates Option Shuffling & Answer Re-indexing
@@ -536,18 +511,10 @@ Each object in the array must strictly have these keys:
       res.json(normalized);
     } catch (err: any) {
       console.error("[Quiz API Error]:", err);
-      const fallbackQuestions = generateSubjectMockQuestions(
-        req.body?.subject || 'Mathematics', 
-        req.body?.topic || 'Core Concepts', 
-        req.body?.language === 'hi' ? 'hi' : 'en', 
-        req.body?.questionCount || 10
-      );
-      res.json(fallbackQuestions.map((q: any) => ({
-        question: q.questionText,
-        options: q.options,
-        answer: q.correctOptionIndex,
-        explanation: q.explanation
-      })));
+      res.status(500).json({
+        error: err?.message || String(err),
+        details: err?.stack || ""
+      });
     }
   });
 
