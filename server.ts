@@ -186,7 +186,9 @@ app.use((req, res, next) => {
     "https://studyhalper.vercel.app",
     "http://localhost",
     "http://localhost:3000",
-    "capacitor://localhost"
+    "capacitor://localhost",
+    "https://localhost",
+    "https://localhost:443"
   ];
   if (origin) {
     if (allowedOrigins.includes(origin) || origin.endsWith(".vercel.app") || origin.includes("run.app")) {
