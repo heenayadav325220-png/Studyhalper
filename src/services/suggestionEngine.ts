@@ -1,3 +1,5 @@
+import { API_BASE } from '../config/apiConfig';
+
 export interface AcademicSuggestion {
   id: string;
   icon: 'question' | 'practice' | 'deepen' | 'analogy' | 'quiz' | 'formula' | 'step' | 'mistake' | 'summary' | 'action';
@@ -415,32 +417,39 @@ export async function getAiTutorSuggestions(context: SuggestionContext): Promise
     }));
 
     // Call backend suggestion generator
-    const res = await fetch('/api/gemini/suggestions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        history: recentMsgs,
-        subject: context.subject,
-        studentContext: context.studentContext,
-        language: context.language
-      })
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    try {
+      const res = await fetch(`${API_BASE}/api/gemini/suggestions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          history: recentMsgs,
+          subject: context.subject,
+          studentContext: context.studentContext,
+          language: context.language
+        }),
+        signal: controller.signal
+      });
 
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data.suggestions) && data.suggestions.length === 3) {
-        const result = data.suggestions.map((s: any, idx: number) => ({
-          id: `ai_sugg_${Date.now()}_${idx}`,
-          icon: s.icon || (idx === 0 ? 'deepen' : idx === 1 ? 'practice' : 'analogy'),
-          label: s.label || heuristic[idx].label,
-          prompt: s.prompt || heuristic[idx].prompt,
-          subtitle: s.subtitle || heuristic[idx].subtitle,
-          category: s.category || (idx === 0 ? 'deep_dive' : idx === 1 ? 'practice' : 'concept'),
-          badge: s.badge || (idx === 1 ? '+15 XP' : 'High Yield')
-        }));
-        clientSuggCache.set(cacheKey, { data: result, timestamp: Date.now() });
-        return result;
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.suggestions) && data.suggestions.length === 3) {
+          const result = data.suggestions.map((s: any, idx: number) => ({
+            id: `ai_sugg_${Date.now()}_${idx}`,
+            icon: s.icon || (idx === 0 ? 'deepen' : idx === 1 ? 'practice' : 'analogy'),
+            label: s.label || heuristic[idx].label,
+            prompt: s.prompt || heuristic[idx].prompt,
+            subtitle: s.subtitle || heuristic[idx].subtitle,
+            category: s.category || (idx === 0 ? 'deep_dive' : idx === 1 ? 'practice' : 'concept'),
+            badge: s.badge || (idx === 1 ? '+15 XP' : 'High Yield')
+          }));
+          clientSuggCache.set(cacheKey, { data: result, timestamp: Date.now() });
+          return result;
+        }
       }
+    } finally {
+      clearTimeout(timeoutId);
     }
   } catch (e) {
     // Non-blocking fallback to heuristic

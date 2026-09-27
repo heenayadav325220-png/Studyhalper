@@ -1,4 +1,5 @@
 import { auth } from './firebase';
+import { API_BASE } from '../config/apiConfig';
 
 // Get current user auth token
 async function getAuthToken(): Promise<string | null> {
@@ -16,14 +17,17 @@ export async function syncUserWithSql(displayName?: string, photoUrl?: string) {
   const token = await getAuthToken();
   if (!token) return null;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
-    const res = await fetch('/api/user/sync', {
+    const res = await fetch(`${API_BASE}/api/user/sync`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ displayName, photoUrl }),
+      signal: controller.signal,
     });
     if (res.ok) {
       const data = await res.json();
@@ -31,6 +35,8 @@ export async function syncUserWithSql(displayName?: string, photoUrl?: string) {
     }
   } catch (err) {
     console.warn('SQL User sync notice:', err);
+  } finally {
+    clearTimeout(timeoutId);
   }
   return null;
 }
@@ -40,9 +46,12 @@ export async function fetchSqlUserProfile() {
   const token = await getAuthToken();
   if (!token) return null;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
-    const res = await fetch('/api/user/profile', {
+    const res = await fetch(`${API_BASE}/api/user/profile`, {
       headers: { 'Authorization': `Bearer ${token}` },
+      signal: controller.signal,
     });
     if (res.ok) {
       const data = await res.json();
@@ -50,6 +59,8 @@ export async function fetchSqlUserProfile() {
     }
   } catch (err) {
     console.warn('SQL fetch profile notice:', err);
+  } finally {
+    clearTimeout(timeoutId);
   }
   return null;
 }
@@ -59,20 +70,25 @@ export async function logSqlStudySession(subject: string, durationMinutes: numbe
   const token = await getAuthToken();
   if (!token) return null;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
-    const res = await fetch('/api/study-sessions', {
+    const res = await fetch(`${API_BASE}/api/study-sessions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ subject, durationMinutes, topic, xpEarned }),
+      signal: controller.signal,
     });
     if (res.ok) {
       return await res.json();
     }
   } catch (err) {
     console.warn('SQL study session log notice:', err);
+  } finally {
+    clearTimeout(timeoutId);
   }
   return null;
 }
@@ -82,20 +98,25 @@ export async function logSqlMockExam(subject: string, score: number, totalQuesti
   const token = await getAuthToken();
   if (!token) return null;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
-    const res = await fetch('/api/mock-exams', {
+    const res = await fetch(`${API_BASE}/api/mock-exams`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ subject, score, totalQuestions, details }),
+      signal: controller.signal,
     });
     if (res.ok) {
       return await res.json();
     }
   } catch (err) {
     console.warn('SQL mock exam log notice:', err);
+  } finally {
+    clearTimeout(timeoutId);
   }
   return null;
 }

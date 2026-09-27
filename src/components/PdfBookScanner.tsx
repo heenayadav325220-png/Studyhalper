@@ -19,6 +19,7 @@ import ReactMarkdown from 'react-markdown';
 import { UserProfile } from '../types';
 import { playTutorSpeech } from '../services/voiceSettings';
 import { showToast } from './Toast';
+import { API_BASE } from '../config/apiConfig';
 
 interface PdfBookScannerProps {
   user?: UserProfile;
@@ -165,19 +166,26 @@ export const PdfBookScanner: React.FC<PdfBookScannerProps> = ({
         payload.textContent = textToAnalyze.trim();
       }
 
-      const res = await fetch('/api/pdf-scan-analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      try {
+        const res = await fetch(`${API_BASE}/api/pdf-scan-analyze`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
 
-      if (!res.ok) {
-        throw new Error('Failed to analyze document');
+        if (!res.ok) {
+          throw new Error('Failed to analyze document');
+        }
+
+        const data: ChapterAnalysisResult = await res.json();
+        setAnalysisResult(data);
+        if (onAddXp) onAddXp(30);
+      } finally {
+        clearTimeout(timeoutId);
       }
-
-      const data: ChapterAnalysisResult = await res.json();
-      setAnalysisResult(data);
-      if (onAddXp) onAddXp(30);
     } catch (err: any) {
       console.error('Scan analysis failed:', err);
       showToast(

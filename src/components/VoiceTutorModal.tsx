@@ -24,6 +24,7 @@ import { UserProfile } from '../types';
 import { playTutorSpeech } from '../services/voiceSettings';
 import { CustomVoiceModal } from './CustomVoiceModal';
 import { showToast } from './Toast';
+import { API_BASE } from '../config/apiConfig';
 
 interface VoiceTutorModalProps {
   isOpen: boolean;
@@ -242,8 +243,10 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
     setTranscript('');
     setIsLoading(true);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     try {
-      const res = await fetch('/api/voice-tutor', {
+      const res = await fetch(`${API_BASE}/api/voice-tutor`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -258,7 +261,8 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
             targetGoal: user.targetGoal
           },
           language: voiceLang
-        })
+        }),
+        signal: controller.signal
       });
 
       if (!res.ok) throw new Error('Voice API failed');
@@ -293,6 +297,7 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
         }
       ]);
     } finally {
+      clearTimeout(timeoutId);
       setIsLoading(false);
     }
   };

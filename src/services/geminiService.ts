@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { API_BASE } from "../config/apiConfig";
 import { getFallbackAnswer } from "./fallbackData";
 import { checkCreatorQuestion, generateSubjectMockQuestions } from "./curriculumEngine";
 
@@ -132,7 +132,7 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
   // Identify if this is a cacheable educational study notes/tools endpoint
   const cacheableEndpoints = [
     "/api/gemini/notes-generator",
-    "/api/gemini/notes-summarizer",
+    "/api/summarize-notes",
     "/api/gemini/explain-topic",
     "/api/gemini/mindmap",
     "/api/gemini/question-paper",
@@ -209,7 +209,24 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
       modifiedInit.headers = headers;
     }
 
-    const response = await fetch(input, modifiedInit);
+    const resolvedInput = typeof input === "string" && input.startsWith("/api/")
+      ? `${API_BASE}${input}`
+      : input;
+
+    const controller = !modifiedInit.signal ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 30000) : null;
+    if (controller) {
+      modifiedInit.signal = controller.signal;
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(resolvedInput, modifiedInit);
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    }
 
     try {
       const isAiEndpoint = url.includes("/api/gemini/") || url.includes("generativelanguage.googleapis.com");
@@ -288,118 +305,6 @@ export function cleanAndParseJson<T>(text: string, fallback: T): T {
   }
 }
 
-// Lazy-loaded client-side fallback
-let clientAiInstance: any = null;
-function getClientAiInstance(): any {
-  if (!clientAiInstance) {
-    const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || "";
-    if (!apiKey) {
-      console.warn("Client VITE_GEMINI_API_KEY is not defined.");
-      return null;
-    }
-    clientAiInstance = new GoogleGenAI({
-      apiKey: apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        }
-      }
-    });
-  }
-  return clientAiInstance;
-}
-
-/**
- * Handles user-friendly error formatting for Gemini API failures.
- */
-function handleApiError(error: any): string {
-  const errMsg = error?.message || String(error);
-  const status = error?.status || error?.statusCode || error?.code;
-
-  if (errMsg.includes("API_KEY_INVALID") || errMsg.includes("invalid api key") || (status === 400 && errMsg.includes("key"))) {
-    return "Invalid API Key: Please verify that your VITE_GEMINI_API_KEY is correct in your settings.";
-  }
-  if (errMsg.includes("leaked") || errMsg.includes("PERMISSION_DENIED") || status === 403) {
-    return "API Key Error: Your Gemini API key was reported as leaked or unauthorized. Please configure a new Gemini API key in Settings.";
-  }
-  if (status === 429 || errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("Rate limit")) {
-    setAiQuotaExceeded(true, "Rate Limit Exceeded on Gemini client API.");
-    return "Rate Limit Exceeded: We are receiving too many requests. Please wait a moment and try again.";
-  }
-  if (status === 503 || errMsg.includes("503") || errMsg.includes("UNAVAILABLE") || errMsg.includes("busy") || errMsg.includes("high demand")) {
-    return "Service Temporarily Unavailable: Google's AI model is currently under high demand. Retrying...";
-  }
-  if (errMsg.includes("timeout") || errMsg.includes("deadline")) {
-    return "Connection Timeout: The request took too long. Please check your internet connection.";
-  }
-  if (errMsg.includes("fetch") || errMsg.includes("NetworkError") || errMsg.includes("Failed to fetch")) {
-    return "Network Error: Could not connect to the API server. Please check your internet connection.";
-  }
-  return `AI Error: ${errMsg}`;
-}
-
-async function callClientGeminiWithRetry(
-  ai: any,
-  params: {
-    model: string;
-    contents: any;
-    config?: any;
-  },
-  retries = 3,
-  delay = 1000
-): Promise<any> {
-  const isImageModel = params.model.indexOf("image") !== -1;
-  const hasModelsPrefix = params.model.startsWith("models/");
-  const baseCandidates = isImageModel 
-    ? [params.model, "gemini-3.1-flash-lite-image", "gemini-3.1-flash-image"] 
-    : [
-        params.model,
-        "gemini-3.5-flash",
-        "gemini-3.1-flash-lite",
-        "gemini-flash-latest"
-      ];
-  const candidates = baseCandidates.map(m => {
-    if (hasModelsPrefix && !m.startsWith("models/")) {
-      return `models/${m}`;
-    }
-    return m;
-  });
-  const modelsToTry = candidates.filter((item, index) => candidates.indexOf(item) === index);
-
-  for (const modelCandidate of modelsToTry) {
-    let currentRetries = retries;
-    let currentDelay = delay;
-    while (currentRetries >= 0) {
-      try {
-        const result = await ai.models.generateContent({
-          ...params,
-          model: modelCandidate,
-        });
-        if (!result || !result.text && !result.candidates) {
-          throw new Error("Empty response from AI model.");
-        }
-        setAiQuotaExceeded(false, null); // Clear quota state on success!
-        return result;
-      } catch (error: any) {
-        const friendlyError = handleApiError(error);
-        console.warn(`[Gemini Bridge] Transitioning from ${modelCandidate} fallback...`);
-
-        const isTransient = error.status === 503 || error.statusCode === 503 || error.code === 503 || 
-                            friendlyError.includes("Temporarily Unavailable") || friendlyError.includes("Connection Timeout");
-        
-        if (isTransient && currentRetries > 0) {
-          await new Promise((resolve) => setTimeout(resolve, currentDelay));
-          currentRetries--;
-          currentDelay *= 2;
-        } else {
-          break; // Try next model candidate or throw
-        }
-      }
-    }
-  }
-  throw new Error("All client-side Gemini candidate models failed to generate content.");
-}
-
 export async function getStudyAnswer(
   prompt: string, 
   imageBase64?: string | string[], 
@@ -426,7 +331,7 @@ export async function getStudyAnswer(
     ? [imageBase64]
     : [];
 
-  // 1. Try secure backend server route (Primary route)
+  // Try secure backend server route
   try {
     const response = await safeFetch("/api/gemini/answer", {
       method: "POST",
@@ -454,125 +359,11 @@ export async function getStudyAnswer(
       console.warn("Backend Gemini answer route returned error status:", response.status, errData);
     }
   } catch (error) {
-    console.warn("Backend Gemini answer route unreachable, trying client-side fallback...", error);
+    console.warn("Backend Gemini answer route unreachable, falling back to safe offline answer:", error);
   }
 
-  // 2. Client-side fallback if VITE_GEMINI_API_KEY is available
-  try {
-    const ai = getClientAiInstance();
-    if (!ai) {
-      throw new Error("Client Gemini instance could not be initialized (key missing).");
-    }
-
-    let contentsList: any[] = [];
-    if (history && Array.isArray(history)) {
-      contentsList = history.map((msg: any) => ({
-        role: msg.role === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.text }]
-      }));
-    }
-    const currentParts: any[] = [{ text: prompt }];
-    for (const img of imagesArray) {
-      if (img) {
-        currentParts.push({
-          inlineData: {
-            mimeType: "image/png",
-            data: img.split(',')[1] || img
-          }
-        });
-      }
-    }
-    contentsList.push({
-      role: 'user',
-      parts: currentParts
-    });
-
-    let langInstruction = `Explain everything in English.`;
-    if (language === "Hindi") {
-      langInstruction = `You MUST explain entirely in clean, formal Hindi using Devanagari script. All calculations, steps, text, and encouraging words must be in Devangari Hindi.`;
-    } else if (language === "Hinglish" || language === "Mixed") {
-      langInstruction = `You MUST explain concepts in Hinglish (a friendly mix of simple Hindi and English, written in a warm, conversational tone using Latin characters, e.g., 'Hello! Heart humari body ka ek organ hai jo blood pump karta hai. Iske 4 parts hote hai...'). Speak like a helpful study teammate.`;
-    } else if (language === "Marathi") {
-      langInstruction = `You MUST explain entirely in clear, friendly Marathi language.`;
-    } else if (language === "Tamil") {
-      langInstruction = `You MUST explain entirely in clear, friendly Tamil language.`;
-    } else if (language === "Bengali") {
-      langInstruction = `You MUST explain entirely in clear, friendly Bengali language.`;
-    } else if (language === "Spanish") {
-      langInstruction = `You MUST explain entirely in clear, friendly Spanish language.`;
-    } else if (language === "French") {
-      langInstruction = `You MUST explain entirely in clear, friendly French language.`;
-    } else if (language === "German") {
-      langInstruction = `You MUST explain entirely in clear, friendly German language.`;
-    } else if (language === "Russian") {
-      langInstruction = `You MUST explain entirely in clear, friendly Russian language.`;
-    } else if (language === "Chinese") {
-      langInstruction = `You MUST explain entirely in clear, friendly Chinese (Simplified) language.`;
-    }
-
-    let syllabusPrompt = "";
-    if (studentContext) {
-      const country = studentContext.country || "Global";
-      const className = studentContext.className || "10";
-      if (country === "Russia") {
-        syllabusPrompt = `You must strictly follow the Russian National Educational Syllabus (Государственная программа / ФГОС) for grade/class ${className}. All academic standards, terminology, reference formulas, and pedagogy must be tailored to the Russian standard curriculum. Speak in Russian.`;
-      } else if (country === "China") {
-        syllabusPrompt = `You must strictly follow the Chinese National Curriculum Standard (国家课程标准) / Gaokao-aligned pathway for grade/class ${className}. All academic standards, terminology, reference formulas, and pedagogy must match the Chinese educational system. Speak in Chinese.`;
-      } else if (country === "United States") {
-        syllabusPrompt = `You must strictly follow the US Common Core / Next Generation Science Standards (NGSS) or AP/honors standards for grade/class ${className}. Tailor academic terminology and curriculum standards to the United States educational system.`;
-      } else if (country === "India") {
-        syllabusPrompt = `You must strictly follow the Indian CBSE (NCERT) / ICSE / State Board curriculum for grade/class ${className}. Tailor explanations, topics, and terms to the Indian schooling system.`;
-      } else if (country === "United Kingdom") {
-        syllabusPrompt = `You must strictly follow the National Curriculum of England / GCSE / Key Stage curriculum for grade/class ${className}. Tailor spelling, terms (like Key Stages) and curriculum standards to the UK school system.`;
-      } else {
-        syllabusPrompt = `You must follow an internationally recognized global curriculum standard such as the International Baccalaureate (IB) or Cambridge Assessment International Education (CIE) suitable for grade/class ${className}.`;
-      }
-    }
-
-    let personaInstruction = "";
-    if (persona === 'socratic') {
-      personaInstruction = "You are a Socratic Teacher. Never give direct, straight answers to the student immediately. Instead, always ask short, helpful guiding questions to prompt the student to think, deduce, and discover the answer themselves. Encourage their critical thinking.";
-    } else if (persona === 'debugger') {
-      personaInstruction = "You are a Code Debugger and Programming Expert. Analyze code logic, pinpoint bugs, explain syntax errors, and break down solutions step-by-step in clean formatting. Provide optimized and secure code snippets with thorough comments.";
-    } else if (persona === 'translator') {
-      personaInstruction = "You are a Language Translator & Bilingual Speaking Partner. Help the student translate phrases, explain grammar rules, clarify pronunciation tips, and practice conversational dialogue in both English and Hindi or their chosen language.";
-    } else if (persona === 'math') {
-      personaInstruction = "You are a Math Wizard. Break down all mathematical equations, proofs, and word problems into extremely clear, sequential steps. Explain the 'why' behind each step and define any variables or formulas used.";
-    } else {
-      personaInstruction = "You are an encouraging and friendly study helper/coach. Explain concepts clearly and provide step-by-step solutions.";
-    }
-
-    const appInfo = "You are ASCEND AI TUTOR — an intelligent, calm, highly capable study partner who helps students genuinely understand subjects and become better at solving problems independently. You are a brilliant senior/student mentor who deeply understands the subject and explains difficult ideas simply, naturally, and confidently.";
-    const creatorInfo = "Your owner, creator, and lead developer is Rohit Yadav, a brilliant 14/15-year-old student and coder who designed and developed this entire applet. Rohit is the head and founder of his developer team called 'Core AI'. IMPORTANT: You must ONLY talk about your creator Rohit Yadav or Core AI when the user explicitly asks about who created, developed, designed, or owns you. For any other topic (such as general greetings like 'hi' or academic questions like math, science, motion, history), you must NEVER mention Rohit Yadav or Core AI; instead, immediately greet them or address their academic query directly. You must never claim that Google, Google AI Studio, or OpenAI created or own you - they are only providers of the underlying large language model APIs, but the app itself and your persona belongs strictly to Rohit Yadav and Core AI.";
-
-    const writingStyleRules = `
-CORE PERSONALITY & TONE:
-- Tone: Intelligent, calm, clear, curious, patient, honest, encouraging, precise, and student-aware.
-- Presentation style: Slightly conversational, natural, and confident. Speak like a brilliant senior/student mentor who deeply understands the subject.
-- Core Principle: "Understand first. Solve second. Memorize only what actually needs memorizing."
-- NO COMPLIMENT FILLER / NO CONVERSATIONAL FLUFF: Never start responses with sentences like "Excellent choice!", "That's a fantastic question!", "Let's tackle this!", "Let's dive right in!", "Absolutely!", or "Certainly!". Open directly with the core concept or answer.
-- Avoid unnecessary greetings, introductions, motivational filler, and repeated explanations.
-- Praise Policy: Keep praise minimal and realistic (e.g., "You are close, but..." or "Good progress; now let's focus on..."). Never use excessive exclamation marks or hype words.
-- Emojis Policy: Use very few emojis. Never use emojis as decorative markers for headings or lists. The response must look professional even if all emojis are removed.
-`;
-
-    const systemInstruction = studentContext 
-      ? `${appInfo} ${creatorInfo} ${personaInstruction} ${writingStyleRules} You are tutoring ${studentContext.name} who studies in ${studentContext.className} at ${studentContext.school}. ${syllabusPrompt} Keep your tone highly personalized, warm, and encouraging, referring to their school or name when it fits naturally. ${langInstruction}`
-      : `${appInfo} ${creatorInfo} ${personaInstruction} ${writingStyleRules} Support subjects like Math, Science, Biology, Physics, Chemistry, and English. If the user asks for a diagram or visual explanation, describe it clearly or suggest a visual aid. ${langInstruction}`;
-
-    const response = await callClientGeminiWithRetry(ai, {
-      model: "gemini-2.5-flash",
-      contents: contentsList,
-      config: {
-        systemInstruction: systemInstruction,
-      },
-    });
-    
-    return response.text;
-  } catch (clientError: any) {
-    console.warn("Client-side Gemini answer generation failed. Returning smart fallback answer.", clientError?.message || clientError);
-    return getFallbackAnswer(prompt, studentContext);
-  }
+  // Safe offline curriculum fallback
+  return getFallbackAnswer(prompt, studentContext);
 }
 
 function generateGuaranteedLocalSvg(prompt: string): string {
@@ -994,101 +785,10 @@ export async function generateStudyDiagram(prompt: string, type?: "svg" | "image
       return data.imageUrl;
     }
   } catch (error) {
-    console.warn("Backend Gemini diagram route unreachable, trying client-side fallback...", error);
+    console.warn("Backend Gemini diagram route unreachable:", error);
   }
 
-  // 2. Client-side fallback if VITE_GEMINI_API_KEY is available
-  try {
-    const ai = getClientAiInstance();
-    if (!ai) {
-      throw new Error("Client Gemini instance could not be initialized for diagram.");
-    }
-    
-    // If client requested image directly, try standard image model first
-    if (type === "image") {
-      try {
-        const response = await callClientGeminiWithRetry(ai, {
-          model: "gemini-3.1-flash-lite-image",
-          contents: [{ text: `A highly detailed, beautiful, textbook-grade full-color graphic educational diagram or illustration showing: ${prompt}. High-contrast academic illustration, clear markings, 3D style, suitable for scientific learning.` }],
-          config: {
-            imageConfig: {
-              aspectRatio: "1:1",
-            }
-          }
-        });
-
-        if (response.candidates?.[0]?.content?.parts) {
-          for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData) {
-              return `data:image/png;base64,${part.inlineData.data}`;
-            }
-          }
-        }
-      } catch (imgErr) {
-        console.warn("Client image model generation failed:", imgErr);
-      }
-    }
-
-    // Otherwise, or if image model failed, try to generate a beautiful vector SVG using the working text model gemini-3.5-flash
-    try {
-      const svgPrompt = `You are an expert educational designer. Create a beautiful, detailed, neat, textbook-grade academic vector SVG diagram/illustration for: "${prompt}".
-
-      Requirements:
-      1. MUST be a valid, standalone <svg> element with viewBox="0 0 600 450" and width="100%" height="100%".
-      2. Use a modern, ultra-clean design: soft background, precise vector shapes (rects, circles, paths), elegant colors (indigo, slate, sky, emerald), and clear, clean leader lines/arrows pointing to labels.
-      3. Include prominent, highly readable, clear textbook labels for all major parts of the diagram using <text> elements (font-family="system-ui, -apple-system, sans-serif" and proper sizing/contrast).
-      4. Make it highly detailed, professional, and visually appealing.
-      5. Output ONLY the raw SVG code. No markdown formatting (like \`\`\`xml or \`\`\`svg), no leading/trailing commentary, no explanations. It must start with <svg and end with </svg>.`;
-
-      const svgResponse = await callClientGeminiWithRetry(ai, {
-        model: "gemini-3.5-flash",
-        contents: svgPrompt,
-      });
-
-      let svgCode = svgResponse.text || "";
-      // Strip markdown wrapper if present
-      svgCode = svgCode.trim();
-      if (svgCode.startsWith("```")) {
-        svgCode = svgCode.replace(/^```[a-zA-Z]*\n/, "").replace(/\n```$/, "").trim();
-      }
-
-      if (svgCode.includes("<svg")) {
-        // Base64 encode the SVG code for safety in data URLs
-        const base64Svg = btoa(unescape(encodeURIComponent(svgCode)));
-        return `data:image/svg+xml;base64,${base64Svg}`;
-      }
-    } catch (svgErr) {
-      console.warn("Client text-to-SVG fallback failed, trying client image generation...", svgErr);
-    }
-
-    // Try standard image model fallback as third resort
-    try {
-      const response = await callClientGeminiWithRetry(ai, {
-        model: "gemini-3.1-flash-lite-image",
-        contents: [{ text: `Educational diagram or illustration for: ${prompt}. Clear, academic style, labeled if necessary.` }],
-        config: {
-          imageConfig: {
-            aspectRatio: "1:1",
-          }
-        }
-      });
-
-      if (response.candidates?.[0]?.content?.parts) {
-        for (const part of response.candidates[0].content.parts) {
-          if (part.inlineData) {
-            return `data:image/png;base64,${part.inlineData.data}`;
-          }
-        }
-      }
-    } catch (imgErr) {
-      console.warn("Client image model generation failed:", imgErr);
-    }
-
-  } catch (err) {
-    console.warn("Client Gemini diagram generation failed.", err);
-  }
-
-  // Guaranteed local fallback if all API calls fail (e.g. offline, 429 quota exhausted)
+  // Guaranteed local fallback if backend is unavailable (e.g. offline, 429 quota exhausted)
   try {
     const fallbackSvg = generateGuaranteedLocalSvg(prompt);
     const base64Svg = btoa(unescape(encodeURIComponent(fallbackSvg)));
@@ -1171,89 +871,10 @@ export async function generateQuiz(
       }
     }
   } catch (error) {
-    console.warn("Backend Gemini quiz route unreachable, trying client-side fallback...", error);
+    console.warn("Backend Gemini quiz route unreachable:", error);
   }
 
-  // 2. Client-side fallback if VITE_GEMINI_API_KEY is available
-  try {
-    const ai = getClientAiInstance();
-    if (!ai) {
-      throw new Error("Client Gemini instance could not be initialized for quiz.");
-    }
-    const classText = studentContext ? `for grade/class ${studentContext.className}` : "";
-    let langPromptText = `in English`;
-    if (language === "Hindi") {
-      langPromptText = `entirely in Hindi language (using clear Devanagari script suitable for classroom study). All questions, descriptions, and option texts MUST be in clean Hindi.`;
-    } else if (language === "Hinglish" || language === "Mixed") {
-      langPromptText = `in Hinglish language (a casual mix of English and Hindi words written using standard English/Latin alphabet, e.g., 'Soil erosion ko prevent karne ka best way kya hai?'). All questions, descriptions, and option texts MUST be in clean Hinglish sentence structures.`;
-    } else if (language === "Marathi") {
-      langPromptText = `entirely in Marathi language. All questions, descriptions, and option texts MUST be in clean Marathi.`;
-    } else if (language === "Tamil") {
-      langPromptText = `entirely in Tamil language. All questions, descriptions, and option texts MUST be in clean Tamil.`;
-    } else if (language === "Bengali") {
-      langPromptText = `entirely in Bengali language. All questions, descriptions, and option texts MUST be in clean Bengali.`;
-    } else if (language === "Spanish") {
-      langPromptText = `entirely in Spanish language. All questions, descriptions, and option texts MUST be in clean Spanish.`;
-    } else if (language === "French") {
-      langPromptText = `entirely in French language. All questions, descriptions, and option texts MUST be in clean French.`;
-    } else if (language === "German") {
-      langPromptText = `entirely in German language. All questions, descriptions, and option texts MUST be in clean German.`;
-    } else if (language === "Russian") {
-      langPromptText = `entirely in clean, friendly Russian language. All questions, descriptions, and option texts MUST be in clean Russian.`;
-    } else if (language === "Chinese") {
-      langPromptText = `entirely in clean, friendly Chinese (Simplified) language. All questions, descriptions, and option texts MUST be in clean Chinese.`;
-    }
-
-    let syllabusInstruct = "";
-    if (studentContext) {
-      const country = studentContext.country || "Global";
-      if (country === "Russia") {
-        syllabusInstruct = "strictly following the Russian National Educational Syllabus (Государственная программа / ФГОС) standard,";
-      } else if (country === "China") {
-        syllabusInstruct = "strictly matching the Chinese National Curriculum Standard (国家课程标准) standard,";
-      } else if (country === "United States") {
-        syllabusInstruct = "aligned with US Common Core / NGSS standards,";
-      } else if (country === "India") {
-        syllabusInstruct = "aligned with Indian CBSE (NCERT) syllabus guidelines,";
-      } else if (country === "United Kingdom") {
-        syllabusInstruct = "aligned with GCSE / National Curriculum of England standards,";
-      }
-    }
-
-    let difficultyInstruct = "";
-    if (difficulty === "Easy") {
-      difficultyInstruct = "The difficulty of the quiz MUST be EASY. Focus on introductory definitions, basic principles, and simple, direct questions. Make option distractors very simple.";
-    } else if (difficulty === "Hard") {
-      difficultyInstruct = "The difficulty of the quiz MUST be HARD or ADVANCED. Focus on complex, multi-step problem solving, critical thinking, advanced theories, and subtle nuances. Use trickier, plausible option distractors.";
-    } else {
-      difficultyInstruct = "The difficulty of the quiz MUST be MEDIUM. Provide a balanced mix of conceptual recall, analytical questions, and practical applications suitable for typical classroom standards.";
-    }
-
-    const instructionText = `Generate a ${numQuestions}-question multiple choice quiz on the topic "${chosenTopic}" in ${subject} ${classText} ${syllabusInstruct} ${langPromptText}. ${difficultyInstruct}
-CRITICAL: Distribute the correct answer (0, 1, 2, 3) randomly. Never make all questions option C.
-Return only valid JSON in the format: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0, "explanation": "..."}]`;
-
-    const response = await callClientGeminiWithRetry(ai, {
-      model: "gemini-2.5-flash",
-      contents: instructionText,
-      config: {
-        responseMimeType: "application/json",
-      },
-    });
-
-    try {
-      const parsed = cleanAndParseJson(response.text || "[]", [] as any[]);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return shuffleQuizQuestions(parsed);
-      }
-    } catch (e) {
-      console.warn("Client quiz JSON parsing failed.", e);
-    }
-  } catch (clientError) {
-    console.warn("Client-side Gemini quiz generation failed. Serving curriculum mock exam questions.", clientError);
-  }
-
-  // 3. Final guaranteed fallback with dynamic question count and random option shuffle
+  // 2. Final guaranteed curriculum mock exam fallback
   const fallbackQuestions = generateSubjectMockQuestions(
     subject,
     chosenTopic,
@@ -1341,84 +962,7 @@ export async function generateFlashcards(
       }
     }
   } catch (error) {
-    console.warn("Backend Gemini flashcards route unreachable, trying client-side fallback...", error);
-  }
-
-  // 4. Client-side fallback if VITE_GEMINI_API_KEY is available
-  try {
-    const ai = getClientAiInstance();
-    if (ai) {
-      const contextText = noteContent 
-        ? `based on the note titled "${noteTitle || 'Untitled'}" with content: "${noteContent}"`
-        : `for the subject "${subject}"`;
-
-      // Batching strategy on client side if count > 5
-      let finalCards: Array<{ front: string; back: string }> = [];
-
-      if (count > 5) {
-        const prompts = [
-          `Generate exactly 5 educational study flashcards ${contextText}. Focus on foundational terms and core definitions. Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`,
-          `Generate exactly ${count - 5} educational study flashcards ${contextText}. Focus on secondary concepts, formulas, and deep-dive details. Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`
-        ];
-
-        const batchPromises = prompts.map(p => 
-          callClientGeminiWithRetry(ai, {
-            model: "gemini-3.5-flash",
-            contents: p,
-            config: { responseMimeType: "application/json" }
-          })
-        );
-
-        const responses = await Promise.all(batchPromises);
-        for (const res of responses) {
-          try {
-            const parsed = cleanAndParseJson(res.text || "[]", [] as any[]);
-            if (Array.isArray(parsed)) {
-              finalCards.push(...parsed);
-            }
-          } catch (e) {
-            console.warn("Client batch flashcards JSON parsing failed.", e);
-          }
-        }
-      } else {
-        const instructionText = `Generate exactly ${count} educational study flashcards ${contextText}.
-Identify key terms, definitions, formulas, or concepts. For each, create a brief, clear, engaging question or term for the "front" and a precise, easy-to-understand answer or explanation for the "back".
-Return ONLY valid JSON in the format: [{"front": "...", "back": "..."}]`;
-
-        const response = await callClientGeminiWithRetry(ai, {
-          model: "gemini-3.5-flash",
-          contents: instructionText,
-          config: {
-            responseMimeType: "application/json",
-          },
-        });
-
-        try {
-          const parsed = cleanAndParseJson(response.text || "[]", [] as any[]);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            finalCards = parsed;
-          }
-        } catch (e) {
-          console.warn("Client flashcards JSON parsing failed.", e);
-        }
-      }
-
-      if (finalCards.length > 0) {
-        setLocalCache("flashcards", country, subject, cacheKey, finalCards);
-        clientFlashcardsCache.set(cacheKey, finalCards);
-        try {
-          const localCacheStr = localStorage.getItem('studybuddy_flashcard_api_cache') || '{}';
-          const cacheMap = JSON.parse(localCacheStr);
-          cacheMap[cacheKey] = finalCards;
-          localStorage.setItem('studybuddy_flashcard_api_cache', JSON.stringify(cacheMap));
-        } catch (cErr) {
-          console.warn("Failed to store local cache", cErr);
-        }
-        return finalCards;
-      }
-    }
-  } catch (clientError) {
-    console.warn("Client-side Gemini flashcard generation failed. Using final fallback lists.", clientError);
+    console.warn("Backend Gemini flashcards route unreachable:", error);
   }
 
   // Final guaranteed fallback
@@ -1469,24 +1013,7 @@ export async function generateNotes(
       return await response.json();
     }
   } catch (err) {
-    console.warn("Backend notes generator failed, trying client fallback...", err);
-  }
-
-  try {
-    const ai = getClientAiInstance();
-    if (ai) {
-      const prompt = `Generate comprehensive, highly educational, structured study notes on the topic: "${topic}" for Subject: "${subject}" at a Grade ${grade} level. 
-      Format with clean Markdown, clear headings, bullet points, key definitions, and examples.
-      Return ONLY valid JSON in the format: {"title": "...", "content": "..."}`;
-      const response = await callClientGeminiWithRetry(ai, {
-        model: "gemini-3.5-flash",
-        contents: prompt,
-        config: { responseMimeType: "application/json" }
-      });
-      return cleanAndParseJson(response.text || "{}", { title: `${topic} Notes`, content: "" });
-    }
-  } catch (err) {
-    console.error("Client-side notes generator failed:", err);
+    console.warn("Backend notes generator unreachable:", err);
   }
 
   return {
@@ -1495,32 +1022,18 @@ export async function generateNotes(
   };
 }
 
-export async function summarizeNotes(content: string): Promise<{ summary: string }> {
+export async function summarizeNotes(content: string, language?: string): Promise<{ summary: string }> {
   try {
-    const response = await safeFetch("/api/gemini/notes-summarizer", {
+    const response = await safeFetch("/api/summarize-notes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content })
+      body: JSON.stringify({ content, language })
     });
     if (response.ok) {
       return await response.json();
     }
   } catch (err) {
-    console.warn("Backend notes summarizer failed, trying client fallback...", err);
-  }
-
-  try {
-    const ai = getClientAiInstance();
-    if (ai) {
-      const prompt = `Create a concise, high-impact summary of the following study notes. Highlight key terms, major formulas, and critical takeaways using bullet points. Keep it clear and easy for a student to review quickly.\n\nNotes Content:\n${content}`;
-      const response = await callClientGeminiWithRetry(ai, {
-        model: "gemini-3.5-flash",
-        contents: prompt,
-      });
-      return { summary: response.text || "Failed to generate summary." };
-    }
-  } catch (err) {
-    console.error("Client-side notes summarizer failed:", err);
+    console.warn("Backend notes summarizer unreachable:", err);
   }
 
   return { summary: "Failed to summarize notes dynamically due to a service error. Please try again." };
@@ -1542,29 +1055,7 @@ export async function explainTopic(
       return await response.json();
     }
   } catch (err) {
-    console.warn("Backend explain-topic failed, trying client fallback...", err);
-  }
-
-  try {
-    const ai = getClientAiInstance();
-    if (ai) {
-      let styleInstruction = "Explain in extremely simple, friendly language suitable for a child.";
-      if (style === "Analogies") {
-        styleInstruction = "Explain using vivid, funny everyday analogies and metaphors that makes it impossible to forget.";
-      } else if (style === "5-year-old") {
-        styleInstruction = "Explain like I am 5 years old (ELI5). Use very basic words and a fun, story-like approach.";
-      } else if (style === "Step-by-step") {
-        styleInstruction = "Provide a meticulous, clear step-by-step breakdown from first principles.";
-      }
-      const prompt = `${styleInstruction} Topic: "${topic}" (Subject: ${subject}) for Grade ${grade}. Make it engaging and encouraging!`;
-      const response = await callClientGeminiWithRetry(ai, {
-        model: "gemini-3.5-flash",
-        contents: prompt,
-      });
-      return { explanation: response.text || "Failed to generate explanation." };
-    }
-  } catch (err) {
-    console.error("Client-side explain-topic failed:", err);
+    console.warn("Backend explain-topic unreachable:", err);
   }
 
   return { explanation: "Could not fetch a simplified explanation at this moment. Please check your internet connection and try again." };
@@ -1581,25 +1072,7 @@ export async function generateMindmap(topic: string): Promise<{ name: string; ch
       return await response.json();
     }
   } catch (err) {
-    console.warn("Backend mindmap failed, trying client fallback...", err);
-  }
-
-  try {
-    const ai = getClientAiInstance();
-    if (ai) {
-      const prompt = `Generate a hierarchical mind map structure for the topic: "${topic}".
-      Provide a deeply nested JSON representation where each node has a "name" and an optional list of "children" (which is an array of other nodes). Limit hierarchy depth to 3 levels.
-      Format your response ONLY as valid JSON in this exact structure:
-      {"name": "${topic}", "children": [{"name": "Subtopic A", "children": [{"name": "Detail 1"}]}, {"name": "Subtopic B", "children": []}]}`;
-      const response = await callClientGeminiWithRetry(ai, {
-        model: "gemini-3.5-flash",
-        contents: prompt,
-        config: { responseMimeType: "application/json" }
-      });
-      return cleanAndParseJson(response.text || "{}", { name: topic, children: [] });
-    }
-  } catch (err) {
-    console.error("Client-side mindmap failed:", err);
+    console.warn("Backend mindmap unreachable:", err);
   }
 
   return {
@@ -1627,26 +1100,7 @@ export async function generateQuestionPaper(
       return await response.json();
     }
   } catch (err) {
-    console.warn("Backend question-paper failed, trying client fallback...", err);
-  }
-
-  try {
-    const ai = getClientAiInstance();
-    if (ai) {
-      const prompt = `Create a complete, formal, school-grade question paper for the topic: "${topic}" in Subject: "${subject}" for Grade ${grade} students.
-      Divide the paper into:
-      - Section A: 5 Multiple Choice Questions (with correct options indicated at the very bottom in an answer key)
-      - Section B: 3 Short Answer Questions (each with marks allotted, e.g., [3 Marks])
-      - Section C: 2 Long Answer/Analytical Questions (each with marks allotted, e.g., [5 Marks])
-      Format beautifully with clean Markdown headings and lines.`;
-      const response = await callClientGeminiWithRetry(ai, {
-        model: "gemini-3.5-flash",
-        contents: prompt,
-      });
-      return { paperText: response.text || "Failed to generate question paper." };
-    }
-  } catch (err) {
-    console.error("Client-side question-paper failed:", err);
+    console.warn("Backend question-paper unreachable:", err);
   }
 
   return { paperText: "Failed to generate question paper dynamically. Please try again." };
@@ -1663,29 +1117,7 @@ export async function performOcr(imageBase64: string): Promise<{ text: string }>
       return await response.json();
     }
   } catch (err) {
-    console.warn("Backend OCR failed, trying client fallback...", err);
-  }
-
-  try {
-    const ai = getClientAiInstance();
-    if (ai) {
-      const cleanBase64 = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
-      const response = await callClientGeminiWithRetry(ai, {
-        model: "gemini-3.5-flash",
-        contents: [
-          { text: "Extract all study-related text, math equations, formulas, and written contents from this image. Return clean text formatted properly. If there are math equations, format them nicely." },
-          {
-            inlineData: {
-              mimeType: "image/png",
-              data: cleanBase64
-            }
-          }
-        ],
-      });
-      return { text: response.text || "Failed to extract text." };
-    }
-  } catch (err) {
-    console.error("Client-side OCR failed:", err);
+    console.warn("Backend OCR unreachable:", err);
   }
 
   return { text: "Failed to extract text from image." };
@@ -1702,30 +1134,7 @@ export async function summarizePdf(textContent: string): Promise<{ summary: stri
       return await response.json();
     }
   } catch (err) {
-    console.warn("Backend PDF-summary failed, trying client fallback...", err);
-  }
-
-  try {
-    const ai = getClientAiInstance();
-    if (ai) {
-      const prompt = `Analyze the following document text and produce a structured analysis.
-      Return a JSON object containing:
-      1. "summary": A concise overview of the document (Markdown-enabled string).
-      2. "keyTerms": An array of objects: [{"term": "...", "definition": "..."}].
-      3. "questions": An array of mock test questions: [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}].
-      Limit key terms to 5 and questions to 5.
-      
-      Document text:
-      ${textContent.substring(0, 8000)}`;
-      const response = await callClientGeminiWithRetry(ai, {
-        model: "gemini-3.5-flash",
-        contents: prompt,
-        config: { responseMimeType: "application/json" }
-      });
-      return cleanAndParseJson(response.text || "{}", { summary: "Could not summarize document dynamically.", keyTerms: [], questions: [] });
-    }
-  } catch (err) {
-    console.error("Client-side PDF-summary failed:", err);
+    console.warn("Backend PDF-summary unreachable:", err);
   }
 
   return {
@@ -1736,11 +1145,14 @@ export async function summarizePdf(textContent: string): Promise<{ summary: stri
 }
 
 export async function enhanceImagePrompt(prompt: string, style?: string): Promise<string> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
-    const response = await fetch("/api/enhance-image-prompt", {
+    const response = await fetch(`${API_BASE}/api/enhance-image-prompt`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, style })
+      body: JSON.stringify({ prompt, style }),
+      signal: controller.signal
     });
     if (response.ok) {
       const data = await response.json();
@@ -1748,6 +1160,8 @@ export async function enhanceImagePrompt(prompt: string, style?: string): Promis
     }
   } catch (err) {
     console.warn("Failed to enhance prompt:", err);
+  } finally {
+    clearTimeout(timeoutId);
   }
   return prompt;
 }
@@ -1762,8 +1176,10 @@ export async function generateAiImage(
     seed?: number;
   }
 ): Promise<{ imageUrl: string; size: string; aspectRatio: string; modelUsed?: string; width?: number; height?: number; prompt?: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
-    const response = await fetch("/api/generate-image", {
+    const response = await fetch(`${API_BASE}/api/generate-image`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1773,7 +1189,8 @@ export async function generateAiImage(
         style: options?.style || 'none',
         negativePrompt: options?.negativePrompt,
         seed: options?.seed
-      })
+      }),
+      signal: controller.signal
     });
     if (response.ok) {
       const data = await response.json();
@@ -1782,6 +1199,8 @@ export async function generateAiImage(
     }
   } catch (err) {
     console.warn("API /api/generate-image call failed, fallback:", err);
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   // Fallback if network fails
