@@ -309,4 +309,30 @@ export class PersonalLearningService {
     ]);
     return { completed, weak };
   }
+
+  static async compileStudentMemory(userId: string): Promise<any> {
+    const { completed, weak } = this.getTopicStats();
+    const mistakes = await this.getMistakes(userId);
+    const revisions = await this.getRevisionTopics(userId);
+    
+    const recentMistakes = mistakes.slice(-5).map(m => `[${m.subject}] ${m.topic}: "${m.question}"`);
+    const spacedRevisions = revisions.filter(r => r.status === 'pending').map(r => `${r.subject} - ${r.topic} (${r.priority} Priority)`);
+    const preferredStyle = localStorage.getItem(`sb_preferred_style_${userId}`) || 'Adaptive (Intuitive analogies first, then formal definitions)';
+    
+    return {
+      completedTopics: completed,
+      weakTopics: weak,
+      recentMistakes,
+      spacedRevisions,
+      preferredStyle
+    };
+  }
+
+  static setPreferredStyle(userId: string, style: string): void {
+    localStorage.setItem(`sb_preferred_style_${userId}`, style);
+  }
+
+  static getPreferredStyle(userId: string): string {
+    return localStorage.getItem(`sb_preferred_style_${userId}`) || 'Adaptive (Intuitive analogies first, then formal definitions)';
+  }
 }

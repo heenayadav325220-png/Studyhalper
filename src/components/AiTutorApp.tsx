@@ -53,6 +53,7 @@ import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const CodeHighlighter = SyntaxHighlighter as any;
 import { getStudyAnswer } from '../services/geminiService';
+import { PersonalLearningService } from '../services/personalLearningService';
 import { createGoogleDoc, authorizeGoogleService, getSavedToken, removeToken, fetchDriveFiles, fetchFileContent } from '../services/googleWorkspace';
 import { exportConversationToPdf } from '../utils/pdfExport';
 import { showToast } from './Toast';
@@ -582,6 +583,45 @@ interface SavedFormula {
   latex: string;
 }
 
+const isPdfMaterial = (text: string): boolean => {
+  if (!text) return false;
+  const lc = text.toLowerCase();
+  
+  // English keywords
+  const hasEnglishKeywords = lc.includes('notes') || 
+         lc.includes('summary') || 
+         lc.includes('formula sheet') || 
+         lc.includes('formula list') || 
+         lc.includes('questions') || 
+         lc.includes('practice paper') || 
+         lc.includes('worksheet') || 
+         lc.includes('mock test') || 
+         lc.includes('question paper') || 
+         lc.includes('answer key') || 
+         lc.includes('revision sheet') || 
+         lc.includes('study guide') ||
+         lc.includes('pdf');
+
+  // Hindi/Hinglish keywords
+  const hasHindiKeywords = lc.includes('नोट्स') || 
+         lc.includes('नोट') || 
+         lc.includes('सारांश') || 
+         lc.includes('सूत्र') || 
+         lc.includes('प्रश्नावली') || 
+         lc.includes('प्रश्न') || 
+         lc.includes('अभ्यास') || 
+         lc.includes('वर्कशीट') || 
+         lc.includes('पर्चा') || 
+         lc.includes('पीडीएफ') || 
+         lc.includes('अध्ययन सामग्री') || 
+         lc.includes('revision pdf') || 
+         lc.includes('summary pdf') || 
+         lc.includes('formula pdf') || 
+         lc.includes('practice pdf');
+
+  return hasEnglishKeywords || hasHindiKeywords;
+};
+
 const DEFAULT_SAVED_FORMULAS: SavedFormula[] = [
   { id: 'f1', name: 'Quadratic Formula', latex: 'x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}' },
   { id: 'f2', name: 'Pythagorean Theorem', latex: 'a^2 + b^2 = c^2' },
@@ -637,6 +677,7 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [inputQuery, setInputQuery] = useState(() => getStoredValue(`ai_tutor_input_draft_${user.uid}`));
   const [selectedSubject, setSelectedSubject] = useState<Subject>('Science');
   const [selectedLanguage, setSelectedLanguage] = useState<string>(() => getStoredValue(`ai_tutor_language_${user.uid}`, 'Hinglish'));
+  const [preferredStyle, setPreferredStyle] = useState<string>(() => PersonalLearningService.getPreferredStyle(user.uid));
 
   // Load prefilled recommendation context from Personal Planner
   useEffect(() => {
@@ -730,6 +771,7 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [copiedFormulaId, setCopiedFormulaId] = useState<string | null>(null);
 
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingSinglePdfId, setIsExportingSinglePdfId] = useState<string | null>(null);
   const [pdfExportSuccess, setPdfExportSuccess] = useState(false);
   const [isExportingDocId, setIsExportingDocId] = useState<string | null>(null);
   const [docExportSuccessId, setDocExportSuccessId] = useState<string | null>(null);
@@ -1716,7 +1758,15 @@ export const AiTutorApp = memo(function AiTutorApp({
         promptContext = `${promptContext}\n[QUICK REVISION MODE] Provide a high-yield summary table or bullet list containing: 1. Core concept, 2. Golden formulas, 3. One quick example, 4. Common student mistake to avoid.`;
       }
 
-      const answer = await getStudyAnswer(promptContext, imagesToSend.length > 0 ? imagesToSend : undefined, undefined, selectedLanguage);
+      const compiledMemory = await PersonalLearningService.compileStudentMemory(user.uid);
+      const studentCtx = {
+        name: user.name,
+        school: user.schoolName || '',
+        className: user.className || '',
+        memory: compiledMemory
+      };
+
+      const answer = await getStudyAnswer(promptContext, imagesToSend.length > 0 ? imagesToSend : undefined, studentCtx, selectedLanguage);
 
       const aiMsg: ChatMessage = {
         id: 'msg_ai_' + Date.now(),
@@ -1778,6 +1828,35 @@ export const AiTutorApp = memo(function AiTutorApp({
       showToast('Failed to export PDF study guide. Please ensure there are conversation messages.', 'error');
     } finally {
       setIsExportingPdf(false);
+    }
+  };
+
+  const handleExportSingleMessageToPdf = async (msg: ChatMessage) => {
+    if (isExportingSinglePdfId) return;
+    setIsExportingSinglePdfId(msg.id);
+    try {
+      const msgIdx = messages.findIndex(m => m.id === msg.id);
+      const userQuestionMsg = msgIdx > 0 ? messages[msgIdx - 1] : null;
+      
+      const pdfMessages = [];
+      if (userQuestionMsg && userQuestionMsg.sender === 'user') {
+        pdfMessages.push(userQuestionMsg);
+      }
+      pdfMessages.push(msg);
+
+      await exportConversationToPdf({
+        messages: pdfMessages,
+        user,
+        subject: msg.subject || selectedSubject,
+        tutorMode: msg.mode || tutorMode
+      });
+      showToast('Single study guide PDF downloaded successfully!', 'success');
+      if (onAddXp) onAddXp(15);
+    } catch (error) {
+      logError(error, 'SINGLE_PDF_EXPORT');
+      showToast('Failed to export message to PDF.', 'error');
+    } finally {
+      setIsExportingSinglePdfId(null);
     }
   };
 
@@ -2245,6 +2324,45 @@ export const AiTutorApp = memo(function AiTutorApp({
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
                 Language / भाषा
               </label>
+            </div>
+
+            {/* FEATURE SECTION 3.5: AI LEARNING MEMORY & TEACHING STYLE */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                AI Learning Memory & Style / शिक्षण शैली
+              </label>
+              <div className="bg-slate-900/30 border border-slate-800/40 p-2.5 rounded-xl space-y-2 text-[11px]">
+                <div className="text-slate-400 leading-normal">
+                  <span className="text-indigo-400 font-bold">Memory Sync:</span> Active. Remembering weak topics and mistakes to personalize responses.
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 block">Preferred Style:</span>
+                  <div className="relative">
+                    <select
+                      value={preferredStyle}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setPreferredStyle(val);
+                        PersonalLearningService.setPreferredStyle(user.uid, val);
+                        showToast('Preferred Explanation style updated in AI Memory!', 'success');
+                      }}
+                      className="w-full bg-slate-950 border border-slate-800/80 text-slate-200 text-[11px] font-bold py-2 px-2.5 pr-8 rounded-lg focus:border-indigo-500 focus:outline-none appearance-none cursor-pointer"
+                    >
+                      <option value="Adaptive (Intuitive analogies first, then formal definitions)">Adaptive (Intuitive)</option>
+                      <option value="Visual / Example-based (Heavy focus on diagrams and everyday stories)">Visual / Examples</option>
+                      <option value="Step-by-Step Breakdown (Highly detailed mathematical & concept steps)">Step-by-Step</option>
+                      <option value="Socratic Mentor (Guides you with hints instead of raw answers)">Socratic Mentor</option>
+                      <option value="Concise & Exact (Straight to the point with zero extra talk)">Concise & Exact</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-slate-500">
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
               <div className="relative">
                 <select
                   value={selectedLanguage}
@@ -2531,6 +2649,33 @@ export const AiTutorApp = memo(function AiTutorApp({
                       <StaggeredRevealMarkdown text={msg.text} isLatest={isLatest} fontStyle={tutorFontStyle} />
                     </div>
 
+                    {isPdfMaterial(msg.text) && (
+                      <div className="mt-3 mb-2 p-3.5 bg-gradient-to-r from-amber-50/80 via-amber-50/50 to-indigo-50/40 border border-amber-200/80 rounded-2xl flex items-center justify-between shadow-xs">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-xs shrink-0">
+                            <FileDown className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                              {appLanguage === 'hi' ? 'पीडीएफ अध्ययन सामग्री तैयार है!' : 'PDF Study Guide Ready!'}
+                            </h4>
+                            <p className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">
+                              {appLanguage === 'hi' ? 'इसे ऑफलाइन पढ़ने के लिए प्रिंट या सेव करें' : 'Export this curated study guide into a formatted PDF instantly'}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleExportSingleMessageToPdf(msg)}
+                          disabled={isExportingSinglePdfId === msg.id}
+                          className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-black text-xs rounded-xl shadow-md shadow-amber-500/10 active:scale-95 transition cursor-pointer flex items-center space-x-1.5 shrink-0"
+                        >
+                          {isExportingSinglePdfId === msg.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-4 h-4 text-amber-100" />}
+                          <span>{appLanguage === 'hi' ? 'पीडीएफ डाउनलोड' : 'Download PDF'}</span>
+                        </button>
+                      </div>
+                    )}
+
                     {/* Professional Action Suite */}
                     <div className="bg-transparent border-t border-slate-100 px-0 py-2 flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center space-x-1 flex-wrap gap-1">
@@ -2579,6 +2724,23 @@ export const AiTutorApp = memo(function AiTutorApp({
                             <FileDown className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                           )}
                           <span className="hidden sm:inline">{docExportSuccessId === msg.id ? 'Exported!' : isExportingDocId === msg.id ? 'Exporting...' : 'Export to Docs'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleExportSingleMessageToPdf(msg)}
+                          disabled={isExportingSinglePdfId === msg.id}
+                          className="text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-xs font-bold h-8 px-2.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs disabled:opacity-50"
+                          title="Export this tutoring answer to a beautifully formatted PDF Study Guide"
+                        >
+                          {isExportingSinglePdfId === msg.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600 shrink-0" />
+                          ) : (
+                            <FileDown className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                          )}
+                          <span className="hidden sm:inline">
+                            {isExportingSinglePdfId === msg.id ? 'Exporting...' : 'Export to PDF'}
+                          </span>
                         </button>
                       </div>
 

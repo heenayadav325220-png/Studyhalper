@@ -277,6 +277,27 @@ app.get("/api/health", (_req, res) => {
       }
 
       const studentInfo = studentContext && studentContext.name ? `Addressing student: ${studentContext.name} (${studentContext.className || ''} ${studentContext.school || ''}).` : '';
+      
+      let studentMemoryContext = '';
+      if (studentContext && studentContext.memory) {
+        const m = studentContext.memory;
+        studentMemoryContext = `
+STUDENT ADAPTIVE MEMORY PROFILE:
+- Completed/Mastered Topics: ${Array.isArray(m.completedTopics) ? m.completedTopics.join(', ') : 'None yet'}
+- Weak Topics (Needs Work): ${Array.isArray(m.weakTopics) ? m.weakTopics.join(', ') : 'None yet'}
+- Spaced Revisions Pending: ${Array.isArray(m.spacedRevisions) ? m.spacedRevisions.join(', ') : 'None yet'}
+- Mistakes Pattern (Mistake Book): ${Array.isArray(m.recentMistakes) ? m.recentMistakes.join(', ') : 'No recorded mistakes'}
+- Preferred Explanation/Teaching Style: ${m.preferredStyle || 'Adaptive (Intuitive analogies first, then formal definitions)'}
+
+INSTRUCTION FOR ADAPTIVE PERSONALIZATION:
+1. Always align your explanations with the student's Preferred Explanation/Teaching Style above.
+2. If the student asks about a concept under "Weak Topics", pay extra attention, explain with double patience, break it down step-by-step, and offer a mini-analogy.
+3. Do not start explanations from the absolute beginning if a concept is marked as "Completed/Mastered" unless requested. Refer to their mastery (e.g., "Since you've already mastered X, let's build on that...").
+4. Reference their past mistake patterns if they are making similar errors now, helping them spot their own solving traps.
+5. Address the student in a supportive and personalized way that matches this memory.
+`;
+      }
+
       const personaStyle = persona === 'socratic' 
         ? 'Mode: SOCRATIC TEACHER - Guide with helpful probing questions before revealing full answers.' 
         : persona === 'math' 
@@ -285,6 +306,7 @@ app.get("/api/health", (_req, res) => {
 
       const sysInstruction = `You are ASCEND AI TUTOR — an intelligent, calm, highly capable study partner who helps students genuinely understand subjects and become better at solving problems independently. You are a brilliant senior/student mentor who deeply understands the subject and explains difficult ideas simply, naturally, and confidently.
 ${studentInfo} ${personaStyle}
+${studentMemoryContext}
 
 YOUR CORE IDENTITY & VOICE:
 - Tone & Personality: Intelligent, calm, clear, curious, patient, honest, encouraging, precise, and student-aware.
@@ -325,7 +347,20 @@ Encourage through constructive, precise feedback rather than empty praise. Avoid
 
 8. MULTILINGUAL & HINGLISH EXCELLENCE:
 - Language requested: ${language === 'hi' ? 'Hindi (Devanagari script)' : language === 'Hinglish' ? 'Hinglish (mix of simple Hindi & English in Latin script)' : 'English'}.
-- Always reply fluently and naturally in the requested language, prioritizing ultimate conceptual clarity.`;
+- Always reply fluently and naturally in the requested language, prioritizing ultimate conceptual clarity.
+
+9. SPECIAL INSTRUCTIONS FOR STUDY GUIDES & PDF GENERATION REQUESTS:
+When a student explicitly requests any PDF generation (e.g., "इस chapter की revision PDF बनाओ", "इन notes को PDF में बनाओ", "इस topic की formula sheet बनाओ", "मेरे लिए practice paper PDF बनाओ", "इस chapter का summary PDF बनाओ", or equivalents in Hindi/English/Hinglish), you MUST generate a beautifully-formatted, highly-comprehensive, logical study guide or sheet inside your response.
+Structure your reply exactly like this where relevant, adapting to the requested PDF type (Revision Notes, Chapter Summary, Formula Sheet, Important Questions, Practice Worksheet, Mock Test, Question Paper, Answer Key, Quick Revision Sheet, or Study Guide):
+- # [Title] (e.g. Chapter Revision Notes: [Chapter Name])
+- ## [Topics Covered] (List of subtopics)
+- ## [Core Explanation & Concepts] (Break it down beautifully with intuitive analogies)
+- ## [Examples & Step-by-Step Solutions] (Practical step-by-step problems with explanations)
+- ## [Important Points / Formulas / Key Takeaways] (High-yield facts)
+- ## [Practice Questions & Worksheet Problems] (Conceptual and calculative exercises)
+- ## [Answers / Solutions & Hints] (To help students self-verify)
+
+Make sure you write keywords like "PDF", "Notes", "Summary", "Formula Sheet", "Practice Paper", or their Hindi transliterations/equivalents inside the response text so the client can automatically trigger the PDF Export option for offline study. The output language must strictly match the selected language (${language}).`;
 
       const contents: any[] = [];
       if (history && Array.isArray(history) && history.length > 0) {
@@ -1312,6 +1347,322 @@ You MUST output ONLY valid JSON matching this schema:
         speechReply: speech,
         markdownReply: md,
         actions
+      });
+    }
+  });
+
+  // API Route: AI Note Synthesizer Generator
+  app.post("/api/gemini/notes-generator", rateLimitAi, async (req, res) => {
+    try {
+      const { topic, subject, grade, language } = req.body || {};
+      if (!topic) {
+        res.status(400).json({ error: "Topic is required." });
+        return;
+      }
+
+      let langName = 'English';
+      const normLang = String(language || '').toLowerCase().trim();
+      if (normLang === 'hi' || normLang === 'hindi') {
+        langName = 'pure, standard Hindi (हिंदी in Devanagari script)';
+      } else if (normLang === 'hinglish') {
+        langName = 'friendly Hinglish (a casual conversational blend of Hindi and English written in the English/Latin alphabet)';
+      } else if (normLang === 'bengali') {
+        langName = 'Bengali (বাংলা)';
+      } else if (normLang === 'tamil') {
+        langName = 'Tamil (தமிழ்)';
+      } else if (normLang === 'marathi') {
+        langName = 'Marathi (मराठी)';
+      }
+
+      const prompt = `You are an expert academic curriculum writer. 
+Generate comprehensive, detailed, highly structured study notes for the topic "${topic}" in the subject "${subject}" tailored for Class ${grade || '10'} level students.
+The entire notes response MUST be written in the language: ${langName}.
+Structure the notes beautifully using rich Markdown. Include:
+1. Title (e.g. Chapter Revision Notes: [Topic])
+2. Core Topics & Curriculum Coverage
+3. Detailed Explanation & Conceptual Breakdown (use intuitive analogies or clear visual mental images)
+4. Solved Examples & Step-by-Step Solutions
+5. High-Yield Key Points / Revision Summary
+6. 3 Practice Questions with short Answer keys.
+
+Ensure there is NO promotional fluff or filler greetings. Open directly with the title.`;
+
+      const text = await callGeminiWithResilience({
+        contents: prompt,
+        preferredModel: 'gemini-3.5-flash',
+        config: { temperature: 0.5 }
+      });
+
+      res.json({ title: `${topic} Notes`, content: text });
+    } catch (err: any) {
+      console.error("Backend notes generator error:", err);
+      res.json({
+        title: `${req.body?.topic || 'Syllabus'} Notes`,
+        content: `### 📌 ${req.body?.topic || 'Study Topic'}\n\nNotes could not be generated dynamically. Please check your internet connection and try again.`
+      });
+    }
+  });
+
+  // API Route: Deep Concept Explainer
+  app.post("/api/gemini/explain-topic", rateLimitAi, async (req, res) => {
+    try {
+      const { topic, subject, grade, style, language } = req.body || {};
+      if (!topic) {
+        res.status(400).json({ error: "Topic is required." });
+        return;
+      }
+
+      let langName = 'English';
+      const normLang = String(language || '').toLowerCase().trim();
+      if (normLang === 'hi' || normLang === 'hindi') {
+        langName = 'pure, standard Hindi (हिंदी in Devanagari script)';
+      } else if (normLang === 'hinglish') {
+        langName = 'friendly Hinglish (a casual conversational blend of Hindi and English written in the English/Latin alphabet)';
+      } else if (normLang === 'bengali') {
+        langName = 'Bengali (বাংলা)';
+      } else if (normLang === 'tamil') {
+        langName = 'Tamil (தமிழ்)';
+      } else if (normLang === 'marathi') {
+        langName = 'Marathi (मराठी)';
+      }
+
+      const prompt = `You are a world-class, ultra-supportive, and patient personal study partner.
+Explain the concept or topic "${topic}" in "${subject}" for Class ${grade || '10'} level students using a "${style || 'Simple'}" teaching style.
+The entire explanation MUST be written in the language: ${langName}.
+
+Teaching Styles Reference:
+- Simple: Avoid jargon, explain with easy analogies, focus on direct intuition first.
+- Deep: Explore the fundamental principles, derivations, and mathematical details.
+- Socratic: Ask guided questions, lead the student to discover the answers.
+- Exam Focus: Highlight marks-scoring terms, CBSE/Board focus areas, and common examiner traps.
+
+Format beautifully in Markdown. Do not include any greeting or conversational filler.`;
+
+      const text = await callGeminiWithResilience({
+        contents: prompt,
+        preferredModel: 'gemini-3.5-flash',
+        config: { temperature: 0.6 }
+      });
+
+      res.json({ explanation: text });
+    } catch (err: any) {
+      console.error("Backend explain topic error:", err);
+      res.json({ explanation: "Could not fetch a simplified explanation at this moment. Please check your connection and try again." });
+    }
+  });
+
+  // API Route: Interactive Mind Map Generator
+  app.post("/api/gemini/mindmap", rateLimitAi, async (req, res) => {
+    try {
+      const { topic, language } = req.body || {};
+      if (!topic) {
+        res.status(400).json({ error: "Topic is required." });
+        return;
+      }
+
+      let langName = 'English';
+      const normLang = String(language || '').toLowerCase().trim();
+      if (normLang === 'hi' || normLang === 'hindi') {
+        langName = 'pure standard Hindi (Devanagari script)';
+      } else if (normLang === 'hinglish') {
+        langName = 'Hinglish (blend of simple Hindi & English in Latin script)';
+      } else if (normLang === 'bengali') {
+        langName = 'Bengali';
+      } else if (normLang === 'tamil') {
+        langName = 'Tamil';
+      } else if (normLang === 'marathi') {
+        langName = 'Marathi';
+      }
+
+      const prompt = `You are a visual education expert. Create a complete, detailed, and logically hierarchical mindmap JSON structure for the topic "${topic}".
+The mindmap must have a root 'name' property and a 'children' array of subcategories. Each subcategory should have a 'name' and an optional 'children' array (up to 3 levels deep).
+All names and text inside the JSON MUST be written in the language: ${langName}.
+Do NOT write any text before or after the JSON. Return only the raw valid JSON.
+
+JSON Format Schema:
+{
+  "name": "Root Topic",
+  "children": [
+    {
+      "name": "Subcategory 1",
+      "children": [
+        { "name": "Detail 1.1" },
+        { "name": "Detail 1.2" }
+      ]
+    },
+    {
+      "name": "Subcategory 2",
+      "children": [
+        { "name": "Detail 2.1" }
+      ]
+    }
+  ]
+}`;
+
+      const text = await callGeminiWithResilience({
+        contents: prompt,
+        preferredModel: 'gemini-2.5-flash',
+        config: { temperature: 0.5 }
+      });
+
+      const cleanJsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
+      const parsed = JSON.parse(cleanJsonStr);
+      res.json(parsed);
+    } catch (err: any) {
+      console.error("Backend mindmap error:", err);
+      // Clean fallback
+      res.json({
+        name: req.body?.topic || "Syllabus Overview",
+        children: [
+          { name: "Overview & Definitions", children: [{ name: "Core terms" }, { name: "Basic ideas" }] },
+          { name: "Key Formulas & Rules", children: [{ name: "Standard applications" }] },
+          { name: "Core Examples", children: [] }
+        ]
+      });
+    }
+  });
+
+  // API Route: CBSE & Board Question Paper Generator
+  app.post("/api/gemini/question-paper", rateLimitAi, async (req, res) => {
+    try {
+      const { topic, subject, grade, language } = req.body || {};
+      if (!topic) {
+        res.status(400).json({ error: "Topic is required." });
+        return;
+      }
+
+      let langName = 'English';
+      const normLang = String(language || '').toLowerCase().trim();
+      if (normLang === 'hi' || normLang === 'hindi') {
+        langName = 'pure, standard Hindi (हिंदी in Devanagari script)';
+      } else if (normLang === 'hinglish') {
+        langName = 'friendly Hinglish (a casual conversational blend of Hindi and English written in the English/Latin alphabet)';
+      } else if (normLang === 'bengali') {
+        langName = 'Bengali (বাংলা)';
+      } else if (normLang === 'tamil') {
+        langName = 'Tamil (தமிழ்)';
+      } else if (normLang === 'marathi') {
+        langName = 'Marathi (मराठी)';
+      }
+
+      const prompt = `You are an expert academic board examiner. Generate an authentic curriculum question paper for Class ${grade || '10'} on the topic "${topic}" (Subject: "${subject || 'General'}").
+The entire question paper (instructions, marks distribution, questions divided into Section A (MCQs), Section B (Short Answers), Section C (Long Answers), and marking schemes) MUST be written in the language: ${langName}.
+Format nicely using standard Markdown. Include the detailed step-by-step marking scheme / solutions at the very end of the document.`;
+
+      const text = await callGeminiWithResilience({
+        contents: prompt,
+        preferredModel: 'gemini-3.5-flash',
+        config: { temperature: 0.5 }
+      });
+
+      res.json({ paperText: text });
+    } catch (err: any) {
+      console.error("Backend question paper error:", err);
+      res.json({ paperText: "Failed to generate question paper dynamically. Please try again." });
+    }
+  });
+
+  // API Route: Vision Textbook OCR Scanner
+  app.post("/api/gemini/ocr", rateLimitAi, async (req, res) => {
+    try {
+      const { imageBase64 } = req.body || {};
+      if (!imageBase64) {
+        res.status(400).json({ error: "imageBase64 is required." });
+        return;
+      }
+
+      const mimeMatch = imageBase64.match(/^data:(image\/\w+);base64,/);
+      const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+      const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+
+      const prompt = `You are a precise vision OCR extraction engine. 
+Extract all text, equations, scientific formulas, textbook questions, and diagrams descriptions from this image.
+Preserve the visual structure as clean markdown, lists, and formatted headers. Do not summarize or alter the core academic content.`;
+
+      const contents = [
+        {
+          role: 'user',
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType,
+                data: cleanBase64
+              }
+            }
+          ]
+        }
+      ];
+
+      const text = await callGeminiWithResilience({
+        contents: contents,
+        preferredModel: 'gemini-2.5-flash',
+        config: { temperature: 0.1 }
+      });
+
+      res.json({ text });
+    } catch (err: any) {
+      console.error("Backend OCR scanner error:", err);
+      res.json({ text: "Failed to extract text from image." });
+    }
+  });
+
+  // API Route: Document & PDF Analyzer
+  app.post("/api/gemini/pdf-summary", rateLimitAi, async (req, res) => {
+    try {
+      const { textContent, language } = req.body || {};
+      if (!textContent) {
+        res.status(400).json({ error: "textContent is required." });
+        return;
+      }
+
+      let langName = 'English';
+      const normLang = String(language || '').toLowerCase().trim();
+      if (normLang === 'hi' || normLang === 'hindi') {
+        langName = 'pure, standard Hindi (हिंदी in Devanagari script)';
+      } else if (normLang === 'hinglish') {
+        langName = 'friendly Hinglish (a casual conversational blend of Hindi and English written in the English/Latin alphabet)';
+      } else if (normLang === 'bengali') {
+        langName = 'Bengali (বাংলা)';
+      } else if (normLang === 'tamil') {
+        langName = 'Tamil (தமிழ்)';
+      } else if (normLang === 'marathi') {
+        langName = 'Marathi (मराठी)';
+      }
+
+      const prompt = `You are an expert curriculum document analyzer. Analyze the following study material and generate a comprehensive study guide package.
+The entire package (summary, key definitions, practice questions, and answers) MUST be written in the language: ${langName}.
+You must return ONLY a valid JSON object matching the schema below. Do NOT wrap in \`\`\`json markdown blocks.
+
+JSON Format Schema:
+{
+  "summary": "A structured Markdown study guide summary of the document",
+  "keyTerms": [
+    { "term": "Term Name", "definition": "Term Definition" }
+  ],
+  "questions": [
+    { "question": "High-yield review question based on text", "hint": "A conceptual solving hint" }
+  ]
+}
+
+Document text:
+${textContent.slice(0, 50000)}`;
+
+      const text = await callGeminiWithResilience({
+        contents: prompt,
+        preferredModel: 'gemini-3.5-flash',
+        config: { temperature: 0.4 }
+      });
+
+      const cleanJsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
+      const parsed = JSON.parse(cleanJsonStr);
+      res.json(parsed);
+    } catch (err: any) {
+      console.error("Backend PDF analyzer error:", err);
+      res.json({
+        summary: "Could not summarize document dynamically.",
+        keyTerms: [],
+        questions: []
       });
     }
   });

@@ -248,6 +248,52 @@ export default function App() {
     }
   };
 
+  const [appLoading, setAppLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingMessage, setLoadingMessage] = useState('Initializing Study Buddy Engine...');
+
+  useEffect(() => {
+    const isHindi = appLanguage === 'hi';
+    const messages = isHindi ? [
+      'फायरबेस स्टडी रूम्स कनेक्ट हो रहे हैं...',
+      'स्टडी स्ट्रीक और एक्सपी सिंक की जा रही है...',
+      'चिम्पू (स्टडी पेट) को बंबू फीड किया जा रहा है...',
+      '19+ एडवांस्ड एआई एकेडमिक टूल्स सक्रिय हो रहे हैं...',
+      'हार्डवेयर जीपीयू एक्सेलेरेशन सक्षम किया जा रहा है...',
+      'ऐप अब एकदम मक्खन की तरह चलने को तैयार है!'
+    ] : [
+      'Connecting to Firebase Study Rooms...',
+      'Syncing study streak and XP levels...',
+      'Feeding bamboo to Chimpu (Study Pet)...',
+      'Activating 19+ Advanced AI Academic Tools...',
+      'Enabling hardware GPU acceleration layers...',
+      'Ready to run ultra smooth like butter!'
+    ];
+    let step = 0;
+    const interval = setInterval(() => {
+      setLoadingProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            setAppLoading(false);
+          }, 450);
+          return 100;
+        }
+        const stepSize = Math.floor(Math.random() * 15) + 12;
+        const next = Math.min(100, prev + stepSize);
+        if (next < 100 && step < messages.length - 1) {
+          setLoadingMessage(messages[step]);
+          step++;
+        } else if (next === 100) {
+          setLoadingMessage(isHindi ? 'पढ़ाई शुरू करने को तैयार! 🔥' : 'Ready to study! 🔥');
+        }
+        return next;
+      });
+    }, 180);
+
+    return () => clearInterval(interval);
+  }, [appLanguage]);
+
   const [activeTab, setActiveTab] = useState<'home' | 'toolkit' | 'groupChat' | 'whiteboard' | 'mockExam' | 'studyDocs' | 'petCompanion' | 'aiTutor' | 'quiz' | 'notebook' | 'planner' | 'imageGen' | 'pdfScanner' | 'googleWorkspace'>('home');
   const [attachedWorkspaceFiles, setAttachedWorkspaceFiles] = useState<Array<{ id: string; name: string; content: string; type: "drive" | "classroom" | "sheets" }>>([]);
   const [initialTool, setInitialTool] = useState<string | undefined>(undefined);
@@ -1320,6 +1366,68 @@ export default function App() {
       className={`min-h-screen text-slate-100 ${getAppFontClass()} flex flex-col selection:bg-emerald-500 selection:text-white w-full max-w-full overflow-x-hidden relative transition-colors duration-300`}
       style={{ backgroundColor: currentBgColor }}
     >
+      {/* STARTUP SPLASH SCREEN / APP INITIAL LOADING FLASHSCR */}
+      <AnimatePresence>
+        {appLoading && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.35, ease: 'easeInOut' }}
+            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#050811] text-white p-6 select-none"
+          >
+            {/* Ambient Background Lights */}
+            <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Glowing Brand Title Container */}
+            <div className="relative flex flex-col items-center text-center max-w-sm space-y-6 z-10">
+              <motion.div
+                animate={{ scale: [1, 1.04, 1] }}
+                transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
+                className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 shadow-[0_0_40px_rgba(99,102,241,0.4)] flex items-center justify-center relative border border-indigo-400/30"
+              >
+                <Sparkles className="w-10 h-10 text-white animate-pulse" />
+                {/* Orbital Loader light around logo */}
+                <div className="absolute inset-0 rounded-3xl border-2 border-indigo-400 animate-ping opacity-25" />
+              </motion.div>
+
+              <div className="space-y-2">
+                <h1 className="text-3xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-indigo-200">
+                  Ascend Study
+                </h1>
+                <p className="text-[10px] font-black text-indigo-400 tracking-widest uppercase">
+                  REMIX STUDY BUDDY
+                </p>
+              </div>
+
+              {/* Progress Bar Container */}
+              <div className="w-64 space-y-3 pt-4">
+                <div className="flex justify-between items-baseline text-xs">
+                  <span className="text-slate-400 font-medium truncate max-w-[190px]">
+                    {loadingMessage}
+                  </span>
+                  <span className="font-mono font-black text-indigo-300 tabular-nums">
+                    {loadingProgress}%
+                  </span>
+                </div>
+
+                {/* Horizontal Progress Track */}
+                <div className="h-2 w-full bg-slate-900/95 border border-slate-800/80 rounded-full p-[2px] overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 rounded-full transition-all duration-150"
+                    style={{ width: `${loadingProgress}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="text-[10px] text-slate-500 font-bold tracking-wider pt-8 uppercase">
+                {appLanguage === 'hi' ? 'जीपीयू एक्सेलेरेटेड इंजन सक्रिय है' : 'GPU Accelerated Engine Active'}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* DYNAMIC LIVE CUSTOM CSS INJECTED BY AI COPILOT */}
       <style id="ai-editor-live-styles">{uiCustomization.customCss || ''}</style>
       

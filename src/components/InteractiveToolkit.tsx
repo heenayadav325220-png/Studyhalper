@@ -104,6 +104,21 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
   const [catalogCategory, setCatalogCategory] = useState("all");
   const [copiedToast, setCopiedToast] = useState<string | null>(null);
 
+  const [toolkitLanguage, setToolkitLanguage] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ascend_toolkit_language") || appLanguage || "English";
+    }
+    return "English";
+  });
+
+  const handleLanguageChange = (lang: string) => {
+    setToolkitLanguage(lang);
+    if (typeof window !== "undefined") {
+      localStorage.getItem("ascend_toolkit_language") || localStorage.setItem("ascend_toolkit_language", lang);
+    }
+    showToast(`Toolkit Language: ${lang}!`, "success");
+  };
+
   // Complete list of 19+ Advanced Toolkit Tools
   const ADVANCED_TOOLS_CATALOG = [
     { id: "notes", name: "AI Note Synthesizer", category: "study", icon: "📝", tab: "study", badge: "Live AI", desc: "Transforms any complex curriculum topic into structured, revision-ready note cards." },
@@ -194,14 +209,14 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
     Ve(true);
     $({ nodeName, explanation: "" });
     try {
-      const promptText = `Explain the concept or subtopic "${nodeName}" in the context of our study topic "${E}" for class/grade ${I} level. Give a 2-sentence simple, clear explanation in ${appLanguage}.`;
-      const response = await getStudyAnswer(promptText, undefined, undefined, appLanguage);
+      const promptText = `Explain the concept or subtopic "${nodeName}" in the context of our study topic "${E}" for class/grade ${I} level. Give a 2-sentence simple, clear explanation in ${toolkitLanguage}.`;
+      const response = await getStudyAnswer(promptText, undefined, undefined, toolkitLanguage);
       $({ nodeName, explanation: response });
     } catch (err) {
       console.error(err);
       $({
         nodeName,
-        explanation: appLanguage === "Hindi"
+        explanation: (toolkitLanguage === "Hindi" || toolkitLanguage === "हिंदी" || toolkitLanguage === "हिन्दी")
           ? "स्पष्टीकरण लोड करने में असमर्थ। कृपया पुनः प्रयास करें।"
           : "Unable to load explanation. Please try again."
       });
@@ -562,13 +577,13 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
     H(null);
     try {
       let result = null;
-      if (p === "notes") result = await generateNotes(s, f, I);
-      else if (p === "summarize") result = await summarizeNotes(s);
-      else if (p === "explain") result = await explainTopic(s, f, I, ke);
-      else if (p === "mindmap") result = await generateMindmap(s);
-      else if (p === "qpaper") result = await generateQuestionPaper(s, f, I);
+      if (p === "notes") result = await generateNotes(s, f, I, toolkitLanguage);
+      else if (p === "summarize") result = await summarizeNotes(s, toolkitLanguage);
+      else if (p === "explain") result = await explainTopic(s, f, I, ke, toolkitLanguage);
+      else if (p === "mindmap") result = await generateMindmap(s, toolkitLanguage);
+      else if (p === "qpaper") result = await generateQuestionPaper(s, f, I, toolkitLanguage);
       else if (p === "ocr") result = await performOcr(Y || "");
-      else if (p === "pdf") result = await summarizePdf(Se);
+      else if (p === "pdf") result = await summarizePdf(Se, toolkitLanguage);
 
       if (result) {
         H(result);
@@ -619,7 +634,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
         name: user?.name || "Student",
         school: user?.school || "School",
         className: Ce
-      }, appLanguage, "Hard");
+      }, toolkitLanguage, "Hard");
 
       if (res && res.length > 0) {
         wt(res);
@@ -964,6 +979,28 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                 ? `प्रयुक्त: Toolkit: ${c.count}/${c.limit} Used`
                 : `Toolkit: ${c.count}/${c.limit} Used`}
             </span>
+          </div>
+
+          {/* Toolkit Global Language Selection Option */}
+          <div className="flex items-center space-x-1">
+            <span className="hidden lg:inline text-[9px] font-black uppercase text-slate-400">Lang:</span>
+            <select
+              value={toolkitLanguage}
+              onChange={(e) => handleLanguageChange(e.target.value)}
+              className={`text-[10px] font-black uppercase px-2 py-1.5 rounded-xl border outline-none transition-all duration-200 cursor-pointer ${
+                m 
+                  ? "bg-slate-950 border-cyan-800/80 text-cyan-400 hover:border-cyan-500" 
+                  : "bg-slate-50 border-slate-200 text-slate-700 hover:border-indigo-300 focus:border-indigo-500"
+              }`}
+              title="Toolkit Global Language Preference"
+            >
+              <option value="English">English</option>
+              <option value="Hindi">हिंदी (Hindi)</option>
+              <option value="Hinglish">Hinglish</option>
+              <option value="Bengali">বাংলা (Bengali)</option>
+              <option value="Tamil">தமிழ் (Tamil)</option>
+              <option value="Marathi">मराठी (Marathi)</option>
+            </select>
           </div>
 
           <motion.button

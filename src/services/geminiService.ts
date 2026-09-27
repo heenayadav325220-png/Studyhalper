@@ -308,7 +308,7 @@ export function cleanAndParseJson<T>(text: string, fallback: T): T {
 export async function getStudyAnswer(
   prompt: string, 
   imageBase64?: string | string[], 
-  studentContext?: { name: string; school: string; className: string; country?: string }, 
+  studentContext?: { name: string; school: string; className: string; country?: string; memory?: any }, 
   language: string = "English",
   persona: 'default' | 'socratic' | 'debugger' | 'translator' | 'math' = 'default',
   history?: { role: 'user' | 'model', text: string }[]
@@ -1001,13 +1001,14 @@ export async function generateFlashcards(
 export async function generateNotes(
   topic: string,
   subject: string,
-  grade: string = "10"
+  grade: string = "10",
+  language?: string
 ): Promise<{ title: string; content: string }> {
   try {
     const response = await safeFetch("/api/gemini/notes-generator", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic, subject, grade })
+      body: JSON.stringify({ topic, subject, grade, language })
     });
     if (response.ok) {
       return await response.json();
@@ -1043,13 +1044,14 @@ export async function explainTopic(
   topic: string,
   subject: string,
   grade: string = "10",
-  style: string = "Simple"
+  style: string = "Simple",
+  language?: string
 ): Promise<{ explanation: string }> {
   try {
     const response = await safeFetch("/api/gemini/explain-topic", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic, subject, grade, style })
+      body: JSON.stringify({ topic, subject, grade, style, language })
     });
     if (response.ok) {
       return await response.json();
@@ -1061,12 +1063,12 @@ export async function explainTopic(
   return { explanation: "Could not fetch a simplified explanation at this moment. Please check your internet connection and try again." };
 }
 
-export async function generateMindmap(topic: string): Promise<{ name: string; children: any[] }> {
+export async function generateMindmap(topic: string, language?: string): Promise<{ name: string; children: any[] }> {
   try {
     const response = await safeFetch("/api/gemini/mindmap", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic })
+      body: JSON.stringify({ topic, language })
     });
     if (response.ok) {
       return await response.json();
@@ -1088,13 +1090,14 @@ export async function generateMindmap(topic: string): Promise<{ name: string; ch
 export async function generateQuestionPaper(
   topic: string,
   subject: string,
-  grade: string = "10"
+  grade: string = "10",
+  language?: string
 ): Promise<{ paperText: string }> {
   try {
     const response = await safeFetch("/api/gemini/question-paper", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic, subject, grade })
+      body: JSON.stringify({ topic, subject, grade, language })
     });
     if (response.ok) {
       return await response.json();
@@ -1123,12 +1126,12 @@ export async function performOcr(imageBase64: string): Promise<{ text: string }>
   return { text: "Failed to extract text from image." };
 }
 
-export async function summarizePdf(textContent: string): Promise<{ summary: string; keyTerms: any[]; questions: any[] }> {
+export async function summarizePdf(textContent: string, language?: string): Promise<{ summary: string; keyTerms: any[]; questions: any[] }> {
   try {
     const response = await safeFetch("/api/gemini/pdf-summary", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ textContent })
+      body: JSON.stringify({ textContent, language })
     });
     if (response.ok) {
       return await response.json();
