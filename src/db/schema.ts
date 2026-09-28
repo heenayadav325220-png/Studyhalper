@@ -9,7 +9,7 @@ export const users = pgTable('users', {
   displayName: text('display_name'),
   photoUrl: text('photo_url'),
   xp: integer('xp').default(0),
-  streak: integer('streak').default(1),
+  streak: integer('streak').default(0),
   petLevel: integer('pet_level').default(1),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),

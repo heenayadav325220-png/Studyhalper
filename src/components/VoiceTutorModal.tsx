@@ -265,9 +265,20 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
         signal: controller.signal
       });
 
-      if (!res.ok) throw new Error('Voice API failed');
+      const contentType = res.headers.get('content-type') || '';
+      let data: any = null;
+      if (contentType.includes('application/json')) {
+        try {
+          data = await res.json();
+        } catch {
+          data = null;
+        }
+      }
 
-      const data = await res.json();
+      if (!res.ok || !data || data.error || !data.responseText) {
+        throw new Error(data?.error || `Voice AI is temporarily unavailable (status ${res.status}).`);
+      }
+
       const tutorMsg: VoiceMessage = {
         id: 'tutor_' + Date.now(),
         sender: 'tutor',
@@ -281,12 +292,14 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
 
       // Auto read out the AI's response in voice
       speakText(data.speechText || data.responseText);
-    } catch (err) {
-      console.error('Voice Tutor Error:', err);
+    } catch (err: any) {
+      console.error('Voice Tutor Error:', err?.message || err);
       const fallbackText =
         voiceLang === 'hi'
-          ? 'माफ़ कीजिए, नेटवर्क में समस्या आई। आप दोबारा बोलें, मैं समझाने के लिए तैयार हूँ!'
-          : "Sorry, I had trouble processing that audio. Please speak again!";
+          ? 'माफ़ कीजिए, AI ट्यूटर अभी व्यस्त है। कृपया 5 सेकंड बाद पुनः बोलें!'
+          : (err?.message && !err.message.includes('<!doctype') && !err.message.includes('JSON')
+              ? err.message
+              : "Sorry, I had trouble processing that audio. Please speak again in a moment!");
       setMessages((prev) => [
         ...prev,
         {

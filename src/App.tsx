@@ -1299,12 +1299,24 @@ export default function App() {
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!['studyDocs', 'notebook', 'toolkit'].includes(activeTab)) return;
+    if (!userProfile?.uid) return;
     const unsubscribe = subscribeToStudyDocuments(userProfile.uid, (docs) => {
       setStudyDocs(docs);
     });
     return () => unsubscribe();
-  }, [userProfile.uid, activeTab]);
+  }, [userProfile?.uid]);
+
+  const saveAndSyncStudyDocument = async (docData: StudyDocument) => {
+    await saveStudyDocument(docData);
+    setStudyDocs((prev) => {
+      const exists = prev.some((d) => d.id === docData.id);
+      if (exists) {
+        return prev.map((d) => (d.id === docData.id ? docData : d));
+      } else {
+        return [docData, ...prev];
+      }
+    });
+  };
 
   const handleSaveDoc = async () => {
     if (!newDocTitle.trim()) return;
@@ -1319,7 +1331,7 @@ export default function App() {
       isShared: false,
       timestamp: new Date().toISOString()
     };
-    await saveStudyDocument(docData);
+    await saveAndSyncStudyDocument(docData);
     setIsAddingDoc(false);
     setEditingDocId(null);
     setNewDocTitle('');
@@ -1329,6 +1341,7 @@ export default function App() {
 
   const handleDeleteDoc = async (id: string) => {
     await deleteStudyDocument(userProfile.uid, id);
+    setStudyDocs((prev) => prev.filter((d) => d.id !== id));
   };
 
   // Open specific tool in Toolkit
@@ -1548,7 +1561,7 @@ export default function App() {
           user={userProfile}
           onBack={() => setActiveTab('home')}
           onAddNote={async (note) => {
-            await saveStudyDocument({
+            await saveAndSyncStudyDocument({
               id: 'doc_' + Date.now(),
               ownerId: userProfile.uid,
               title: note.title,
@@ -1711,7 +1724,7 @@ export default function App() {
                       <span>Streak</span>
                     </div>
                     <div className="text-base sm:text-lg font-black text-amber-100 mt-0.5 leading-tight">
-                      {userProfile.streak || 5} <span className="text-[10px] font-normal text-slate-400">days</span>
+                      {userProfile.streak !== undefined ? userProfile.streak : 0} <span className="text-[10px] font-normal text-slate-400">days</span>
                     </div>
                   </div>
 
@@ -1747,13 +1760,6 @@ export default function App() {
                         {userProfile.xp ? (userProfile.xp % 100) : 0} <span className="text-slate-500 font-normal">/</span> 100 <span className="text-slate-400 font-normal">XP</span>
                       </span>
                     </div>
-                    <button 
-                      onClick={() => addXp(10)}
-                      className="text-xs text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 flex items-center space-x-1.5 cursor-pointer font-bold transition px-2.5 py-1 rounded-lg shadow-xs active:scale-95"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                      <span>+10 XP Booster</span>
-                    </button>
                   </div>
                   {/* Sleek modern progress bar track */}
                   <div className="w-full h-2.5 bg-[#060913] border border-slate-800/90 rounded-full relative overflow-hidden">
@@ -3231,7 +3237,7 @@ export default function App() {
               user={userProfile}
               notes={studyDocs}
               onAddNote={async (note) => {
-                await saveStudyDocument({
+                await saveAndSyncStudyDocument({
                   id: 'doc_' + Date.now(),
                   ownerId: userProfile.uid,
                   title: note.title,
@@ -3714,7 +3720,7 @@ export default function App() {
         {activeTab === 'imageGen' && (
           <ImageGenerator
             onSaveToNotebook={async (title, content) => {
-              await saveStudyDocument({
+              await saveAndSyncStudyDocument({
                 id: 'doc_' + Date.now(),
                 ownerId: userProfile.uid,
                 title,
@@ -3735,7 +3741,7 @@ export default function App() {
             user={userProfile}
             appLanguage={appLanguage}
             onSaveToNotebook={async (title, content, tags) => {
-              await saveStudyDocument({
+              await saveAndSyncStudyDocument({
                 id: 'doc_' + Date.now(),
                 ownerId: userProfile.uid,
                 title,
@@ -4135,7 +4141,7 @@ export default function App() {
         appLanguage={appLanguage}
         onAddXp={addXp}
         onSaveToNotebook={async (title, content, tags) => {
-          await saveStudyDocument({
+          await saveAndSyncStudyDocument({
             id: 'doc_' + Date.now(),
             ownerId: userProfile.uid,
             title,

@@ -96,29 +96,57 @@ export async function updateUserProfile(userId: string, profile: Partial<UserPro
 }
 
 // --- STUDY ROOM CHATS ---
+const getLocalChats = (roomId: string): RoomChatMessage[] => {
+  try {
+    return JSON.parse(localStorage.getItem(`local_chats_${roomId}`) || "[]");
+  } catch {
+    return [];
+  }
+};
+
 export function subscribeToChats(roomId: string, callback: (messages: RoomChatMessage[]) => void) {
   if (!db) {
-    callback([]);
+    callback(getLocalChats(roomId));
     return () => {};
   }
+
+  // Auto-sync offline messages when online
+  const local = getLocalChats(roomId);
+  if (local.length > 0 && navigator.onLine) {
+    setTimeout(async () => {
+      try {
+        const chatsRef = collection(db, `rooms/${roomId}/chats`);
+        for (const msg of local) {
+          await setDoc(doc(chatsRef, msg.id), msg);
+        }
+        localStorage.setItem(`local_chats_${roomId}`, "[]");
+      } catch (e) {
+        console.warn("Failed to sync offline chats:", e);
+      }
+    }, 1000);
+  }
+
   try {
     const chatsRef = collection(db, `rooms/${roomId}/chats`);
-    // Cost Optimization: Fetch the latest 40 messages descending, then reverse for display
-    // Slices read volume by 60% compared to limit(100) while ensuring newest messages are seen
     const q = query(chatsRef, orderBy("timestamp", "desc"), limit(40));
     return onSnapshot(q, (snapshot) => {
       const messages: RoomChatMessage[] = [];
       snapshot.forEach((d) => {
         messages.push({ id: d.id, ...d.data() } as RoomChatMessage);
       });
-      callback(messages.reverse());
+      const dbMsgs = messages.reverse();
+      const currentLocal = getLocalChats(roomId);
+      const merged = [...dbMsgs, ...currentLocal];
+      const unique = Array.from(new Map(merged.map(m => [m.id, m])).values());
+      unique.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      callback(unique);
     }, (error) => {
-      console.warn("Chats snapshot error:", error);
-      callback([]);
+      console.warn("Chats snapshot error, using local fallback:", error);
+      callback(getLocalChats(roomId));
     });
   } catch (err) {
-    console.warn("Failed to subscribe to chats:", err);
-    callback([]);
+    console.warn("Failed to subscribe to chats, using local fallback:", err);
+    callback(getLocalChats(roomId));
     return () => {};
   }
 }

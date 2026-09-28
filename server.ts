@@ -784,7 +784,8 @@ YOUR VOICE SPEECH GUIDELINES:
 2. **Conciseness & Clarity**: Keep voice answers around 2-4 sentences for immediate comprehension, followed by 1 quick question or tip. Avoid long dense paragraphs.
 3. **No Clunky Symbols**: Avoid reading out markdown headers or complex symbols like '###' or asterisks that sound awkward when spoken aloud. Use clean punctuation and natural speech cadence.
 4. **Language**: Speak naturally in ${langName}. If Hindi is chosen, use natural spoken Hindi.
-5. **Tone**: Warm, encouraging, supportive like an expert private tutor sitting right beside the student.`;
+5. **Tone**: Warm, encouraging, supportive like an expert private tutor sitting right beside the student.
+6. **Direct Speech Only**: Output ONLY your final spoken dialogue to the student. Do NOT output scratchpad notes, bullet points, planning steps, or drafts. Speak directly to ${studentName}.`;
 
       const contents: any[] = [];
       if (Array.isArray(history) && history.length > 0) {
@@ -816,7 +817,15 @@ YOUR VOICE SPEECH GUIDELINES:
       if (!result.success || !result.text) {
         throw new Error("AI Gateway failed");
       }
-      const responseText = result.text;
+      let responseText = result.text.trim();
+      // Remove any reasoning tags or planning blocks if present
+      responseText = responseText.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+      if (responseText.includes('User wants') || responseText.includes('Constraint:')) {
+        const parts = responseText.split('\n\n');
+        if (parts.length > 1) {
+          responseText = parts[parts.length - 1].trim();
+        }
+      }
 
       res.json({
         responseText,
@@ -825,7 +834,7 @@ YOUR VOICE SPEECH GUIDELINES:
       });
     } catch (err: any) {
       console.error("[Voice Tutor] Error:", err?.message || err);
-      res.status(503).json({ error: "Voice AI is temporarily unavailable. Please try again." });
+      res.status(429).json({ error: "Voice AI is temporarily unavailable. Please try again." });
     }
   });
 
@@ -2003,6 +2012,14 @@ Rules:
       console.error("Log mock exam error:", err);
       res.status(500).json({ error: err.message || "Failed to log exam." });
     }
+  });
+
+  // Global JSON-Safe Error Handling Middleware
+  app.use((err: any, _req: any, res: any, _next: any) => {
+    console.error("[GLOBAL_ERROR]:", err);
+    res.status(err.status || 500).json({
+      error: err.message || "An internal error occurred. Please try again."
+    });
   });
 
   // Dynamic Vite Dev Server or Standalone Production Server

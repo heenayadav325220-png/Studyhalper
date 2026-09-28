@@ -63,7 +63,7 @@ export const MODEL_CONFIG = {
 };
 
 // 3. Configuration values
-const COOLDOWN_MS = Number(process.env.AI_PROVIDER_COOLDOWN_MS) || 60000; // 60 seconds
+const COOLDOWN_MS = Number(process.env.AI_PROVIDER_COOLDOWN_MS) || 12000; // 12 seconds cooldown for quick quota recovery
 const REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS) || 25000; // 25 seconds
 
 // 4. In-Memory Gateway State
@@ -371,50 +371,78 @@ async function executeProviderRequest(
       }
 
       const primaryModel = context.modelPreference || (context.requiresVision ? MODEL_CONFIG.gemini.vision : MODEL_CONFIG.gemini.text);
-      const modelsToTry = [primaryModel, "gemini-2.5-flash-lite", "gemini-flash-latest"];
+      const modelsToTry = [
+        primaryModel, 
+        "gemini-2.5-flash-lite", 
+        "gemini-3.5-flash-lite", 
+        "gemini-3.1-flash-lite", 
+        "gemma-4-26b-a4b-it"
+      ];
 
       let lastGeminiErr: any = null;
       for (const model of modelsToTry) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cred.secret}`;
+        // Calculate remaining time relative to the overall global timeout (25 seconds total)
+        const elapsed = Date.now() - start;
+        const remainingTime = Math.max(2000, REQUEST_TIMEOUT_MS - elapsed);
+        const modelTimeout = Math.min(18000, remainingTime); // Generous timeout up to 18s if time permits
 
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(geminiPayload),
-          signal: controller.signal
-        });
+        const modelController = new AbortController();
+        const modelTimeoutId = setTimeout(() => modelController.abort(), modelTimeout);
 
-        if (!response.ok) {
-          const errText = await response.text();
-          lastGeminiErr = { status: response.status, message: errText || `Gemini API HTTP ${response.status}` };
-          if (response.status === 429 || response.status === 503) {
-            console.warn(`[AI_GATEWAY] Model ${model} on ${cred.id} hit ${response.status}. Trying next model on this key...`);
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cred.secret}`;
+
+          const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(geminiPayload),
+            signal: modelController.signal
+          });
+
+          clearTimeout(modelTimeoutId);
+
+          if (!response.ok) {
+            const errText = await response.text();
+            lastGeminiErr = { status: response.status, message: errText || `Gemini API HTTP ${response.status}` };
+            if (response.status === 429 || response.status === 503) {
+              console.warn(`[AI_GATEWAY] Model ${model} on ${cred.id} hit ${response.status}. Trying next model on this key...`);
+              continue;
+            }
+            throw lastGeminiErr;
+          }
+
+          clearTimeout(timeoutId);
+          const data = await response.json();
+          const parts = data?.candidates?.[0]?.content?.parts || [];
+          const text = parts.map((p: any) => p.text || "").join("").trim();
+
+          if (!text) {
+            const finishReason = data?.candidates?.[0]?.finishReason;
+            if (finishReason && finishReason !== "STOP") {
+              throw { status: 400, message: `Gemini content blocked: ${finishReason}` };
+            }
             continue;
           }
-          throw lastGeminiErr;
-        }
 
-        clearTimeout(timeoutId);
-        const data = await response.json();
-        const parts = data?.candidates?.[0]?.content?.parts || [];
-        const text = parts.map((p: any) => p.text || "").join("").trim();
+          const inputTokens = data?.usageMetadata?.promptTokenCount || 0;
+          const outputTokens = data?.usageMetadata?.candidatesTokenCount || 0;
 
-        if (!text) {
-          const finishReason = data?.candidates?.[0]?.finishReason;
-          if (finishReason && finishReason !== "STOP") {
-            throw { status: 400, message: `Gemini content blocked: ${finishReason}` };
+          return {
+            text,
+            model,
+            usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens }
+          };
+        } catch (fetchErr: any) {
+          clearTimeout(modelTimeoutId);
+          if (fetchErr.name === 'AbortError') {
+            console.warn(`[AI_GATEWAY] Model ${model} timed out after ${modelTimeout}ms. Trying next model...`);
+            lastGeminiErr = { status: 504, message: `Model ${model} timed out after ${modelTimeout}ms` };
+            continue;
           }
+          if (fetchErr.status) throw fetchErr;
+          lastGeminiErr = { status: 500, message: fetchErr.message || String(fetchErr) };
           continue;
         }
-
-        const inputTokens = data?.usageMetadata?.promptTokenCount || 0;
-        const outputTokens = data?.usageMetadata?.candidatesTokenCount || 0;
-
-        return {
-          text,
-          model,
-          usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens }
-        };
       }
 
       clearTimeout(timeoutId);

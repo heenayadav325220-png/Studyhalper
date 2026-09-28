@@ -13,7 +13,7 @@ function getMemoryUser(uid: string, email: string, displayName?: string, photoUr
       displayName: displayName || email.split('@')[0],
       photoUrl: photoUrl || '',
       xp: 0,
-      streak: 1,
+      streak: 0,
       petLevel: 1,
       createdAt: new Date(),
       updatedAt: new Date(),
