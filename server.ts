@@ -247,6 +247,149 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
+const providerCooldowns = new Map<string, number>();
+
+function mapGeminiContentsToOpenAi(contents: any[], systemInstruction?: string) {
+  const messages: any[] = [];
+  if (systemInstruction) {
+    messages.push({ role: "system", content: systemInstruction });
+  }
+  for (const item of contents) {
+    const role = item.role === 'model' ? 'assistant' : 'user';
+    let textContent = "";
+    if (Array.isArray(item.parts)) {
+      for (const part of item.parts) {
+        if (part.text) {
+          textContent += part.text + "\n";
+        }
+      }
+    } else if (typeof item.parts === 'string') {
+      textContent = item.parts;
+    }
+    textContent = textContent.trim();
+    if (textContent) {
+      messages.push({ role, content: textContent });
+    }
+  }
+  return messages;
+}
+
+async function callFailoverChain(params: {
+  contents: any[];
+  sysInstruction: string;
+  cacheKey?: string;
+  prompt: string;
+  language?: string;
+  studentContext?: any;
+}): Promise<{ text: string; provider: string }> {
+  // Ordered provider list: Gemini -> Groq Llama -> Groq Qwen -> OpenRouter
+  const providers = [
+    { name: "Gemini", keyName: "GEMINI_API_KEY" },
+    { name: "Groq Llama", keyName: "GROQ_API_KEY" },
+    { name: "Groq Qwen", keyName: "GROQ_API_KEY" },
+    { name: "OpenRouter", keyName: "OPENROUTER_API_KEY" }
+  ];
+
+  for (const provider of providers) {
+    const apiKey = process.env[provider.keyName];
+    if (!apiKey || apiKey.trim() === "") {
+      continue;
+    }
+
+    // Check cooldown
+    const cooldownExpiry = providerCooldowns.get(provider.name);
+    if (cooldownExpiry && Date.now() < cooldownExpiry) {
+      console.log(`[Failover] Skipping provider ${provider.name} due to active cooldown.`);
+      continue;
+    }
+
+    console.log(`[Failover] Trying provider: ${provider.name}`);
+
+    try {
+      let answerText = "";
+      if (provider.name === "Gemini") {
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Timeout")), 10000)
+        );
+        const geminiPromise = callGeminiWithResilience({
+          contents: params.contents,
+          config: {
+            systemInstruction: params.sysInstruction,
+            temperature: 0.3,
+          }
+        });
+        answerText = await Promise.race([geminiPromise, timeoutPromise]);
+      } else {
+        const messages = mapGeminiContentsToOpenAi(params.contents, params.sysInstruction);
+        let endpoint = "";
+        let model = "";
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json"
+        };
+
+        if (provider.name.startsWith("Groq")) {
+          endpoint = "https://api.groq.com/openai/v1/chat/completions";
+          headers["Authorization"] = `Bearer ${apiKey.trim()}`;
+          if (provider.name === "Groq Llama") {
+            model = "llama-3.3-70b-versatile";
+          } else {
+            model = "qwen-2.5-coder-32b";
+          }
+        } else if (provider.name === "OpenRouter") {
+          endpoint = "https://openrouter.ai/api/v1/chat/completions";
+          headers["Authorization"] = `Bearer ${apiKey.trim()}`;
+          headers["HTTP-Referer"] = "https://studyhalper.vercel.app";
+          headers["X-Title"] = "Ascend Study";
+          model = "google/gemini-2.5-flash";
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            model,
+            messages,
+            temperature: 0.3
+          }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const status = response.status;
+          const errBody = await response.text().catch(() => "");
+          console.error(`[Failover] Provider ${provider.name} failed with status ${status}:`, errBody);
+
+          if (status === 429) {
+            console.log(`[Failover] Rate limited (429) by ${provider.name}. Entering 10-minute cooldown.`);
+            providerCooldowns.set(provider.name, Date.now() + 10 * 60 * 1000);
+          }
+          throw new Error(`Provider ${provider.name} failed with status ${status}`);
+        }
+
+        const data: any = await response.json();
+        answerText = data?.choices?.[0]?.message?.content || "";
+      }
+
+      if (answerText && answerText.trim() !== "") {
+        console.log(`[Failover] SUCCESS: Answered by provider: ${provider.name}`);
+        return { text: answerText, provider: provider.name };
+      } else {
+        throw new Error(`Provider ${provider.name} returned empty response.`);
+      }
+
+    } catch (err: any) {
+      console.warn(`[Failover] Error with provider ${provider.name}:`, err?.message || String(err));
+    }
+  }
+
+  throw new Error("All AI providers in the failover chain failed or timed out.");
+}
+
   // API Route: World-class AI Tutor Answer / Explanation
   app.post("/api/gemini/answer", rateLimitAi, async (req, res) => {
     try {
@@ -399,13 +542,15 @@ Make sure you write keywords like "PDF", "Notes", "Summary", "Formula Sheet", "P
         parts: currentParts
       });
 
-      const answerText = await callGeminiWithResilience({
-        contents: contents,
-        config: {
-          systemInstruction: sysInstruction,
-          temperature: 0.3,
-        }
+      const result = await callFailoverChain({
+        contents,
+        sysInstruction,
+        prompt,
+        language,
+        studentContext
       });
+
+      const answerText = result.text;
 
       if (cacheKey && answerText) {
         apiCache.set(cacheKey, answerText, 60 * 60 * 1000); // 1 hr cache
@@ -413,11 +558,14 @@ Make sure you write keywords like "PDF", "Notes", "Summary", "Formula Sheet", "P
 
       res.json({ text: answerText });
     } catch (err: any) {
-      console.error("[AI Tutor] Gemini Error occurred:", err);
-      res.status(500).json({
-        error: err?.message || String(err),
-        details: err?.stack || ""
+      console.error("[AI Tutor] Failover Chain exhausted, providing fallback answer:", err);
+      const fallbackText = generateCurriculumStudyAnswer({
+        prompt: req.body?.prompt || "Study Question",
+        language: req.body?.language,
+        isApiKeyIssue: true,
+        studentContext: req.body?.studentContext
       });
+      res.json({ text: fallbackText });
     }
   });
 
