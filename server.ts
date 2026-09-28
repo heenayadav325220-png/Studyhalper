@@ -1,6 +1,9 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+import { initializeGateway, executeAIRequest, getProviderHealth } from "./src/services/aiGateway.js";
+initializeGateway();
+
 import express from "express";
 import path from "path";
 import compression from "compression";
@@ -109,69 +112,6 @@ function getAiClient(): GoogleGenAI | null {
   return aiClient;
 }
 
-// Resilient Gemini Execution with Multi-Model Fallback & Quota Protection
-// gemini-2.5-flash is our primary production model as selected in the workspace environment
-const FALLBACK_MODELS = [
-  "gemini-2.5-flash",
-  "gemini-3.5-flash",
-  "gemini-3.1-flash-lite"
-];
-
-async function callGeminiWithResilience(params: {
-  contents: any;
-  config?: any;
-  preferredModel?: string;
-}): Promise<string> {
-  const ai = getAiClient();
-  if (!ai) {
-    throw new Error(isKeyReportedLeaked ? "GEMINI_KEY_LEAKED_OR_FORBIDDEN" : "GEMINI_API_KEY_UNAVAILABLE");
-  }
-  const preferred = params.preferredModel || "gemini-2.5-flash";
-  // Always try gemini-2.5-flash first to guarantee instant success in the user's active sandbox environment
-  const modelsToTry = Array.from(new Set(["gemini-2.5-flash", preferred, ...FALLBACK_MODELS]));
-  
-  let lastError: any = null;
-  for (const model of modelsToTry) {
-    try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: params.contents,
-        config: params.config,
-      });
-      if (response && response.text) {
-        return response.text;
-      }
-    } catch (err: any) {
-      lastError = err;
-      const errMsg = err?.message || String(err);
-      
-      const isActualLeak = errMsg.includes("API key was reported as leaked") || 
-                           (errMsg.includes("leaked") && errMsg.includes("key"));
-      
-      if (isActualLeak) {
-        isKeyReportedLeaked = true;
-        throw new Error("GEMINI_KEY_LEAKED_OR_FORBIDDEN");
-      }
-
-      const isQuotaOrRateLimit = errMsg.includes("429") || 
-                                 errMsg.includes("RESOURCE_EXHAUSTED") || 
-                                 errMsg.includes("quota") || 
-                                 errMsg.includes("Too Many Requests") ||
-                                 errMsg.includes("rate-limits");
-      
-      if (isQuotaOrRateLimit) {
-        console.log(`[Gemini Resilience] Model ${model} rate-limited. Trying alternative model...`);
-        continue;
-      }
-      
-      console.warn(`[Gemini Resilience] Model ${model} attempt failed: ${errMsg.slice(0, 80)}. Trying fallback...`);
-      continue;
-    }
-  }
-
-  throw lastError || new Error("AI service temporarily unavailable. Please retry in a moment.");
-}
-
 export const app = express();
 
 app.disable('x-powered-by');
@@ -247,148 +187,18 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-const providerCooldowns = new Map<string, number>();
-
-function mapGeminiContentsToOpenAi(contents: any[], systemInstruction?: string) {
-  const messages: any[] = [];
-  if (systemInstruction) {
-    messages.push({ role: "system", content: systemInstruction });
+// Telemetry endpoint for gateway diagnostics with authorization check
+app.get("/api/admin/ai-health", (req, res) => {
+  const token = req.headers["x-admin-token"] || req.query.token;
+  const expectedToken = process.env.ADMIN_HEALTH_TOKEN || "ascend_secure_health_token";
+  
+  if (token !== expectedToken) {
+    res.status(401).json({ error: "Unauthorized access to telemetry data." });
+    return;
   }
-  for (const item of contents) {
-    const role = item.role === 'model' ? 'assistant' : 'user';
-    let textContent = "";
-    if (Array.isArray(item.parts)) {
-      for (const part of item.parts) {
-        if (part.text) {
-          textContent += part.text + "\n";
-        }
-      }
-    } else if (typeof item.parts === 'string') {
-      textContent = item.parts;
-    }
-    textContent = textContent.trim();
-    if (textContent) {
-      messages.push({ role, content: textContent });
-    }
-  }
-  return messages;
-}
-
-async function callFailoverChain(params: {
-  contents: any[];
-  sysInstruction: string;
-  cacheKey?: string;
-  prompt: string;
-  language?: string;
-  studentContext?: any;
-}): Promise<{ text: string; provider: string }> {
-  // Ordered provider list: Gemini -> Groq Llama -> Groq Qwen -> OpenRouter
-  const providers = [
-    { name: "Gemini", keyName: "GEMINI_API_KEY" },
-    { name: "Groq Llama", keyName: "GROQ_API_KEY" },
-    { name: "Groq Qwen", keyName: "GROQ_API_KEY" },
-    { name: "OpenRouter", keyName: "OPENROUTER_API_KEY" }
-  ];
-
-  for (const provider of providers) {
-    const apiKey = process.env[provider.keyName];
-    if (!apiKey || apiKey.trim() === "") {
-      continue;
-    }
-
-    // Check cooldown
-    const cooldownExpiry = providerCooldowns.get(provider.name);
-    if (cooldownExpiry && Date.now() < cooldownExpiry) {
-      console.log(`[Failover] Skipping provider ${provider.name} due to active cooldown.`);
-      continue;
-    }
-
-    console.log(`[Failover] Trying provider: ${provider.name}`);
-
-    try {
-      let answerText = "";
-      if (provider.name === "Gemini") {
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Timeout")), 10000)
-        );
-        const geminiPromise = callGeminiWithResilience({
-          contents: params.contents,
-          config: {
-            systemInstruction: params.sysInstruction,
-            temperature: 0.3,
-          }
-        });
-        answerText = await Promise.race([geminiPromise, timeoutPromise]);
-      } else {
-        const messages = mapGeminiContentsToOpenAi(params.contents, params.sysInstruction);
-        let endpoint = "";
-        let model = "";
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json"
-        };
-
-        if (provider.name.startsWith("Groq")) {
-          endpoint = "https://api.groq.com/openai/v1/chat/completions";
-          headers["Authorization"] = `Bearer ${apiKey.trim()}`;
-          if (provider.name === "Groq Llama") {
-            model = "llama-3.3-70b-versatile";
-          } else {
-            model = "qwen-2.5-coder-32b";
-          }
-        } else if (provider.name === "OpenRouter") {
-          endpoint = "https://openrouter.ai/api/v1/chat/completions";
-          headers["Authorization"] = `Bearer ${apiKey.trim()}`;
-          headers["HTTP-Referer"] = "https://studyhalper.vercel.app";
-          headers["X-Title"] = "Ascend Study";
-          model = "google/gemini-2.5-flash";
-        }
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            model,
-            messages,
-            temperature: 0.3
-          }),
-          signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          const status = response.status;
-          const errBody = await response.text().catch(() => "");
-          console.error(`[Failover] Provider ${provider.name} failed with status ${status}:`, errBody);
-
-          if (status === 429) {
-            console.log(`[Failover] Rate limited (429) by ${provider.name}. Entering 10-minute cooldown.`);
-            providerCooldowns.set(provider.name, Date.now() + 10 * 60 * 1000);
-          }
-          throw new Error(`Provider ${provider.name} failed with status ${status}`);
-        }
-
-        const data: any = await response.json();
-        answerText = data?.choices?.[0]?.message?.content || "";
-      }
-
-      if (answerText && answerText.trim() !== "") {
-        console.log(`[Failover] SUCCESS: Answered by provider: ${provider.name}`);
-        return { text: answerText, provider: provider.name };
-      } else {
-        throw new Error(`Provider ${provider.name} returned empty response.`);
-      }
-
-    } catch (err: any) {
-      console.warn(`[Failover] Error with provider ${provider.name}:`, err?.message || String(err));
-    }
-  }
-
-  throw new Error("All AI providers in the failover chain failed or timed out.");
-}
+  
+  res.json(getProviderHealth());
+});
 
   // API Route: World-class AI Tutor Answer / Explanation
   app.post("/api/gemini/answer", rateLimitAi, async (req, res) => {
@@ -542,13 +352,17 @@ Make sure you write keywords like "PDF", "Notes", "Summary", "Formula Sheet", "P
         parts: currentParts
       });
 
-      const result = await callFailoverChain({
-        contents,
-        sysInstruction,
-        prompt,
-        language,
-        studentContext
+      const result = await executeAIRequest({
+        modality: hasImages ? "image" : "text",
+        requiresVision: !!hasImages,
+        systemInstruction: sysInstruction
+      }, {
+        contents
       });
+
+      if (!result.success || !result.text) {
+        throw new Error(result.error?.message || "Failed to generate answer");
+      }
 
       const answerText = result.text;
 
@@ -611,13 +425,19 @@ Each object in the array must strictly have these keys:
 - "explanation": string (clear conceptual reason why this option is correct)`;
 
       let questions: any[] = [];
-      const text = await callGeminiWithResilience({
+      const result = await executeAIRequest({
+        modality: "text",
+        requiresVision: false,
+        modelPreference: 'gemini-2.5-flash'
+      }, {
         contents: prompt,
-        preferredModel: 'gemini-2.5-flash',
-        config: {
-          temperature: 0.8
-        }
+        config: { temperature: 0.8 }
       });
+
+      if (!result.success || !result.text) {
+        throw new Error(result.error?.message || "Failed to generate questions");
+      }
+      const text = result.text;
       const cleanJsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
       const parsed = JSON.parse(cleanJsonStr);
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -688,7 +508,14 @@ Each object in the array must strictly have these keys:
 
       let questions: any[] = [];
       try {
-        const text = await callGeminiWithResilience({ contents: prompt });
+        const result = await executeAIRequest({
+          modality: "text",
+          requiresVision: false
+        }, prompt);
+        if (!result.success || !result.text) {
+          throw new Error("AI Gateway failed");
+        }
+        const text = result.text;
         const cleanJsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
         questions = JSON.parse(cleanJsonStr);
       } catch {
@@ -768,7 +595,14 @@ Each item must have:
 
       let suggestions: any[] = [];
       try {
-        const text = await callGeminiWithResilience({ contents: prompt });
+        const result = await executeAIRequest({
+          modality: "text",
+          requiresVision: false
+        }, prompt);
+        if (!result.success || !result.text) {
+          throw new Error("AI Gateway failed");
+        }
+        const text = result.text;
         const cleanJsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
         const parsed = JSON.parse(cleanJsonStr);
         if (parsed && Array.isArray(parsed.suggestions)) {
@@ -894,13 +728,21 @@ JSON SCHEMA:
 
       let resultJson: any = null;
       try {
-        const aiText = await callGeminiWithResilience({
+        const hasVisualInput = !!(pdfBase64 || imageBase64 || (imagesBase64 && imagesBase64.length > 0));
+        const result = await executeAIRequest({
+          modality: hasVisualInput ? "image" : "text",
+          requiresVision: hasVisualInput,
+          modelPreference: 'gemini-2.5-flash'
+        }, {
           contents,
-          preferredModel: 'gemini-2.5-flash',
           config: {
             temperature: 0.2
           }
         });
+        if (!result.success || !result.text) {
+          throw new Error("AI Gateway failed");
+        }
+        const aiText = result.text;
         const cleanJsonStr = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
         resultJson = JSON.parse(cleanJsonStr);
       } catch (parseErr) {
@@ -996,14 +838,22 @@ YOUR VOICE SPEECH GUIDELINES:
         parts: [{ text: userSpokenText }]
       });
 
-      const responseText = await callGeminiWithResilience({
+      const result = await executeAIRequest({
+        modality: "text",
+        requiresVision: false,
+        systemInstruction: sysInstruction,
+        modelPreference: 'gemini-2.5-flash'
+      }, {
         contents,
-        preferredModel: 'gemini-2.5-flash',
         config: {
-          systemInstruction: sysInstruction,
           temperature: 0.4
         }
       });
+
+      if (!result.success || !result.text) {
+        throw new Error("AI Gateway failed");
+      }
+      const responseText = result.text;
 
       res.json({
         responseText,
@@ -1118,15 +968,23 @@ You MUST output ONLY valid JSON matching this schema:
         parts: [{ text: userPrompt }]
       });
 
-      const rawResult = await callGeminiWithResilience({
+      const result = await executeAIRequest({
+        modality: "text",
+        requiresVision: false,
+        modelPreference: 'gemini-2.5-flash',
+        systemInstruction: systemPrompt
+      }, {
         contents,
-        preferredModel: 'gemini-2.5-flash',
         config: {
-          systemInstruction: systemPrompt,
           temperature: 0.3,
           responseMimeType: 'application/json'
         }
       });
+
+      if (!result.success || !result.text) {
+        throw new Error("AI Gateway failed");
+      }
+      const rawResult = result.text;
 
       let parsedResult: any = null;
       try {
@@ -1502,11 +1360,19 @@ Structure the notes beautifully using rich Markdown. Include:
 
 Ensure there is NO promotional fluff or filler greetings. Open directly with the title.`;
 
-      const text = await callGeminiWithResilience({
+      const result = await executeAIRequest({
+        modality: "text",
+        requiresVision: false,
+        modelPreference: 'gemini-2.5-flash'
+      }, {
         contents: prompt,
-        preferredModel: 'gemini-2.5-flash',
         config: { temperature: 0.5 }
       });
+
+      if (!result.success || !result.text) {
+        throw new Error("AI Gateway failed");
+      }
+      const text = result.text;
 
       res.json({ title: `${topic} Notes`, content: text });
     } catch (err: any) {
@@ -1553,11 +1419,19 @@ Teaching Styles Reference:
 
 Format beautifully in Markdown. Do not include any greeting or conversational filler.`;
 
-      const text = await callGeminiWithResilience({
+      const result = await executeAIRequest({
+        modality: "text",
+        requiresVision: false,
+        modelPreference: 'gemini-2.5-flash'
+      }, {
         contents: prompt,
-        preferredModel: 'gemini-2.5-flash',
         config: { temperature: 0.6 }
       });
+
+      if (!result.success || !result.text) {
+        throw new Error("AI Gateway failed");
+      }
+      const text = result.text;
 
       res.json({ explanation: text });
     } catch (err: any) {
@@ -1614,11 +1488,19 @@ JSON Format Schema:
   ]
 }`;
 
-      const text = await callGeminiWithResilience({
+      const result = await executeAIRequest({
+        modality: "text",
+        requiresVision: false,
+        modelPreference: 'gemini-2.5-flash'
+      }, {
         contents: prompt,
-        preferredModel: 'gemini-2.5-flash',
         config: { temperature: 0.5 }
       });
+
+      if (!result.success || !result.text) {
+        throw new Error("AI Gateway failed");
+      }
+      const text = result.text;
 
       const cleanJsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
       const parsed = JSON.parse(cleanJsonStr);
@@ -1664,11 +1546,19 @@ JSON Format Schema:
 The entire question paper (instructions, marks distribution, questions divided into Section A (MCQs), Section B (Short Answers), Section C (Long Answers), and marking schemes) MUST be written in the language: ${langName}.
 Format nicely using standard Markdown. Include the detailed step-by-step marking scheme / solutions at the very end of the document.`;
 
-      const text = await callGeminiWithResilience({
+      const result = await executeAIRequest({
+        modality: "text",
+        requiresVision: false,
+        modelPreference: 'gemini-2.5-flash'
+      }, {
         contents: prompt,
-        preferredModel: 'gemini-2.5-flash',
         config: { temperature: 0.5 }
       });
+
+      if (!result.success || !result.text) {
+        throw new Error("AI Gateway failed");
+      }
+      const text = result.text;
 
       res.json({ paperText: text });
     } catch (err: any) {
@@ -1709,11 +1599,19 @@ Preserve the visual structure as clean markdown, lists, and formatted headers. D
         }
       ];
 
-      const text = await callGeminiWithResilience({
+      const result = await executeAIRequest({
+        modality: "image",
+        requiresVision: true,
+        modelPreference: 'gemini-2.5-flash'
+      }, {
         contents: contents,
-        preferredModel: 'gemini-2.5-flash',
         config: { temperature: 0.1 }
       });
+
+      if (!result.success || !result.text) {
+        throw new Error("AI Gateway failed");
+      }
+      const text = result.text;
 
       res.json({ text });
     } catch (err: any) {
@@ -1763,11 +1661,19 @@ JSON Format Schema:
 Document text:
 ${textContent.slice(0, 50000)}`;
 
-      const text = await callGeminiWithResilience({
+      const result = await executeAIRequest({
+        modality: "text",
+        requiresVision: false,
+        modelPreference: 'gemini-2.5-flash'
+      }, {
         contents: prompt,
-        preferredModel: 'gemini-2.5-flash',
         config: { temperature: 0.4 }
       });
+
+      if (!result.success || !result.text) {
+        throw new Error("AI Gateway failed");
+      }
+      const text = result.text;
 
       const cleanJsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
       const parsed = JSON.parse(cleanJsonStr);
@@ -1802,7 +1708,14 @@ Format your response using beautiful, structured Markdown. Include:
 Study Material:
 ${content}`;
 
-      const summary = await callGeminiWithResilience({ contents: prompt });
+      const result = await executeAIRequest({
+        modality: "text",
+        requiresVision: false
+      }, prompt);
+      if (!result.success || !result.text) {
+        throw new Error("AI Gateway failed");
+      }
+      const summary = result.text;
       res.json({ summary });
     } catch {
       console.log("[Summarize Notes] Generating structured academic summary fallback.");
@@ -1836,12 +1749,18 @@ Keep your tone encouraging and educational. Use clear formatting, lists, and mar
         parts: [{ text: m.content }]
       }));
 
-      const responseText = await callGeminiWithResilience({
-        contents: contents,
-        config: {
-          systemInstruction: sysInstruction
-        }
+      const result = await executeAIRequest({
+        modality: "text",
+        requiresVision: false,
+        systemInstruction: sysInstruction
+      }, {
+        contents
       });
+
+      if (!result.success || !result.text) {
+        throw new Error("AI Gateway failed");
+      }
+      const responseText = result.text;
 
       res.json({ response: responseText });
     } catch {
