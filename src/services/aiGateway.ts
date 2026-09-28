@@ -1,6 +1,6 @@
 import fetch from "node-fetch";
 
-// 1. Interfaces & Types as specified in the Master Production Directive
+// 1. Interfaces & Types
 export interface AIRequestContext {
   modality: "text" | "image" | "document" | "multimodal";
   requiresVision: boolean;
@@ -27,7 +27,7 @@ export interface NormalizedAIResponse {
 }
 
 export interface ProviderCredential {
-  id: string; // e.g. "groq-1", "gemini-2"
+  id: string; // e.g. "gemini-1", "groq-2"
   provider: "groq" | "gemini" | "openrouter";
   secret: string;
   enabled: boolean;
@@ -62,21 +62,17 @@ export const MODEL_CONFIG = {
   }
 };
 
-// 3. Configuration values from environment with solid defaults
+// 3. Configuration values
 const COOLDOWN_MS = Number(process.env.AI_PROVIDER_COOLDOWN_MS) || 60000; // 60 seconds
-const REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS) || 30000; // 30 seconds
-const MAX_RETRIES = Number(process.env.AI_MAX_RETRIES) || 2;
-const MAX_BACKOFF_MS = Number(process.env.AI_MAX_BACKOFF_MS) || 3000;
+const REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS) || 25000; // 25 seconds
 
 // 4. In-Memory Gateway State
 const credentials: ProviderCredential[] = [];
 const healthTracker = new Map<string, ProviderHealth>();
 
-let groqCursor = 0;
-let geminiCursor = 0;
-let openrouterCursor = 0;
+let roundRobinCursor = 0;
 
-// 5. Initialize credentials once
+// 5. Initialize and load credentials dynamically
 export function initializeGateway() {
   credentials.length = 0;
   healthTracker.clear();
@@ -84,31 +80,28 @@ export function initializeGateway() {
   // A. Parse Gemini Keys
   const geminiKeys: string[] = [];
   
-  // 1. Support legacy unnumbered keys first
+  // 1. Unnumbered legacy keys
   const legacyGemini = (process.env.GEMINI_API_KEY || 
                         process.env.VITE_GEMINI_API_KEY || 
                         process.env.GOOGLE_API_KEY || 
                         process.env.API_KEY || "").trim();
-  if (legacyGemini) {
+  if (legacyGemini && !geminiKeys.includes(legacyGemini)) {
     geminiKeys.push(legacyGemini);
   }
 
-  // 2. Support comma-separated format if provided
+  // 2. Numbered keys (GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_API_KEY_3...)
+  for (let i = 1; i <= 30; i++) {
+    const key = (process.env[`GEMINI_API_KEY_${i}`] || "").trim();
+    if (key && !geminiKeys.includes(key)) {
+      geminiKeys.push(key);
+    }
+  }
+
+  // 3. Comma-separated format if provided
   const geminiRaw = process.env.GEMINI_API_KEYS || "";
   geminiRaw.split(",").map(k => k.trim()).filter(k => k.length > 0).forEach(k => {
     if (!geminiKeys.includes(k)) geminiKeys.push(k);
   });
-
-  // 3. Support separate numbered keys (GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_API_KEY_3...)
-  let geminiIndex = 1;
-  while (true) {
-    const numberedKey = (process.env[`GEMINI_API_KEY_${geminiIndex}`] || "").trim();
-    if (!numberedKey) break;
-    if (!geminiKeys.includes(numberedKey)) {
-      geminiKeys.push(numberedKey);
-    }
-    geminiIndex++;
-  }
 
   geminiKeys.forEach((key, index) => {
     const id = `gemini-${index + 1}`;
@@ -124,28 +117,25 @@ export function initializeGateway() {
   // B. Parse Groq Keys
   const groqKeys: string[] = [];
   
-  // 1. Support legacy unnumbered key
+  // 1. Unnumbered key
   const legacyGroq = (process.env.GROQ_API_KEY || "").trim();
-  if (legacyGroq) {
+  if (legacyGroq && !groqKeys.includes(legacyGroq)) {
     groqKeys.push(legacyGroq);
   }
 
-  // 2. Support comma-separated format if provided
+  // 2. Numbered keys (GROQ_API_KEY_1, GROQ_API_KEY_2, GROQ_API_KEY_3...)
+  for (let i = 1; i <= 30; i++) {
+    const key = (process.env[`GROQ_API_KEY_${i}`] || "").trim();
+    if (key && !groqKeys.includes(key)) {
+      groqKeys.push(key);
+    }
+  }
+
+  // 3. Comma-separated format
   const groqRaw = process.env.GROQ_API_KEYS || "";
   groqRaw.split(",").map(k => k.trim()).filter(k => k.length > 0).forEach(k => {
     if (!groqKeys.includes(k)) groqKeys.push(k);
   });
-
-  // 3. Support separate numbered keys (GROQ_API_KEY_1, GROQ_API_KEY_2, GROQ_API_KEY_3...)
-  let groqIndex = 1;
-  while (true) {
-    const numberedKey = (process.env[`GROQ_API_KEY_${groqIndex}`] || "").trim();
-    if (!numberedKey) break;
-    if (!groqKeys.includes(numberedKey)) {
-      groqKeys.push(numberedKey);
-    }
-    groqIndex++;
-  }
 
   groqKeys.forEach((key, index) => {
     const id = `groq-${index + 1}`;
@@ -160,29 +150,22 @@ export function initializeGateway() {
 
   // C. Parse OpenRouter Keys
   const orKeys: string[] = [];
-  
-  // 1. Support legacy unnumbered key
   const legacyOr = (process.env.OPENROUTER_API_KEY || "").trim();
-  if (legacyOr) {
+  if (legacyOr && !orKeys.includes(legacyOr)) {
     orKeys.push(legacyOr);
   }
 
-  // 2. Support comma-separated format
+  for (let i = 1; i <= 30; i++) {
+    const key = (process.env[`OPENROUTER_API_KEY_${i}`] || "").trim();
+    if (key && !orKeys.includes(key)) {
+      orKeys.push(key);
+    }
+  }
+
   const orRaw = process.env.OPENROUTER_API_KEYS || "";
   orRaw.split(",").map(k => k.trim()).filter(k => k.length > 0).forEach(k => {
     if (!orKeys.includes(k)) orKeys.push(k);
   });
-
-  // 3. Support separate numbered keys (OPENROUTER_API_KEY_1, OPENROUTER_API_KEY_2...)
-  let orIndex = 1;
-  while (true) {
-    const numberedKey = (process.env[`OPENROUTER_API_KEY_${orIndex}`] || "").trim();
-    if (!numberedKey) break;
-    if (!orKeys.includes(numberedKey)) {
-      orKeys.push(numberedKey);
-    }
-    orIndex++;
-  }
 
   orKeys.forEach((key, index) => {
     const id = `openrouter-${index + 1}`;
@@ -195,9 +178,9 @@ export function initializeGateway() {
     initHealth(id);
   });
 
-  console.log(`[AI_GATEWAY] Initialized with ${credentials.length} credentials.`);
+  console.log(`[AI_GATEWAY] Loaded ${credentials.length} configured credentials into active pool.`);
   for (const cred of credentials) {
-    console.log(`[AI_GATEWAY] Registered credential ID: ${cred.id} (${cred.provider})`);
+    console.log(`[AI_GATEWAY] -> Registered ID: ${cred.id} (${cred.provider})`);
   }
 }
 
@@ -210,12 +193,12 @@ function initHealth(id: string) {
   });
 }
 
-// 6. Public Health Inspection Endpoint helper
+// 6. Public Health Inspection
 export function getProviderHealth() {
-  const summary: Record<string, { healthy: number; cooldown: number; total: number }> = {
-    groq: { healthy: 0, cooldown: 0, total: 0 },
-    gemini: { healthy: 0, cooldown: 0, total: 0 },
-    openrouter: { healthy: 0, cooldown: 0, total: 0 }
+  const summary: Record<string, { healthy: number; cooldown: number; disabled: number; total: number }> = {
+    groq: { healthy: 0, cooldown: 0, disabled: 0, total: 0 },
+    gemini: { healthy: 0, cooldown: 0, disabled: 0, total: 0 },
+    openrouter: { healthy: 0, cooldown: 0, disabled: 0, total: 0 }
   };
 
   const now = Date.now();
@@ -224,9 +207,11 @@ export function getProviderHealth() {
     if (!health) continue;
 
     summary[cred.provider].total++;
-    if (now < health.cooldownUntil) {
+    if (!cred.enabled) {
+      summary[cred.provider].disabled++;
+    } else if (now < health.cooldownUntil) {
       summary[cred.provider].cooldown++;
-    } else if (cred.enabled) {
+    } else {
       summary[cred.provider].healthy++;
     }
   }
@@ -234,74 +219,45 @@ export function getProviderHealth() {
   return summary;
 }
 
-// 7. Modality / Key Selection Router with Round-Robin Load Distribution
-export function selectProvider(context: AIRequestContext): ProviderCredential | null {
+// 7. Modality-Aware Provider Selection with Fair Round-Robin and Cooldown Respect
+export function selectProvider(context: AIRequestContext, excludeIds: Set<string>): ProviderCredential | null {
   const now = Date.now();
 
-  // Filter out disabled & cooldown credentials
-  let eligible = credentials.filter(cred => {
+  // Filter: Must be enabled and not yet tried in this request
+  let pool = credentials.filter(cred => {
     if (!cred.enabled) return false;
-    const health = healthTracker.get(cred.id);
-    if (!health) return false;
-    if (now < health.cooldownUntil) return false;
+    if (excludeIds.has(cred.id)) return false;
     return true;
   });
 
-  if (eligible.length === 0) {
+  if (pool.length === 0) {
     return null;
   }
 
-  // Vision Modality Enforcement
+  // Vision Modality Enforcement: Text-only models must NEVER receive image payloads
   if (context.requiresVision) {
-    eligible = eligible.filter(cred => {
-      // Gemini always supports vision. Groq only if vision model is used. OpenRouter supports vision.
-      return cred.provider === "gemini" || cred.provider === "openrouter" || cred.provider === "groq";
-    });
+    pool = pool.filter(cred => cred.provider === "gemini" || cred.provider === "openrouter");
   }
 
-  if (eligible.length === 0) {
+  if (pool.length === 0) {
     return null;
   }
 
-  // Context preferred provider check
-  if (context.preferredProvider) {
-    const preferred = eligible.filter(c => c.provider === context.preferredProvider);
-    if (preferred.length > 0) {
-      eligible = preferred;
-    }
-  }
+  // Prioritize credentials currently out of cooldown
+  const readyCredentials = pool.filter(cred => {
+    const health = healthTracker.get(cred.id);
+    return !health || now >= health.cooldownUntil;
+  });
 
-  // Round-Robin Cursor Strategy
-  // Separate cursor per provider type to ensure balanced distribution
-  let selected: ProviderCredential;
-  if (eligible.some(c => c.provider === "groq")) {
-    const groqEligible = eligible.filter(c => c.provider === "groq");
-    if (groqEligible.length > 0) {
-      const idx = groqCursor % groqEligible.length;
-      selected = groqEligible[idx];
-      groqCursor = (groqCursor + 1) % 100000;
-      return selected;
-    }
-  }
+  const candidates = readyCredentials.length > 0 ? readyCredentials : pool;
 
-  if (eligible.some(c => c.provider === "openrouter")) {
-    const orEligible = eligible.filter(c => c.provider === "openrouter");
-    if (orEligible.length > 0) {
-      const idx = openrouterCursor % orEligible.length;
-      selected = orEligible[idx];
-      openrouterCursor = (openrouterCursor + 1) % 100000;
-      return selected;
-    }
-  }
-
-  // Fallback to whichever eligible is next
-  const idx = geminiCursor % eligible.length;
-  selected = eligible[idx];
-  geminiCursor = (geminiCursor + 1) % 100000;
+  // Round-robin selection
+  const selected = candidates[roundRobinCursor % candidates.length];
+  roundRobinCursor = (roundRobinCursor + 1) % 100000;
   return selected;
 }
 
-// 8. Cooldown / Failure Circuit Breaker Mechanics
+// 8. Health tracking updates
 export function markProviderFailure(id: string, statusCode?: number) {
   const health = healthTracker.get(id);
   if (!health) return;
@@ -309,12 +265,12 @@ export function markProviderFailure(id: string, statusCode?: number) {
   health.consecutiveFailures++;
   health.lastFailureAt = Date.now();
   if (statusCode) health.lastStatusCode = statusCode;
-  
-  // Backoff cooldown period: 60s base multiplied by consecutive failure factor
-  const factor = Math.min(health.consecutiveFailures, 5);
-  health.cooldownUntil = Date.now() + (COOLDOWN_MS * factor);
 
-  console.warn(`[AI_GATEWAY] [FAILURE] credentialId=${id} consecutiveFailures=${health.consecutiveFailures} cooldownMs=${COOLDOWN_MS * factor} statusCode=${statusCode || "unknown"}`);
+  // Rate limit 429 = 60s cooldown; other errors = 15s cooldown
+  const cooldownDuration = statusCode === 429 ? COOLDOWN_MS : 15000;
+  health.cooldownUntil = Date.now() + cooldownDuration;
+
+  console.warn(`[AI_GATEWAY] [FAILURE] ID=${id} failures=${health.consecutiveFailures} cooldownMs=${cooldownDuration} status=${statusCode || "unknown"}`);
 }
 
 export function markProviderSuccess(id: string) {
@@ -325,23 +281,9 @@ export function markProviderSuccess(id: string) {
   health.lastSuccessAt = Date.now();
   health.cooldownUntil = 0;
   health.successfulRequests++;
-  
-  console.log(`[AI_GATEWAY] [SUCCESS] credentialId=${id} totalRequests=${health.totalRequests} successfulRequests=${health.successfulRequests}`);
 }
 
-// 9. Error Classifier
-export function classifyProviderError(status: number, message: string): "TRANSIENT" | "AUTHENTICATION" | "INVALID_REQUEST" {
-  if (status === 401 || status === 403 || message.includes("API key") || message.includes("invalid key") || message.includes("unauthorized")) {
-    return "AUTHENTICATION";
-  }
-  if (status === 400 || status === 422 || message.includes("invalid model") || message.includes("unsupported modality")) {
-    return "INVALID_REQUEST";
-  }
-  // 429 (rate-limit), 500, 502, 503, 504 are transient
-  return "TRANSIENT";
-}
-
-// 10. OpenAI-style message formatter from Gemini contents array
+// 9. Format Gemini contents to OpenAI messages for Groq & OpenRouter
 function mapGeminiContentsToOpenAi(contents: any[], systemInstruction?: string) {
   const messages: any[] = [];
   if (systemInstruction) {
@@ -350,8 +292,7 @@ function mapGeminiContentsToOpenAi(contents: any[], systemInstruction?: string) 
 
   for (const item of contents) {
     const role = item.role === 'model' ? 'assistant' : 'user';
-    
-    // Check if parts is simple text, array, or contains visual elements
+
     if (Array.isArray(item.parts)) {
       const contentParts: any[] = [];
       let simpleText = "";
@@ -391,28 +332,24 @@ function mapGeminiContentsToOpenAi(contents: any[], systemInstruction?: string) 
   return messages;
 }
 
-// 11. Execute Single Network Request with Built-in Timeout Protection
+// 10. Execute Single Provider Request with AbortController timeout
 async function executeProviderRequest(
   cred: ProviderCredential,
   context: AIRequestContext,
   payload: any,
   requestId: string
-): Promise<any> {
+): Promise<{ text: string; model: string; usage?: any }> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
   const start = Date.now();
-  let response: any;
-  let status = 0;
-  
+
   try {
     const health = healthTracker.get(cred.id);
     if (health) health.totalRequests++;
 
     if (cred.provider === "gemini") {
-      // Format Gemini API contents
       let geminiPayload: any = {};
-      
+
       if (typeof payload === 'string') {
         geminiPayload = {
           contents: [{ parts: [{ text: payload }] }]
@@ -433,41 +370,58 @@ async function executeProviderRequest(
         geminiPayload.generationConfig = payload.config;
       }
 
-      const model = context.modelPreference || (context.requiresVision ? MODEL_CONFIG.gemini.vision : MODEL_CONFIG.gemini.text);
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cred.secret}`;
+      const primaryModel = context.modelPreference || (context.requiresVision ? MODEL_CONFIG.gemini.vision : MODEL_CONFIG.gemini.text);
+      const modelsToTry = [primaryModel, "gemini-2.5-flash-lite", "gemini-flash-latest"];
 
-      response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(geminiPayload),
-        signal: controller.signal
-      });
+      let lastGeminiErr: any = null;
+      for (const model of modelsToTry) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cred.secret}`;
 
-      status = response.status;
-      clearTimeout(timeoutId);
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(geminiPayload),
+          signal: controller.signal
+        });
 
-      if (!response.ok) {
-        const errText = await response.text();
-        throw { status, message: errText || "Gemini request failed" };
+        if (!response.ok) {
+          const errText = await response.text();
+          lastGeminiErr = { status: response.status, message: errText || `Gemini API HTTP ${response.status}` };
+          if (response.status === 429 || response.status === 503) {
+            console.warn(`[AI_GATEWAY] Model ${model} on ${cred.id} hit ${response.status}. Trying next model on this key...`);
+            continue;
+          }
+          throw lastGeminiErr;
+        }
+
+        clearTimeout(timeoutId);
+        const data = await response.json();
+        const parts = data?.candidates?.[0]?.content?.parts || [];
+        const text = parts.map((p: any) => p.text || "").join("").trim();
+
+        if (!text) {
+          const finishReason = data?.candidates?.[0]?.finishReason;
+          if (finishReason && finishReason !== "STOP") {
+            throw { status: 400, message: `Gemini content blocked: ${finishReason}` };
+          }
+          continue;
+        }
+
+        const inputTokens = data?.usageMetadata?.promptTokenCount || 0;
+        const outputTokens = data?.usageMetadata?.candidatesTokenCount || 0;
+
+        return {
+          text,
+          model,
+          usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens }
+        };
       }
 
-      const data = await response.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      const inputTokens = data?.usageMetadata?.promptTokenCount || 0;
-      const outputTokens = data?.usageMetadata?.candidatesTokenCount || 0;
-
-      return {
-        text,
-        model,
-        usage: {
-          inputTokens,
-          outputTokens,
-          totalTokens: inputTokens + outputTokens
-        }
-      };
+      clearTimeout(timeoutId);
+      throw lastGeminiErr || { status: 500, message: "All Gemini models on this credential failed." };
 
     } else {
-      // Groq & OpenRouter compatible APIs
+      // Groq & OpenRouter OpenAI-compatible requests
       let endpoint = "https://api.groq.com/openai/v1/chat/completions";
       let model = MODEL_CONFIG.groq.text;
       const headers: Record<string, string> = {
@@ -500,7 +454,7 @@ async function executeProviderRequest(
         messages = [{ role: "user", content: JSON.stringify(payload) }];
       }
 
-      response = await fetch(endpoint, {
+      const response = await fetch(endpoint, {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -512,62 +466,71 @@ async function executeProviderRequest(
         signal: controller.signal
       });
 
-      status = response.status;
       clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errText = await response.text();
-        throw { status, message: errText || "Provider request failed" };
+        throw { status: response.status, message: errText || `Provider ${cred.provider} HTTP ${response.status}` };
       }
 
       const data = await response.json();
       const text = data?.choices?.[0]?.message?.content || "";
+      if (!text.trim()) {
+        throw { status: 500, message: `Empty completion returned from ${cred.provider}` };
+      }
+
       const inputTokens = data?.usage?.prompt_tokens || 0;
       const outputTokens = data?.usage?.completion_tokens || 0;
 
       return {
         text,
         model,
-        usage: {
-          inputTokens,
-          outputTokens,
-          totalTokens: inputTokens + outputTokens
-        }
+        usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens }
       };
     }
   } catch (err: any) {
     clearTimeout(timeoutId);
     const latencyMs = Date.now() - start;
-    const finalStatus = err.status || status || 500;
-    const errorMsg = err.message || String(err);
-    
-    console.error(`[AI_GATEWAY] [REQUEST_ERROR] requestId=${requestId} provider=${cred.provider} credential=${cred.id} latencyMs=${latencyMs} status=${finalStatus} error="${errorMsg.slice(0, 100)}"`);
+    const finalStatus = err.status || (err.name === 'AbortError' ? 504 : 500);
+    const errorMsg = err.message || (err.name === 'AbortError' ? 'Request timed out' : String(err));
+
+    console.error(`[AI_GATEWAY] [CALL_FAILED] requestId=${requestId} id=${cred.id} provider=${cred.provider} latency=${latencyMs}ms status=${finalStatus} error="${errorMsg.slice(0, 100)}"`);
     throw { status: finalStatus, message: errorMsg };
   }
 }
 
-// 12. Central Unified Entrypoint with Modality-Aware Fallbacks & Exponential Backoff
+// 11. Central Gateway Entrypoint: Switches across ALL configured keys on failure in 0.1s
 export async function executeAIRequest(
   context: AIRequestContext,
   payload: any
 ): Promise<NormalizedAIResponse> {
-  const requestId = `req_${Math.random().toString(36).substring(2, 11)}`;
-  let attempts = 0;
+  // Ensure credentials pool is populated
+  if (credentials.length === 0) {
+    initializeGateway();
+  }
+
+  if (credentials.length === 0) {
+    return {
+      success: false,
+      error: {
+        code: "NO_API_KEYS_CONFIGURED",
+        message: "No AI API keys are configured on the server. Please add your Gemini or Groq API keys."
+      }
+    };
+  }
+
+  const requestId = `req_${Math.random().toString(36).substring(2, 9)}`;
   const triedCredentials = new Set<string>();
+  const maxAttempts = Math.max(credentials.length, 5);
+  let lastError: any = null;
 
-  console.log(`[AI_GATEWAY] [NEW_REQUEST] requestId=${requestId} modality=${context.modality} requiresVision=${context.requiresVision}`);
+  console.log(`[AI_GATEWAY] [START] requestId=${requestId} modality=${context.modality} poolSize=${credentials.length}`);
 
-  while (attempts <= MAX_RETRIES) {
-    const cred = selectProvider(context);
+  while (triedCredentials.size < maxAttempts) {
+    const cred = selectProvider(context, triedCredentials);
     if (!cred) {
-      console.error(`[AI_GATEWAY] [NO_HEALTHY_PROVIDERS] requestId=${requestId} attempts=${attempts}`);
+      console.warn(`[AI_GATEWAY] [NO_MORE_CANDIDATES] requestId=${requestId} tried=${triedCredentials.size}/${credentials.length}`);
       break;
-    }
-
-    if (triedCredentials.has(cred.id)) {
-      // Avoid querying the same failed credential again in this loop
-      attempts++;
-      continue;
     }
 
     triedCredentials.add(cred.id);
@@ -577,9 +540,7 @@ export async function executeAIRequest(
       const result = await executeProviderRequest(cred, context, payload, requestId);
       const latencyMs = Date.now() - start;
 
-      // Log success cleanly
-      console.log(`[AI_GATEWAY] [SUCCESS] requestId=${requestId} provider=${cred.provider} credential=${cred.id} model=${result.model} status=success latencyMs=${latencyMs}`);
-      
+      console.log(`[AI_GATEWAY] [SUCCESS] requestId=${requestId} id=${cred.id} provider=${cred.provider} model=${result.model} latency=${latencyMs}ms`);
       markProviderSuccess(cred.id);
 
       return {
@@ -591,42 +552,31 @@ export async function executeAIRequest(
       };
 
     } catch (err: any) {
-      attempts++;
-      const latencyMs = Date.now() - start;
+      lastError = err;
       const status = err.status || 500;
-      const message = err.message || "Unknown error";
+      const errMsg = err.message || String(err);
 
-      console.warn(`[AI_GATEWAY] [ATTEMPT_FAILED] requestId=${requestId} provider=${cred.provider} credential=${cred.id} latencyMs=${latencyMs} status=${status} message="${message.slice(0, 100)}"`);
-
-      markProviderFailure(cred.id, status);
-
-      const errClass = classifyProviderError(status, message);
-      if (errClass === "AUTHENTICATION" || errClass === "INVALID_REQUEST") {
-        // Circuit break immediately on Authentication or bad payloads - do not retry blindly
-        console.error(`[AI_GATEWAY] [NON_RETRYABLE_ERROR] requestId=${requestId} class=${errClass} credential=${cred.id}`);
-        return {
-          success: false,
-          error: {
-            code: `AI_${errClass}_ERROR`,
-            message: `Request failed due to ${errClass.toLowerCase()} issues.`
-          }
-        };
+      // Handle invalid credentials
+      if (status === 401 || status === 403 || errMsg.includes("API key not valid") || errMsg.includes("API_KEY_INVALID")) {
+        cred.enabled = false;
+        console.error(`[AI_GATEWAY] Key disabled due to invalid credentials: ${cred.id}`);
+      } else {
+        markProviderFailure(cred.id, status);
       }
 
-      // If we have remaining attempts, apply bounded exponential backoff
-      if (attempts <= MAX_RETRIES) {
-        const delay = Math.min(Math.pow(2, attempts) * 100, MAX_BACKOFF_MS);
-        console.log(`[AI_GATEWAY] [FAILOVER_RETRY] requestId=${requestId} delayMs=${delay} nextAttempt=${attempts + 1}`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
+      console.log(`[AI_GATEWAY] [ROTATING_KEY] requestId=${requestId} -> Failing over to next available key in 0.1s...`);
+      // 100ms pause to yield event loop cleanly
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
   }
 
+  // All keys were exhausted; return a clean, honest error message
+  console.error(`[AI_GATEWAY] [EXHAUSTED] All ${triedCredentials.size} keys failed for requestId=${requestId}`);
   return {
     success: false,
     error: {
-      code: "AI_TEMPORARILY_UNAVAILABLE",
-      message: "AI service is temporarily busy. Please try again shortly."
+      code: "ALL_AI_PROVIDERS_EXHAUSTED",
+      message: lastError?.message || "सभी AI स्लॉट्स इस समय व्यस्त हैं या सीमा पार हो चुकी है। कृपया 10 सेकंड बाद पुनः प्रयास करें।"
     }
   };
 }
