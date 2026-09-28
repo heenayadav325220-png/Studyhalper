@@ -47,6 +47,7 @@ import { PdfBookScanner } from './components/PdfBookScanner';
 import { VoiceTutorModal } from './components/VoiceTutorModal';
 
 import IntegrationsHub from './components/IntegrationsHub';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 const RealtimeMovingUniverse = React.lazy(() => import('./components/RealtimeMovingUniverse').then(m => ({ default: m.RealtimeMovingUniverse })));
 import { TRANSLATIONS, Language } from './services/translations';
 import { playUiSound } from './services/soundEffects';
@@ -247,6 +248,32 @@ export default function App() {
       updateUserProfile(userProfile.uid, { language: newLang });
     }
   };
+
+  const [currentPath, setCurrentPath] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname.toLowerCase();
+      if (p === '/privacy' || p === '/privacy/' || window.location.hash === '#/privacy') {
+        return '/privacy';
+      }
+      return p;
+    }
+    return '/';
+  });
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (typeof window !== 'undefined') {
+        const p = window.location.pathname.toLowerCase();
+        if (p === '/privacy' || p === '/privacy/' || window.location.hash === '#/privacy') {
+          setCurrentPath('/privacy');
+        } else {
+          setCurrentPath(window.location.pathname);
+        }
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const [appLoading, setAppLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -1361,6 +1388,19 @@ export default function App() {
   const cornerRadius = getCardRadiusClasses();
   const currentBgColor = uiCustomization.backgroundColor || '#000000';
   const isPureBlack = uiCustomization.wallpaperAmbiance === 'pure_black';
+
+  if (currentPath === '/privacy') {
+    return (
+      <PrivacyPolicy 
+        onBack={() => {
+          if (typeof window !== 'undefined') {
+            window.history.pushState(null, '', '/');
+            setCurrentPath('/');
+          }
+        }} 
+      />
+    );
+  }
 
   return (
     <div 

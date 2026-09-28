@@ -904,6 +904,22 @@ export default function AuthModal({
               </div>
             </div>
           )}
+
+          {/* Privacy Policy Link Footer */}
+          <div className="pt-3 border-t border-slate-800/80 text-center">
+            <a
+              href="/privacy"
+              onClick={(e) => {
+                e.preventDefault();
+                onClose();
+                window.history.pushState(null, '', '/privacy');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }}
+              className="text-[11px] text-slate-400 hover:text-indigo-400 underline underline-offset-2 transition inline-flex items-center gap-1 cursor-pointer"
+            >
+              <span>{isHi ? 'गोपनीयता नीति (Privacy Policy)' : 'Privacy Policy'}</span>
+            </a>
+          </div>
         </div>
       </motion.div>
     </div>
