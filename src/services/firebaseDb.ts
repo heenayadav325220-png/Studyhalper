@@ -182,8 +182,20 @@ export async function sendGroupMessage(roomId: string, text: string, senderId: s
 
 // --- REAL-TIME CANVAS WHITEBOARD ---
 export function subscribeToWhiteboard(roomId: string, callback: (elements: WhiteboardElement[]) => void) {
+  const localKey = `local_wb_${roomId}`;
+  const getLocalElements = () => {
+    try {
+      return JSON.parse(localStorage.getItem(localKey) || "[]") as WhiteboardElement[];
+    } catch (e) {
+      return [];
+    }
+  };
+
+  // Provide initial local elements immediately for instant zero-latency rendering
+  const initialLocal = getLocalElements();
+  callback(initialLocal);
+
   if (!db) {
-    callback([]);
     return () => {};
   }
   try {
@@ -196,14 +208,19 @@ export function subscribeToWhiteboard(roomId: string, callback: (elements: White
       snapshot.forEach((d) => {
         elements.push({ id: d.id, ...d.data() } as WhiteboardElement);
       });
-      callback(elements.reverse());
+      const remoteElements = elements.reverse();
+      
+      // Update local cache so offline transition is seamless
+      localStorage.setItem(localKey, JSON.stringify(remoteElements));
+      
+      callback(remoteElements);
     }, (error) => {
-      console.warn("Whiteboard snapshot error:", error);
-      callback([]);
+      console.warn("Whiteboard snapshot error, falling back to local:", error);
+      callback(getLocalElements());
     });
   } catch (err) {
-    console.warn("Failed to subscribe to whiteboard:", err);
-    callback([]);
+    console.warn("Failed to subscribe to whiteboard, falling back to local:", err);
+    callback(getLocalElements());
     return () => {};
   }
 }

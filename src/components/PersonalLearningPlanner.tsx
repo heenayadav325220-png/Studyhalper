@@ -57,7 +57,7 @@ export default function PersonalLearningPlanner({
     try {
       const mistList = await PersonalLearningService.getMistakes(user.uid);
       const revList = await PersonalLearningService.getRevisionTopics(user.uid);
-      const stats = PersonalLearningService.getTopicStats();
+      const stats = await PersonalLearningService.getTopicStats(user.uid);
       
       setMistakes(mistList);
       setRevisions(revList);
@@ -110,8 +110,6 @@ export default function PersonalLearningPlanner({
             overdueRev.subject,
             `Please provide a quick spaced revision overview of ${overdueRev.topic} inside the ${overdueRev.subject} curriculum. Detail the core concepts, main equations, and 1 practice exercise.`
           );
-          // Mark completed spacing asynchronously
-          PersonalLearningService.completeRevision(user.uid, overdueRev.id).then(() => loadLearningData());
         }
       };
     }
@@ -568,7 +566,6 @@ Explain:
                               r.subject,
                               `I need a quick dynamic spaced revision review of "${r.topic}" in "${r.subject}" to retain mastery. Detail: 1) Essential formulas, 2) Critical concept breakdown, 3) Standard exam questions.`
                             );
-                            PersonalLearningService.completeRevision(user.uid, r.id).then(() => loadLearningData());
                           }}
                           className="px-2.5 py-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-200 font-black text-[10px] rounded-lg transition flex items-center space-x-1 cursor-pointer"
                         >

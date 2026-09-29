@@ -127,6 +127,26 @@ service cloud.firestore {
       allow create: if isOwner(userId) && isValidUserCreate(incoming(), userId);
       allow update: if isOwner(userId) && isValidUserUpdate(incoming(), existing(), userId);
       allow delete: if isOwner(userId);
+
+      // Mistakes subcollection: Owner only
+      match /mistakes/{mistakeId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Spaced Revisions subcollection: Owner only
+      match /spaced_revisions/{revisionId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Learning State (Weak/Completed topics): Owner only
+      match /learning_state/{stateId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Learning Progress: Owner only
+      match /learning_progress/{progressId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // 2. Study Rooms container: Read by authenticated students, protected from unauthorized modification or deletion

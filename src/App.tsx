@@ -327,6 +327,7 @@ export default function App() {
   const [prefilledTutorPrompt, setPrefilledTutorPrompt] = useState<string | undefined>(undefined);
   const [prefilledSubject, setPrefilledSubject] = useState<Subject | undefined>(undefined);
   const [prefilledTopic, setPrefilledTopic] = useState<string | undefined>(undefined);
+  const [prefilledImage, setPrefilledImage] = useState<string | undefined>(undefined);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -727,16 +728,58 @@ export default function App() {
   };
 
   // --- STREAK & GOALS STATE ---
-  const currentStreak = userProfile?.streak || 0;
-  const completedDaysInCycle = currentStreak % 5 === 0 && currentStreak > 0 ? 5 : currentStreak % 5;
-  const streakCompletedDays = [
-    completedDaysInCycle >= 1,
-    completedDaysInCycle >= 2,
-    completedDaysInCycle >= 3,
-    completedDaysInCycle >= 4,
-    completedDaysInCycle >= 5
-  ];
-  const nextMilestone = Math.max(5, Math.ceil((userProfile?.streak || 1) / 5) * 5);
+
+  // Dynamic Weekly Grid (Mon - Sun) calculation for unlimited continuous streak
+  const getWeeklyGridStatus = () => {
+    const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const now = new Date();
+    const currentDayIndex = now.getDay();
+    const mondayShift = currentDayIndex === 0 ? 6 : currentDayIndex - 1;
+
+    const mondayDate = new Date(now);
+    mondayDate.setDate(now.getDate() - mondayShift);
+    mondayDate.setHours(0, 0, 0, 0);
+
+    const todayStr = getLocalDateString();
+    const streak = userProfile?.streak || 0;
+    const lastStreakStr = userProfile?.lastStreakDate || '';
+
+    const completedDatesSet = new Set<string>();
+    if (streak > 0 && lastStreakStr) {
+      const lastDateObj = new Date(lastStreakStr + 'T00:00:00');
+      for (let i = 0; i < streak; i++) {
+        const dObj = new Date(lastDateObj);
+        dObj.setDate(lastDateObj.getDate() - i);
+        const y = dObj.getFullYear();
+        const m = String(dObj.getMonth() + 1).padStart(2, '0');
+        const d = String(dObj.getDate()).padStart(2, '0');
+        completedDatesSet.add(`${y}-${m}-${d}`);
+      }
+    }
+
+    if (activeSecondsToday >= 600) {
+      completedDatesSet.add(todayStr);
+    }
+
+    return daysOfWeek.map((dayLabel, index) => {
+      const targetDate = new Date(mondayDate);
+      targetDate.setDate(mondayDate.getDate() + index);
+      const y = targetDate.getFullYear();
+      const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+      const d = String(targetDate.getDate()).padStart(2, '0');
+      const dateStr = `${y}-${m}-${d}`;
+      const isDone = completedDatesSet.has(dateStr);
+      const isToday = dateStr === todayStr;
+
+      return {
+        label: dayLabel,
+        dateStr,
+        isDone,
+        isToday
+      };
+    });
+  };
+
   const [day1GoalCompleted, setDay1GoalCompleted] = useState(false);
 
   const [activeSecondsToday, setActiveSecondsToday] = useState<number>(0);
@@ -1104,6 +1147,8 @@ export default function App() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPoints, setCurrentPoints] = useState<{ x: number; y: number }[]>([]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const lastXRef = useRef<number | null>(null);
+  const lastYRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (activeTab !== 'whiteboard') return;
@@ -1145,10 +1190,12 @@ export default function App() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
     setIsDrawing(true);
     setCurrentPoints([{ x, y }]);
+    lastXRef.current = x;
+    lastYRef.current = y;
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1156,26 +1203,70 @@ export default function App() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
     setCurrentPoints((prev) => [...prev, { x, y }]);
 
     const ctx = canvas.getContext('2d');
-    if (ctx && currentPoints.length > 0) {
-      const lastPoint = currentPoints[currentPoints.length - 1];
+    if (ctx && lastXRef.current !== null && lastYRef.current !== null) {
       ctx.beginPath();
       ctx.strokeStyle = drawColor;
       ctx.lineWidth = drawThickness;
       ctx.lineCap = 'round';
-      ctx.moveTo(lastPoint.x, lastPoint.y);
+      ctx.lineJoin = 'round';
+      ctx.moveTo(lastXRef.current, lastYRef.current);
       ctx.lineTo(x, y);
       ctx.stroke();
     }
+    lastXRef.current = x;
+    lastYRef.current = y;
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas || e.touches.length === 0) return;
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const x = (touch.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (touch.clientY - rect.top) * (canvas.height / rect.height);
+    setIsDrawing(true);
+    setCurrentPoints([{ x, y }]);
+    lastXRef.current = x;
+    lastYRef.current = y;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || e.touches.length === 0) return;
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const x = (touch.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (touch.clientY - rect.top) * (canvas.height / rect.height);
+    setCurrentPoints((prev) => [...prev, { x, y }]);
+
+    const ctx = canvas.getContext('2d');
+    if (ctx && lastXRef.current !== null && lastYRef.current !== null) {
+      ctx.beginPath();
+      ctx.strokeStyle = drawColor;
+      ctx.lineWidth = drawThickness;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.moveTo(lastXRef.current, lastYRef.current);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    }
+    lastXRef.current = x;
+    lastYRef.current = y;
   };
 
   const handleMouseUp = async () => {
     if (!isDrawing) return;
     setIsDrawing(false);
+    lastXRef.current = null;
+    lastYRef.current = null;
     if (currentPoints.length > 1) {
       const newEl: Omit<WhiteboardElement, 'id'> = {
         roomId: 'global_board',
@@ -1192,8 +1283,31 @@ export default function App() {
     setCurrentPoints([]);
   };
 
+  const handleTouchEnd = async () => {
+    await handleMouseUp();
+  };
+
   const handleClearCanvas = async () => {
     await clearWhiteboardRoom('global_board');
+  };
+
+  const handleSendWhiteboardToAiTutor = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      showToast("Whiteboard canvas is not ready.", "error");
+      return;
+    }
+    try {
+      const dataUrl = canvas.toDataURL('image/png');
+      setPrefilledImage(dataUrl);
+      setPrefilledTutorPrompt("Please analyze my whiteboard drawing of diagrams and equations and help me understand it or solve it!");
+      setPrefilledSubject('Science');
+      setActiveTab('aiTutor');
+      showToast("🎨 Whiteboard drawing sent to AI Tutor successfully!", "success");
+    } catch (err) {
+      console.error('Error capturing whiteboard canvas:', err);
+      showToast("Failed to capture whiteboard canvas.", "error");
+    }
   };
 
   // --- MOCK EXAMS STATE ---
@@ -1587,10 +1701,12 @@ export default function App() {
           prefilledPrompt={prefilledTutorPrompt}
           prefilledSubject={prefilledSubject}
           prefilledTopic={prefilledTopic}
+          prefilledImage={prefilledImage}
           onClearPrefilled={() => {
             setPrefilledTutorPrompt(undefined);
             setPrefilledSubject(undefined);
             setPrefilledTopic(undefined);
+            setPrefilledImage(undefined);
           }}
         />
       ) : (
@@ -2662,12 +2778,12 @@ export default function App() {
                 </div>
               </motion.div>
 
-            {/* 4. 5-DAY STUDY STREAK - PROMINENT GAMIFICATION & VISUAL PROGRESS */}
+            {/* 4. UNLIMITED STUDY STREAK - PROMINENT GAMIFICATION & VISUAL PROGRESS */}
             <div id="streak-card-section" className="rounded-2xl p-4 sm:p-5 border border-transparent bg-[#0b101d]/90 backdrop-blur-xl text-white space-y-4 relative overflow-hidden shadow-xl">
               <NeonBorder color1="#fbbf24" color2="#ea580c" duration="6s" />
               {/* Subtle Ambient Radial Glow */}
               <div className="absolute -top-12 -right-12 w-40 h-40 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
-
+ 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
                 <div className="flex items-center gap-3.5">
                   {/* Premium Circular Progress Ring SVG */}
@@ -2711,10 +2827,10 @@ export default function App() {
                       </span>
                     </div>
                   </div>
-
+ 
                   <div>
                     <h3 className="font-extrabold text-slate-100 text-xs sm:text-sm tracking-wider uppercase flex items-center space-x-2">
-                      <span>{nextMilestone}-DAY STUDY STREAK</span>
+                      <span>{userProfile.streak > 0 ? `${userProfile.streak} DAY STUDY STREAK` : 'STUDY STREAK'}</span>
                     </h3>
                     <p className="text-[11px] sm:text-xs text-slate-300 mt-1">
                       {activeSecondsToday >= 600 ? (
@@ -2725,18 +2841,18 @@ export default function App() {
                     </p>
                   </div>
                 </div>
-
+ 
                 {/* Streak Badge Pill */}
                 <div className="px-3 py-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 rounded-xl text-xs font-black text-amber-300 flex items-center gap-2 shadow-[0_0_12px_rgba(245,158,11,0.25)] shrink-0 self-start sm:self-center">
                   <span className="text-base animate-pulse">🔥</span>
                   <div className="leading-tight text-right sm:text-left">
-                    <div className="font-black text-xs text-amber-100">{userProfile.streak}/{nextMilestone} Days</div>
+                    <div className="font-black text-xs text-amber-100">{userProfile.streak} Days</div>
                     <div className="text-[8.5px] font-bold text-amber-400 uppercase tracking-widest">STREAK</div>
                   </div>
                 </div>
               </div>
-
-              {/* 5-DAY PROGRESS BAR INDICATOR */}
+ 
+              {/* STUDY GOAL TODAY PROGRESS BAR */}
               <div className="space-y-1.5 relative z-10">
                 <div className="flex items-center justify-between text-[11px] font-bold">
                   <span className="text-slate-300 flex items-center gap-1.5">
@@ -2754,43 +2870,42 @@ export default function App() {
                   />
                 </div>
               </div>
-
-              {/* DAY PILLS (5-DAY CARDS) */}
-              <div className="grid grid-cols-5 gap-1.5 sm:gap-2.5 relative z-10">
-                {[
-                  { d: `DAY ${nextMilestone - 4}`, w: 'Mon' },
-                  { d: `DAY ${nextMilestone - 3}`, w: 'Tue' },
-                  { d: `DAY ${nextMilestone - 2}`, w: 'Wed' },
-                  { d: `DAY ${nextMilestone - 1}`, w: 'Thu' },
-                  { d: `DAY ${nextMilestone}`, w: 'Fri' }
-                ].map((item, idx) => {
-                  const isDone = streakCompletedDays[idx];
+ 
+              {/* UNLIMITED WEEKLY PROGRESS GRID (Mon - Sun) */}
+              <div className="grid grid-cols-7 gap-1 sm:gap-2 relative z-10">
+                {getWeeklyGridStatus().map((dayItem, idx) => {
+                  const isDone = dayItem.isDone;
+                  const isToday = dayItem.isToday;
                   return (
                     <div 
                       key={idx}
-                      className={`p-2 sm:p-3 rounded-xl text-center flex flex-col items-center justify-between h-22 sm:h-26 transition-all cursor-default relative overflow-hidden ${
+                      className={`p-1.5 sm:p-2.5 rounded-xl text-center flex flex-col items-center justify-between h-22 sm:h-26 transition-all cursor-default relative overflow-hidden ${
                         isDone
                           ? 'border border-amber-500/50 bg-gradient-to-b from-amber-500/20 to-amber-950/40 text-amber-100 shadow-[0_0_14px_rgba(245,158,11,0.22)]'
-                          : 'border border-slate-800/90 bg-[#070c18]/90 hover:bg-[#0c1428] text-slate-400'
+                          : isToday
+                          ? 'border border-slate-700 bg-slate-900/60 text-slate-300'
+                          : 'border border-slate-800/90 bg-[#070c18]/90 hover:bg-[#0c1428] text-slate-500'
                       }`}
                     >
-                      <div className={`text-[8px] sm:text-[9px] font-black uppercase tracking-wider ${isDone ? 'text-amber-400' : 'text-slate-400'}`}>
-                        {item.d}
+                      <div className={`text-[7px] sm:text-[8px] font-black uppercase tracking-wider ${isDone ? 'text-amber-400' : isToday ? 'text-slate-300' : 'text-slate-600'}`}>
+                        {dayItem.label}
                       </div>
-                      <div className={`font-black text-xs sm:text-sm ${isDone ? 'text-white' : 'text-slate-300'}`}>
-                        {item.w}
+                      <div className={`font-black text-[9px] sm:text-xs ${isDone ? 'text-white' : 'text-slate-400'}`}>
+                        {dayItem.dateStr.split('-')[2]}
                       </div>
-                      <div className="flex justify-center items-center">
-                        <span className={`text-base sm:text-lg transition-transform ${isDone ? 'scale-110 drop-shadow-[0_0_8px_rgba(245,158,11,0.8)]' : 'opacity-60'}`}>
+                      <div className="flex justify-center items-center my-0.5">
+                        <span className={`text-sm sm:text-base transition-transform ${isDone ? 'scale-110 drop-shadow-[0_0_8px_rgba(245,158,11,0.8)]' : 'opacity-60'}`}>
                           {isDone ? '🔥' : '🎯'}
                         </span>
                       </div>
-                      <span className={`text-[7.5px] sm:text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                      <span className={`text-[6.5px] sm:text-[7.5px] font-black uppercase tracking-wider px-1 sm:px-1.5 py-0.5 rounded ${
                         isDone 
                           ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
-                          : 'bg-slate-900 text-slate-400 border border-slate-800'
+                          : isToday
+                          ? 'bg-slate-800 text-slate-300 border border-slate-700'
+                          : 'bg-slate-950/60 text-slate-600 border border-slate-900'
                       }`}>
-                        {isDone ? 'DONE' : 'LOCKED'}
+                        {isDone ? 'DONE' : isToday ? 'ACTIVE' : 'LOCKED'}
                       </span>
                     </div>
                   );
@@ -3369,6 +3484,15 @@ export default function App() {
                 </div>
 
                 <button
+                  onClick={handleSendWhiteboardToAiTutor}
+                  className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-extrabold flex items-center space-x-1 transition shadow-sm"
+                  title="Send whiteboard drawing directly to AI Study Tutor for conceptual explanation or step-by-step math solutions"
+                >
+                  <Send className="w-3 h-3" />
+                  <span>Send to AI Tutor</span>
+                </button>
+
+                <button
                   onClick={handleClearCanvas}
                   className="px-2.5 py-1 bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200 rounded-xl text-[10px] font-bold transition"
                 >
@@ -3385,6 +3509,9 @@ export default function App() {
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
                 className="w-full h-full block"
               />
             </div>

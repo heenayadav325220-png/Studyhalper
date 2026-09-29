@@ -95,6 +95,7 @@ interface AiTutorAppProps {
   prefilledPrompt?: string;
   prefilledSubject?: Subject;
   prefilledTopic?: string;
+  prefilledImage?: string;
   onClearPrefilled?: () => void;
 }
 
@@ -645,6 +646,7 @@ export const AiTutorApp = memo(function AiTutorApp({
   prefilledPrompt,
   prefilledSubject,
   prefilledTopic,
+  prefilledImage,
   onClearPrefilled
 }: AiTutorAppProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
@@ -679,7 +681,7 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [selectedLanguage, setSelectedLanguage] = useState<string>(() => getStoredValue(`ai_tutor_language_${user.uid}`, 'Hinglish'));
   const [preferredStyle, setPreferredStyle] = useState<string>(() => PersonalLearningService.getPreferredStyle(user.uid));
 
-  // Load prefilled recommendation context from Personal Planner
+  // Load prefilled recommendation context from Personal Planner / Whiteboard
   useEffect(() => {
     if (prefilledPrompt) {
       setInputQuery(prefilledPrompt);
@@ -687,12 +689,18 @@ export const AiTutorApp = memo(function AiTutorApp({
     if (prefilledSubject) {
       setSelectedSubject(prefilledSubject);
     }
-    if (prefilledPrompt || prefilledSubject || prefilledTopic) {
+    if (prefilledImage) {
+      setSelectedImages((prev) => {
+        if (prev.includes(prefilledImage)) return prev;
+        return [...prev, prefilledImage];
+      });
+    }
+    if (prefilledPrompt || prefilledSubject || prefilledTopic || prefilledImage) {
       if (onClearPrefilled) {
         onClearPrefilled();
       }
     }
-  }, [prefilledPrompt, prefilledSubject, prefilledTopic, onClearPrefilled]);
+  }, [prefilledPrompt, prefilledSubject, prefilledTopic, prefilledImage, onClearPrefilled]);
   const [tutorMode, setTutorMode] = useState<'homework' | 'explain' | 'step' | 'quiz'>('homework');
   const [aiTutorSubMode, setAiTutorSubMode] = useState<string>('direct');
   const [isLoading, setIsLoading] = useState(false);
@@ -1189,6 +1197,7 @@ export const AiTutorApp = memo(function AiTutorApp({
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const recognitionRef = useRef<any>(null);
 
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
 
@@ -1208,6 +1217,16 @@ export const AiTutorApp = memo(function AiTutorApp({
       vv.removeEventListener('scroll', updateHeight);
     };
   }, []);
+
+  // Dynamic auto-expanding height effect for Chat Input Textarea
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      // Set the height dynamically based on the scrollHeight of the typed content
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+  }, [inputQuery]);
 
   const playShutterSound = () => {
     try {
@@ -1965,29 +1984,65 @@ export const AiTutorApp = memo(function AiTutorApp({
     }
 
     if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (err) {
+          console.warn('Failed to stop speech recognition:', err);
+        }
+      }
       setIsListening(false);
       return;
     }
 
     try {
       const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      
       recognition.continuous = false;
       recognition.interimResults = false;
-      recognition.lang = 'en-US';
+      
+      // Dynamically select language (Hindi vs Indian English) for hyper-accurate transcription
+      recognition.lang = appLanguage === 'hi' ? 'hi-IN' : 'en-IN';
 
-      recognition.onstart = () => setIsListening(true);
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
       recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setInputQuery((prev) => (prev ? `${prev} ${transcript}` : transcript));
+        if (event.results && event.results[0] && event.results[0][0]) {
+          const transcript = event.results[0][0].transcript;
+          setInputQuery((prev) => (prev ? `${prev} ${transcript}` : transcript));
+        }
         setIsListening(false);
       };
-      recognition.onerror = () => setIsListening(false);
-      recognition.onend = () => setIsListening(false);
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed') {
+          const errMsg = appLanguage === 'hi' 
+            ? 'माइक्रोफ़ोन एक्सेस की अनुमति नहीं है। कृपया अपने ब्राउज़र की सेटिंग में माइक चालू करें।' 
+            : 'Microphone access denied. Please enable microphone permissions in your browser settings.';
+          showToast(errMsg, 'error');
+        } else {
+          const errMsg = appLanguage === 'hi'
+            ? 'माइक्रोफ़ोन में त्रुटि आई। कृपया पुनः प्रयास करें।'
+            : 'Speech recognition error occurred. Please try again.';
+          showToast(errMsg, 'error');
+        }
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        recognitionRef.current = null;
+      };
 
       recognition.start();
     } catch (e) {
-      console.error(e);
+      console.error('Speech recognition startup error:', e);
       setIsListening(false);
+      recognitionRef.current = null;
     }
   };
 
@@ -3182,277 +3237,294 @@ export const AiTutorApp = memo(function AiTutorApp({
             })}
           </div>
 
-          <div className="relative flex items-center bg-white border border-slate-250/90 hover:border-slate-350 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/15 rounded-2xl p-1 transition-all duration-200 shadow-sm">
-            {/* MIC BUTTON */}
-            <button
-              type="button"
-              onClick={handleVoiceInputToggle}
-              className={`w-9 h-9 flex items-center justify-center rounded-xl transition cursor-pointer shrink-0 ${
-                isListening 
-                  ? 'bg-rose-600 text-white animate-bounce shadow-sm' 
-                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-              }`}
-              title={isListening ? 'Listening... Click to stop' : 'Voice Input'}
-            >
-              <Mic className="w-4 h-4" />
-            </button>
+          <div className="relative flex flex-col bg-white border border-slate-250/90 hover:border-slate-350 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/15 rounded-3xl p-3 pb-2.5 transition-all duration-200 shadow-sm min-h-[96px]">
+            {/* Top Row: Full-width Flexible Textarea */}
+            <div className={`w-full flex-grow flex ${inputQuery ? 'items-start' : 'items-center'} pb-1`}>
+              <textarea
+                ref={textareaRef}
+                rows={1}
+                value={inputQuery}
+                onChange={(e) => setInputQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                placeholder={
+                  isListening 
+                    ? 'Listening to your voice...' 
+                    : selectedImages.length > 0 
+                    ? `${selectedImages.length} page(s) attached! Press Send...` 
+                    : `Ask AI Tutor about ${selectedSubject}...`
+                }
+                className="w-full bg-transparent border-0 outline-none p-0 px-2 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-0 focus:border-0 resize-none max-h-[150px] overflow-y-auto py-1 font-medium min-h-[24px]"
+                style={{
+                  outline: 'none',
+                  border: 'none',
+                  boxShadow: 'none',
+                  WebkitAppearance: 'none'
+                }}
+              />
+            </div>
 
-            {/* THREE-DOTS QUICK ACTIONS MENU (Next to Mic) */}
-            <div ref={quickActionsMenuRef} className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowQuickActionsMenu(!showQuickActionsMenu)}
-                className={`w-9 h-9 flex items-center justify-center rounded-xl transition cursor-pointer ${
-                  showQuickActionsMenu 
-                    ? 'bg-indigo-600 text-white shadow-xs' 
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-                }`}
-                title={appLanguage === 'hi' ? 'त्वरित अध्ययन सुझाव' : 'Quick Actions & Study Prompts'}
-              >
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
+            {/* Bottom Row: Utilities Toolbelt & Send Buttons (Permanently Pinned at Bottom) */}
+            <div className="flex items-center justify-between border-t border-slate-100/70 pt-2 mt-2">
+              {/* Left Column utilities (Mic, Quick actions menu, attachment button) */}
+              <div className="flex items-center space-x-1 shrink-0">
+                {/* MIC BUTTON */}
+                <button
+                  type="button"
+                  onClick={handleVoiceInputToggle}
+                  className={`w-9 h-9 flex items-center justify-center rounded-xl transition cursor-pointer shrink-0 ${
+                    isListening 
+                      ? 'bg-rose-600 text-white animate-bounce shadow-sm' 
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                  }`}
+                  title={isListening ? 'Listening... Click to stop' : 'Voice Input'}
+                >
+                  <Mic className="w-4 h-4" />
+                </button>
 
-              <AnimatePresence>
-                {showQuickActionsMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95, y: 6 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: 6 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute bottom-full left-0 mb-2 w-72 sm:w-80 bg-white/98 backdrop-blur-lg border border-slate-200 rounded-2xl p-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.18)] z-50 text-slate-800 space-y-2"
+                {/* THREE-DOTS QUICK ACTIONS MENU */}
+                <div ref={quickActionsMenuRef} className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickActionsMenu(!showQuickActionsMenu)}
+                    className={`w-9 h-9 flex items-center justify-center rounded-xl transition cursor-pointer ${
+                      showQuickActionsMenu 
+                        ? 'bg-indigo-600 text-white shadow-xs' 
+                        : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                    }`}
+                    title={appLanguage === 'hi' ? 'त्वरित अध्ययन सुझाव' : 'Quick Actions & Study Prompts'}
                   >
-                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
-                      <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-800">
-                        <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                        <span>{appLanguage === 'hi' ? 'त्वरित सुझाव' : 'Quick Study Actions'}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <button
-                          type="button"
-                          onClick={handleRefreshSuggestions}
-                          disabled={isGeneratingSuggestions}
-                          className="p-1 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition"
-                          title="Refresh prompts"
-                        >
-                          <RefreshCw className={`w-3.5 h-3.5 ${isGeneratingSuggestions ? 'animate-spin' : ''}`} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowQuickActionsMenu(false)}
-                          className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
-                          title="Close"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
 
-                    <div className="max-h-56 overflow-y-auto space-y-1 pr-0.5 no-scrollbar">
-                      {suggestions.map((sugg, idx) => (
+                  <AnimatePresence>
+                    {showQuickActionsMenu && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: 6 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: 6 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute bottom-full left-0 mb-2 w-72 sm:w-80 bg-white/98 backdrop-blur-lg border border-slate-200 rounded-2xl p-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.18)] z-50 text-slate-800 space-y-2"
+                      >
+                        <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                          <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-800">
+                            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                            <span>{appLanguage === 'hi' ? 'त्वरित सुझाव' : 'Quick Study Actions'}</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <button
+                              type="button"
+                              onClick={handleRefreshSuggestions}
+                              disabled={isGeneratingSuggestions}
+                              className="p-1 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition"
+                              title="Refresh prompts"
+                            >
+                              <RefreshCw className={`w-3.5 h-3.5 ${isGeneratingSuggestions ? 'animate-spin' : ''}`} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowQuickActionsMenu(false)}
+                              className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
+                              title="Close"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="max-h-56 overflow-y-auto space-y-1 pr-0.5 no-scrollbar">
+                          {suggestions.map((sugg, idx) => (
+                            <button
+                              key={sugg.id || idx}
+                              type="button"
+                              onClick={() => {
+                                handleSendMessage(sugg.prompt);
+                                setShowQuickActionsMenu(false);
+                              }}
+                              className="w-full text-left px-2.5 py-1.5 bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200/60 hover:border-blue-200 rounded-xl text-xs font-medium transition cursor-pointer flex items-center justify-between group"
+                            >
+                              <span className="truncate mr-1.5">{sugg.label}</span>
+                              <Send className="w-3 h-3 text-slate-400 group-hover:text-blue-600 opacity-0 group-hover:opacity-100 transition shrink-0" />
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center space-x-1.5 pt-1 border-t border-slate-100 text-[10px]">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowMathPalette(!showMathPalette);
+                              setShowQuickActionsMenu(false);
+                            }}
+                            className="flex-1 py-1 px-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-mono font-bold text-center transition"
+                          >
+                            f(x) Math Symbols
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowSavedFormulasPanel(!showSavedFormulasPanel);
+                              setShowQuickActionsMenu(false);
+                            }}
+                            className="flex-1 py-1 px-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-center transition flex items-center justify-center space-x-1"
+                          >
+                            <Bookmark className="w-3 h-3 fill-current" />
+                            <span>Formulas</span>
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                {/* PLUS / ATTACHMENT MENU BUTTON */}
+                <div ref={attachmentMenuRef} className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
+                    className={`w-9 h-9 flex items-center justify-center rounded-xl transition shrink-0 cursor-pointer ${
+                      showAttachmentMenu || selectedImages.length > 0 || localAttachedFiles.length > 0
+                        ? 'bg-indigo-600 text-white shadow-xs' 
+                        : 'text-indigo-600 hover:bg-indigo-50'
+                    }`}
+                    title={appLanguage === 'hi' ? 'अटैचमेंट जोड़ें' : 'Add Attachment'}
+                  >
+                    <div className="relative">
+                      <Plus className={`w-4 h-4 transition-transform duration-200 ${showAttachmentMenu ? 'rotate-45' : ''}`} />
+                      {(selectedImages.length > 0 || localAttachedFiles.length > 0) && (
+                        <span className="absolute -top-1.5 -right-2 bg-emerald-500 text-white text-[8px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center shadow-xs">
+                          {selectedImages.length + localAttachedFiles.length}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+
+                  <AnimatePresence>
+                    {showAttachmentMenu && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: 8 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: 8 }}
+                        transition={{ duration: 0.15, ease: 'easeOut' }}
+                        className="absolute bottom-full left-0 mb-2 w-56 sm:w-64 bg-slate-900 border border-slate-800 rounded-2xl p-2 shadow-2xl z-50 text-slate-100 space-y-1"
+                      >
+                        <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800/60 pb-1.5 mb-1 flex items-center justify-between">
+                          <span>{appLanguage === 'hi' ? 'अटैचमेंट' : 'Attachments'}</span>
+                          <X className="w-3 h-3 cursor-pointer text-slate-500 hover:text-white" onClick={() => setShowAttachmentMenu(false)} />
+                        </div>
+
+                        {/* CAMERA OPTION */}
                         <button
-                          key={sugg.id || idx}
                           type="button"
                           onClick={() => {
-                            handleSendMessage(sugg.prompt);
-                            setShowQuickActionsMenu(false);
+                            setShowCameraModal(true);
+                            setShowAttachmentMenu(false);
                           }}
-                          className="w-full text-left px-2.5 py-1.5 bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200/60 hover:border-blue-200 rounded-xl text-xs font-medium transition cursor-pointer flex items-center justify-between group"
+                          className="w-full text-left px-3 py-2 hover:bg-slate-800 rounded-xl text-xs font-semibold transition flex items-center space-x-2.5 text-slate-200 hover:text-white"
                         >
-                          <span className="truncate mr-1.5">{sugg.label}</span>
-                          <Send className="w-3 h-3 text-slate-400 group-hover:text-blue-600 opacity-0 group-hover:opacity-100 transition shrink-0" />
+                          <Camera className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <div>
+                            <div className="font-bold">{appLanguage === 'hi' ? 'कैमरा' : 'Camera'}</div>
+                            <div className="text-[9px] text-slate-400 font-normal">{appLanguage === 'hi' ? 'सीधे फोटो खींचें' : 'Take a photo of assignment'}</div>
+                          </div>
                         </button>
-                      ))}
-                    </div>
 
-                    <div className="flex items-center space-x-1.5 pt-1 border-t border-slate-100 text-[10px]">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowMathPalette(!showMathPalette);
-                          setShowQuickActionsMenu(false);
-                        }}
-                        className="flex-1 py-1 px-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-mono font-bold text-center transition"
-                      >
-                        f(x) Math Symbols
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowSavedFormulasPanel(!showSavedFormulasPanel);
-                          setShowQuickActionsMenu(false);
-                        }}
-                        className="flex-1 py-1 px-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-center transition flex items-center justify-center space-x-1"
-                      >
-                        <Bookmark className="w-3 h-3 fill-current" />
-                        <span>Formulas</span>
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+                        {/* PHOTOS OPTION */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            photosInputRef.current?.click();
+                            setShowAttachmentMenu(false);
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-slate-800 rounded-xl text-xs font-semibold transition flex items-center space-x-2.5 text-slate-200 hover:text-white"
+                        >
+                          <Images className="w-4 h-4 text-blue-400 shrink-0" />
+                          <div>
+                            <div className="font-bold">{appLanguage === 'hi' ? 'तस्वीरें' : 'Photos'}</div>
+                            <div className="text-[9px] text-slate-400 font-normal">{appLanguage === 'hi' ? 'गैलरी से चित्र चुनें' : 'Choose images from library'}</div>
+                          </div>
+                        </button>
 
-            {/* PLUS / ATTACHMENT MENU BUTTON */}
-            <div ref={attachmentMenuRef} className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
-                className={`w-9 h-9 flex items-center justify-center rounded-xl transition shrink-0 cursor-pointer ${
-                  showAttachmentMenu || selectedImages.length > 0 || localAttachedFiles.length > 0
-                    ? 'bg-indigo-600 text-white shadow-xs' 
-                    : 'text-indigo-600 hover:bg-indigo-50'
-                }`}
-                title={appLanguage === 'hi' ? 'अटैचमेंट जोड़ें' : 'Add Attachment'}
-              >
-                <div className="relative">
-                  <Plus className={`w-4 h-4 transition-transform duration-200 ${showAttachmentMenu ? 'rotate-45' : ''}`} />
-                  {(selectedImages.length > 0 || localAttachedFiles.length > 0) && (
-                    <span className="absolute -top-1.5 -right-2 bg-emerald-500 text-white text-[8px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center shadow-xs">
-                      {selectedImages.length + localAttachedFiles.length}
-                    </span>
-                  )}
+                        {/* FILE UPLOAD OPTION */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            genericFileInputRef.current?.click();
+                            setShowAttachmentMenu(false);
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-slate-800 rounded-xl text-xs font-semibold transition flex items-center space-x-2.5 text-slate-200 hover:text-white"
+                        >
+                          <Upload className="w-4 h-4 text-purple-400 shrink-0" />
+                          <div>
+                            <div className="font-bold">{appLanguage === 'hi' ? 'फ़ाइल अपलोड' : 'File Upload'}</div>
+                            <div className="text-[9px] text-slate-400 font-normal">{appLanguage === 'hi' ? 'दस्तावेज़ या पीडीएफ चुनें' : 'Attach docs, PDFs, or files'}</div>
+                          </div>
+                        </button>
+
+                        {/* DRIVE OPTION */}
+                        <button
+                          type="button"
+                          onClick={handleOpenDrive}
+                          className="w-full text-left px-3 py-2 hover:bg-slate-800 rounded-xl text-xs font-semibold transition flex items-center space-x-2.5 text-slate-200 hover:text-white"
+                        >
+                          <FolderOpen className="w-4 h-4 text-amber-400 shrink-0" />
+                          <div>
+                            <div className="font-bold">{appLanguage === 'hi' ? 'गूगल ड्राइव' : 'Google Drive'}</div>
+                            <div className="text-[9px] text-slate-400 font-normal">{appLanguage === 'hi' ? 'गूगल ड्राइव से फाइलें चुनें' : 'Select directly from Cloud'}</div>
+                          </div>
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-              </button>
+              </div>
 
-              <AnimatePresence>
-                {showAttachmentMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95, y: 8 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: 8 }}
-                    transition={{ duration: 0.15, ease: 'easeOut' }}
-                    className="absolute bottom-full left-0 mb-2 w-56 sm:w-64 bg-slate-900 border border-slate-800 rounded-2xl p-2 shadow-2xl z-50 text-slate-100 space-y-1"
+              {/* Right Column utilities (Clear Input, Navigation arrow, Send button) */}
+              <div className="flex items-center space-x-1.5 shrink-0 pb-[1px]">
+                {/* CLEAR INPUT BUTTON */}
+                {inputQuery.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInputQuery('');
+                      setStoredValue(`ai_tutor_input_draft_${user.uid}`, null);
+                      textareaRef.current?.focus();
+                    }}
+                    className="p-1 sm:p-1.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-lg transition flex items-center justify-center shrink-0 mr-1 cursor-pointer"
+                    title="Clear Input"
                   >
-                    <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800/60 pb-1.5 mb-1 flex items-center justify-between">
-                      <span>{appLanguage === 'hi' ? 'अटैचमेंट' : 'Attachments'}</span>
-                      <X className="w-3 h-3 cursor-pointer text-slate-500 hover:text-white" onClick={() => setShowAttachmentMenu(false)} />
-                    </div>
-
-                    {/* CAMERA OPTION */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowCameraModal(true);
-                        setShowAttachmentMenu(false);
-                      }}
-                      className="w-full text-left px-3 py-2 hover:bg-slate-800 rounded-xl text-xs font-semibold transition flex items-center space-x-2.5 text-slate-200 hover:text-white"
-                    >
-                      <Camera className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <div>
-                        <div className="font-bold">{appLanguage === 'hi' ? 'कैमरा' : 'Camera'}</div>
-                        <div className="text-[9px] text-slate-400 font-normal">{appLanguage === 'hi' ? 'सीधे फोटो खींचें' : 'Take a photo of assignment'}</div>
-                      </div>
-                    </button>
-
-                    {/* PHOTOS OPTION */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        photosInputRef.current?.click();
-                        setShowAttachmentMenu(false);
-                      }}
-                      className="w-full text-left px-3 py-2 hover:bg-slate-800 rounded-xl text-xs font-semibold transition flex items-center space-x-2.5 text-slate-200 hover:text-white"
-                    >
-                      <Images className="w-4 h-4 text-blue-400 shrink-0" />
-                      <div>
-                        <div className="font-bold">{appLanguage === 'hi' ? 'तस्वीरें' : 'Photos'}</div>
-                        <div className="text-[9px] text-slate-400 font-normal">{appLanguage === 'hi' ? 'गैलरी से चित्र चुनें' : 'Choose images from library'}</div>
-                      </div>
-                    </button>
-
-                    {/* FILE UPLOAD OPTION */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        genericFileInputRef.current?.click();
-                        setShowAttachmentMenu(false);
-                      }}
-                      className="w-full text-left px-3 py-2 hover:bg-slate-800 rounded-xl text-xs font-semibold transition flex items-center space-x-2.5 text-slate-200 hover:text-white"
-                    >
-                      <Upload className="w-4 h-4 text-purple-400 shrink-0" />
-                      <div>
-                        <div className="font-bold">{appLanguage === 'hi' ? 'फ़ाइल अपलोड' : 'File Upload'}</div>
-                        <div className="text-[9px] text-slate-400 font-normal">{appLanguage === 'hi' ? 'दस्तावेज़ या पीडीएफ चुनें' : 'Attach docs, PDFs, or files'}</div>
-                      </div>
-                    </button>
-
-                    {/* DRIVE OPTION */}
-                    <button
-                      type="button"
-                      onClick={handleOpenDrive}
-                      className="w-full text-left px-3 py-2 hover:bg-slate-800 rounded-xl text-xs font-semibold transition flex items-center space-x-2.5 text-slate-200 hover:text-white"
-                    >
-                      <FolderOpen className="w-4 h-4 text-amber-400 shrink-0" />
-                      <div>
-                        <div className="font-bold">{appLanguage === 'hi' ? 'गूगल ड्राइव' : 'Google Drive'}</div>
-                        <div className="text-[9px] text-slate-400 font-normal">{appLanguage === 'hi' ? 'गूगल ड्राइव से फाइलें चुनें' : 'Select directly from Cloud'}</div>
-                      </div>
-                    </button>
-                  </motion.div>
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 )}
-              </AnimatePresence>
+
+                {/* RESTORE ARROW INSIDE INPUT BOX */}
+                {!isBottomNavVisible && onShowBottomNav && (
+                  <button
+                    type="button"
+                    onClick={onShowBottomNav}
+                    className="p-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 transition flex items-center justify-center cursor-pointer shrink-0 mr-1"
+                    title={appLanguage === 'hi' ? 'नेविगेशन बार दिखाएं' : 'Show Navigation Bar'}
+                  >
+                    <ChevronUp className="w-3.5 h-3.5 text-emerald-600" />
+                  </button>
+                )}
+
+                {/* SEND BUTTON */}
+                <button
+                  type="button"
+                  onClick={() => handleSendMessage()}
+                  disabled={(!inputQuery.trim() && selectedImages.length === 0) || isLoading}
+                  className="w-9 h-9 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white font-bold rounded-xl shadow-xs transition-all duration-150 cursor-pointer shrink-0"
+                  title="Send Message"
+                >
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
-
-            {/* INPUT TEXTAREA */}
-            <textarea
-              ref={textareaRef}
-              rows={1}
-              value={inputQuery}
-              onChange={(e) => setInputQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
-                }
-              }}
-              placeholder={
-                isListening 
-                  ? 'Listening to your voice...' 
-                  : selectedImages.length > 0 
-                  ? `${selectedImages.length} page(s) attached! Press Send...` 
-                  : `Ask AI Tutor about ${selectedSubject}...`
-              }
-              className="flex-1 bg-transparent border-0 px-2 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none resize-none max-h-24 py-1.5 font-medium min-h-[34px]"
-            />
-
-            {/* CLEAR INPUT BUTTON */}
-            {inputQuery.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setInputQuery('');
-                  setStoredValue(`ai_tutor_input_draft_${user.uid}`, null);
-                  textareaRef.current?.focus();
-                }}
-                className="p-1 sm:p-1.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-lg transition flex items-center justify-center shrink-0 mr-1 cursor-pointer"
-                title="Clear Input"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-
-            {/* RESTORE ARROW INSIDE INPUT BOX (When bottom nav is auto-hidden) */}
-            {!isBottomNavVisible && onShowBottomNav && (
-              <button
-                type="button"
-                onClick={onShowBottomNav}
-                className="p-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 transition flex items-center justify-center cursor-pointer shrink-0 mr-1"
-                title={appLanguage === 'hi' ? 'नेविगेशन बार दिखाएं' : 'Show Navigation Bar'}
-              >
-                <ChevronUp className="w-3.5 h-3.5 text-emerald-600" />
-              </button>
-            )}
-
-            {/* SEND BUTTON */}
-            <button
-              type="button"
-              onClick={() => handleSendMessage()}
-              disabled={(!inputQuery.trim() && selectedImages.length === 0) || isLoading}
-              className="w-9 h-9 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white font-bold rounded-xl shadow-xs transition-all duration-150 cursor-pointer shrink-0"
-              title="Send Message"
-            >
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            </button>
           </div>
         </div>
 

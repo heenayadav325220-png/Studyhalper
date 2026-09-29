@@ -527,25 +527,37 @@ export default function QuizSection({
 
     let correctCount = 0;
     questions.forEach((q, idx) => {
-      const isCorrect = finalAnswers[idx] === q.answer;
-      if (isCorrect) {
+      if (finalAnswers[idx] === q.answer) {
         correctCount++;
-      } else {
-        // Save to automatic mistake book
-        PersonalLearningService.addMistake(user?.uid || 'user_local_student', {
-          question: q.question,
-          options: q.options,
-          answer: q.answer,
-          explanation: q.explanation || 'Review the core concept for this problem.',
-          subject: selectedSubject,
-          topic: customTopic || 'General Quiz',
-          userAnswer: finalAnswers[idx] !== undefined ? finalAnswers[idx] : -1
-        }).catch(err => console.warn('Failed to save mistake:', err));
       }
     });
 
     const totalQuestions = Math.max(1, questions.length);
+    const wrongCount = totalQuestions - correctCount;
     const accuracy = Math.round((correctCount / totalQuestions) * 100);
+
+    const wrongQuestionsList = questions.map((q, idx) => {
+      const isCorrect = finalAnswers[idx] === q.answer;
+      if (isCorrect) return null;
+      return {
+        question: q.question,
+        options: q.options,
+        answer: q.answer,
+        explanation: q.explanation || 'Review the core concept for this problem.',
+        userAnswer: finalAnswers[idx] !== undefined ? finalAnswers[idx] : -1
+      };
+    }).filter(Boolean) as any[];
+
+    // Centralized recording for Mistakes, Progress, Weak Topic tracking and Revision scheduling
+    PersonalLearningService.recordQuizResult(user?.uid || 'user_local_student', {
+      subject: selectedSubject,
+      topic: customTopic || 'General Quiz',
+      totalQuestions,
+      correctAnswers: correctCount,
+      wrongAnswers: wrongCount,
+      accuracy,
+      wrongQuestionsList
+    }).catch(err => console.warn('Failed to record centralized quiz result:', err));
     let earnedXp = correctCount * 15;
     if (accuracy >= 80) earnedXp += 25;
     if (maxStreak >= 3) earnedXp += 20;

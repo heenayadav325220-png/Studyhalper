@@ -145,7 +145,13 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
         };
 
         recog.onerror = (event: any) => {
-          console.warn('Speech recognition event:', event.error);
+          console.warn('Speech recognition error (VoiceTutor):', event.error);
+          if (event.error === 'not-allowed') {
+            const errMsg = appLanguage === 'hi'
+              ? 'माइक्रोफ़ोन एक्सेस की अनुमति नहीं है। कृपया ब्राउज़र सेटिंग्स में अनुमति दें।'
+              : 'Microphone access denied. Please enable microphone permissions in your browser settings.';
+            showToast(errMsg, 'error');
+          }
           setIsListening(false);
         };
 

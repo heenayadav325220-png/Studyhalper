@@ -3,6 +3,7 @@ import {
   collection, 
   doc, 
   setDoc, 
+  getDoc,
   getDocs, 
   deleteDoc
 } from 'firebase/firestore';
@@ -36,10 +37,56 @@ export interface LearningState {
   classGoal?: string;
 }
 
-const LOCAL_MISTAKES_KEY = 'ascend_mistake_book';
-const LOCAL_REVISION_KEY = 'ascend_spaced_revision';
-const LOCAL_COMPLETED_KEY = 'ascend_completed_topics';
-const LOCAL_WEAK_KEY = 'ascend_weak_topics';
+export interface LearningProgressItem {
+  subject: string;
+  topic: string;
+  attempts: number;
+  correct: number;
+  incorrect: number;
+  accuracy: number;
+  lastStudied: string;
+  mastery: number;
+  updatedAt: string;
+}
+
+// --- ERROR HANDLING SPECS ---
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+  };
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null, userId?: string) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: userId || null,
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error in Learning Pipeline:', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
+// --- USER-SPECIFIC LOCAL STORAGE KEY GENERATORS ---
+const getLocalMistakesKey = (userId: string) => `ascend_mistake_book_${userId || 'local'}`;
+const getLocalRevisionKey = (userId: string) => `ascend_spaced_revision_${userId || 'local'}`;
+const getLocalCompletedKey = (userId: string) => `ascend_completed_topics_${userId || 'local'}`;
+const getLocalWeakKey = (userId: string) => `ascend_weak_topics_${userId || 'local'}`;
+const getLocalProgressKey = (userId: string) => `ascend_learning_progress_${userId || 'local'}`;
 
 // Helper to get local data safely
 const getLocal = <T>(key: string, fallback: T): T => {
@@ -72,12 +119,14 @@ export class PersonalLearningService {
       timestamp: new Date().toISOString()
     };
 
-    // 1. Save locally
-    const current = getLocal<MistakeItem[]>(LOCAL_MISTAKES_KEY, []);
+    // 1. Save locally (user-specific key)
+    const localKey = getLocalMistakesKey(userId);
+    const current = getLocal<MistakeItem[]>(localKey, []);
+    
     // Prevent duplicate questions
     if (!current.some(m => m.question === mistake.question)) {
       current.push(newItem);
-      setLocal(LOCAL_MISTAKES_KEY, current);
+      setLocal(localKey, current);
     }
 
     // 2. Sync to firestore if authenticated
@@ -86,7 +135,7 @@ export class PersonalLearningService {
         const docRef = doc(db, 'users', userId, 'mistakes', id);
         await setDoc(docRef, newItem);
       } catch (e) {
-        console.warn('Failed to sync mistake to Firestore', e);
+        handleFirestoreError(e, OperationType.WRITE, `users/${userId}/mistakes/${id}`, userId);
       }
     }
 
@@ -97,8 +146,8 @@ export class PersonalLearningService {
   }
 
   static async getMistakes(userId: string): Promise<MistakeItem[]> {
-    // Return local immediately for instant UI
-    const localItems = getLocal<MistakeItem[]>(LOCAL_MISTAKES_KEY, []);
+    const localKey = getLocalMistakesKey(userId);
+    const localItems = getLocal<MistakeItem[]>(localKey, []);
 
     if (userId && userId !== 'user_local_student') {
       try {
@@ -108,19 +157,27 @@ export class PersonalLearningService {
         q.forEach(docSnap => {
           fbItems.push(docSnap.data() as MistakeItem);
         });
-        if (fbItems.length > 0) {
-          // Merge and preserve duplicates
-          const merged = [...localItems];
-          fbItems.forEach(fb => {
-            if (!merged.some(m => m.id === fb.id || m.question === fb.question)) {
-              merged.push(fb);
+
+        // Sync local-only items that were created offline
+        const unsynced = localItems.filter(local => !fbItems.some(fb => fb.id === local.id || fb.question === local.question));
+        if (unsynced.length > 0) {
+          for (const item of unsynced) {
+            try {
+              const docRef = doc(db, 'users', userId, 'mistakes', item.id);
+              await setDoc(docRef, item);
+              fbItems.push(item);
+            } catch (err) {
+              console.warn("Unsynced mistake uploads failed transiently:", err);
             }
-          });
-          setLocal(LOCAL_MISTAKES_KEY, merged);
-          return merged;
+          }
         }
+
+        // Overwrite local cache with authoritative firestore-synchronized set
+        fbItems.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        setLocal(localKey, fbItems);
+        return fbItems;
       } catch (e) {
-        console.warn('Failed to fetch mistakes from Firestore', e);
+        console.warn('Failed to fetch mistakes from Firestore, using cache:', e);
       }
     }
 
@@ -128,16 +185,17 @@ export class PersonalLearningService {
   }
 
   static async removeMistake(userId: string, mistakeId: string): Promise<void> {
-    const current = getLocal<MistakeItem[]>(LOCAL_MISTAKES_KEY, []);
+    const localKey = getLocalMistakesKey(userId);
+    const current = getLocal<MistakeItem[]>(localKey, []);
     const filtered = current.filter(m => m.id !== mistakeId);
-    setLocal(LOCAL_MISTAKES_KEY, filtered);
+    setLocal(localKey, filtered);
 
     if (userId && userId !== 'user_local_student') {
       try {
         const docRef = doc(db, 'users', userId, 'mistakes', mistakeId);
         await deleteDoc(docRef);
       } catch (e) {
-        console.warn('Failed to delete mistake from Firestore', e);
+        handleFirestoreError(e, OperationType.DELETE, `users/${userId}/mistakes/${mistakeId}`, userId);
       }
     }
   }
@@ -169,22 +227,24 @@ export class PersonalLearningService {
       status: 'pending'
     };
 
-    const current = getLocal<RevisionItem[]>(LOCAL_REVISION_KEY, []);
-    // Prevent duplicates on the same topic
+    const localKey = getLocalRevisionKey(userId);
+    const current = getLocal<RevisionItem[]>(localKey, []);
+    
+    // Prevent duplicates on the same topic: update interval/due instead
     const existingIdx = current.findIndex(r => r.subject === subject && r.topic === topic);
     if (existingIdx >= 0) {
       current[existingIdx] = newItem;
     } else {
       current.push(newItem);
     }
-    setLocal(LOCAL_REVISION_KEY, current);
+    setLocal(localKey, current);
 
     if (userId && userId !== 'user_local_student') {
       try {
         const docRef = doc(db, 'users', userId, 'spaced_revisions', id);
         await setDoc(docRef, newItem);
       } catch (e) {
-        console.warn('Failed to sync revision topic to Firestore', e);
+        handleFirestoreError(e, OperationType.WRITE, `users/${userId}/spaced_revisions/${id}`, userId);
       }
     }
 
@@ -192,7 +252,8 @@ export class PersonalLearningService {
   }
 
   static async getRevisionTopics(userId: string): Promise<RevisionItem[]> {
-    const localItems = getLocal<RevisionItem[]>(LOCAL_REVISION_KEY, []);
+    const localKey = getLocalRevisionKey(userId);
+    const localItems = getLocal<RevisionItem[]>(localKey, []);
 
     if (userId && userId !== 'user_local_student') {
       try {
@@ -202,18 +263,26 @@ export class PersonalLearningService {
         q.forEach(docSnap => {
           fbItems.push(docSnap.data() as RevisionItem);
         });
-        if (fbItems.length > 0) {
-          const merged = [...localItems];
-          fbItems.forEach(fb => {
-            if (!merged.some(m => m.id === fb.id || (m.subject === fb.subject && m.topic === fb.topic))) {
-              merged.push(fb);
+
+        // Sync local-only unsynced revisions
+        const unsynced = localItems.filter(local => !fbItems.some(fb => fb.id === local.id || (fb.subject === local.subject && fb.topic === local.topic)));
+        if (unsynced.length > 0) {
+          for (const item of unsynced) {
+            try {
+              const docRef = doc(db, 'users', userId, 'spaced_revisions', item.id);
+              await setDoc(docRef, item);
+              fbItems.push(item);
+            } catch (err) {
+              console.warn("Unsynced revision uploads failed transiently:", err);
             }
-          });
-          setLocal(LOCAL_REVISION_KEY, merged);
-          return merged;
+          }
         }
+
+        fbItems.sort((a, b) => new Date(a.nextDue).getTime() - new Date(b.nextDue).getTime());
+        setLocal(localKey, fbItems);
+        return fbItems;
       } catch (e) {
-        console.warn('Failed to fetch revisions from Firestore', e);
+        console.warn('Failed to fetch revisions from Firestore, using cache:', e);
       }
     }
 
@@ -221,13 +290,14 @@ export class PersonalLearningService {
   }
 
   static async completeRevision(userId: string, id: string): Promise<void> {
-    const current = getLocal<RevisionItem[]>(LOCAL_REVISION_KEY, []);
+    const localKey = getLocalRevisionKey(userId);
+    const current = getLocal<RevisionItem[]>(localKey, []);
     const idx = current.findIndex(r => r.id === id);
     if (idx >= 0) {
       const item = current[idx];
       const now = new Date();
       
-      // Double the interval for spacing
+      // Double the interval for spaced learning retention
       const newInterval = item.intervalDays * 2;
       const nextDue = new Date();
       nextDue.setDate(now.getDate() + newInterval);
@@ -238,14 +308,14 @@ export class PersonalLearningService {
       item.status = 'completed';
 
       current[idx] = item;
-      setLocal(LOCAL_REVISION_KEY, current);
+      setLocal(localKey, current);
 
       if (userId && userId !== 'user_local_student') {
         try {
           const docRef = doc(db, 'users', userId, 'spaced_revisions', id);
           await setDoc(docRef, item);
         } catch (e) {
-          console.warn('Failed to update revision on Firestore', e);
+          handleFirestoreError(e, OperationType.WRITE, `users/${userId}/spaced_revisions/${id}`, userId);
         }
       }
 
@@ -258,70 +328,176 @@ export class PersonalLearningService {
 
   static async markTopicAsCompleted(userId: string, subject: string, topic: string): Promise<void> {
     const key = `${subject}:${topic}`;
-    const completed = getLocal<string[]>(LOCAL_COMPLETED_KEY, []);
+    const compKey = getLocalCompletedKey(userId);
+    const weakKey = getLocalWeakKey(userId);
+
+    const completed = getLocal<string[]>(compKey, []);
     if (!completed.includes(key)) {
       completed.push(key);
-      setLocal(LOCAL_COMPLETED_KEY, completed);
+      setLocal(compKey, completed);
     }
     
     // Remove from weak topics if present
-    const weak = getLocal<string[]>(LOCAL_WEAK_KEY, []);
+    const weak = getLocal<string[]>(weakKey, []);
     const filteredWeak = weak.filter(w => w !== key);
-    setLocal(LOCAL_WEAK_KEY, filteredWeak);
+    setLocal(weakKey, filteredWeak);
 
     if (userId && userId !== 'user_local_student') {
       try {
         const docRef = doc(db, 'users', userId, 'learning_state', 'status');
         await setDoc(docRef, { completedTopics: completed, weakTopics: filteredWeak }, { merge: true });
-      } catch (e) {}
+      } catch (e) {
+        handleFirestoreError(e, OperationType.WRITE, `users/${userId}/learning_state/status`, userId);
+      }
     }
   }
 
   static async markTopicAsWeak(userId: string, subject: string, topic: string): Promise<void> {
     const key = `${subject}:${topic}`;
-    const weak = getLocal<string[]>(LOCAL_WEAK_KEY, []);
+    const compKey = getLocalCompletedKey(userId);
+    const weakKey = getLocalWeakKey(userId);
+
+    const weak = getLocal<string[]>(weakKey, []);
     if (!weak.includes(key)) {
       weak.push(key);
-      setLocal(LOCAL_WEAK_KEY, weak);
+      setLocal(weakKey, weak);
     }
 
-    // Remove from completed topics if present (it needs rework!)
-    const completed = getLocal<string[]>(LOCAL_COMPLETED_KEY, []);
+    // Remove from completed topics if present
+    const completed = getLocal<string[]>(compKey, []);
     const filteredComp = completed.filter(c => c !== key);
-    setLocal(LOCAL_COMPLETED_KEY, filteredComp);
+    setLocal(compKey, filteredComp);
 
     if (userId && userId !== 'user_local_student') {
       try {
         const docRef = doc(db, 'users', userId, 'learning_state', 'status');
         await setDoc(docRef, { completedTopics: filteredComp, weakTopics: weak }, { merge: true });
-      } catch (e) {}
+      } catch (e) {
+        handleFirestoreError(e, OperationType.WRITE, `users/${userId}/learning_state/status`, userId);
+      }
     }
   }
 
-  static getTopicStats(): { completed: string[]; weak: string[] } {
-    const completed = getLocal<string[]>(LOCAL_COMPLETED_KEY, [
-      'Mathematics:Trigonometry & Formulas',
-      'Science:Newton\'s Laws of Motion'
-    ]);
-    const weak = getLocal<string[]>(LOCAL_WEAK_KEY, [
-      'Mathematics:Quadratic Equations',
-      'Physics:Thermodynamics'
-    ]);
+  static async getTopicStats(userId: string): Promise<{ completed: string[]; weak: string[] }> {
+    const compKey = getLocalCompletedKey(userId);
+    const weakKey = getLocalWeakKey(userId);
+
+    // Initial load from user-specific local cache
+    let completed = getLocal<string[]>(compKey, []);
+    let weak = getLocal<string[]>(weakKey, []);
+
+    if (userId && userId !== 'user_local_student') {
+      try {
+        const docRef = doc(db, 'users', userId, 'learning_state', 'status');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          completed = data.completedTopics || [];
+          weak = data.weakTopics || [];
+          
+          setLocal(compKey, completed);
+          setLocal(weakKey, weak);
+        }
+      } catch (e) {
+        console.warn('Failed to load topic stats from Firestore:', e);
+      }
+    }
+
     return { completed, weak };
   }
 
+  // --- CENTRALIZED QUIZ & EXAM RESULT HANDLER ---
+  static async recordQuizResult(
+    userId: string,
+    result: {
+      subject: string;
+      topic: string;
+      totalQuestions: number;
+      correctAnswers: number;
+      wrongAnswers: number;
+      accuracy: number;
+      wrongQuestionsList?: Omit<MistakeItem, 'id' | 'timestamp'>[];
+    }
+  ): Promise<void> {
+    const timestamp = new Date().toISOString();
+    const isLocal = !userId || userId === 'user_local_student';
+
+    // 1. Process Mistakes for wrong answers
+    if (result.wrongQuestionsList && result.wrongQuestionsList.length > 0) {
+      for (const wrongQ of result.wrongQuestionsList) {
+        await this.addMistake(userId, {
+          question: wrongQ.question,
+          options: wrongQ.options,
+          answer: wrongQ.answer,
+          explanation: wrongQ.explanation || 'Review core explanations for this topic.',
+          subject: result.subject,
+          topic: result.topic,
+          userAnswer: wrongQ.userAnswer
+        });
+      }
+    }
+
+    // 2. Track completed vs weak topics based on results
+    if (result.accuracy >= 80) {
+      await this.markTopicAsCompleted(userId, result.subject, result.topic);
+    } else if (result.accuracy < 70 && result.wrongAnswers > 0) {
+      await this.markTopicAsWeak(userId, result.subject, result.topic);
+      // Auto-schedule revision task on failure
+      await this.addRevisionTopic(userId, result.subject, result.topic, result.accuracy < 40 ? 'High' : 'Medium');
+    }
+
+    // 3. Update persistent progress metrics
+    const progressId = `${result.subject.toLowerCase()}_${result.topic.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const progressData: LearningProgressItem = {
+      subject: result.subject,
+      topic: result.topic,
+      attempts: 1,
+      correct: result.correctAnswers,
+      incorrect: result.wrongAnswers,
+      accuracy: result.accuracy,
+      lastStudied: timestamp,
+      mastery: result.accuracy,
+      updatedAt: timestamp
+    };
+
+    const progressKey = getLocalProgressKey(userId);
+    const progressMap = getLocal<Record<string, LearningProgressItem>>(progressKey, {});
+    const existingP = progressMap[progressId];
+    if (existingP) {
+      progressData.attempts = (existingP.attempts || 0) + 1;
+      const totalCorrect = (existingP.correct || 0) + result.correctAnswers;
+      const totalIncorrect = (existingP.incorrect || 0) + result.wrongAnswers;
+      const totalCount = totalCorrect + totalIncorrect;
+      progressData.accuracy = totalCount > 0 ? Math.round((totalCorrect / totalCount) * 100) : 0;
+      progressData.mastery = progressData.accuracy;
+    }
+    progressMap[progressId] = progressData;
+    setLocal(progressKey, progressMap);
+
+    // Sync progress to Firestore
+    if (!isLocal) {
+      try {
+        const docRef = doc(db, 'users', userId, 'learning_progress', progressId);
+        await setDoc(docRef, progressData, { merge: true });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `users/${userId}/learning_progress/${progressId}`, userId);
+      }
+    }
+  }
+
+  // --- AI TUTOR COMPACT STUDENT MEMORY ---
   static async compileStudentMemory(userId: string): Promise<any> {
-    const { completed, weak } = this.getTopicStats();
+    const { completed, weak } = await this.getTopicStats(userId);
     const mistakes = await this.getMistakes(userId);
     const revisions = await this.getRevisionTopics(userId);
     
     const recentMistakes = mistakes.slice(-5).map(m => `[${m.subject}] ${m.topic}: "${m.question}"`);
     const spacedRevisions = revisions.filter(r => r.status === 'pending').map(r => `${r.subject} - ${r.topic} (${r.priority} Priority)`);
-    const preferredStyle = localStorage.getItem(`sb_preferred_style_${userId}`) || 'Adaptive (Intuitive analogies first, then formal definitions)';
+    const preferredStyle = this.getPreferredStyle(userId);
     
     return {
-      completedTopics: completed,
-      weakTopics: weak,
+      completedTopics: completed.slice(0, 10), // keep compact for AI tokens
+      weakTopics: weak.slice(0, 10),
       recentMistakes,
       spacedRevisions,
       preferredStyle
@@ -329,10 +505,10 @@ export class PersonalLearningService {
   }
 
   static setPreferredStyle(userId: string, style: string): void {
-    localStorage.setItem(`sb_preferred_style_${userId}`, style);
+    localStorage.setItem(`sb_preferred_style_${userId || 'local'}`, style);
   }
 
   static getPreferredStyle(userId: string): string {
-    return localStorage.getItem(`sb_preferred_style_${userId}`) || 'Adaptive (Intuitive analogies first, then formal definitions)';
+    return localStorage.getItem(`sb_preferred_style_${userId || 'local'}`) || 'Adaptive (Intuitive analogies first, then formal definitions)';
   }
 }

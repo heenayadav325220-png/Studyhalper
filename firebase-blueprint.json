@@ -222,12 +222,88 @@
         }
       },
       "required": ["id", "ownerId", "title", "content", "summary", "tagsJson", "isShared", "timestamp"]
+    },
+    "mistake": {
+      "title": "MistakeItem",
+      "description": "A single missed question item tracked in the student's mistake book",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "question": { "type": "string" },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "answer": { "type": "integer" },
+        "explanation": { "type": "string" },
+        "subject": { "type": "string" },
+        "topic": { "type": "string" },
+        "userAnswer": { "type": "integer" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "question", "options", "answer", "explanation", "subject", "topic", "userAnswer", "timestamp"]
+    },
+    "spaced_revision": {
+      "title": "RevisionItem",
+      "description": "A scheduled spaced-repetition study revision task for a topic",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "subject": { "type": "string" },
+        "topic": { "type": "string" },
+        "priority": { "type": "string", "enum": ["High", "Medium", "Low"] },
+        "lastStudied": { "type": "string" },
+        "nextDue": { "type": "string" },
+        "intervalDays": { "type": "integer" },
+        "status": { "type": "string", "enum": ["pending", "completed"] }
+      },
+      "required": ["id", "subject", "topic", "priority", "lastStudied", "nextDue", "intervalDays", "status"]
+    },
+    "learning_state": {
+      "title": "LearningState",
+      "description": "Aggregated list of completed and weak topics for user personalization",
+      "type": "object",
+      "properties": {
+        "completedTopics": { "type": "array", "items": { "type": "string" } },
+        "weakTopics": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["completedTopics", "weakTopics"]
+    },
+    "learning_progress": {
+      "title": "LearningProgress",
+      "description": "Real-time accuracy and mastery tracking progress metrics per topic",
+      "type": "object",
+      "properties": {
+        "subject": { "type": "string" },
+        "topic": { "type": "string" },
+        "attempts": { "type": "integer" },
+        "correct": { "type": "integer" },
+        "incorrect": { "type": "integer" },
+        "accuracy": { "type": "integer" },
+        "lastStudied": { "type": "string" },
+        "mastery": { "type": "integer" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["subject", "topic", "attempts", "correct", "incorrect", "accuracy", "lastStudied", "mastery", "updatedAt"]
     }
   },
   "firestore": {
     "users/{userId}": {
       "schema": "user",
       "description": "Collection storing user profiles and gamification stats"
+    },
+    "users/{userId}/mistakes/{mistakeId}": {
+      "schema": "mistake",
+      "description": "Nest collection of logged quiz/mock exam mistakes"
+    },
+    "users/{userId}/spaced_revisions/{revisionId}": {
+      "schema": "spaced_revision",
+      "description": "Nested spaced-repetition scheduled study tasks"
+    },
+    "users/{userId}/learning_state/{stateId}": {
+      "schema": "learning_state",
+      "description": "Aggregated student status profile"
+    },
+    "users/{userId}/learning_progress/{progressId}": {
+      "schema": "learning_progress",
+      "description": "Nested topic performance metrics"
     },
     "rooms/{roomId}/chats/{chatId}": {
       "schema": "chatMessage",

@@ -520,7 +520,16 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
         J(false);
         We(o);
       };
-      s.onerror = () => J(false);
+      s.onerror = (e: any) => {
+        console.error("Speech Recognition error (Toolkit):", e?.error);
+        if (e?.error === 'not-allowed') {
+          const errMsg = appLanguage === "hi"
+            ? "माइक्रोफ़ोन एक्सेस की अनुमति नहीं है। कृपया ब्राउज़र सेटिंग्स में अनुमति दें।"
+            : "Microphone access denied. Please enable microphone permissions in your browser settings.";
+          showToast(errMsg, "error");
+        }
+        J(false);
+      };
       s.onend = () => J(false);
       pe.current = s;
     }
