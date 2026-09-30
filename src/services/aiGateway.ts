@@ -243,6 +243,21 @@ export function selectProvider(context: AIRequestContext, excludeIds: Set<string
     return null;
   }
 
+  // Support preferredProvider prioritization
+  if (context.preferredProvider) {
+    const preferredPool = pool.filter(cred => cred.provider === context.preferredProvider);
+    if (preferredPool.length > 0) {
+      const readyPreferred = preferredPool.filter(cred => {
+        const health = healthTracker.get(cred.id);
+        return !health || now >= health.cooldownUntil;
+      });
+      const candidates = readyPreferred.length > 0 ? readyPreferred : preferredPool;
+      const selected = candidates[roundRobinCursor % candidates.length];
+      roundRobinCursor = (roundRobinCursor + 1) % 100000;
+      return selected;
+    }
+  }
+
   // Prioritize credentials currently out of cooldown
   const readyCredentials = pool.filter(cred => {
     const health = healthTracker.get(cred.id);
@@ -355,7 +370,11 @@ async function executeProviderRequest(
           contents: [{ parts: [{ text: payload }] }]
         };
       } else if (payload.contents) {
-        geminiPayload = { contents: payload.contents };
+        if (typeof payload.contents === 'string') {
+          geminiPayload = { contents: [{ parts: [{ text: payload.contents }] }] };
+        } else {
+          geminiPayload = { contents: payload.contents };
+        }
       } else {
         geminiPayload = { contents: [{ parts: [{ text: JSON.stringify(payload) }] }] };
       }
@@ -477,7 +496,10 @@ async function executeProviderRequest(
           messages.unshift({ role: "system", content: context.systemInstruction });
         }
       } else if (payload.contents) {
-        messages = mapGeminiContentsToOpenAi(payload.contents, context.systemInstruction);
+        const contentsArray = typeof payload.contents === 'string'
+          ? [{ role: 'user', parts: [{ text: payload.contents }] }]
+          : payload.contents;
+        messages = mapGeminiContentsToOpenAi(contentsArray, context.systemInstruction);
       } else {
         messages = [{ role: "user", content: JSON.stringify(payload) }];
       }

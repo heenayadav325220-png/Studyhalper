@@ -443,12 +443,15 @@ export async function generateQuiz(
       if (Array.isArray(data) && data.length > 0) {
         return shuffleQuizQuestions(data);
       }
+      throw new Error("No quiz questions returned from server.");
+    } else {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || err.message || "Failed to generate quiz on server.");
     }
-  } catch (error) {
-    console.warn("Backend Gemini quiz route unreachable:", error);
+  } catch (error: any) {
+    console.warn("Backend Gemini quiz route error:", error);
+    throw new Error(error?.message || "Quiz Generator service is temporarily unavailable.");
   }
-
-  throw new Error("Unable to generate quiz questions from AI at this moment. Please try again.");
 }
 
 // Client-side flashcard cache
@@ -548,15 +551,14 @@ export async function generateNotes(
     });
     if (response.ok) {
       return await response.json();
+    } else {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || err.message || "Failed to generate notes on server.");
     }
-  } catch (err) {
-    console.warn("Backend notes generator unreachable:", err);
+  } catch (err: any) {
+    console.warn("Backend notes generator error:", err);
+    throw new Error(err?.message || "Notes generator service is temporarily unavailable.");
   }
-
-  return {
-    title: `${topic} Notes`,
-    content: `### ${topic}\n\nNotes could not be generated dynamically. Here is a brief outline of ${topic} for ${subject} at Grade ${grade} level.\n\n- Key Concept 1: Definition and details\n- Key Concept 2: Mathematical or practical applications\n- Important Formula/Fact: Standard references.`
-  };
 }
 
 export async function summarizeNotes(content: string, language?: string): Promise<{ summary: string }> {
@@ -568,12 +570,14 @@ export async function summarizeNotes(content: string, language?: string): Promis
     });
     if (response.ok) {
       return await response.json();
+    } else {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || err.message || "Failed to summarize text.");
     }
-  } catch (err) {
-    console.warn("Backend notes summarizer unreachable:", err);
+  } catch (err: any) {
+    console.warn("Backend notes summarizer error:", err);
+    throw new Error(err?.message || "Summarizer service is temporarily offline.");
   }
-
-  return { summary: "Failed to summarize notes dynamically due to a service error. Please try again." };
 }
 
 export async function explainTopic(
@@ -591,12 +595,14 @@ export async function explainTopic(
     });
     if (response.ok) {
       return await response.json();
+    } else {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || err.message || "Failed to explain topic on server.");
     }
-  } catch (err) {
-    console.warn("Backend explain-topic unreachable:", err);
+  } catch (err: any) {
+    console.warn("Backend explain-topic error:", err);
+    throw new Error(err?.message || "Concept explainer service is temporarily unavailable.");
   }
-
-  return { explanation: "Could not fetch a simplified explanation at this moment. Please check your internet connection and try again." };
 }
 
 export async function generateMindmap(topic: string, language?: string): Promise<{ name: string; children: any[] }> {
@@ -608,19 +614,14 @@ export async function generateMindmap(topic: string, language?: string): Promise
     });
     if (response.ok) {
       return await response.json();
+    } else {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || err.message || "Failed to generate mindmap on server.");
     }
-  } catch (err) {
-    console.warn("Backend mindmap unreachable:", err);
+  } catch (err: any) {
+    console.warn("Backend mindmap error:", err);
+    throw new Error(err?.message || "Mindmap generator is temporarily offline.");
   }
-
-  return {
-    name: topic,
-    children: [
-      { name: "Overview & Definitions", children: [{ name: "Core terms" }, { name: "Basic ideas" }] },
-      { name: "Key Formulas & Rules", children: [{ name: "Standard applications" }] },
-      { name: "Examples", children: [] }
-    ]
-  };
 }
 
 export async function generateQuestionPaper(
@@ -637,12 +638,14 @@ export async function generateQuestionPaper(
     });
     if (response.ok) {
       return await response.json();
+    } else {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || err.message || "Failed to generate question paper on server.");
     }
-  } catch (err) {
-    console.warn("Backend question-paper unreachable:", err);
+  } catch (err: any) {
+    console.warn("Backend question-paper error:", err);
+    throw new Error(err?.message || "Question paper generator is temporarily unavailable.");
   }
-
-  return { paperText: "Failed to generate question paper dynamically. Please try again." };
 }
 
 export async function performOcr(imageBase64: string): Promise<{ text: string }> {
@@ -654,12 +657,14 @@ export async function performOcr(imageBase64: string): Promise<{ text: string }>
     });
     if (response.ok) {
       return await response.json();
+    } else {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || err.message || "Failed to parse OCR image on server.");
     }
-  } catch (err) {
-    console.warn("Backend OCR unreachable:", err);
+  } catch (err: any) {
+    console.warn("Backend OCR error:", err);
+    throw new Error(err?.message || "Textbook OCR scanner is temporarily unavailable.");
   }
-
-  return { text: "Failed to extract text from image." };
 }
 
 export async function summarizePdf(textContent: string, language?: string): Promise<{ summary: string; keyTerms: any[]; questions: any[] }> {
@@ -671,16 +676,14 @@ export async function summarizePdf(textContent: string, language?: string): Prom
     });
     if (response.ok) {
       return await response.json();
+    } else {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || err.message || "Failed to analyze document on server.");
     }
-  } catch (err) {
-    console.warn("Backend PDF-summary unreachable:", err);
+  } catch (err: any) {
+    console.warn("Backend PDF-summary error:", err);
+    throw new Error(err?.message || "PDF Analyzer service is temporarily offline.");
   }
-
-  return {
-    summary: "Could not summarize document dynamically.",
-    keyTerms: [],
-    questions: []
-  };
 }
 
 export async function enhanceImagePrompt(prompt: string, style?: string): Promise<string> {

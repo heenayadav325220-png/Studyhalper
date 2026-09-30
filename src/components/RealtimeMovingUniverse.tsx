@@ -122,6 +122,7 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
     let handleVisibilityChange: (() => void) | null = null;
     let handlePointerMove: ((e: MouseEvent | TouchEvent) => void) | null = null;
     let handleResize: (() => void) | null = null;
+    let intersectionObserverLocal: IntersectionObserver | null = null;
 
     try {
       // -------------------------------------------------------------------------
@@ -1084,12 +1085,21 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
     resizeObserver = resizeObserverLocal;
 
     // Visibility change handling for power efficiency and performance scalability
-    let isTabVisible = true;
+    let isTabVisible = !document.hidden;
     const handleVisibilityChangeLocal = () => {
       isTabVisible = !document.hidden;
     };
     handleVisibilityChange = handleVisibilityChangeLocal;
     document.addEventListener('visibilitychange', handleVisibilityChangeLocal);
+
+    // IntersectionObserver to pause rendering when the universe is not visible on screen
+    let isElementVisible = true;
+    intersectionObserverLocal = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        isElementVisible = entry.isIntersecting;
+      }
+    }, { threshold: 0.05 });
+    intersectionObserverLocal.observe(container);
 
     // -------------------------------------------------------------------------
     // 9. REAL-TIME 60FPS ANIMATION LOOP (FPS THROTTLED ON MOBILE TO PREVENT LAG)
@@ -1102,7 +1112,7 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
     const animate = () => {
       animFrameId = requestAnimationFrame(animate);
       animationFrameId = animFrameId;
-      if (!isTabVisible || !renderer || !scene || !camera) return;
+      if (!isTabVisible || !isElementVisible || !renderer || !scene || !camera) return;
 
       const delta = Math.min(clock.getDelta(), 0.1);
       const elapsedTime = clock.getElapsedTime();
@@ -1145,6 +1155,7 @@ export const RealtimeMovingUniverse: React.FC<RealtimeMovingUniverseProps> = ({
     // 8. CLEANUP & MEMORY MANAGEMENT (SAFE-SHIELD AGAINST NULL POINTERS)
     // -------------------------------------------------------------------------
     return () => {
+      if (intersectionObserverLocal) intersectionObserverLocal.disconnect();
       if (animationFrameId !== null) cancelAnimationFrame(animationFrameId);
       if (resizeTimeout !== null) clearTimeout(resizeTimeout);
       if (resizeObserver) resizeObserver.disconnect();

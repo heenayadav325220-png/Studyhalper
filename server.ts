@@ -305,9 +305,25 @@ Make sure you write keywords like "PDF", "Notes", "Summary", "Formula Sheet", "P
       const contents: any[] = [];
       if (history && Array.isArray(history) && history.length > 0) {
         for (const msg of history) {
+          const parts: any[] = [{ text: msg.text || '' }];
+          
+          const msgImages = Array.isArray(msg.images) ? msg.images : (msg.image ? [msg.image] : []);
+          for (const img of msgImages) {
+            if (!img || typeof img !== 'string') continue;
+            const mimeMatch = img.match(/^data:(image\/\w+);base64,/);
+            const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+            const cleanBase64 = img.replace(/^data:image\/\w+;base64,/, '');
+            parts.push({
+              inlineData: {
+                mimeType,
+                data: cleanBase64
+              }
+            });
+          }
+
           contents.push({
             role: msg.role === 'user' ? 'user' : 'model',
-            parts: [{ text: msg.text || '' }]
+            parts
           });
         }
       }
@@ -342,6 +358,8 @@ Make sure you write keywords like "PDF", "Notes", "Summary", "Formula Sheet", "P
       const result = await executeAIRequest({
         modality: hasImages ? "image" : "text",
         requiresVision: !!hasImages,
+        preferredProvider: "gemini",
+        modelPreference: "gemini-2.5-flash",
         systemInstruction: sysInstruction
       }, {
         contents
@@ -400,23 +418,31 @@ Each object in the array must strictly have these keys:
 - "explanation": string (clear conceptual reason why this option is correct)`;
 
       let questions: any[] = [];
-      const result = await executeAIRequest({
-        modality: "text",
-        requiresVision: false,
-        modelPreference: 'gemini-2.5-flash'
-      }, {
-        contents: prompt,
-        config: { temperature: 0.8 }
-      });
+      const cacheKey = `quiz_${String(chosenTopic).toLowerCase().trim()}_${String(cleanSubject).toLowerCase().trim()}_${String(difficulty || 'medium').toLowerCase().trim()}_${String(numQuestions).toLowerCase().trim()}_${String(langName).toLowerCase().trim()}`;
+      const cachedQuestions = apiCache.get<any[]>(cacheKey);
+      
+      if (cachedQuestions && Array.isArray(cachedQuestions) && cachedQuestions.length > 0) {
+        questions = cachedQuestions;
+      } else {
+        const result = await executeAIRequest({
+          modality: "text",
+          requiresVision: false,
+          modelPreference: 'gemini-2.5-flash'
+        }, {
+          contents: prompt,
+          config: { temperature: 0.8 }
+        });
 
-      if (!result.success || !result.text) {
-        throw new Error(result.error?.message || "Failed to generate questions");
-      }
-      const text = result.text;
-      const cleanJsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
-      const parsed = JSON.parse(cleanJsonStr);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        questions = parsed;
+        if (!result.success || !result.text) {
+          throw new Error(result.error?.message || "Failed to generate questions");
+        }
+        const text = result.text;
+        const cleanJsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
+        const parsed = JSON.parse(cleanJsonStr);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          questions = parsed;
+          apiCache.set(cacheKey, questions, 4 * 3600 * 1000); // 4 hours TTL cache
+        }
       }
 
       if (!questions || questions.length === 0) {
@@ -1326,6 +1352,14 @@ You MUST output ONLY valid JSON matching this schema:
         langName = 'Marathi (मराठी)';
       }
 
+      const cacheKey = `notes_${String(topic).toLowerCase().trim()}_${String(subject || '').toLowerCase().trim()}_${String(grade || '').toLowerCase().trim()}_${String(language || '').toLowerCase().trim()}`;
+      const cached = apiCache.get<any>(cacheKey);
+      if (cached) {
+        console.log(`[SmartCache Hit] notes-generator: ${cacheKey}`);
+        res.json(cached);
+        return;
+      }
+
       const prompt = `You are an expert academic curriculum writer. 
 Generate comprehensive, detailed, highly structured study notes for the topic "${topic}" in the subject "${subject}" tailored for Class ${grade || '10'} level students.
 The entire notes response MUST be written in the language: ${langName}.
@@ -1353,7 +1387,9 @@ Ensure there is NO promotional fluff or filler greetings. Open directly with the
       }
       const text = result.text;
 
-      res.json({ title: `${topic} Notes`, content: text });
+      const output = { title: `${topic} Notes`, content: text };
+      apiCache.set(cacheKey, output, 4 * 3600 * 1000); // 4 hour TTL cache
+      res.json(output);
     } catch (err: any) {
       console.error("Backend notes generator error:", err);
       res.json({
@@ -1386,6 +1422,14 @@ Ensure there is NO promotional fluff or filler greetings. Open directly with the
         langName = 'Marathi (मराठी)';
       }
 
+      const cacheKey = `explain_${String(topic).toLowerCase().trim()}_${String(subject || '').toLowerCase().trim()}_${String(grade || '').toLowerCase().trim()}_${String(style || '').toLowerCase().trim()}_${String(language || '').toLowerCase().trim()}`;
+      const cached = apiCache.get<any>(cacheKey);
+      if (cached) {
+        console.log(`[SmartCache Hit] explain-topic: ${cacheKey}`);
+        res.json(cached);
+        return;
+      }
+
       const prompt = `You are a world-class, ultra-supportive, and patient personal study partner.
 Explain the concept or topic "${topic}" in "${subject}" for Class ${grade || '10'} level students using a "${style || 'Simple'}" teaching style.
 The entire explanation MUST be written in the language: ${langName}.
@@ -1412,7 +1456,9 @@ Format beautifully in Markdown. Do not include any greeting or conversational fi
       }
       const text = result.text;
 
-      res.json({ explanation: text });
+      const output = { explanation: text };
+      apiCache.set(cacheKey, output, 4 * 3600 * 1000); // 4 hour TTL cache
+      res.json(output);
     } catch (err: any) {
       console.error("Backend explain topic error:", err);
       res.json({ explanation: "Could not fetch a simplified explanation at this moment. Please check your connection and try again." });
@@ -1440,6 +1486,14 @@ Format beautifully in Markdown. Do not include any greeting or conversational fi
         langName = 'Tamil';
       } else if (normLang === 'marathi') {
         langName = 'Marathi';
+      }
+
+      const cacheKey = `mindmap_${String(topic).toLowerCase().trim()}_${String(language || '').toLowerCase().trim()}`;
+      const cached = apiCache.get<any>(cacheKey);
+      if (cached) {
+        console.log(`[SmartCache Hit] mindmap: ${cacheKey}`);
+        res.json(cached);
+        return;
       }
 
       const prompt = `You are a visual education expert. Create a complete, detailed, and logically hierarchical mindmap JSON structure for the topic "${topic}".
@@ -1483,6 +1537,7 @@ JSON Format Schema:
 
       const cleanJsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
       const parsed = JSON.parse(cleanJsonStr);
+      apiCache.set(cacheKey, parsed, 4 * 3600 * 1000); // 4 hour TTL cache
       res.json(parsed);
     } catch (err: any) {
       console.error("Backend mindmap error:", err);
@@ -1521,6 +1576,14 @@ JSON Format Schema:
         langName = 'Marathi (मराठी)';
       }
 
+      const cacheKey = `qpaper_${String(topic).toLowerCase().trim()}_${String(subject || '').toLowerCase().trim()}_${String(grade || '').toLowerCase().trim()}_${String(language || '').toLowerCase().trim()}`;
+      const cached = apiCache.get<any>(cacheKey);
+      if (cached) {
+        console.log(`[SmartCache Hit] question-paper: ${cacheKey}`);
+        res.json(cached);
+        return;
+      }
+
       const prompt = `You are an expert academic board examiner. Generate an authentic curriculum question paper for Class ${grade || '10'} on the topic "${topic}" (Subject: "${subject || 'General'}").
 The entire question paper (instructions, marks distribution, questions divided into Section A (MCQs), Section B (Short Answers), Section C (Long Answers), and marking schemes) MUST be written in the language: ${langName}.
 Format nicely using standard Markdown. Include the detailed step-by-step marking scheme / solutions at the very end of the document.`;
@@ -1539,7 +1602,9 @@ Format nicely using standard Markdown. Include the detailed step-by-step marking
       }
       const text = result.text;
 
-      res.json({ paperText: text });
+      const output = { paperText: text };
+      apiCache.set(cacheKey, output, 4 * 3600 * 1000); // 4 hour TTL cache
+      res.json(output);
     } catch (err: any) {
       console.error("Backend question paper error:", err);
       res.json({ paperText: "Failed to generate question paper dynamically. Please try again." });
@@ -1622,6 +1687,14 @@ Preserve the visual structure as clean markdown, lists, and formatted headers. D
         langName = 'Marathi (मराठी)';
       }
 
+      const hashKey = `pdf_${String(textContent).slice(0, 1500).toLowerCase().trim().replace(/[^a-z0-9]/g, '')}_${String(language || '').toLowerCase().trim()}`;
+      const cached = apiCache.get<any>(hashKey);
+      if (cached) {
+        console.log(`[SmartCache Hit] pdf-summary: ${hashKey}`);
+        res.json(cached);
+        return;
+      }
+
       const prompt = `You are an expert curriculum document analyzer. Analyze the following study material and generate a comprehensive study guide package.
 The entire package (summary, key definitions, practice questions, and answers) MUST be written in the language: ${langName}.
 You must return ONLY a valid JSON object matching the schema below. Do NOT wrap in \`\`\`json markdown blocks.
@@ -1656,6 +1729,7 @@ ${textContent.slice(0, 50000)}`;
 
       const cleanJsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
       const parsed = JSON.parse(cleanJsonStr);
+      apiCache.set(hashKey, parsed, 4 * 3600 * 1000); // 4 hour TTL cache
       res.json(parsed);
     } catch (err: any) {
       console.error("Backend PDF analyzer error:", err);
@@ -1673,6 +1747,14 @@ ${textContent.slice(0, 50000)}`;
       const { content, language } = req.body;
       if (!content) {
         res.status(400).json({ error: "Content is required for summarization." });
+        return;
+      }
+
+      const hashKey = `notes_summary_${String(content).slice(0, 1500).toLowerCase().trim().replace(/[^a-z0-9]/g, '')}_${String(language || '').toLowerCase().trim()}`;
+      const cached = apiCache.get<any>(hashKey);
+      if (cached) {
+        console.log(`[SmartCache Hit] summarize-notes: ${hashKey}`);
+        res.json(cached);
         return;
       }
 
@@ -1695,7 +1777,10 @@ ${content}`;
         throw new Error("AI Gateway failed");
       }
       const summary = result.text;
-      res.json({ summary });
+      
+      const output = { summary };
+      apiCache.set(hashKey, output, 4 * 3600 * 1000); // 4 hour TTL cache
+      res.json(output);
     } catch (err: any) {
       console.error("[Summarize Notes] Error:", err?.message || err);
       res.status(503).json({ error: "Unable to summarize notes at this time. Please try again." });

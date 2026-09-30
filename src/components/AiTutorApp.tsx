@@ -1785,7 +1785,24 @@ export const AiTutorApp = memo(function AiTutorApp({
         memory: compiledMemory
       };
 
-      const answer = await getStudyAnswer(promptContext, imagesToSend.length > 0 ? imagesToSend : undefined, studentCtx, selectedLanguage);
+      // Construct a sliding context window of history messages (excluding greeting and error blocks)
+      const historyPayload = messages
+        .filter(m => !m.id.startsWith('welcome_') && !m.id.startsWith('msg_err_'))
+        .slice(-8) // Sensible 8-message context window to respect tokens and avoid payload bloat
+        .map(m => ({
+          role: m.sender === 'user' ? ('user' as const) : ('model' as const),
+          text: m.text,
+          images: m.images || (m.image ? [m.image] : [])
+        }));
+
+      const answer = await getStudyAnswer(
+        promptContext, 
+        imagesToSend.length > 0 ? imagesToSend : undefined, 
+        studentCtx, 
+        selectedLanguage,
+        'default',
+        historyPayload
+      );
 
       const aiMsg: ChatMessage = {
         id: 'msg_ai_' + Date.now(),

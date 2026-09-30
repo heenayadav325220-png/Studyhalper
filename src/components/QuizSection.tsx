@@ -363,6 +363,81 @@ export default function QuizSection({
   // Navigation & Step State
   const [viewState, setViewState] = useState<'setup' | 'loading' | 'active' | 'results' | 'history'>('setup');
 
+  // Loading Progressive steps states
+  const [loadingStep, setLoadingStep] = useState(0);
+  const loadingIntervalRef = useRef<any>(null);
+
+  const getLoadingSteps = () => {
+    const topicToUse = customTopic.trim() || 'Core Concepts';
+    const stepsMap: Record<string, string[]> = {
+      hi: [
+        "अस्केंड अकैडमिक इंजन आरंभ हो रहा है...",
+        "सुरक्षित एआई गेटवे कनेक्शन स्थापित किया जा रहा है...",
+        `"${topicToUse}" की मुख्य संकल्पनाओं का विश्लेषण हो रहा है...`,
+        "बहुविकल्पीय प्रश्नों (MCQs) का ढांचा संकलित किया जा रहा है...",
+        "सटीक वैचारिक स्पष्टीकरण और संकेतों की पुष्टि हो रही है...",
+        "ऑप्शंस और उत्तरों के वजन को यादृच्छिक रूप से व्यवस्थित किया जा रहा है...",
+        "आपका मॉक परीक्षा पत्र तैयार है!"
+      ],
+      hinglish: [
+        "Ascend Academic Engine initialize ho raha hai...",
+        "Secure AI Gateway connection connect ho raha hai...",
+        `"${topicToUse}" ke core concepts analyze ho rahe hain...`,
+        "Multiple choice questions (MCQs) generate ho rahe hain...",
+        "Detailed solutions aur hints verify ho rahe hain...",
+        "Option indexing aur difficulty parameters set ho rahe hain...",
+        "Aapka Mock Exam paper completely ready hai!"
+      ],
+      marathi: [
+        "अस्केंड अकैडमिक इंजिन सुरू होत आहे...",
+        "सुरक्षित एआय गेटवे कनेक्शन स्थापित केले जात आहे...",
+        `"${topicToUse}" च्या मुख्य संकल्पनांचे विश्लेषण केले जात आहे...`,
+        "बहुपर्यायी प्रश्नांची रचना तयार केली जात आहे...",
+        "स्पष्टीकरणे आणि हिंट्स सत्यापित केले जात आहेत...",
+        "पर्यायांची मांडणी रँडमली व्यवस्थापित केली जात आहे...",
+        "तुमचा मॉक परीक्षा पेपर तयार आहे!"
+      ],
+      tamil: [
+        "அஸெண்ட் அகாடமிக் எஞ்சின் தொடங்குகிறது...",
+        "பாதுகாப்பான AI கேட்வே இணைப்பு நிறுவப்படுகிறது...",
+        `"${topicToUse}" இன் முக்கிய கருத்துக்கள் பகுப்பாய்வு செய்யப்படுகின்றன...`,
+        "கொள்குறி வினாக்கள் (MCQs) கட்டமைக்கப்படுகின்றன...",
+        "விளக்கங்கள் மற்றும் குறிப்புகள் சரிபார்க்கப்படுகின்றன...",
+        "விருப்பங்கள் தற்செயலாக வரிசைப்படுத்தப்படுகின்றன...",
+        "உங்கள் மாதிரி தேர்வுத் தாள் தயாராக உள்ளது!"
+      ],
+      bengali: [
+        "অ্যাসেন্ড একাডেমিক ইঞ্জিন চালু হচ্ছে...",
+        "সুরক্ষিত AI গেটওয়ে সংযোগ স্থাপন করা হচ্ছে...",
+        `"${topicToUse}" এর মূল ধারণাগুলি বিশ্লেষণ করা হচ্ছে...`,
+        "বহুনির্বাচনী প্রশ্ন (MCQs) তৈরি করা হচ্ছে...",
+        "ব্যাখ্যা এবং ইঙ্গিত যাচাই করা হচ্ছে...",
+        "বিকল্পগুলি এলোমেলোভাবে সাজানো হচ্ছে...",
+        "আপনার মক পরীক্ষার পেপার সম্পূর্ণ প্রস্তুত!"
+      ]
+    };
+    return stepsMap[quizLanguage] || [
+      "Initializing Ascend Academic Engine...",
+      "Establishing secure AI gateway connection...",
+      `Analyzing core concepts of "${topicToUse}"...`,
+      "Structuring high-yield multiple choice questions (MCQs)...",
+      "Validating conceptual answers and student-friendly hints...",
+      "Performing true Fisher-Yates option randomized positioning...",
+      "Assembling and rendering your custom mock exam paper!"
+    ];
+  };
+
+  const loadingSteps = getLoadingSteps();
+
+  // Clear loading interval on unmount
+  useEffect(() => {
+    return () => {
+      if (loadingIntervalRef.current) {
+        clearInterval(loadingIntervalRef.current);
+      }
+    };
+  }, []);
+
   // Dynamic Quiz-specific Language Selection
   const [quizLanguage, setQuizLanguage] = useState<QuizLanguage>(() => {
     if (language && ['en', 'hi', 'hinglish', 'marathi', 'tamil', 'bengali'].includes(language)) {
@@ -448,6 +523,16 @@ export default function QuizSection({
     const topicToUse = customTopic.trim() || 'Core Concepts';
     setViewState('loading');
     setErrorMsg('');
+    setLoadingStep(0);
+
+    if (loadingIntervalRef.current) {
+      clearInterval(loadingIntervalRef.current);
+    }
+
+    const stepsCount = getLoadingSteps().length;
+    loadingIntervalRef.current = setInterval(() => {
+      setLoadingStep((prev) => Math.min(prev + 1, stepsCount - 1));
+    }, 1300);
 
     try {
       // Map quizLanguage correctly to the string parameter for generateQuiz
@@ -476,6 +561,10 @@ export default function QuizSection({
         topicToUse
       );
 
+      if (loadingIntervalRef.current) {
+        clearInterval(loadingIntervalRef.current);
+      }
+
       if (Array.isArray(generated) && generated.length > 0) {
         // Defensive shuffle: guarantees random options and uniform A/B/C/D answer spread
         const randomized = shuffleQuizQuestions(generated);
@@ -492,6 +581,9 @@ export default function QuizSection({
         throw new Error('Could not load quiz questions.');
       }
     } catch (err: any) {
+      if (loadingIntervalRef.current) {
+        clearInterval(loadingIntervalRef.current);
+      }
       logError(err, 'QUIZ_GEN');
       const parsed = parseError(err);
       const isHi = quizLanguage === 'hi';
@@ -1109,39 +1201,92 @@ export default function QuizSection({
         )}
 
         {/* ========================================================================= */}
-        {/* VIEW 2: LOADING SKELETON WITH ANIMATED RADIAL WAVE */}
+        {/* VIEW 2: LOADING SKELETON WITH ANIMATED PROGRESSIVE PIPELINE */}
         {/* ========================================================================= */}
         {viewState === 'loading' && (
           <motion.div
             key="loading"
-            initial={{ opacity: 0, scale: 0.96 }}
+            initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.96 }}
-            className="py-20 flex flex-col items-center justify-center text-center space-y-5 bg-white rounded-3xl border border-slate-200/80 p-8 shadow-sm"
+            exit={{ opacity: 0, scale: 0.98 }}
+            className="space-y-6"
           >
-            <div className="relative">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 3, ease: 'linear' }}
-                className="w-20 h-20 rounded-full border-4 border-indigo-100 border-t-indigo-600"
-              />
-              <div className="absolute inset-0 flex items-center justify-center text-2xl">
-                🧠
+            {/* Top Bar Skeleton */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between animate-pulse">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-slate-200" />
+                <div className="space-y-2">
+                  <div className="w-24 h-4 bg-slate-200 rounded-md" />
+                  <div className="w-36 h-3 bg-slate-100 rounded-md" />
+                </div>
               </div>
+              <div className="w-16 h-8 bg-slate-200 rounded-lg" />
             </div>
 
-            <div className="space-y-1.5 max-w-sm">
-              <h3 className="text-base font-extrabold text-slate-900">
-                Generating {selectedSubject} Quiz
-              </h3>
-              <p className="text-xs text-slate-500">
-                AI Tutor is formulating {questionCount} multiple choice questions for <strong>"{customTopic}"</strong> at {difficulty} difficulty with randomized answer positions...
-              </p>
-            </div>
+            {/* Main Question Skeleton */}
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm space-y-6 relative overflow-hidden">
+              {/* Dynamic Status Progress Tracker */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                  <div className="flex items-center space-x-1.5 text-indigo-600">
+                    <Sparkles className="w-4 h-4 animate-spin text-indigo-500" />
+                    <span className="uppercase tracking-widest text-[10px]">AI Pipeline Active</span>
+                  </div>
+                  <span>{Math.round(((loadingStep + 1) / loadingSteps.length) * 100)}% Complete</span>
+                </div>
+                
+                {/* Glowing Progress Bar */}
+                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <motion.div 
+                    className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 shadow-xs"
+                    initial={{ width: "0%" }}
+                    animate={{ width: `${((loadingStep + 1) / loadingSteps.length) * 100}%` }}
+                    transition={{ duration: 0.8, ease: "easeInOut" }}
+                  />
+                </div>
 
-            <div className="flex items-center space-x-2 text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
-              <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-              <span>Verifying syllabus accuracy & explanations</span>
+                {/* Progressive Status Message */}
+                <div className="text-center py-2">
+                  <AnimatePresence mode="wait">
+                    <motion.p 
+                      key={loadingStep}
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -5 }}
+                      className="text-sm font-extrabold text-slate-900"
+                    >
+                      {loadingSteps[loadingStep]}
+                    </motion.p>
+                  </AnimatePresence>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Formulating {questionCount} multiple choice questions for <strong>"{customTopic}"</strong> at {difficulty} difficulty...
+                  </p>
+                </div>
+              </div>
+
+              {/* Quiz Body Skeleton Layout */}
+              <div className="space-y-4 animate-pulse pt-4 border-t border-slate-100">
+                {/* Question line placeholders */}
+                <div className="space-y-2">
+                  <div className="h-5 bg-slate-200 rounded-lg w-11/12" />
+                  <div className="h-5 bg-slate-200 rounded-lg w-3/4" />
+                </div>
+
+                {/* 4 options placeholders */}
+                <div className="grid grid-cols-1 gap-3 pt-4">
+                  {[0, 1, 2, 3].map((idx) => (
+                    <div 
+                      key={idx}
+                      className="flex items-center space-x-3 p-4 rounded-xl border border-slate-100 bg-slate-50/60"
+                    >
+                      <div className="w-6 h-6 rounded-lg bg-slate-200 flex items-center justify-center text-[10px] font-black text-transparent">
+                        {String.fromCharCode(65 + idx)}
+                      </div>
+                      <div className="h-4 bg-slate-200 rounded-md w-2/3" />
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
