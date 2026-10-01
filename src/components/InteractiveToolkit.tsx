@@ -930,7 +930,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
         <div className="flex items-center gap-1.5">
           <button
             onClick={onClose}
-            className={`p-2 rounded-full transition-all duration-200 active:scale-95 flex items-center justify-center mr-1 ${
+            className={`p-2 rounded-full transition-colors duration-200 active:scale-95 flex items-center justify-center mr-1 ${
               m ? "hover:bg-slate-800 text-cyan-400 hover:text-cyan-300" : "hover:bg-slate-100 text-slate-500 hover:text-slate-800"
             }`}
             title="Back to Home"
@@ -939,7 +939,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
           </button>
           <button
             onClick={() => L(true)}
-            className={`p-2 rounded-full transition-all duration-200 active:scale-95 flex items-center justify-center md:hidden mr-1 ${
+            className={`p-2 rounded-full transition-colors duration-200 active:scale-95 flex items-center justify-center md:hidden mr-1 ${
               m ? "hover:bg-slate-800 text-cyan-400 hover:text-cyan-300" : "hover:bg-slate-100 text-slate-500 hover:text-slate-800"
             }`}
             title="Open Navigation"
@@ -965,7 +965,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.96 }}
             onClick={() => setShowCatalogModal(true)}
-            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-xs border transition-all ${
+            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-xs border transition-colors ${
               m 
                 ? "bg-gradient-to-r from-cyan-950 to-indigo-950 border-cyan-500/40 text-cyan-300 hover:border-cyan-400" 
                 : "bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-indigo-500 shadow-indigo-500/20"
@@ -996,7 +996,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
             <select
               value={toolkitLanguage}
               onChange={(e) => handleLanguageChange(e.target.value)}
-              className={`text-[10px] font-black uppercase px-2 py-1.5 rounded-xl border outline-none transition-all duration-200 cursor-pointer ${
+              className={`text-[10px] font-black uppercase px-2 py-1.5 rounded-xl border outline-none transition-colors duration-200 cursor-pointer ${
                 m 
                   ? "bg-slate-950 border-cyan-800/80 text-cyan-400 hover:border-cyan-500" 
                   : "bg-slate-50 border-slate-200 text-slate-700 hover:border-indigo-300 focus:border-indigo-500"
@@ -1016,7 +1016,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             onClick={() => zt(!m)}
-            className={`text-[10px] font-black uppercase px-2.5 py-1.5 sm:px-3 rounded-xl border transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
+            className={`text-[10px] font-black uppercase px-2.5 py-1.5 sm:px-3 rounded-xl border transition-colors duration-200 flex items-center gap-1.5 cursor-pointer ${
               m ? "bg-cyan-950 border-cyan-500/50 text-cyan-300 hover:bg-cyan-900" : "bg-indigo-50 border-indigo-100 hover:bg-indigo-100 text-indigo-700"
             }`}
           >
@@ -1027,7 +1027,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => setShowCatalogModal(true)}
-            className={`p-2 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer ${
+            className={`p-2 rounded-full transition-colors duration-200 flex items-center justify-center cursor-pointer ${
               m ? "hover:bg-slate-800 text-cyan-500 hover:text-cyan-300" : "hover:bg-slate-100 text-slate-500 hover:text-slate-800"
             }`}
             title="Search 19+ Tools"
@@ -1037,7 +1037,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
 
           <button
             onClick={() => setShowCatalogModal(true)}
-            className={`p-2 rounded-full transition-all duration-200 flex items-center justify-center cursor-pointer ${
+            className={`p-2 rounded-full transition-colors duration-200 flex items-center justify-center cursor-pointer ${
               m ? "hover:bg-slate-800 text-cyan-500 hover:text-cyan-300" : "hover:bg-slate-100 text-slate-500 hover:text-slate-800"
             }`}
             title="Toolkit Catalog"
@@ -1065,7 +1065,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
       {/* ALL 19+ ADVANCED TOOLS INTERACTIVE CATALOG MODAL */}
       <AnimatePresence>
         {showCatalogModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 ">
             <motion.div
               initial={{ opacity: 0, scale: 0.92, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -1198,7 +1198,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
         <div className="flex-1 bg-slate-950 text-cyan-300 p-6 flex flex-col md:flex-row gap-6 overflow-y-auto">
           <div className="flex-1 flex flex-col justify-center items-center text-center space-y-6 border-r border-slate-900 pr-0 md:pr-6">
             <span className="text-sm tracking-widest font-black uppercase text-cyan-500">Focusing On Your Future</span>
-            <div className="text-6xl font-mono font-black text-cyan-400 shadow-cyan-950/50 drop-shadow-[0_0_15px_rgba(34,211,238,0.4)]">
+            <div className="text-6xl font-mono font-black text-cyan-400 shadow-cyan-950/50 drop-shadow-sm">
               {Math.floor(B / 60)
                 .toString()
                 .padStart(2, "0")}
@@ -1268,10 +1268,10 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
       ) : (
         <div className="flex-1 flex overflow-hidden relative">
           {ve && (
-            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-30 md:hidden" onClick={() => L(false)} />
+            <div className="fixed inset-0 bg-slate-900/40  z-30 md:hidden" onClick={() => L(false)} />
           )}
           <aside
-            className={`fixed inset-y-0 left-0 z-40 bg-white border-r border-slate-200/80 p-4 flex flex-col gap-2 transition-all duration-300 ease-in-out md:static md:translate-x-0 shrink-0 ${
+            className={`fixed inset-y-0 left-0 z-40 bg-white border-r border-slate-200/80 p-4 flex flex-col gap-2 transition-colors duration-300 ease-in-out md:static md:translate-x-0 shrink-0 ${
               ve ? "translate-x-0" : "-translate-x-full md:translate-x-0"
             } ${u ? "md:w-16 md:px-2 md:py-4" : "md:w-56 md:px-4 md:py-4"}`}
           >
@@ -1315,15 +1315,15 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                       ut(t.id);
                       L(false);
                     }}
-                    className={`w-full py-2.5 px-3 rounded-xl transition-all duration-200 flex items-center gap-3 font-extrabold text-xs group relative ${
+                    className={`w-full py-2.5 px-3 rounded-xl transition-colors duration-200 flex items-center gap-3 font-extrabold text-xs group relative ${
                       isCurrent ? "bg-indigo-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                     } ${u ? "md:justify-center md:px-0" : ""}`}
                     title={t.label}
                   >
                     <span className={isCurrent ? "text-white" : "text-indigo-600 group-hover:text-indigo-700"}>{t.icon}</span>
-                    <span className={`transition-all duration-300 ${u ? "md:hidden" : "block"}`}>{t.label}</span>
+                    <span className={`transition-colors duration-300 ${u ? "md:hidden" : "block"}`}>{t.label}</span>
                     {u && (
-                      <div className="absolute left-full ml-3 px-2 py-1 bg-slate-900 text-white text-[9px] font-black rounded-md opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap z-50 hidden md:block shadow-md">
+                      <div className="absolute left-full ml-3 px-2 py-1 bg-slate-900 text-white text-[9px] font-black rounded-md opacity-0 group-hover:opacity-100 pointer-events-none transition-colors duration-200 whitespace-nowrap z-50 hidden md:block shadow-md">
                         {t.label}
                       </div>
                     )}
@@ -1336,7 +1336,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                   onClose();
                   if (onOpenDiagramMaker) onOpenDiagramMaker("Process Flow of Water Cycle", "Water Cycle", "Science");
                 }}
-                className={`w-full py-2.5 px-3 rounded-xl transition-all duration-200 flex items-center gap-3 font-black text-xs group relative border border-dashed text-indigo-600 border-indigo-200 hover:bg-indigo-50/50 mt-2 ${
+                className={`w-full py-2.5 px-3 rounded-xl transition-colors duration-200 flex items-center gap-3 font-black text-xs group relative border border-dashed text-indigo-600 border-indigo-200 hover:bg-indigo-50/50 mt-2 ${
                   u ? "md:justify-center md:px-0" : ""
                 }`}
                 title="Open Diagram Lab"
@@ -1344,9 +1344,9 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                 <span className="text-indigo-600">
                   <Palette size={15} />
                 </span>
-                <span className={`transition-all duration-300 ${u ? "md:hidden" : "block"}`}>Open Diagram Lab 🎨</span>
+                <span className={`transition-colors duration-300 ${u ? "md:hidden" : "block"}`}>Open Diagram Lab 🎨</span>
                 {u && (
-                  <div className="absolute left-full ml-3 px-2 py-1 bg-slate-900 text-white text-[9px] font-black rounded-md opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap z-50 hidden md:block shadow-md">
+                  <div className="absolute left-full ml-3 px-2 py-1 bg-slate-900 text-white text-[9px] font-black rounded-md opacity-0 group-hover:opacity-100 pointer-events-none transition-colors duration-200 whitespace-nowrap z-50 hidden md:block shadow-md">
                     Diagram Lab
                   </div>
                 )}
@@ -1374,7 +1374,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                 <div className="space-y-1">
                   <div className="w-full bg-slate-100 border border-slate-200/40 rounded-full h-1.5 overflow-hidden">
                     <div
-                      className={`h-full transition-all duration-300 ${
+                      className={`h-full transition-colors duration-300 ${
                         c.count >= c.limit ? "bg-rose-500" : c.count >= c.limit * 0.8 ? "bg-amber-500 animate-pulse" : "bg-indigo-600"
                       }`}
                       style={{ width: `${Math.min(100, (c.count / c.limit) * 100)}%` }}
@@ -1418,7 +1418,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                           xt(t.id);
                           H(null);
                         }}
-                        className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 ${
                           isSelected
                             ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
                             : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-700/50"
@@ -1547,7 +1547,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                             <img src={Y} alt="OCR Upload Preview" className="w-full h-28 object-cover" />
                             {G && (
                               <div className="absolute inset-0 bg-indigo-900/30 flex items-center justify-center">
-                                <div className="w-full h-1 bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.9)] animate-bounce" />
+                                <div className="w-full h-1 bg-cyan-400 shadow-sm animate-bounce" />
                               </div>
                             )}
                           </div>
@@ -1664,7 +1664,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                                 <div className="flex bg-slate-100 p-0.5 rounded-xl text-[9px] font-bold">
                                   <button
                                     onClick={() => Ie("visual")}
-                                    className={`px-2.5 py-1 rounded-lg transition-all ${
+                                    className={`px-2.5 py-1 rounded-lg transition-colors ${
                                       W === "visual" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
                                     }`}
                                   >
@@ -1672,7 +1672,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                                   </button>
                                   <button
                                     onClick={() => Ie("tree")}
-                                    className={`px-2.5 py-1 rounded-lg transition-all ${
+                                    className={`px-2.5 py-1 rounded-lg transition-colors ${
                                       W === "tree" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
                                     }`}
                                   >
@@ -1697,7 +1697,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                                       const isExpanded = !!gt[`child-${s}`];
                                       const hasSubChildren = t.children && t.children.length > 0;
                                       return (
-                                        <div key={s} className="bg-white rounded-2xl border border-indigo-50 shadow-xs overflow-hidden transition-all duration-300">
+                                        <div key={s} className="bg-white rounded-2xl border border-indigo-50 shadow-xs overflow-hidden transition-colors duration-300">
                                           <div className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-50/20 to-slate-50/35 border-b border-indigo-50/40">
                                             <div className="flex items-center space-x-2 flex-1 min-w-0 pr-1">
                                               <span className="flex items-center justify-center w-5 h-5 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-lg shrink-0">
@@ -1716,7 +1716,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                                                       [`child-${s}`]: !isExpanded
                                                     }))
                                                   }
-                                                  className="p-1 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-50 transition-all text-[9px] font-bold flex items-center gap-0.5"
+                                                  className="p-1 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-50 transition-colors text-[9px] font-bold flex items-center gap-0.5"
                                                   title={isExpanded ? "Collapse" : "Expand"}
                                                 >
                                                   <span className="uppercase text-[8px]">
@@ -1734,13 +1734,13 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                                               )}
                                               <button
                                                 onClick={() => we(t.name)}
-                                                className="px-2 py-0.5 text-indigo-600 hover:bg-indigo-50 border border-indigo-100 bg-indigo-50/20 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all"
+                                                className="px-2 py-0.5 text-indigo-600 hover:bg-indigo-50 border border-indigo-100 bg-indigo-50/20 rounded-lg text-[8px] font-black uppercase tracking-wider transition-colors"
                                               >
                                                 💡 {appLanguage === "Hindi" ? "समझें" : "Explain"}
                                               </button>
                                               <button
                                                 onClick={() => Q(t.name)}
-                                                className="p-1 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-50 transition-all"
+                                                className="p-1 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-50 transition-colors"
                                                 title="Speak text"
                                               >
                                                 <Volume2 size={12} />
@@ -1754,7 +1754,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                                                 {t.children.map((subNode: any, subIdx: number) => (
                                                   <div
                                                     key={subIdx}
-                                                    className="bg-white border border-slate-150 p-2 rounded-xl shadow-2xs hover:border-indigo-100 transition-all flex items-center justify-between"
+                                                    className="bg-white border border-slate-150 p-2 rounded-xl shadow-2xs hover:border-indigo-100 transition-colors flex items-center justify-between"
                                                   >
                                                     <div className="flex items-center space-x-1.5 flex-1 min-w-0 pr-1.5">
                                                       <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0 animate-pulse" />
@@ -1765,14 +1765,14 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                                                     <div className="flex items-center space-x-1 shrink-0">
                                                       <button
                                                         onClick={() => we(subNode.name)}
-                                                        className="px-1.5 py-0.5 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 text-slate-500 rounded-lg text-[7px] font-black uppercase transition-all"
+                                                        className="px-1.5 py-0.5 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 text-slate-500 rounded-lg text-[7px] font-black uppercase transition-colors"
                                                         title="Explain this detail"
                                                       >
                                                         AI
                                                       </button>
                                                       <button
                                                         onClick={() => Q(subNode.name)}
-                                                        className="p-0.5 text-slate-300 hover:text-indigo-600 transition-all"
+                                                        className="p-0.5 text-slate-300 hover:text-indigo-600 transition-colors"
                                                       >
                                                         <Volume2 size={10} />
                                                       </button>
@@ -1808,7 +1808,6 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
 
                               {h && (
                                 <div className="mt-4 p-4 bg-gradient-to-br from-indigo-950 to-indigo-900 text-white rounded-3xl shadow-xl space-y-3 border border-indigo-800 animate-fadeIn relative overflow-hidden">
-                                  <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-indigo-500/10 rounded-full blur-xl pointer-events-none" />
                                   <div className="flex justify-between items-center pb-2 border-b border-indigo-800/60">
                                     <div className="flex items-center space-x-1.5">
                                       <Sparkles className="w-4 h-4 text-yellow-300 stroke-[2] animate-bounce" />
@@ -1818,7 +1817,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                                     </div>
                                     <button
                                       onClick={() => $(null)}
-                                      className="text-indigo-400 hover:text-white p-1 rounded-lg transition-all"
+                                      className="text-indigo-400 hover:text-white p-1 rounded-lg transition-colors"
                                     >
                                       <X size={14} />
                                     </button>
@@ -1840,13 +1839,13 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                                     <div className="flex justify-between items-center pt-2 border-t border-indigo-800/40">
                                       <button
                                         onClick={() => Q(h.explanation)}
-                                        className="px-3 py-1.5 bg-indigo-800 hover:bg-indigo-700 text-indigo-200 hover:text-white rounded-xl text-[10px] font-extrabold uppercase flex items-center gap-1.5 transition-all"
+                                        className="px-3 py-1.5 bg-indigo-800 hover:bg-indigo-700 text-indigo-200 hover:text-white rounded-xl text-[10px] font-extrabold uppercase flex items-center gap-1.5 transition-colors"
                                       >
                                         <Volume2 size={12} /> {appLanguage === "Hindi" ? "सुनें" : "Listen"}
                                       </button>
                                       <button
                                         onClick={() => kt(h.nodeName, h.explanation)}
-                                        className="px-4 py-1.5 bg-yellow-400 hover:bg-yellow-300 text-indigo-950 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md shadow-yellow-500/10 active:scale-95"
+                                        className="px-4 py-1.5 bg-yellow-400 hover:bg-yellow-300 text-indigo-950 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-colors shadow-md shadow-yellow-500/10 active:scale-95"
                                       >
                                         <Plus size={12} strokeWidth={2.5} /> {appLanguage === "Hindi" ? "नोटबुक" : "Add to Note"}
                                       </button>
@@ -1870,7 +1869,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                                       const lang = match ? match[1] : 'code';
                                       return (
                                         <div className="relative my-2.5 rounded-xl overflow-hidden border border-slate-700/80 bg-slate-950 text-left">
-                                          <div className="bg-slate-900/90 px-3 py-1.5 flex items-center justify-between text-[10px] text-slate-400 font-mono border-b border-slate-800">
+                                          <div className="bg-slate-900 px-3 py-1.5 flex items-center justify-between text-[10px] text-slate-400 font-mono border-b border-slate-800">
                                             <span className="uppercase font-bold text-indigo-400">{lang}</span>
                                             <button
                                               type="button"
@@ -2096,7 +2095,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                           whileHover={{ scale: 1.04 }}
                           whileTap={{ scale: 0.94 }}
                           onClick={() => Ut(t)}
-                          className={`py-2.5 rounded-xl font-black transition-all cursor-pointer shadow-xs ${
+                          className={`py-2.5 rounded-xl font-black transition-colors cursor-pointer shadow-xs ${
                             t === "="
                               ? "bg-gradient-to-r from-cyan-600 to-indigo-600 text-white hover:from-cyan-500 hover:to-indigo-500 col-span-2 shadow-cyan-600/20"
                               : ["C", "DEL"].includes(t)

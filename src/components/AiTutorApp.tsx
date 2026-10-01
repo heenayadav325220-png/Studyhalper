@@ -2082,7 +2082,7 @@ export const AiTutorApp = memo(function AiTutorApp({
       }}
     >
       {/* SINGLE CLEAN TOP NAVIGATION BAR */}
-      <header className="bg-white border-b border-slate-200/90 px-3 sm:px-5 py-2 sm:py-2.5 flex items-center justify-between shrink-0 shadow-[0_1px_2px_rgba(15,23,42,0.03)] z-20 relative">
+      <header className="bg-white border-b border-slate-200/90 px-3 sm:px-5 py-2 sm:py-2.5 flex items-center justify-between shrink-0 shadow-sm z-20 relative">
         <div className="flex items-center space-x-2 sm:space-x-3">
           {/* 1. ☰ Sidebar/Menu button */}
           <button
@@ -2287,7 +2287,7 @@ export const AiTutorApp = memo(function AiTutorApp({
         {showSidebar && (
           <div
             onClick={() => setShowSidebar(false)}
-            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 lg:hidden"
+            className="fixed inset-0 bg-slate-950/60  z-40 lg:hidden"
           />
         )}
 
@@ -2322,7 +2322,7 @@ export const AiTutorApp = memo(function AiTutorApp({
             <button
               type="button"
               onClick={handleNewChat}
-              className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-md shadow-indigo-900/10 transition-all duration-200 active:scale-95 cursor-pointer"
+              className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-md shadow-indigo-900/10 transition-colors duration-200 active:scale-95 cursor-pointer"
             >
               <Plus className="w-4 h-4 text-indigo-100" />
               <span>+ New Study Chat</span>
@@ -2584,7 +2584,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                       whileHover={{ y: -2 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => handleSendMessage(qp.prompt)}
-                      className="p-3 bg-white hover:bg-slate-50/80 border border-slate-200 hover:border-blue-300 rounded-2xl transition-all duration-200 text-left group flex items-start space-x-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
+                      className="p-3 bg-white hover:bg-slate-50/80 border border-slate-200 hover:border-blue-300 rounded-2xl transition-colors duration-200 text-left group flex items-start space-x-2.5 shadow-sm"
                     >
                       <div className="p-2 rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-200 shrink-0">
                         <Icon className="w-4 h-4" />
@@ -2634,7 +2634,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                         </button>
                       </div>
 
-                      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 text-white rounded-2xl rounded-tr-xs p-3.5 sm:p-4 border border-slate-700/60 shadow-[0_4px_16px_rgba(15,23,42,0.12)] space-y-2.5">
+                      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 text-white rounded-2xl rounded-tr-xs p-3.5 sm:p-4 border border-slate-700/60 shadow-sm space-y-2.5">
                         {msg.images && msg.images.length > 0 ? (
                           <div className={`grid gap-2 ${msg.images.length === 1 ? 'grid-cols-1 max-w-xs' : 'grid-cols-2 max-w-sm'}`}>
                             {msg.images.map((img, i) => (
@@ -2671,7 +2671,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                   transition={{ duration: 0.28, ease: 'easeOut' }}
                   className="flex justify-start w-full group/aimsg my-2"
                 >
-                  <div className="w-full max-w-[820px] bg-transparent border-0 overflow-visible transition-all">
+                  <div className="w-full max-w-[820px] bg-transparent border-0 overflow-visible transition-colors">
                     {/* Professional Header Bar */}
                     <div className="bg-transparent border-b border-slate-100 px-0 py-2 flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center space-x-2.5">
@@ -2908,7 +2908,7 @@ export const AiTutorApp = memo(function AiTutorApp({
       </div>
 
       <footer
-        className="bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-2 sm:px-3 py-1 sm:py-1.5 shrink-0 relative shadow-[0_-4px_20px_-4px_rgba(15,23,42,0.08)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        className="bg-white  border-t border-slate-200/90 px-2 sm:px-3 py-1 sm:py-1.5 shrink-0 relative shadow-sm transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
         style={{
           paddingBottom: isBottomNavVisible
             ? 'calc(48px + 8px + env(safe-area-inset-bottom, 0px))'
@@ -3157,7 +3157,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                         alt={`Page ${idx + 1}`}
                         className="w-14 h-14 rounded-xl object-cover border border-slate-300 shadow-2xs bg-white"
                       />
-                      <span className="absolute bottom-1 left-1 px-1 py-0.2 bg-slate-900/80 backdrop-blur-xs text-[8px] font-black text-white rounded">
+                      <span className="absolute bottom-1 left-1 px-1 py-0.2 bg-slate-900/80  text-[8px] font-black text-white rounded">
                         P{idx + 1}
                       </span>
                       <button
@@ -3254,7 +3254,7 @@ export const AiTutorApp = memo(function AiTutorApp({
             })}
           </div>
 
-          <div className="relative flex flex-col bg-white border border-slate-250/90 hover:border-slate-350 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/15 rounded-3xl p-3 pb-2.5 transition-all duration-200 shadow-sm min-h-[96px]">
+          <div className="relative flex flex-col bg-white border border-slate-250/90 hover:border-slate-350 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/15 rounded-3xl p-3 pb-2.5 transition-colors duration-200 shadow-sm min-h-[96px]">
             {/* Top Row: Full-width Flexible Textarea */}
             <div className={`w-full flex-grow flex ${inputQuery ? 'items-start' : 'items-center'} pb-1`}>
               <textarea
@@ -3325,7 +3325,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 6 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute bottom-full left-0 mb-2 w-72 sm:w-80 bg-white/98 backdrop-blur-lg border border-slate-200 rounded-2xl p-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.18)] z-50 text-slate-800 space-y-2"
+                        className="absolute bottom-full left-0 mb-2 w-72 sm:w-80 bg-white/98  border border-slate-200 rounded-2xl p-2.5 shadow-sm z-50 text-slate-800 space-y-2"
                       >
                         <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
                           <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-800">
@@ -3535,7 +3535,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                   type="button"
                   onClick={() => handleSendMessage()}
                   disabled={(!inputQuery.trim() && selectedImages.length === 0) || isLoading}
-                  className="w-9 h-9 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white font-bold rounded-xl shadow-xs transition-all duration-150 cursor-pointer shrink-0"
+                  className="w-9 h-9 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white font-bold rounded-xl shadow-xs transition-colors duration-150 cursor-pointer shrink-0"
                   title="Send Message"
                 >
                   {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -3580,7 +3580,7 @@ export const AiTutorApp = memo(function AiTutorApp({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+              className="fixed inset-0 bg-slate-950  z-50 flex items-center justify-center p-4"
               onClick={() => setShowDriveModal(false)}
             >
               <motion.div 
@@ -3722,7 +3722,7 @@ export const AiTutorApp = memo(function AiTutorApp({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+              className="fixed inset-0 bg-slate-950/80  z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
               onClick={() => setShowMoreMenu(false)}
             >
               <motion.div 
@@ -3911,7 +3911,7 @@ export const AiTutorApp = memo(function AiTutorApp({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4"
+              className="fixed inset-0 bg-slate-950/90  z-50 flex items-center justify-center p-4"
             >
               <motion.div 
                 initial={{ scale: 0.92, opacity: 0, y: 16 }}
@@ -4005,7 +4005,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                           initial={{ y: '-100%' }}
                           animate={{ y: ['-100%', '0%', '0%', '-100%'] }}
                           transition={{ duration: 0.32, times: [0, 0.35, 0.6, 1], ease: 'easeInOut' }}
-                          className="absolute top-0 left-0 right-0 h-1/2 bg-slate-950/95 border-b-2 border-cyan-400/60 shadow-2xl backdrop-blur-xs flex items-end justify-center pb-2"
+                          className="absolute top-0 left-0 right-0 h-1/2 bg-slate-950/95 border-b-2 border-cyan-400/60 shadow-2xl  flex items-end justify-center pb-2"
                         >
                           <div className="w-16 h-1 bg-cyan-400/40 rounded-full" />
                         </motion.div>
@@ -4014,7 +4014,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                           initial={{ y: '100%' }}
                           animate={{ y: ['100%', '0%', '0%', '100%'] }}
                           transition={{ duration: 0.32, times: [0, 0.35, 0.6, 1], ease: 'easeInOut' }}
-                          className="absolute bottom-0 left-0 right-0 h-1/2 bg-slate-950/95 border-t-2 border-cyan-400/60 shadow-2xl backdrop-blur-xs flex items-start justify-center pt-2"
+                          className="absolute bottom-0 left-0 right-0 h-1/2 bg-slate-950/95 border-t-2 border-cyan-400/60 shadow-2xl  flex items-start justify-center pt-2"
                         >
                           <div className="w-16 h-1 bg-cyan-400/40 rounded-full" />
                         </motion.div>
@@ -4027,11 +4027,11 @@ export const AiTutorApp = memo(function AiTutorApp({
                             opacity: [0.8, 1, 1, 0]
                           }}
                           transition={{ duration: 0.36, times: [0, 0.35, 0.6, 1], ease: [0.22, 1, 0.36, 1] }}
-                          className="relative w-56 h-56 rounded-full border-4 border-slate-800 bg-slate-950 shadow-[0_0_60px_rgba(0,0,0,0.95)] flex items-center justify-center"
+                          className="relative w-56 h-56 rounded-full border-4 border-slate-800 bg-slate-950 shadow-sm flex items-center justify-center"
                         >
                           <div className="absolute inset-2 rounded-full border border-indigo-400/50" />
                           <div className="absolute inset-6 rounded-full border border-cyan-400/40 border-dashed" />
-                          <div className="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_15px_#38bdf8]" />
+                          <div className="w-3 h-3 rounded-full bg-cyan-400 shadow-sm" />
                         </motion.div>
 
                         <motion.div
@@ -4043,10 +4043,10 @@ export const AiTutorApp = memo(function AiTutorApp({
                           transition={{ duration: 0.38, times: [0, 0.45, 1] }}
                           className="absolute flex flex-col items-center justify-center space-y-1.5 z-40"
                         >
-                          <div className="w-16 h-16 rounded-full border-2 border-cyan-400 flex items-center justify-center shadow-[0_0_25px_rgba(6,182,212,0.8)]">
+                          <div className="w-16 h-16 rounded-full border-2 border-cyan-400 flex items-center justify-center shadow-sm">
                             <div className="w-4 h-4 rounded-full bg-cyan-400 animate-ping opacity-75" />
                           </div>
-                          <span className="text-[10px] font-black tracking-widest uppercase text-cyan-200 bg-slate-950/90 px-2.5 py-0.5 rounded-full border border-cyan-400/50 shadow-xl backdrop-blur-md">
+                          <span className="text-[10px] font-black tracking-widest uppercase text-cyan-200 bg-slate-950/90 px-2.5 py-0.5 rounded-full border border-cyan-400/50 shadow-xl ">
                             CAPTURED
                           </span>
                         </motion.div>
@@ -4128,7 +4128,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                             const nextIdx = (currentIdx + 1) % filterIds.length;
                             setCameraFilter(filterIds[nextIdx]);
                           }}
-                          className="bg-slate-950/80 hover:bg-slate-900 text-slate-200 text-[10px] font-bold px-2.5 py-1 rounded-full border border-indigo-500/30 backdrop-blur-md flex items-center space-x-1.5 cursor-pointer"
+                          className="bg-slate-950/80 hover:bg-slate-900 text-slate-200 text-[10px] font-bold px-2.5 py-1 rounded-full border border-indigo-500/30  flex items-center space-x-1.5 cursor-pointer"
                           title="Tap to cycle readability filters"
                         >
                           <span>{HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.emoji}</span>
@@ -4138,10 +4138,10 @@ export const AiTutorApp = memo(function AiTutorApp({
                       </div>
 
                       <div className="absolute inset-5 border-2 border-dashed border-indigo-400/60 rounded-2xl pointer-events-none flex flex-col items-center justify-between p-3">
-                        <span className="bg-slate-950/80 text-indigo-300 text-[10px] font-bold px-2.5 py-1 rounded-full border border-indigo-500/30 backdrop-blur-xs">
+                        <span className="bg-slate-950/80 text-indigo-300 text-[10px] font-bold px-2.5 py-1 rounded-full border border-indigo-500/30 ">
                           Page {selectedImages.length + 1}
                         </span>
-                        <span className="text-[10px] text-slate-300 bg-slate-950/80 px-2.5 py-1 rounded-full border border-slate-700/60 backdrop-blur-xs">
+                        <span className="text-[10px] text-slate-300 bg-slate-950/80 px-2.5 py-1 rounded-full border border-slate-700/60 ">
                           {cameraFilter !== 'none' ? `Filter: ${HOMEWORK_IMAGE_FILTERS.find(f => f.id === cameraFilter)?.label}` : 'Align text & equations in frame'}
                         </span>
                       </div>
@@ -4153,7 +4153,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: 12, scale: 0.94 }}
                             transition={{ duration: 0.25, ease: 'easeOut' }}
-                            className="absolute bottom-3 left-3 right-3 z-20 flex items-center justify-between bg-slate-950/92 text-amber-200 border border-amber-500/50 rounded-xl px-3 py-2 shadow-2xl backdrop-blur-md"
+                            className="absolute bottom-3 left-3 right-3 z-20 flex items-center justify-between bg-slate-950/92 text-amber-200 border border-amber-500/50 rounded-xl px-3 py-2 shadow-2xl "
                           >
                             <div className="flex items-center space-x-2 min-w-0">
                               <div className="p-1.5 bg-amber-500/20 text-amber-400 rounded-lg shrink-0 animate-pulse">

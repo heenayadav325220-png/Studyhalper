@@ -202,7 +202,7 @@ export const CustomVoiceModal: React.FC<CustomVoiceModalProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 ">
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -277,7 +277,7 @@ export const CustomVoiceModal: React.FC<CustomVoiceModalProps> = ({
                       key={p.id}
                       type="button"
                       onClick={() => handlePresetSelect(p)}
-                      className={`p-3 rounded-xl border text-left transition-all ${
+                      className={`p-3 rounded-xl border text-left transition-colors ${
                         isSelected
                           ? 'bg-indigo-600/20 border-indigo-500 ring-1 ring-indigo-500/40 text-white shadow-sm'
                           : 'bg-slate-800/40 border-slate-700/60 hover:bg-slate-800 text-slate-300'
@@ -421,7 +421,7 @@ export const CustomVoiceModal: React.FC<CustomVoiceModalProps> = ({
             <button
               type="button"
               onClick={handleTestSpeech}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold border transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold border transition-colors ${
                 isPlayingTest
                   ? 'bg-rose-600/20 border-rose-500/40 text-rose-400'
                   : 'bg-slate-800 hover:bg-slate-750 border-slate-700 text-slate-200'
@@ -451,7 +451,7 @@ export const CustomVoiceModal: React.FC<CustomVoiceModalProps> = ({
               <button
                 type="button"
                 onClick={handleSave}
-                className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
+                className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/25 transition-colors cursor-pointer"
               >
                 {savedFeedback ? (
                   <>

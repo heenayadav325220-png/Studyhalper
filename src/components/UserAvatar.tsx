@@ -131,7 +131,7 @@ export default function UserAvatar({
 
           {/* EDIT HOVER OVERLAY */}
           {isEditable && (
-            <div className="absolute inset-0 bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[1px]">
+            <div className="absolute inset-0 bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity -[1px]">
               <Camera className={sizeConfig.camera} />
             </div>
           )}

@@ -19,9 +19,9 @@ android {
     signingConfigs {
         release {
             storeFile file('release.keystore')
-            storePassword System.getenv("KEYSTORE_PASSWORD") ?: System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: (project.hasProperty("KEYSTORE_PASSWORD") ? project.property("KEYSTORE_PASSWORD") : 'ascendstudy123')
-            keyAlias System.getenv("KEY_ALIAS") ?: System.getenv("ANDROID_KEY_ALIAS") ?: (project.hasProperty("KEY_ALIAS") ? project.property("KEY_ALIAS") : 'ascendstudy-release')
-            keyPassword System.getenv("KEY_PASSWORD") ?: System.getenv("ANDROID_KEY_PASSWORD") ?: (project.hasProperty("KEY_PASSWORD") ? project.property("KEY_PASSWORD") : 'ascendstudy123')
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: (project.findProperty("KEYSTORE_PASSWORD") ?: "")
+            keyAlias System.getenv("KEY_ALIAS") ?: System.getenv("ANDROID_KEY_ALIAS") ?: (project.findProperty("KEY_ALIAS") ?: "")
+            keyPassword System.getenv("KEY_PASSWORD") ?: System.getenv("ANDROID_KEY_PASSWORD") ?: (project.findProperty("KEY_PASSWORD") ?: "")
         }
     }
     buildTypes {

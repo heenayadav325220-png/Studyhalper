@@ -102,7 +102,7 @@ export default function OnboardingModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60  p-4 animate-in fade-in duration-150">
         <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200/90 shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
           
           {/* CLEAN HEADER */}

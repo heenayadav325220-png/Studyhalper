@@ -123,7 +123,7 @@ export default function PWAInstallBanner() {
             initial={{ opacity: 0, y: 30, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 30, scale: 0.95 }}
-            className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 max-w-sm w-[calc(100%-1.5rem)] sm:w-88 z-40 bg-slate-900/95 backdrop-blur-md border border-indigo-500/40 rounded-2xl p-3.5 shadow-2xl text-slate-100 space-y-3"
+            className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 max-w-sm w-[calc(100%-1.5rem)] sm:w-88 z-40 bg-slate-900/95  border border-indigo-500/40 rounded-2xl p-3.5 shadow-2xl text-slate-100 space-y-3"
           >
             <div className="flex items-start justify-between gap-2.5">
               <div className="flex items-center space-x-3">
@@ -173,7 +173,7 @@ export default function PWAInstallBanner() {
       {/* COMPREHENSIVE ALL-DEVICE INSTALL INSTRUCTIONS MODAL */}
       <AnimatePresence>
         {showGuide && (
-          <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="fixed inset-0 z-50 bg-black/75  flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.92, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -417,7 +417,7 @@ export function PWAHeaderButton() {
       {/* ALL-DEVICE INSTALL GUIDE MODAL */}
       <AnimatePresence>
         {showGuide && (
-          <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="fixed inset-0 z-50 bg-black/75  flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.92, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}

@@ -286,8 +286,7 @@ ${analysisResult.keyTakeaways.map(t => `- ${t}`).join('\n')}
   return (
     <div className="space-y-4 text-slate-100 animate-in fade-in duration-300">
       {/* HEADER BANNER */}
-      <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-[#0d1633] via-[#111f4d] to-[#1c0f3d] border-2 border-indigo-500/50 shadow-[0_0_30px_rgba(99,102,241,0.25)] relative overflow-hidden">
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
+      <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-[#0d1633] via-[#111f4d] to-[#1c0f3d] border-2 border-indigo-500/50 shadow-sm relative overflow-hidden">
         <div className="flex items-center justify-between relative z-10">
           <div className="flex items-center space-x-3">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-lg border border-indigo-400/40 shrink-0">
@@ -309,7 +308,7 @@ ${analysisResult.keyTakeaways.map(t => `- ${t}`).join('\n')}
           {onClose && (
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-white rounded-xl bg-white/5 hover:bg-white/10 transition cursor-pointer"
+              className="p-1.5 text-slate-400 hover:text-white rounded-xl bg-white/5 hover:bg-slate-900 transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -330,7 +329,7 @@ ${analysisResult.keyTakeaways.map(t => `- ${t}`).join('\n')}
                 handleFileSelection(e.dataTransfer.files[0]);
               }
             }}
-            className="border-2 border-dashed border-indigo-400/50 hover:border-indigo-400 bg-slate-900/80 hover:bg-indigo-950/40 rounded-3xl p-6 text-center cursor-pointer transition-all duration-200 group shadow-md"
+            className="border-2 border-dashed border-indigo-400/50 hover:border-indigo-400 bg-slate-900/80 hover:bg-indigo-950/40 rounded-3xl p-6 text-center cursor-pointer transition-colors duration-200 group shadow-md"
           >
             <input
               type="file"
@@ -344,7 +343,7 @@ ${analysisResult.keyTakeaways.map(t => `- ${t}`).join('\n')}
               }}
             />
 
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-indigo-500/20 text-indigo-400 group-hover:bg-indigo-500/30 group-hover:scale-105 flex items-center justify-center transition-all mb-3 border border-indigo-400/30 shadow-xs">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-indigo-500/20 text-indigo-400 group-hover:bg-indigo-500/30 group-hover:scale-105 flex items-center justify-center transition-colors mb-3 border border-indigo-400/30 shadow-xs">
               <Upload className="w-7 h-7" />
             </div>
 
@@ -375,7 +374,7 @@ ${analysisResult.keyTakeaways.map(t => `- ${t}`).join('\n')}
           </div>
 
           {/* OR PASTE TEXT DIRECTLY */}
-          <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-3.5 space-y-2">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl p-3.5 space-y-2">
             <div className="flex items-center justify-between text-xs font-bold text-slate-300">
               <span className="flex items-center gap-1.5">
                 <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
@@ -435,7 +434,7 @@ ${analysisResult.keyTakeaways.map(t => `- ${t}`).join('\n')}
             whileTap={{ scale: 0.98 }}
             disabled={isLoading || (!fileBase64 && !pastedText.trim())}
             onClick={() => handleScanAndAnalyze()}
-            className="w-full py-3.5 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold text-sm rounded-2xl shadow-[0_0_20px_rgba(99,102,241,0.4)] flex items-center justify-center space-x-2 transition cursor-pointer"
+            className="w-full py-3.5 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold text-sm rounded-2xl shadow-sm flex items-center justify-center space-x-2 transition cursor-pointer"
           >
             {isLoading ? (
               <>
@@ -456,7 +455,7 @@ ${analysisResult.keyTakeaways.map(t => `- ${t}`).join('\n')}
       {analysisResult && (
         <div className="space-y-4 animate-in fade-in duration-300">
           {/* TOP SUMMARY HEADER & ACTIONS */}
-          <div className="p-4 rounded-3xl bg-slate-900/90 border border-indigo-500/40 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="p-4 rounded-3xl bg-slate-900 border border-indigo-500/40 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
                 <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 rounded-full text-[10px] font-extrabold uppercase">
@@ -496,7 +495,7 @@ ${analysisResult.keyTakeaways.map(t => `- ${t}`).join('\n')}
                   className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
                     saveSuccess
                       ? 'bg-emerald-600 border-emerald-400 text-white'
-                      : 'bg-white/10 hover:bg-white/20 border-white/20 text-slate-200'
+                      : 'bg-slate-900 hover:bg-white/20 border-white/20 text-slate-200'
                   }`}
                 >
                   <BookmarkPlus className="w-4 h-4" />
@@ -523,7 +522,7 @@ ${analysisResult.keyTakeaways.map(t => `- ${t}`).join('\n')}
           </div>
 
           {/* SUB-TABS: SUMMARY, FORMULAS, QUIZ */}
-          <div className="flex rounded-2xl bg-slate-900/90 border border-slate-800 p-1">
+          <div className="flex rounded-2xl bg-slate-900 border border-slate-800 p-1">
             {[
               { id: 'summary', label: appLanguage === 'hi' ? '📖 सारांश व कॉन्सेप्ट' : '📖 Executive Summary', badge: 'Key Notes' },
               { id: 'formulas', label: appLanguage === 'hi' ? '📐 मुख्य सूत्र व नियम' : '📐 Formula Vault', count: analysisResult.keyFormulas?.length || 0 },
@@ -534,7 +533,7 @@ ${analysisResult.keyTakeaways.map(t => `- ${t}`).join('\n')}
                 <button
                   key={tab.id}
                   onClick={() => setActiveSubTab(tab.id as any)}
-                  className={`flex-1 py-2 px-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  className={`flex-1 py-2 px-2 text-xs font-extrabold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
                     isActive
                       ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
                       : 'text-slate-400 hover:text-slate-200'
@@ -555,7 +554,7 @@ ${analysisResult.keyTakeaways.map(t => `- ${t}`).join('\n')}
 
           {/* VIEW 1: EXECUTIVE SUMMARY */}
           {activeSubTab === 'summary' && (
-            <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-4 text-slate-200">
+            <div className="p-4 sm:p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 text-slate-200">
               <div className="prose prose-invert max-w-none text-xs sm:text-sm leading-relaxed">
                 <ReactMarkdown>{analysisResult.executiveSummary}</ReactMarkdown>
               </div>
@@ -590,7 +589,7 @@ ${analysisResult.keyTakeaways.map(t => `- ${t}`).join('\n')}
                 analysisResult.keyFormulas.map((f, idx) => (
                   <div
                     key={idx}
-                    className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-indigo-500/40 transition space-y-2"
+                    className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-indigo-500/40 transition space-y-2"
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-black text-indigo-300 uppercase tracking-wide flex items-center gap-1.5">
@@ -654,7 +653,7 @@ ${analysisResult.keyTakeaways.map(t => `- ${t}`).join('\n')}
                 return (
                   <div
                     key={qIdx}
-                    className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3"
+                    className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <span className="text-xs font-black text-white leading-snug">

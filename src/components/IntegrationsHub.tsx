@@ -363,7 +363,7 @@ export default function IntegrationsHub({
         <div className="absolute inset-0 pointer-events-none opacity-10 bg-[radial-gradient(#4f46e5_1px,transparent_1px)] [background-size:16px_16px]" />
         
         <div className="space-y-2 text-center sm:text-left relative z-10 max-w-xl">
-          <div className="inline-flex items-center space-x-2 bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-[11px] font-black tracking-widest uppercase px-3 py-1 rounded-full shadow-[0_0_15px_rgba(99,102,241,0.15)]">
+          <div className="inline-flex items-center space-x-2 bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-[11px] font-black tracking-widest uppercase px-3 py-1 rounded-full shadow-sm">
             <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
             <span>Productivity Workspace</span>
           </div>
@@ -376,7 +376,7 @@ export default function IntegrationsHub({
         </div>
 
         {attachedFiles.length > 0 && (
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 min-w-[240px] text-left relative z-10 space-y-2 shadow-lg">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 min-w-[240px] text-left relative z-10 space-y-2 shadow-lg">
             <span className="text-[10px] font-bold text-emerald-400 tracking-wider uppercase block">
               Active Context Attachments ({attachedFiles.length})
             </span>
@@ -676,7 +676,7 @@ export default function IntegrationsHub({
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-slate-950/80  z-50 flex items-center justify-center p-4"
           >
             <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-xl p-5 space-y-4 shadow-2xl relative max-h-[85vh] flex flex-col">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -734,7 +734,7 @@ export default function IntegrationsHub({
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-slate-950/80  z-50 flex items-center justify-center p-4"
           >
             <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl p-5 space-y-4 shadow-2xl relative max-h-[85vh] flex flex-col">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -844,7 +844,7 @@ export default function IntegrationsHub({
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-slate-950/80  z-50 flex items-center justify-center p-4"
           >
             <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-xl p-5 space-y-4 shadow-2xl relative max-h-[85vh] flex flex-col">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -913,7 +913,7 @@ export default function IntegrationsHub({
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-slate-950/70  z-50 flex items-center justify-center p-4"
           >
             <form onSubmit={handleScheduleSession} className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-sm p-5 space-y-4 shadow-2xl relative">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
@@ -1009,7 +1009,7 @@ export default function IntegrationsHub({
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-slate-950/80  z-50 flex items-center justify-center p-4"
           >
             <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl p-5 space-y-4 shadow-2xl relative max-h-[85vh] flex flex-col">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">

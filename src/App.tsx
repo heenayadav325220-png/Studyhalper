@@ -48,7 +48,6 @@ import { VoiceTutorModal } from './components/VoiceTutorModal';
 
 import IntegrationsHub from './components/IntegrationsHub';
 import PrivacyPolicy from './pages/PrivacyPolicy';
-const RealtimeMovingUniverse = React.lazy(() => import('./components/RealtimeMovingUniverse').then(m => ({ default: m.RealtimeMovingUniverse })));
 import { TRANSLATIONS, Language } from './services/translations';
 import { playUiSound } from './services/soundEffects';
 import { 
@@ -336,33 +335,6 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [playgroundViewMode, setPlaygroundViewMode] = useState<'list' | 'grid'>('list');
   const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false);
-  const [is3DBackgroundReady, setIs3DBackgroundReady] = useState(false);
-
-  useEffect(() => {
-    let idleId: number | null = null;
-    let timeoutId: NodeJS.Timeout | null = null;
-
-    if (typeof window !== 'undefined') {
-      if ('requestIdleCallback' in window) {
-        idleId = (window as any).requestIdleCallback(() => {
-          setIs3DBackgroundReady(true);
-        });
-      } else {
-        timeoutId = setTimeout(() => {
-          setIs3DBackgroundReady(true);
-        }, 400);
-      }
-    }
-
-    return () => {
-      if (idleId !== null && 'cancelIdleCallback' in window) {
-        (window as any).cancelIdleCallback(idleId);
-      }
-      if (timeoutId !== null) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, []);
 
   // Bottom navigation auto-hide state for AI Tutor mode (auto-hides in 2s, pull-up arrow restores)
   const [isBottomNavVisible, setIsBottomNavVisible] = useState(true);
@@ -474,9 +446,17 @@ export default function App() {
 
   // Listen to Firebase Auth State changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
-      if (user && !user.isAnonymous) {
+      if (!user) {
+        // Automatically sign in anonymously so that guest sessions still have secure cryptographically signed tokens!
+        try {
+          const { signInAnonymously } = await import("firebase/auth");
+          await signInAnonymously(auth);
+        } catch (err) {
+          console.warn("Failed to sign in guest anonymously", err);
+        }
+      } else if (!user.isAnonymous) {
         // Authenticated user detected
         setUserProfile(prev => {
           const updated: UserProfile = {
@@ -567,6 +547,87 @@ export default function App() {
   const [showOnboardingModal, setShowOnboardingModal] = useState<boolean>(false);
   const [isEditingProfile, setIsEditingProfile] = useState<boolean>(false);
   const [realtimeGreeting, setRealtimeGreeting] = useState<string>(getDynamicGreeting);
+
+  // Synchronize latest navigation states in a React ref to prevent listener rebuilding & stale closures
+  const navigationStateRef = useRef({
+    activeTab,
+    showAuthModal,
+    showAvatarModal,
+    showCustomizeModal,
+    showVoiceTutorModal,
+    showOnboardingModal,
+    isEditingProfile,
+    showMoreMenu
+  });
+
+  useEffect(() => {
+    navigationStateRef.current = {
+      activeTab,
+      showAuthModal,
+      showAvatarModal,
+      showCustomizeModal,
+      showVoiceTutorModal,
+      showOnboardingModal,
+      isEditingProfile,
+      showMoreMenu
+    };
+  }, [
+    activeTab,
+    showAuthModal,
+    showAvatarModal,
+    showCustomizeModal,
+    showVoiceTutorModal,
+    showOnboardingModal,
+    isEditingProfile,
+    showMoreMenu
+  ]);
+
+  // Listen to Android hardware back button to prevent accidental app exits
+  useEffect(() => {
+    let backButtonListener: any = null;
+    const initBackButton = async () => {
+      try {
+        const { App } = await import('@capacitor/app');
+        backButtonListener = await App.addListener('backButton', () => {
+          const s = navigationStateRef.current;
+          
+          // 1. If any modal or menu is open, close it first!
+          if (s.showAuthModal) {
+            setShowAuthModal(false);
+          } else if (s.showAvatarModal) {
+            setShowAvatarModal(false);
+          } else if (s.showCustomizeModal) {
+            setShowCustomizeModal(false);
+          } else if (s.showVoiceTutorModal) {
+            setShowVoiceTutorModal(false);
+          } else if (s.isEditingProfile) {
+            setIsEditingProfile(false);
+          } else if (s.showMoreMenu) {
+            setShowMoreMenu(false);
+          } else if (s.showOnboardingModal) {
+            setShowOnboardingModal(false);
+          }
+          // 2. If the user is in a tool/tab other than Home, return to Home!
+          else if (s.activeTab !== 'home') {
+            setActiveTab('home');
+          }
+          // 3. Otherwise, if we are completely at the root Home page, minimize the app!
+          else {
+            App.minimizeApp(); // Highly native and friendly instead of instantly exiting/crashing!
+          }
+        });
+      } catch (e) {
+        // Ignore if running on pure web browser where App is not available
+      }
+    };
+    initBackButton();
+
+    return () => {
+      if (backButtonListener) {
+        backButtonListener.remove();
+      }
+    };
+  }, []);
 
   // Onboarding Check - Trigger if profile is not onboarded and name is missing
   useEffect(() => {
@@ -869,10 +930,6 @@ export default function App() {
       // Trigger premium visual, vibration, and overlay celebration sequences
       setTimeout(() => {
         setIsStreakCelebrationOpen(true);
-        sendRealNotification(
-          'Streak Complete! 🔥🏆',
-          `Phenomenal effort! You spent 10 minutes studying today. Your Day ${newStreak} streak is now locked in! +15 XP earned.`
-        );
       }, 500);
 
       return updatedProfile;
@@ -946,12 +1003,7 @@ export default function App() {
             console.warn('Error resetting missed streak in Firestore:', err);
           }
 
-          setTimeout(() => {
-            sendRealNotification(
-              'Streak Missed! ⚠️', 
-              `You missed your learning target yesterday. Your study streak has reset. Complete today's 10-minute focus session to start a brand new streak!`
-            );
-          }, 1000);
+
 
           return updatedProfile;
         });
@@ -963,66 +1015,10 @@ export default function App() {
   const [petHappiness, setPetHappiness] = useState(85);
   const [petEnergy, setPetEnergy] = useState(80);
 
-  // --- REAL AUTO-MESSAGING & OS NOTIFICATION SYSTEM ---
-  const requestNotificationPermission = async () => {
-    if ('Notification' in window) {
-      const permission = await Notification.requestPermission();
-      if (permission === 'granted') {
-        sendRealNotification('Remix Study Buddy 🔔', 'Awesome! System notifications are now active. Task completions and Chimpu alerts will show up here.');
-      }
-    }
-  };
-
-  const sendRealNotification = (title: string, body: string) => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      try {
-        new Notification(title, {
-          body: body,
-          icon: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
-        });
-      } catch (err) {
-        console.warn('Native push notification error:', err);
-      }
-    }
-    try {
-      playUiSound();
-    } catch (e) {}
-  };
-
-  // Background Auto-Messaging Check
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      setTimeout(() => {
-        requestNotificationPermission();
-      }, 5000);
-    }
-
-    const notificationInterval = setInterval(() => {
-      // Check 1: If Day 1 Goal is not completed
-      if (!day1GoalCompleted) {
-        sendRealNotification(
-          'Tutor Task Reminder! ✍️',
-          'Hey! Your daily study task is pending: "Ask AI Tutor a homework question". Finish it to claim +20 XP!'
-        );
-      }
-
-      // Check 2: If Chimpu (pet) is hungry
-      if (petHappiness < 50 || petEnergy < 50) {
-        sendRealNotification(
-          `${userProfile.petName || 'Chimpu'} is hungry! 🐼`,
-          `Chimpu is waiting for you! Happiness is ${petHappiness}% and energy is ${petEnergy}%. Please feed him bamboo.`
-        );
-      }
-    }, 45000); // Trigger a check every 45 seconds for a lively and responsive user experience
-
-    return () => clearInterval(notificationInterval);
-  }, [day1GoalCompleted, petHappiness, petEnergy, userProfile.petName]);
-
   const handleCompleteDayGoal = () => {
     if (!day1GoalCompleted) {
       setDay1GoalCompleted(true);
       addXp(20);
-      sendRealNotification('Goal Completed! 🎉', 'Amazing! You finished your Day 1 target and earned +20 XP!');
     }
   };
 
@@ -1037,7 +1033,6 @@ export default function App() {
     setQuests(prev => prev.map(q => {
       if (q.id === id && !q.completed) {
         addXp(q.xp);
-        sendRealNotification('Quest Completed! 🏆', `Fantastic! You completed: "${q.title}" and claimed +${q.xp} XP!`);
         return { ...q, completed: true };
       }
       return q;
@@ -1097,7 +1092,6 @@ export default function App() {
       addXp(-15);
       setPetHappiness(prev => Math.min(100, prev + 15));
       setPetEnergy(prev => Math.min(100, prev + 10));
-      sendRealNotification(`${userProfile.petName || 'Chimpu'} Fed! 🐼🌿`, 'Yum! Chimpu enjoyed the Bamboo. Happiness and Energy increased!');
     } else {
       alert('You need at least 15 XP to buy Bamboo feed!');
     }
@@ -1107,7 +1101,6 @@ export default function App() {
     if (userProfile.xp >= item.cost) {
       addXp(-item.cost);
       setEquippedAccessory(item.icon);
-      sendRealNotification('Accessory Equipped! 👒✨', `Nice choice! Equipped ${item.name} for ${userProfile.petName || 'Chimpu'}.`);
     } else {
       alert(`You need ${item.cost} XP to buy ${item.name}!`);
     }
@@ -1513,8 +1506,7 @@ export default function App() {
   };
 
   const cornerRadius = getCardRadiusClasses();
-  const currentBgColor = uiCustomization.backgroundColor || '#000000';
-  const isPureBlack = uiCustomization.wallpaperAmbiance === 'pure_black';
+  const currentBgColor = '#000000';
 
   if (currentPath === '/privacy') {
     return (
@@ -1532,7 +1524,7 @@ export default function App() {
   return (
     <div 
       id="main-app-container" 
-      className={`min-h-screen text-slate-100 ${getAppFontClass()} flex flex-col selection:bg-emerald-500 selection:text-white w-full max-w-full overflow-x-hidden relative transition-colors duration-300`}
+      className={`min-h-screen text-slate-100 ${getAppFontClass()} flex flex-col selection:bg-emerald-500 selection:text-white w-full max-w-full overflow-x-clip relative transition-colors duration-300`}
       style={{ backgroundColor: currentBgColor }}
     >
       {/* STARTUP SPLASH SCREEN / APP INITIAL LOADING FLASHSCR */}
@@ -1545,15 +1537,13 @@ export default function App() {
             className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#050811] text-white p-6 select-none"
           >
             {/* Ambient Background Lights */}
-            <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
             {/* Glowing Brand Title Container */}
             <div className="relative flex flex-col items-center text-center max-w-sm space-y-6 z-10">
               <motion.div
                 animate={{ scale: [1, 1.04, 1] }}
                 transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-                className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 shadow-[0_0_40px_rgba(99,102,241,0.4)] flex items-center justify-center relative border border-indigo-400/30"
+                className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 shadow-sm flex items-center justify-center relative border border-indigo-400/30"
               >
                 <Sparkles className="w-10 h-10 text-white animate-pulse" />
                 {/* Orbital Loader light around logo */}
@@ -1583,7 +1573,7 @@ export default function App() {
                 {/* Horizontal Progress Track */}
                 <div className="h-2 w-full bg-slate-900/95 border border-slate-800/80 rounded-full p-[2px] overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 rounded-full transition-all duration-150"
+                    className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 rounded-full transition-colors duration-150"
                     style={{ width: `${loadingProgress}%` }}
                   />
                 </div>
@@ -1600,70 +1590,15 @@ export default function App() {
       {/* DYNAMIC LIVE CUSTOM CSS INJECTED BY AI COPILOT */}
       <style id="ai-editor-live-styles">{uiCustomization.customCss || ''}</style>
       
-      {/* FULL-PAGE LIVE WALLPAPER AMBIANCE WITH DYNAMIC USER BACKGROUND */}
-      {isPureBlack ? (
-        /* Pure clean solid color (AMOLED Pitch Black or custom color) - zero scholars, zero distractions */
-        <div 
-          id="app-wallpaper-layer"
-          className="fixed inset-0 pointer-events-none z-0 transition-colors duration-300"
-          style={{ backgroundColor: currentBgColor }}
-        />
-      ) : uiCustomization.wallpaperAmbiance === 'cosmic_nebula' ? (
-        <div 
-          id="app-wallpaper-layer"
-          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-[0.22] transition-all duration-500"
-          style={{ 
-            background: 'radial-gradient(ellipse at 50% 0%, #1e1b4b 0%, #030712 60%, transparent 100%)' 
-          }}
-        >
-          <div className="absolute inset-0 bg-[radial-gradient(#818cf8_1px,transparent_1px)] [background-size:24px_24px] opacity-40" />
-        </div>
-      ) : uiCustomization.wallpaperAmbiance === 'cyber_matrix' ? (
-        <div 
-          id="app-wallpaper-layer"
-          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-[0.20] transition-all duration-500"
-          style={{ 
-            background: 'radial-gradient(ellipse at top, #022c22 0%, transparent 80%)' 
-          }}
-        >
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#00ffcc0a_1px,transparent_1px),linear-gradient(to_bottom,#00ffcc0a_1px,transparent_1px)] [background-size:28px_28px] opacity-70" />
-        </div>
-      ) : uiCustomization.wallpaperAmbiance === 'deep_obsidian' ? (
-        <div id="app-wallpaper-layer" className="fixed inset-0 pointer-events-none z-0 transition-all duration-500" style={{ backgroundColor: currentBgColor }} />
-      ) : uiCustomization.wallpaperAmbiance === 'science_chalkboard' ? (
-        /* Only shown if user explicitly selected Science Lab in customization */
-        <div 
-          id="app-wallpaper-layer"
-          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-fixed bg-no-repeat opacity-[0.18] transition-all duration-500"
-          style={{ backgroundImage: `url('/science_bg.jpg')` }}
-        />
-      ) : (
-        /* Other live wallpaper themes (solar_system, earth_forest, deep_ocean, retro_arcade, celestial_zen) - inherit user's customBgColor */
-        <div 
-          id="app-wallpaper-layer" 
-          className="fixed inset-0 pointer-events-none z-0 transition-colors duration-300"
-          style={{ backgroundColor: currentBgColor }} 
-        />
-      )}
-
-      {/* AMBIENT VIGNETTE OVERLAY - ONLY SHOWN WHEN LIVE WALLPAPERS ARE ACTIVE */}
-      {!isPureBlack && (
-        <div 
-          id="app-vignette-layer" 
-          className="fixed inset-0 pointer-events-none z-0 bg-gradient-to-b from-black/75 via-transparent to-black/85 backdrop-blur-[1px] transition-all duration-500" 
-        />
-      )}
-
-      {/* 100+ REALTIME MOVING LIVING OBJECTS & HUMAN CHARACTERS - ONLY WHEN A LIVE WALLPAPER IS ACTIVE (NEVER ON PURE BLACK) */}
-      {is3DBackgroundReady && !isPureBlack && (
-        <React.Suspense fallback={null}>
-          <RealtimeMovingUniverse theme={uiCustomization.wallpaperAmbiance} interactive={true} />
-        </React.Suspense>
-      )}
+      {/* FULL-PAGE SOLID BLACK BACKGROUND */}
+      <div 
+        id="app-wallpaper-layer"
+        className="fixed inset-0 pointer-events-none z-0 bg-black"
+      />
 
       {/* DYNAMIC OFFLINE INDICATOR PILL */}
       {isOffline && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-3.5 py-1.5 bg-rose-500/15 border border-rose-500/30 text-rose-300 text-[11px] font-extrabold rounded-full shadow-2xl backdrop-blur-md flex items-center space-x-2 animate-bounce">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-3.5 py-1.5 bg-rose-500/15 border border-rose-500/30 text-rose-300 text-[11px] font-extrabold rounded-full shadow-2xl  flex items-center space-x-2 animate-bounce">
           <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping shrink-0" />
           <span>{appLanguage === 'hi' ? 'ऑफ़लाइन मोड (प्रगति स्थानीय रूप से सुरक्षित है)' : 'Offline Mode (Local Sync Mode)'}</span>
         </div>
@@ -1711,7 +1646,7 @@ export default function App() {
         />
       ) : (
       /* MAIN CONTENT AREA - WITH pb-20 sm:pb-24 FOR FULL-WIDTH STICKY BOTTOM NAVIGATION BAR */
-      <main className={`relative z-10 flex-1 p-3.5 sm:p-5 md:p-6 mx-auto w-full pb-20 sm:pb-24 overflow-x-hidden transition-all duration-300 ${activeTab === 'studyDocs' ? 'max-w-7xl' : 'max-w-xl space-y-4 sm:space-y-5'}`}>
+      <main className={`relative z-10 flex-1 p-3.5 sm:p-5 md:p-6 mx-auto w-full pb-20 sm:pb-24 overflow-x-clip transition-colors duration-300 ${activeTab === 'studyDocs' ? 'max-w-7xl' : 'max-w-xl space-y-4 sm:space-y-5'}`}>
         <AnimatePresence mode="popLayout">
           <motion.div
             key={activeTab}
@@ -1728,26 +1663,11 @@ export default function App() {
             {/* 1. TOP USER CARD - REFINED MODERN AMBIENT PROFILE WITH ANIMATED GLOWING AURA & PERIMETER BORDER LIGHT */}
             <div 
               id="top-user-card" 
-              className={`relative ${cornerRadius.casing || 'rounded-[28px]'} transition-all duration-300 group`}
+              className={`relative ${cornerRadius.casing || 'rounded-[28px]'} transition-colors duration-300 group`}
             >
-              {/* 1C. SHARP ANIMATED BORDER LIGHT - CRISP CONTINUOUS FLOWING LASER LINE */}
-              <div 
-                className={`absolute -inset-[1.5px] ${cornerRadius.casing || 'rounded-[28px]'} overflow-hidden pointer-events-none`}
-                aria-hidden="true"
-              >
-                <div 
-                  className="absolute -top-[125%] -left-[125%] w-[350%] h-[350%] animate-aura-rotate"
-                  style={{
-                    background: 'conic-gradient(from 0deg, transparent 0deg, transparent 50deg, rgba(99,102,241,0.15) 80deg, #818cf8 110deg, #c084fc 150deg, #f472b6 190deg, #38bdf8 235deg, #818cf8 280deg, rgba(99,102,241,0.15) 320deg, transparent 350deg, transparent 360deg)'
-                  }}
-                />
-              </div>
-
               {/* INNER DARK SLATE BACKDROP */}
-              <div className={`relative z-10 overflow-hidden ${cornerRadius.inner || 'rounded-[26px]'} bg-[#0a101d]/90 backdrop-blur-xl px-4 pt-3.5 pb-4 sm:px-5 sm:pt-4 sm:pb-5 space-y-3.5 border border-slate-800/80 shadow-2xl`}>
+              <div className={`relative z-10 overflow-hidden ${cornerRadius.inner || 'rounded-[26px]'} bg-[#0a101d]  px-4 pt-3.5 pb-4 sm:px-5 sm:pt-4 sm:pb-5 space-y-3.5 border border-slate-800/80 shadow-2xl`}>
                 {/* Subtle Ambient Glows */}
-                <div className="absolute -top-16 -left-16 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute -top-16 -right-16 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
                 {/* Main Student Profile & Avatar Section - Positioned right at the top with integrated Theme Toggle & Settings */}
                 <div className="flex items-start justify-between gap-3 relative z-10">
@@ -1773,7 +1693,7 @@ export default function App() {
                       </span>
 
                       {/* School / College Pill Badge */}
-                      <span className="px-2.5 py-0.5 bg-slate-900/90 text-slate-300 text-xs font-medium rounded-full border border-slate-700/70 hover:border-slate-600 flex items-center space-x-1.5 shrink-0 shadow-xs max-w-full">
+                      <span className="px-2.5 py-0.5 bg-slate-900 text-slate-300 text-xs font-medium rounded-full border border-slate-700/70 hover:border-slate-600 flex items-center space-x-1.5 shrink-0 shadow-xs max-w-full">
                         <UserIcon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                         <span className="whitespace-nowrap">{userProfile.schoolName || 'School / College Not Set'}</span>
                       </span>
@@ -1785,7 +1705,7 @@ export default function App() {
                     {/* Horizontal Controls Row: Theme Toggle & Settings */}
                     <div className="flex items-center space-x-1.5">
                       {/* Global Dark Mode Switch */}
-                      <div className="flex items-center px-1.5 py-1 rounded-xl bg-slate-900/90 border border-slate-700/60 shadow-xs" title="Late-Night Dark Mode">
+                      <div className="flex items-center px-1.5 py-1 rounded-xl bg-slate-900 border border-slate-700/60 shadow-xs" title="Late-Night Dark Mode">
                         <ThemeToggle variant="compact-switch" />
                       </div>
 
@@ -1794,7 +1714,7 @@ export default function App() {
                         whileHover={{ rotate: 15, scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => setShowCustomizeModal(true)}
-                        className="p-2 text-slate-300 hover:text-white bg-slate-900/90 border border-slate-700/60 rounded-xl transition cursor-pointer hover:border-slate-500 flex items-center justify-center shadow-xs"
+                        className="p-2 text-slate-300 hover:text-white bg-slate-900 border border-slate-700/60 rounded-xl transition cursor-pointer hover:border-slate-500 flex items-center justify-center shadow-xs"
                         title="Self Customize UI / Settings"
                       >
                         <Settings2 className="w-3.5 h-3.5 text-indigo-300" />
@@ -1805,7 +1725,7 @@ export default function App() {
                     <div className="flex flex-col items-center">
                       <div 
                         onClick={() => setShowAvatarModal(true)}
-                        className="w-13 h-13 sm:w-15 sm:h-15 rounded-2xl bg-slate-900 p-0.5 ring-2 ring-indigo-500/40 hover:ring-indigo-400 shadow-md flex items-center justify-center relative cursor-pointer group active:scale-95 transition-all"
+                        className="w-13 h-13 sm:w-15 sm:h-15 rounded-2xl bg-slate-900 p-0.5 ring-2 ring-indigo-500/40 hover:ring-indigo-400 shadow-md flex items-center justify-center relative cursor-pointer group active:scale-95 transition-colors"
                         title="Change Avatar"
                       >
                         <UserAvatar
@@ -1834,7 +1754,7 @@ export default function App() {
                 {/* STAT BOXES - 3-Column Softened, Unified Accent Stat Cards */}
                 <div className="grid grid-cols-3 gap-2 sm:gap-2.5 pt-1 relative z-10">
                   {/* BOX 1: STREAK */}
-                  <div className="bg-[#0f172a]/90 hover:bg-[#141f36] border border-amber-500/30 hover:border-amber-500/50 rounded-xl py-2.5 px-2 text-center relative overflow-hidden transition-all duration-200 shadow-xs">
+                  <div className="bg-[#0f172a]/90 hover:bg-[#141f36] border border-amber-500/30 hover:border-amber-500/50 rounded-xl py-2.5 px-2 text-center relative overflow-hidden transition-colors duration-200 shadow-xs">
                     <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider flex items-center justify-center space-x-1">
                       <span className="text-xs">🔥</span>
                       <span>Streak</span>
@@ -1845,7 +1765,7 @@ export default function App() {
                   </div>
 
                   {/* BOX 2: LEVEL */}
-                  <div className="bg-[#0f172a]/90 hover:bg-[#141f36] border border-indigo-500/30 hover:border-indigo-500/50 rounded-xl py-2.5 px-2 text-center relative overflow-hidden transition-all duration-200 shadow-xs">
+                  <div className="bg-[#0f172a]/90 hover:bg-[#141f36] border border-indigo-500/30 hover:border-indigo-500/50 rounded-xl py-2.5 px-2 text-center relative overflow-hidden transition-colors duration-200 shadow-xs">
                     <div className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider flex items-center justify-center space-x-1">
                       <span className="text-xs">📓</span>
                       <span>Level</span>
@@ -1856,7 +1776,7 @@ export default function App() {
                   </div>
 
                   {/* BOX 3: TOTAL XP */}
-                  <div className="bg-[#0f172a]/90 hover:bg-[#141f36] border border-cyan-500/30 hover:border-cyan-500/50 rounded-xl py-2.5 px-2 text-center relative overflow-hidden transition-all duration-200 shadow-xs">
+                  <div className="bg-[#0f172a]/90 hover:bg-[#141f36] border border-cyan-500/30 hover:border-cyan-500/50 rounded-xl py-2.5 px-2 text-center relative overflow-hidden transition-colors duration-200 shadow-xs">
                     <div className="text-[10px] text-cyan-300 font-bold uppercase tracking-wider flex items-center justify-center space-x-1">
                       <span className="text-xs">⭐</span>
                       <span>Total XP</span>
@@ -1880,7 +1800,7 @@ export default function App() {
                   {/* Sleek modern progress bar track */}
                   <div className="w-full h-2.5 bg-[#060913] border border-slate-800/90 rounded-full relative overflow-hidden">
                     <div 
-                      className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"
+                      className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400 rounded-full transition-colors duration-500 shadow-sm"
                       style={{ width: `${Math.max(6, userProfile.xp ? (userProfile.xp % 100) : 15)}%` }}
                     />
                   </div>
@@ -1891,7 +1811,7 @@ export default function App() {
 
             {/* CLOUD AUTH & SYNC BANNER - SLIMMER & CLEAN */}
             {!isUserLoggedIn && (
-              <div className="bg-gradient-to-r from-[#0c142b]/90 via-[#0e162d]/90 to-[#070b16]/90 border border-indigo-500/40 rounded-2xl px-4 py-3 sm:px-4.5 sm:py-3.5 text-white flex items-center justify-between gap-3 shadow-lg backdrop-blur-xl">
+              <div className="bg-gradient-to-r from-[#0c142b]/90 via-[#0e162d]/90 to-[#070b16]/90 border border-indigo-500/40 rounded-2xl px-4 py-3 sm:px-4.5 sm:py-3.5 text-white flex items-center justify-between gap-3 shadow-lg ">
                 <div className="space-y-0.5 min-w-0 flex-1">
                   <p className="text-xs sm:text-sm font-bold flex items-center gap-1.5 text-white">
                     <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
@@ -1905,7 +1825,7 @@ export default function App() {
                 </div>
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold text-xs rounded-xl transition cursor-pointer shrink-0 shadow-[0_0_15px_rgba(99,102,241,0.4)] active:scale-95 flex items-center space-x-1.5 whitespace-nowrap"
+                  className="px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold text-xs rounded-xl transition cursor-pointer shrink-0 shadow-sm active:scale-95 flex items-center space-x-1.5 whitespace-nowrap"
                 >
                   <LogIn className="w-3.5 h-3.5 text-white" />
                   <span>{appLanguage === 'hi' ? 'साइन इन' : 'Sign In'}</span>
@@ -1939,10 +1859,9 @@ export default function App() {
                   playUiSound(uiCustomization.audioFeedback);
                   setShowVoiceTutorModal(true);
                 }}
-                className="p-3.5 sm:p-4 rounded-2xl border border-pink-500/50 hover:border-pink-400 shadow-[0_4px_20px_rgba(236,72,153,0.18)] bg-[#0c1220]/90 hover:bg-[#12192e] backdrop-blur-xl text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-all duration-200 min-h-[112px] sm:min-h-[120px]"
+                className="p-3.5 sm:p-4 rounded-2xl border border-pink-500/50 hover:border-pink-400 shadow-sm bg-[#0c1220] hover:bg-[#12192e]  text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-colors duration-200 min-h-[112px] sm:min-h-[120px]"
               >
                 {/* Subtle Ambient Glow */}
-                <div className="absolute -top-10 -right-10 w-24 h-24 bg-pink-500/10 rounded-full blur-xl pointer-events-none group-hover:bg-pink-500/20 transition-all" />
 
                 {/* Sleek Micro-Pill Badge in Top-Right Corner */}
                 <div className="absolute top-3 right-3 z-10">
@@ -1952,7 +1871,7 @@ export default function App() {
                 </div>
 
                 <div className="relative z-10 mb-2 sm:mb-2.5">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-pink-950/80 border border-pink-500/50 flex items-center justify-center text-pink-400 shrink-0 shadow-[0_0_12px_rgba(236,72,153,0.25)] group-hover:scale-105 transition-transform">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-pink-950/80 border border-pink-500/50 flex items-center justify-center text-pink-400 shrink-0 shadow-sm group-hover:scale-105 transition-transform">
                     <Mic className="w-4 h-4 sm:w-5 sm:h-5 text-pink-400" />
                   </div>
                 </div>
@@ -1976,10 +1895,9 @@ export default function App() {
                   playUiSound(uiCustomization.audioFeedback);
                   setActiveTab('pdfScanner');
                 }}
-                className="p-3.5 sm:p-4 rounded-2xl border border-purple-500/50 hover:border-purple-400 shadow-[0_4px_20px_rgba(168,85,247,0.18)] bg-[#0c1220]/90 hover:bg-[#12192e] backdrop-blur-xl text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-all duration-200 min-h-[112px] sm:min-h-[120px]"
+                className="p-3.5 sm:p-4 rounded-2xl border border-purple-500/50 hover:border-purple-400 shadow-sm bg-[#0c1220] hover:bg-[#12192e]  text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-colors duration-200 min-h-[112px] sm:min-h-[120px]"
               >
                 {/* Subtle Ambient Glow */}
-                <div className="absolute -top-10 -right-10 w-24 h-24 bg-purple-500/10 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/20 transition-all" />
 
                 {/* Sleek Micro-Pill Badge in Top-Right Corner */}
                 <div className="absolute top-3 right-3 z-10">
@@ -1989,7 +1907,7 @@ export default function App() {
                 </div>
 
                 <div className="relative z-10 mb-2 sm:mb-2.5">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-950/80 border border-purple-500/50 flex items-center justify-center text-purple-400 shrink-0 shadow-[0_0_12px_rgba(168,85,247,0.25)] group-hover:scale-105 transition-transform">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-950/80 border border-purple-500/50 flex items-center justify-center text-purple-400 shrink-0 shadow-sm group-hover:scale-105 transition-transform">
                     <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" />
                   </div>
                 </div>
@@ -2079,7 +1997,7 @@ export default function App() {
                         playUiSound(uiCustomization.audioFeedback);
                         setActiveTab('aiTutor');
                       }}
-                      className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-emerald-400/90 hover:border-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.25)] bg-gradient-to-r from-slate-950 via-[#031d0c] to-[#011408] text-emerald-300 text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300 font-mono"
+                      className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-emerald-400/90 hover:border-emerald-300 shadow-sm bg-gradient-to-r from-slate-950 via-[#031d0c] to-[#011408] text-emerald-300 text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-colors duration-300 font-mono"
                     >
                       <div className="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:8px_8px]" />
                       <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
@@ -2101,7 +2019,7 @@ export default function App() {
                           </p>
                         </div>
                       </div>
-                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 group-hover:translate-x-1 transition-all shrink-0 ml-2 shadow-xs">
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 group-hover:translate-x-1 transition-colors shrink-0 ml-2 shadow-xs">
                         <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
                     </motion.button>
@@ -2114,7 +2032,7 @@ export default function App() {
                         playUiSound(uiCustomization.audioFeedback);
                         setActiveTab('aiTutor');
                       }}
-                      className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-amber-500/90 hover:border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.22)] bg-gradient-to-r from-[#2b1e15] via-[#3a281c] to-[#1f150e] text-amber-100 text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300 font-serif"
+                      className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-amber-500/90 hover:border-amber-400 shadow-sm bg-gradient-to-r from-[#2b1e15] via-[#3a281c] to-[#1f150e] text-amber-100 text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-colors duration-300 font-serif"
                     >
                       <div className="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(#d97706_1px,transparent_1px)] [background-size:12px_12px]" />
                       <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
@@ -2136,7 +2054,7 @@ export default function App() {
                           </p>
                         </div>
                       </div>
-                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 group-hover:translate-x-1 transition-all shrink-0 ml-2 shadow-xs font-sans">
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 group-hover:translate-x-1 transition-colors shrink-0 ml-2 shadow-xs font-sans">
                         <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
                     </motion.button>
@@ -2149,7 +2067,7 @@ export default function App() {
                         playUiSound(uiCustomization.audioFeedback);
                         setActiveTab('aiTutor');
                       }}
-                      className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-white/40 hover:border-white/70 shadow-[0_0_20px_rgba(255,255,255,0.15)] bg-gradient-to-r from-white/15 via-white/10 to-white/5 backdrop-blur-xl text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
+                      className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-white/40 hover:border-white/70 shadow-sm bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950  text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-colors duration-300"
                     >
                       <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
                         <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-white/15 border border-white/30 flex items-center justify-center text-white group-hover:scale-110 transition-transform shrink-0 shadow-inner">
@@ -2170,7 +2088,7 @@ export default function App() {
                           </p>
                         </div>
                       </div>
-                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white/15 border border-white/30 flex items-center justify-center text-white group-hover:translate-x-1 transition-all shrink-0 ml-2 shadow-xs">
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white/15 border border-white/30 flex items-center justify-center text-white group-hover:translate-x-1 transition-colors shrink-0 ml-2 shadow-xs">
                         <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
                     </motion.button>
@@ -2183,7 +2101,7 @@ export default function App() {
                         playUiSound(uiCustomization.audioFeedback);
                         setActiveTab('aiTutor');
                       }}
-                      className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-transparent shadow-[0_0_20px_rgba(34,211,238,0.22)] bg-gradient-to-r from-slate-950 via-[#071d2c] to-[#042436] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
+                      className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-transparent shadow-sm bg-gradient-to-r from-slate-950 via-[#071d2c] to-[#042436] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-colors duration-300"
                     >
                       <NeonBorder color1="#22d3ee" color2="#0284c7" />
                       <div className="absolute inset-0 pointer-events-none opacity-40">
@@ -2193,7 +2111,6 @@ export default function App() {
                           <circle cx="80%" cy="80%" r="1.5" fill="#38bdf8" />
                         </svg>
                       </div>
-                      <div className="absolute -top-10 -right-10 w-32 h-32 bg-cyan-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-cyan-500/30 transition-all" />
 
                       <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
                         <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-cyan-500/20 border border-cyan-400/50 flex items-center justify-center text-cyan-300 group-hover:scale-110 transition-transform shrink-0 shadow-inner">
@@ -2205,7 +2122,7 @@ export default function App() {
                               <span>AI Tutor</span>
                               <span className="text-amber-400">⚡</span>
                             </h4>
-                            <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-2 py-0.5 rounded-full border border-white/20 backdrop-blur-md shrink-0">
+                            <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-slate-900 text-white/90 px-2 py-0.5 rounded-full border border-white/20  shrink-0">
                               STANDALONE APP
                             </span>
                           </div>
@@ -2214,7 +2131,7 @@ export default function App() {
                           </p>
                         </div>
                       </div>
-                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 group-hover:translate-x-1 transition-all shrink-0 ml-2 shadow-xs">
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 group-hover:translate-x-1 transition-colors shrink-0 ml-2 shadow-xs">
                         <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
                     </motion.button>
@@ -2228,10 +2145,9 @@ export default function App() {
                       playUiSound(uiCustomization.audioFeedback);
                       setActiveTab('imageGen');
                     }}
-                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-transparent shadow-[0_0_20px_rgba(168,85,247,0.22)] bg-gradient-to-r from-slate-950 via-[#18092a] to-[#290b47] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
+                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-transparent shadow-sm bg-gradient-to-r from-slate-950 via-[#18092a] to-[#290b47] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-colors duration-300"
                   >
                     <NeonBorder color1="#c084fc" color2="#7c3aed" />
-                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-purple-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/30 transition-all" />
 
                     <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
                       <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-purple-500/20 border border-purple-400/50 flex items-center justify-center text-amber-300 group-hover:scale-110 transition-transform shrink-0 shadow-inner">
@@ -2243,7 +2159,7 @@ export default function App() {
                             <span>Image Gen Studio</span>
                             <span className="text-amber-300">🎨</span>
                           </h4>
-                          <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-2 py-0.5 rounded-full border border-white/20 backdrop-blur-md shrink-0">
+                          <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-slate-900 text-white/90 px-2 py-0.5 rounded-full border border-white/20  shrink-0">
                             REAL ENGINE
                           </span>
                         </div>
@@ -2252,7 +2168,7 @@ export default function App() {
                         </p>
                       </div>
                     </div>
-                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-300 group-hover:translate-x-1 transition-all shrink-0 ml-2 shadow-xs">
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-300 group-hover:translate-x-1 transition-colors shrink-0 ml-2 shadow-xs">
                       <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
                   </motion.button>
@@ -2265,10 +2181,9 @@ export default function App() {
                       playUiSound(uiCustomization.audioFeedback);
                       setActiveTab('mockExam');
                     }}
-                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-transparent shadow-[0_0_20px_rgba(52,211,153,0.22)] bg-gradient-to-r from-slate-950 via-[#051f16] to-[#043321] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
+                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-transparent shadow-sm bg-gradient-to-r from-slate-950 via-[#051f16] to-[#043321] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-colors duration-300"
                   >
                     <NeonBorder color1="#34d399" color2="#14b8a6" />
-                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-emerald-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-emerald-500/30 transition-all" />
 
                     <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
                       <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-emerald-500/20 border border-emerald-400/50 flex items-center justify-center text-emerald-300 group-hover:scale-110 transition-transform shrink-0 shadow-inner">
@@ -2280,7 +2195,7 @@ export default function App() {
                             <span>Quiz & Mock Exams</span>
                             <span className="text-amber-400">🏆</span>
                           </h4>
-                          <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-2 py-0.5 rounded-full border border-white/20 backdrop-blur-md shrink-0">
+                          <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-slate-900 text-white/90 px-2 py-0.5 rounded-full border border-white/20  shrink-0">
                             QUIZ
                           </span>
                         </div>
@@ -2289,7 +2204,7 @@ export default function App() {
                         </p>
                       </div>
                     </div>
-                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 group-hover:translate-x-1 transition-all shrink-0 ml-2 shadow-xs">
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 group-hover:translate-x-1 transition-colors shrink-0 ml-2 shadow-xs">
                       <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
                   </motion.button>
@@ -2302,10 +2217,9 @@ export default function App() {
                       playUiSound(uiCustomization.audioFeedback);
                       setActiveTab('studyDocs');
                     }}
-                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-transparent shadow-[0_0_20px_rgba(251,191,36,0.22)] bg-gradient-to-r from-slate-950 via-[#221504] to-[#3a2003] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
+                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-transparent shadow-sm bg-gradient-to-r from-slate-950 via-[#221504] to-[#3a2003] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-colors duration-300"
                   >
                     <NeonBorder color1="#fbbf24" color2="#f97316" />
-                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-amber-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-amber-500/30 transition-all" />
 
                     <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
                       <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-300 group-hover:scale-110 transition-transform shrink-0 shadow-inner">
@@ -2317,7 +2231,7 @@ export default function App() {
                             <span>Notebook & Formula Vault</span>
                             <span className="text-amber-200">📝</span>
                           </h4>
-                          <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-2 py-0.5 rounded-full border border-white/20 backdrop-blur-md shrink-0">
+                          <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-slate-900 text-white/90 px-2 py-0.5 rounded-full border border-white/20  shrink-0">
                             NOTEBOOK
                           </span>
                         </div>
@@ -2326,7 +2240,7 @@ export default function App() {
                         </p>
                       </div>
                     </div>
-                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 group-hover:translate-x-1 transition-all shrink-0 ml-2 shadow-xs">
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 group-hover:translate-x-1 transition-colors shrink-0 ml-2 shadow-xs">
                       <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
                   </motion.button>
@@ -2339,10 +2253,9 @@ export default function App() {
                       playUiSound(uiCustomization.audioFeedback);
                       setActiveTab('googleWorkspace');
                     }}
-                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-transparent shadow-[0_0_20px_rgba(99,102,241,0.22)] bg-gradient-to-r from-slate-950 via-[#0e162d] to-[#121c3b] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all duration-300"
+                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-transparent shadow-sm bg-gradient-to-r from-slate-950 via-[#0e162d] to-[#121c3b] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-colors duration-300"
                   >
                     <NeonBorder color1="#818cf8" color2="#9333ea" />
-                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-indigo-500/30 transition-all" />
 
                     <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
                       <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-indigo-500/20 border border-indigo-400/50 flex items-center justify-center text-indigo-300 group-hover:scale-110 transition-transform shrink-0 shadow-inner">
@@ -2354,7 +2267,7 @@ export default function App() {
                             <span>Google Workspace Hub</span>
                             <span className="text-indigo-400">💼</span>
                           </h4>
-                          <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-2 py-0.5 rounded-full border border-white/20 backdrop-blur-md shrink-0">
+                          <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-slate-900 text-white/90 px-2 py-0.5 rounded-full border border-white/20  shrink-0">
                             WORKSPACE
                           </span>
                         </div>
@@ -2363,7 +2276,7 @@ export default function App() {
                         </p>
                       </div>
                     </div>
-                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-indigo-300 group-hover:translate-x-1 transition-all shrink-0 ml-2 shadow-xs">
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-indigo-300 group-hover:translate-x-1 transition-colors shrink-0 ml-2 shadow-xs">
                       <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
                   </motion.button>
@@ -2381,7 +2294,7 @@ export default function App() {
                         playUiSound(uiCustomization.audioFeedback);
                         setActiveTab('aiTutor');
                       }}
-                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-[0_0_20px_rgba(52,211,153,0.35)] bg-gradient-to-br from-slate-950 via-[#031d0c] to-[#011408] text-emerald-300 text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300 font-mono"
+                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-sm bg-gradient-to-br from-slate-950 via-[#031d0c] to-[#011408] text-emerald-300 text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-colors duration-300 font-mono"
                     >
                       <NeonBorder color1="#34d399" color2="#059669" />
                       <div className="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:8px_8px]" />
@@ -2412,7 +2325,7 @@ export default function App() {
                         playUiSound(uiCustomization.audioFeedback);
                         setActiveTab('aiTutor');
                       }}
-                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-[0_0_20px_rgba(245,158,11,0.3)] bg-gradient-to-br from-[#2b1e15] via-[#3a281c] to-[#1f150e] text-amber-100 text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300 font-serif"
+                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-sm bg-gradient-to-br from-[#2b1e15] via-[#3a281c] to-[#1f150e] text-amber-100 text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-colors duration-300 font-serif"
                     >
                       <NeonBorder color1="#f59e0b" color2="#d97706" />
                       <div className="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(#d97706_1px,transparent_1px)] [background-size:12px_12px]" />
@@ -2443,7 +2356,7 @@ export default function App() {
                         playUiSound(uiCustomization.audioFeedback);
                         setActiveTab('aiTutor');
                       }}
-                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-[0_0_20px_rgba(255,255,255,0.15)] bg-gradient-to-br from-white/15 via-white/5 to-white/10 backdrop-blur-xl text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
+                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-sm bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950  text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-colors duration-300"
                     >
                       <NeonBorder color1="#ffffff" color2="#cbd5e1" />
                       <div className="flex justify-between items-start relative z-10">
@@ -2473,7 +2386,7 @@ export default function App() {
                         playUiSound(uiCustomization.audioFeedback);
                         setActiveTab('aiTutor');
                       }}
-                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-[0_0_20px_rgba(34,211,238,0.22)] bg-gradient-to-br from-slate-950 via-[#071d2c] to-[#042436] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
+                      className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-sm bg-gradient-to-br from-slate-950 via-[#071d2c] to-[#042436] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-colors duration-300"
                     >
                       <NeonBorder color1="#22d3ee" color2="#06b6d4" />
                       {/* Subtle cosmic particles / grid overlay */}
@@ -2487,13 +2400,12 @@ export default function App() {
                           <circle cx="60%" cy="45%" r="2" fill="#38bdf8" />
                         </svg>
                       </div>
-                      <div className="absolute -top-12 -right-12 w-28 h-28 bg-cyan-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-cyan-500/30 transition-all" />
 
                       <div className="flex justify-between items-start relative z-10">
                         <div className="text-cyan-300 group-hover:scale-110 transition-transform">
                           <BrainCircuit className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
                         </div>
-                        <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 backdrop-blur-md">
+                        <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-slate-900 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 ">
                           STANDALONE APP
                         </span>
                       </div>
@@ -2518,7 +2430,7 @@ export default function App() {
                       playUiSound(uiCustomization.audioFeedback);
                       setActiveTab('imageGen');
                     }}
-                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-[0_0_20px_rgba(168,85,247,0.22)] bg-gradient-to-br from-slate-950 via-[#18092a] to-[#290b47] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
+                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-sm bg-gradient-to-br from-slate-950 via-[#18092a] to-[#290b47] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-colors duration-300"
                   >
                     <NeonBorder color1="#c084fc" color2="#a855f7" />
                     {/* Glowing purple energy wave SVG */}
@@ -2530,13 +2442,12 @@ export default function App() {
                         <circle cx="20%" cy="40%" r="1" fill="#e879f9" />
                       </svg>
                     </div>
-                    <div className="absolute -top-12 -right-12 w-28 h-28 bg-purple-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/30 transition-all" />
 
                     <div className="flex justify-between items-start relative z-10">
                       <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl bg-amber-500/20 border border-amber-400/60 flex items-center justify-center text-amber-300 group-hover:scale-110 transition-transform shadow-xs">
                         <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300" />
                       </div>
-                      <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 backdrop-blur-md">
+                      <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-slate-900 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 ">
                         REAL ENGINE
                       </span>
                     </div>
@@ -2560,7 +2471,7 @@ export default function App() {
                       playUiSound(uiCustomization.audioFeedback);
                       setActiveTab('mockExam');
                     }}
-                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-[0_0_20px_rgba(52,211,153,0.22)] bg-gradient-to-br from-slate-950 via-[#051f16] to-[#043321] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
+                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-sm bg-gradient-to-br from-slate-950 via-[#051f16] to-[#043321] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-colors duration-300"
                   >
                     <NeonBorder color1="#34d399" color2="#10b981" />
                     {/* Subtle sacred geometry / wireframe lines */}
@@ -2571,13 +2482,12 @@ export default function App() {
                         <circle cx="50" cy="50" r="30" />
                       </svg>
                     </div>
-                    <div className="absolute -top-12 -right-12 w-28 h-28 bg-emerald-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-emerald-500/30 transition-all" />
 
                     <div className="flex justify-between items-start relative z-10">
                       <div className="text-emerald-300 group-hover:scale-110 transition-transform">
                         <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
                       </div>
-                      <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 backdrop-blur-md">
+                      <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-slate-900 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 ">
                         QUIZ
                       </span>
                     </div>
@@ -2601,7 +2511,7 @@ export default function App() {
                       playUiSound(uiCustomization.audioFeedback);
                       setActiveTab('studyDocs');
                     }}
-                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-[0_0_20px_rgba(251,191,36,0.22)] bg-gradient-to-br from-slate-950 via-[#221504] to-[#3a2003] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300"
+                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-sm bg-gradient-to-br from-slate-950 via-[#221504] to-[#3a2003] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-colors duration-300"
                   >
                     <NeonBorder color1="#fbbf24" color2="#f59e0b" />
                     {/* Subtle sacred geometry / star lines */}
@@ -2612,13 +2522,12 @@ export default function App() {
                         <circle cx="50" cy="50" r="22" />
                       </svg>
                     </div>
-                    <div className="absolute -top-12 -right-12 w-28 h-28 bg-amber-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-amber-500/30 transition-all" />
 
                     <div className="flex justify-between items-start relative z-10">
                       <div className="text-amber-300 group-hover:scale-110 transition-transform">
                         <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
                       </div>
-                      <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 backdrop-blur-md">
+                      <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-slate-900 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 ">
                         NOTEBOOK
                       </span>
                     </div>
@@ -2642,7 +2551,7 @@ export default function App() {
                       playUiSound(uiCustomization.audioFeedback);
                       setActiveTab('googleWorkspace');
                     }}
-                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-[0_0_20px_rgba(99,102,241,0.22)] bg-gradient-to-br from-slate-950 via-[#0e162d] to-[#121c3b] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-all duration-300 col-span-2 sm:col-span-1"
+                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-sm bg-gradient-to-br from-slate-950 via-[#0e162d] to-[#121c3b] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-colors duration-300 col-span-2 sm:col-span-1"
                   >
                     <NeonBorder color1="#6366f1" color2="#4f46e5" />
                     <div className="absolute inset-0 pointer-events-none opacity-20 flex items-center justify-center">
@@ -2653,13 +2562,12 @@ export default function App() {
                         <line x1="90" y1="25" x2="10" y2="75" />
                       </svg>
                     </div>
-                    <div className="absolute -top-12 -right-12 w-28 h-28 bg-indigo-500/20 rounded-full blur-xl pointer-events-none group-hover:bg-indigo-500/30 transition-all" />
 
                     <div className="flex justify-between items-start relative z-10">
                       <div className="text-indigo-300 group-hover:scale-110 transition-transform">
                         <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-300" />
                       </div>
-                      <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-white/10 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 backdrop-blur-md">
+                      <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-slate-900 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 ">
                         WORKSPACE
                       </span>
                     </div>
@@ -2684,13 +2592,12 @@ export default function App() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 whileHover={{ y: -2 }}
-                className="w-full p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-[#0c142b]/95 via-[#0e1224]/90 to-[#070b16]/95 border border-transparent text-white relative overflow-hidden shadow-[0_8px_32px_rgba(99,102,241,0.22)] group transition-all duration-300"
+                className="w-full p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-[#0c142b]/95 via-[#0e1224]/90 to-[#070b16]/95 border border-transparent text-white relative overflow-hidden shadow-sm group transition-colors duration-300"
               >
                 <NeonBorder color1="#6366f1" color2="#06b6d4" duration="5s" />
                 {/* Dynamic Top Ambient Laser Accent Line */}
                 <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-400 via-purple-400 to-cyan-400 opacity-80" />
                 {/* Quiet deep ambient lighting */}
-                <div className="absolute -right-8 -top-8 w-44 h-44 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none group-hover:bg-indigo-500/25 transition-all" />
 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
                   <div className="flex items-start space-x-3.5">
@@ -2699,7 +2606,7 @@ export default function App() {
                       whileHover={{ scale: 1.08, rotate: 6 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => openToolkitWithTool()}
-                      className="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-400/50 flex items-center justify-center text-indigo-300 shrink-0 shadow-[0_0_16px_rgba(99,102,241,0.35)] cursor-pointer mt-0.5"
+                      className="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-400/50 flex items-center justify-center text-indigo-300 shrink-0 shadow-sm cursor-pointer mt-0.5"
                     >
                       <Sparkles className="w-5 h-5 text-indigo-300 animate-subtle-pulse" />
                     </motion.div>
@@ -2733,7 +2640,7 @@ export default function App() {
                       whileHover={{ scale: 1.03 }}
                       whileTap={{ scale: 0.96 }}
                       onClick={() => openToolkitWithTool()}
-                      className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-[0_0_20px_rgba(99,102,241,0.45)] border border-indigo-400/40 flex items-center space-x-2 cursor-pointer transition active:scale-95"
+                      className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-sm border border-indigo-400/40 flex items-center space-x-2 cursor-pointer transition active:scale-95"
                     >
                       <span>Launch Toolkit</span>
                       <ChevronRight className="w-4 h-4 stroke-[2.5]" />
@@ -2779,10 +2686,9 @@ export default function App() {
               </motion.div>
 
             {/* 4. UNLIMITED STUDY STREAK - PROMINENT GAMIFICATION & VISUAL PROGRESS */}
-            <div id="streak-card-section" className="rounded-2xl p-4 sm:p-5 border border-transparent bg-[#0b101d]/90 backdrop-blur-xl text-white space-y-4 relative overflow-hidden shadow-xl">
+            <div id="streak-card-section" className="rounded-2xl p-4 sm:p-5 border border-transparent bg-[#0b101d]  text-white space-y-4 relative overflow-hidden shadow-xl">
               <NeonBorder color1="#fbbf24" color2="#ea580c" duration="6s" />
               {/* Subtle Ambient Radial Glow */}
-              <div className="absolute -top-12 -right-12 w-40 h-40 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
  
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
                 <div className="flex items-center gap-3.5">
@@ -2821,7 +2727,7 @@ export default function App() {
                     
                     {/* Centered Fire Badge / Icon with glow */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <Flame className={`w-5 h-5 ${activeSecondsToday >= 600 ? 'text-amber-400 fill-amber-400 filter drop-shadow-[0_0_6px_rgba(245,158,11,0.8)]' : 'text-slate-500'} transition-all duration-300`} />
+                      <Flame className={`w-5 h-5 ${activeSecondsToday >= 600 ? 'text-amber-400 fill-amber-400 filter drop-shadow-sm' : 'text-slate-500'} transition-colors duration-300`} />
                       <span className="text-[8.5px] font-black font-mono text-amber-300 leading-none mt-0.5">
                         {Math.min(10, Math.floor(activeSecondsToday / 60))}m
                       </span>
@@ -2843,7 +2749,7 @@ export default function App() {
                 </div>
  
                 {/* Streak Badge Pill */}
-                <div className="px-3 py-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 rounded-xl text-xs font-black text-amber-300 flex items-center gap-2 shadow-[0_0_12px_rgba(245,158,11,0.25)] shrink-0 self-start sm:self-center">
+                <div className="px-3 py-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 rounded-xl text-xs font-black text-amber-300 flex items-center gap-2 shadow-sm shrink-0 self-start sm:self-center">
                   <span className="text-base animate-pulse">🔥</span>
                   <div className="leading-tight text-right sm:text-left">
                     <div className="font-black text-xs text-amber-100">{userProfile.streak} Days</div>
@@ -2865,7 +2771,7 @@ export default function App() {
                 </div>
                 <div className="w-full h-2.5 bg-[#060913] border border-slate-800/90 rounded-full overflow-hidden p-0.5 relative">
                   <div 
-                    className="h-full bg-gradient-to-r from-amber-500 via-orange-500 to-emerald-400 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(245,158,11,0.6)]"
+                    className="h-full bg-gradient-to-r from-amber-500 via-orange-500 to-emerald-400 rounded-full transition-colors duration-500 shadow-sm"
                     style={{ width: `${Math.min(100, Math.max(8, (activeSecondsToday / 600) * 100))}%` }}
                   />
                 </div>
@@ -2879,9 +2785,9 @@ export default function App() {
                   return (
                     <div 
                       key={idx}
-                      className={`p-1.5 sm:p-2.5 rounded-xl text-center flex flex-col items-center justify-between h-22 sm:h-26 transition-all cursor-default relative overflow-hidden ${
+                      className={`p-1.5 sm:p-2.5 rounded-xl text-center flex flex-col items-center justify-between h-22 sm:h-26 transition-colors cursor-default relative overflow-hidden ${
                         isDone
-                          ? 'border border-amber-500/50 bg-gradient-to-b from-amber-500/20 to-amber-950/40 text-amber-100 shadow-[0_0_14px_rgba(245,158,11,0.22)]'
+                          ? 'border border-amber-500/50 bg-gradient-to-b from-amber-500/20 to-amber-950/40 text-amber-100 shadow-sm'
                           : isToday
                           ? 'border border-slate-700 bg-slate-900/60 text-slate-300'
                           : 'border border-slate-800/90 bg-[#070c18]/90 hover:bg-[#0c1428] text-slate-500'
@@ -2894,7 +2800,7 @@ export default function App() {
                         {dayItem.dateStr.split('-')[2]}
                       </div>
                       <div className="flex justify-center items-center my-0.5">
-                        <span className={`text-sm sm:text-base transition-transform ${isDone ? 'scale-110 drop-shadow-[0_0_8px_rgba(245,158,11,0.8)]' : 'opacity-60'}`}>
+                        <span className={`text-sm sm:text-base transition-transform ${isDone ? 'scale-110 drop-shadow-sm' : 'opacity-60'}`}>
                           {isDone ? '🔥' : '🎯'}
                         </span>
                       </div>
@@ -2937,8 +2843,8 @@ export default function App() {
                     onClick={handleCompleteDayGoal}
                     className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm shadow-md transition flex items-center space-x-1.5 cursor-pointer ${
                       day1GoalCompleted
-                        ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
-                        : 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white border border-emerald-400/40 shadow-[0_0_14px_rgba(16,185,129,0.35)]'
+                        ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                        : 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white border border-emerald-400/40 shadow-sm'
                     }`}
                   >
                     <Check className="w-3.5 h-3.5 stroke-[3]" />
@@ -2949,7 +2855,7 @@ export default function App() {
             </div>
 
             {/* 5. DAILY STUDY QUESTS - COMPACT SCANABLE CARDS & REFINED HEADINGS */}
-            <div className="rounded-2xl p-4 sm:p-5 border border-transparent bg-[#0b101d]/90 backdrop-blur-xl text-white space-y-3.5 relative overflow-hidden shadow-xl">
+            <div className="rounded-2xl p-4 sm:p-5 border border-transparent bg-[#0b101d]  text-white space-y-3.5 relative overflow-hidden shadow-xl">
               <NeonBorder color1="#10b981" color2="#6366f1" duration="6s" />
               <div className="flex items-center justify-between">
                 <div>
@@ -2977,7 +2883,7 @@ export default function App() {
                       key={q.id} 
                       whileHover={{ y: -1 }}
                       onClick={() => handleCompleteQuest(q.id)}
-                      className={`p-3 sm:p-3.5 rounded-xl flex items-center justify-between gap-3 transition-all duration-200 group cursor-pointer shadow-xs ${
+                      className={`p-3 sm:p-3.5 rounded-xl flex items-center justify-between gap-3 transition-colors duration-200 group cursor-pointer shadow-xs ${
                         isDone 
                           ? 'bg-[#070c18]/70 border border-slate-800/60 opacity-80' 
                           : 'bg-[#070c18]/90 hover:bg-[#0d152a] border border-slate-800/90 hover:border-indigo-500/40'
@@ -2988,7 +2894,7 @@ export default function App() {
                         <button 
                           className={`w-5 h-5 sm:w-6 sm:h-6 rounded-lg flex items-center justify-center transition shrink-0 ${
                             isDone 
-                              ? 'bg-emerald-500 text-white shadow-[0_0_10px_rgba(16,185,129,0.4)]' 
+                              ? 'bg-emerald-500 text-white shadow-sm' 
                               : 'border border-slate-700 bg-slate-900 group-hover:border-slate-500'
                           }`}
                         >
@@ -3023,10 +2929,10 @@ export default function App() {
                       </div>
 
                       {/* Prominent XP Badge */}
-                      <span className={`text-[10px] sm:text-[11px] font-black px-2.5 py-1 rounded-lg border shrink-0 transition-all ${
+                      <span className={`text-[10px] sm:text-[11px] font-black px-2.5 py-1 rounded-lg border shrink-0 transition-colors ${
                         isDone
                           ? 'bg-emerald-950/60 text-emerald-400 border-emerald-500/30'
-                          : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 shadow-[0_0_10px_rgba(52,211,153,0.18)]'
+                          : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 shadow-sm'
                       }`}>
                         +{q.xp} XP
                       </span>
@@ -3037,7 +2943,7 @@ export default function App() {
             </div>
 
             {/* 6. FOCUS SESSION & TIMER - SOPHISTICATED ACADEMIC */}
-            <div className="bg-[#0b101d]/90 backdrop-blur-xl rounded-2xl p-4 sm:p-5 border border-transparent space-y-3.5 shadow-xl relative overflow-hidden">
+            <div className="bg-[#0b101d]  rounded-2xl p-4 sm:p-5 border border-transparent space-y-3.5 shadow-xl relative overflow-hidden">
               <NeonBorder color1="#6366f1" color2="#06b6d4" duration="5s" />
               {/* Header: Subject Selector & Time Duration Pills */}
               <div className="flex items-center justify-between flex-wrap gap-2">
@@ -3111,7 +3017,7 @@ export default function App() {
               }).length;
 
               return (
-                <div className="bg-[#0b101d]/90 backdrop-blur-xl rounded-2xl p-4 sm:p-5 border border-transparent text-white space-y-4 relative overflow-hidden shadow-xl">
+                <div className="bg-[#0b101d]  rounded-2xl p-4 sm:p-5 border border-transparent text-white space-y-4 relative overflow-hidden shadow-xl">
                   <NeonBorder color1="#fbbf24" color2="#b45309" duration="6s" />
                   {/* Header */}
                   <div className="flex items-center justify-between border-b border-slate-800/60 pb-3">
@@ -3134,7 +3040,7 @@ export default function App() {
                       return (
                         <div
                           key={badge.id}
-                          className={`relative flex flex-col items-center justify-between w-24 h-28 shrink-0 rounded-xl p-2.5 text-center transition-all duration-200 group ${
+                          className={`relative flex flex-col items-center justify-between w-24 h-28 shrink-0 rounded-xl p-2.5 text-center transition-colors duration-200 group ${
                             isEarned
                               ? "bg-[#070c18] border border-amber-500/30 hover:border-amber-500/50 text-amber-100 shadow-xs"
                               : "bg-[#070c18]/50 border border-slate-800/80 opacity-75 hover:opacity-100"
@@ -3176,7 +3082,7 @@ export default function App() {
                                 {/* Micro progress bar */}
                                 <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
                                   <div 
-                                    className="h-full bg-slate-600 rounded-full transition-all duration-500"
+                                    className="h-full bg-slate-600 rounded-full transition-colors duration-500"
                                     style={{ width: `${percentage}%` }}
                                   />
                                 </div>
@@ -3201,7 +3107,7 @@ export default function App() {
             })()}
 
             {/* 10. CHIMPU'S SANCTUARY (VIRTUAL FRIEND) */}
-            <div className="bg-[#0b101d]/90 backdrop-blur-xl rounded-2xl p-4 sm:p-5 border border-transparent text-white space-y-4 shadow-xl relative overflow-hidden">
+            <div className="bg-[#0b101d]  rounded-2xl p-4 sm:p-5 border border-transparent text-white space-y-4 shadow-xl relative overflow-hidden">
               <NeonBorder color1="#10b981" color2="#14b8a6" duration="5s" />
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-slate-200 text-xs tracking-wide uppercase flex items-center space-x-1.5">
@@ -3282,7 +3188,7 @@ export default function App() {
             </div>
 
             {/* STUDENT PROFILE & QUICK ACTIONS CARD */}
-            <div className="bg-[#0b101d]/90 backdrop-blur-xl rounded-2xl p-4 sm:p-5 text-white border border-transparent shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left mt-2 relative overflow-hidden">
+            <div className="bg-[#0b101d]  rounded-2xl p-4 sm:p-5 text-white border border-transparent shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left mt-2 relative overflow-hidden">
               <NeonBorder color1="#6366f1" color2="#f43f5e" duration="5s" />
               <div className="flex items-center space-x-3.5">
                 <UserAvatar
@@ -3382,7 +3288,7 @@ export default function App() {
                   <button
                     key={room.id}
                     onClick={() => setSelectedRoomId(room.id)}
-                    className={`w-full p-3 rounded-xl text-left border transition-all ${
+                    className={`w-full p-3 rounded-xl text-left border transition-colors ${
                       selectedRoomId === room.id
                         ? 'bg-indigo-50 border-indigo-500 text-indigo-900 shadow-xs'
                         : 'bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900'
@@ -3541,7 +3447,7 @@ export default function App() {
             className="space-y-6 w-full"
           >
             {/* FULL WIDTH HEADER & CONTROLS */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/85 backdrop-blur-md border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white  border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs">
               <div className="space-y-1">
                 <h3 className="font-extrabold text-slate-900 text-sm tracking-wide uppercase flex items-center space-x-2">
                   <Notebook className="w-5 h-5 text-indigo-600 animate-pulse" />
@@ -3564,7 +3470,7 @@ export default function App() {
                     value={noteSearchQuery}
                     onChange={(e) => setNoteSearchQuery(e.target.value)}
                     placeholder="Search sticky notes..."
-                    className="w-full sm:w-60 pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all"
+                    className="w-full sm:w-60 pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors"
                   />
                   {noteSearchQuery && (
                     <button
@@ -3653,10 +3559,10 @@ export default function App() {
                           setNewDocContent(doc.content);
                           setIsAddingDoc(true);
                         }}
-                        className={`p-5 rounded-xl border relative flex flex-col justify-between h-[195px] group cursor-pointer shadow-[0_4px_14px_rgba(0,0,0,0.02)] ${palette.bg} ${palette.border}`}
+                        className={`p-5 rounded-xl border relative flex flex-col justify-between h-[195px] group cursor-pointer shadow-sm ${palette.bg} ${palette.border}`}
                       >
                         {/* Washi Tape Ribbon Accent */}
-                        <div className={`w-14 h-4.5 absolute -top-2 left-1/2 -translate-x-1/2 rounded-xs border border-white/20 shadow-2xs backdrop-blur-[0.5px] rotate-1 ${palette.tape}`} />
+                        <div className={`w-14 h-4.5 absolute -top-2 left-1/2 -translate-x-1/2 rounded-xs border border-white/20 shadow-2xs -[0.5px] rotate-1 ${palette.tape}`} />
 
                         <div className="space-y-2 overflow-hidden flex-1 flex flex-col">
                           <div className="flex justify-between items-start gap-2">
@@ -3705,7 +3611,7 @@ export default function App() {
               </AnimatePresence>
 
               {studyDocs.length === 0 && (
-                <div className="col-span-full bg-white/70 backdrop-blur-md border border-slate-200 rounded-2xl py-16 text-center space-y-3.5">
+                <div className="col-span-full bg-white  border border-slate-200 rounded-2xl py-16 text-center space-y-3.5">
                   <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 border border-slate-200 flex items-center justify-center mx-auto text-xl font-bold">
                     📌
                   </div>
@@ -3722,7 +3628,7 @@ export default function App() {
             {/* DEDICATED CENTERED PREMIUM POPUP MODAL */}
             <AnimatePresence>
               {isAddingDoc && (
-                <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-[100] flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-slate-950/40  z-[100] flex items-center justify-center p-4">
                   <motion.div 
                     initial={{ opacity: 0, scale: 0.95, y: 15 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -3760,7 +3666,7 @@ export default function App() {
                           placeholder="Title or Topic..."
                           value={newDocTitle}
                           onChange={(e) => setNewDocTitle(e.target.value)}
-                          className="w-full p-2.5 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-xl text-xs text-slate-900 font-semibold focus:outline-none transition-all duration-300"
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-xl text-xs text-slate-900 font-semibold focus:outline-none transition-colors duration-300"
                         />
                       </div>
                       <div className="space-y-1">
@@ -3770,7 +3676,7 @@ export default function App() {
                           rows={6}
                           value={newDocContent}
                           onChange={(e) => setNewDocContent(e.target.value)}
-                          className="w-full p-2.5 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-xl text-xs text-slate-900 font-semibold resize-none focus:outline-none transition-all duration-300"
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-xl text-xs text-slate-900 font-semibold resize-none focus:outline-none transition-colors duration-300"
                         />
                       </div>
                     </div>
@@ -3915,7 +3821,7 @@ export default function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
-              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40"
+              className="fixed inset-0 bg-slate-950/60  z-40"
               onClick={() => setShowMoreMenu(false)}
             />
             <motion.div 
@@ -3923,7 +3829,7 @@ export default function App() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 14 }}
               transition={{ type: 'spring', stiffness: 420, damping: 30 }}
-              className="fixed bottom-20 right-3 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 z-50 w-76 max-w-[92vw] bg-[#090f1d]/95 backdrop-blur-2xl border border-slate-700/70 rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.8)] p-4 space-y-3"
+              className="fixed bottom-20 right-3 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 z-50 w-76 max-w-[92vw] bg-[#090f1d]  border border-slate-700/70 rounded-2xl shadow-sm p-4 space-y-3"
             >
               <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                 <span className="text-xs font-bold text-slate-200 flex items-center space-x-1.5">
@@ -3983,7 +3889,7 @@ export default function App() {
               {/* Studio Settings & Eye Comfort Controls */}
               <div className="pt-2 border-t border-slate-800/80 space-y-2">
                 {/* Late-Night Dark Mode Toggle Card */}
-                <ThemeToggle variant="settings" className="border-slate-800 bg-slate-900/90 text-[11px]" />
+                <ThemeToggle variant="settings" className="border-slate-800 bg-slate-900 text-[11px]" />
 
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   <div className="relative py-1.5 px-2 bg-slate-850 hover:bg-slate-800 text-slate-200 border border-slate-700/60 rounded-xl font-bold flex items-center justify-center space-x-1 transition shadow-xs">
@@ -4050,7 +3956,7 @@ export default function App() {
             resetBottomNavTimer();
           }
         }}
-        className={`fixed bottom-0 left-0 right-0 z-50 bg-[#0a0f1d]/95 backdrop-blur-xl border-t border-slate-700/60 rounded-t-2xl sm:rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,0.65),0_0_20px_rgba(16,185,129,0.06)] px-2 py-1 flex items-center justify-around h-[56px] sm:h-14 transition-all duration-200 ${
+        className={`fixed bottom-0 left-0 right-0 z-50 bg-[#0a0f1d]  border-t border-slate-700/60 rounded-t-2xl sm:rounded-t-3xl shadow-sm px-2 py-1 flex items-center justify-around h-[56px] sm:h-14 transition-colors duration-200 ${
           activeTab === 'aiTutor' && !isBottomNavVisible ? 'pointer-events-none' : 'pointer-events-auto'
         }`}
       >
@@ -4063,7 +3969,7 @@ export default function App() {
               setShowMoreMenu(false);
               setActiveTab('home');
             }}
-            className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all cursor-pointer select-none min-h-[44px] ${
+            className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-colors cursor-pointer select-none min-h-[44px] ${
               activeTab === 'home'
                 ? 'text-emerald-400 font-bold'
                 : 'text-slate-300 hover:text-white font-medium'
@@ -4072,11 +3978,11 @@ export default function App() {
             {activeTab === 'home' && (
               <motion.div
                 layoutId="bottomNavIndicator"
-                className="absolute inset-0 bg-emerald-500/18 border border-emerald-500/35 rounded-xl -z-10 shadow-[0_0_12px_rgba(52,211,153,0.25)]"
+                className="absolute inset-0 bg-emerald-500/18 border border-emerald-500/35 rounded-xl -z-10 shadow-sm"
                 transition={{ type: 'spring', stiffness: 450, damping: 32 }}
               />
             )}
-            <BookOpen className={`w-4 h-4 sm:w-[18px] sm:h-[18px] transition-transform ${activeTab === 'home' ? 'scale-110 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'text-slate-200'}`} />
+            <BookOpen className={`w-4 h-4 sm:w-[18px] sm:h-[18px] transition-transform ${activeTab === 'home' ? 'scale-110 text-emerald-400 drop-shadow-sm' : 'text-slate-200'}`} />
             <span className={`text-[10px] tracking-tight mt-0.5 whitespace-nowrap ${activeTab === 'home' ? 'font-bold text-emerald-400' : 'font-medium text-slate-300'}`}>
               Home
             </span>
@@ -4091,7 +3997,7 @@ export default function App() {
               setActiveTab('aiTutor');
               resetBottomNavTimer();
             }}
-            className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all cursor-pointer select-none min-h-[44px] ${
+            className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-colors cursor-pointer select-none min-h-[44px] ${
               activeTab === 'aiTutor'
                 ? 'text-emerald-400 font-bold'
                 : 'text-slate-300 hover:text-white font-medium'
@@ -4100,13 +4006,13 @@ export default function App() {
             {activeTab === 'aiTutor' && (
               <motion.div
                 layoutId="bottomNavIndicator"
-                className="absolute inset-0 bg-emerald-500/18 border border-emerald-500/35 rounded-xl -z-10 shadow-[0_0_12px_rgba(52,211,153,0.25)]"
+                className="absolute inset-0 bg-emerald-500/18 border border-emerald-500/35 rounded-xl -z-10 shadow-sm"
                 transition={{ type: 'spring', stiffness: 450, damping: 32 }}
               />
             )}
             <div className="relative inline-flex items-center justify-center">
-              <BrainCircuit className={`w-4 h-4 sm:w-[18px] sm:h-[18px] transition-transform ${activeTab === 'aiTutor' ? 'scale-110 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'text-slate-200'}`} />
-              <span className="absolute -top-1.5 -right-2 px-1 py-[0.5px] bg-gradient-to-r from-emerald-500 to-indigo-600 text-white text-[7px] font-black rounded-full leading-none shadow-[0_0_6px_rgba(16,185,129,0.5)] border border-emerald-300/40 z-20 tracking-tight pointer-events-none select-none">
+              <BrainCircuit className={`w-4 h-4 sm:w-[18px] sm:h-[18px] transition-transform ${activeTab === 'aiTutor' ? 'scale-110 text-emerald-400 drop-shadow-sm' : 'text-slate-200'}`} />
+              <span className="absolute -top-1.5 -right-2 px-1 py-[0.5px] bg-gradient-to-r from-emerald-500 to-indigo-600 text-white text-[7px] font-black rounded-full leading-none shadow-sm border border-emerald-300/40 z-20 tracking-tight pointer-events-none select-none">
                 PRO
               </span>
             </div>
@@ -4124,7 +4030,7 @@ export default function App() {
               setInitialTool(undefined);
               setActiveTab('toolkit');
             }}
-            className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all cursor-pointer select-none min-h-[44px] ${
+            className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-colors cursor-pointer select-none min-h-[44px] ${
               activeTab === 'toolkit'
                 ? 'text-emerald-400 font-bold'
                 : 'text-slate-300 hover:text-white font-medium'
@@ -4133,11 +4039,11 @@ export default function App() {
             {activeTab === 'toolkit' && (
               <motion.div
                 layoutId="bottomNavIndicator"
-                className="absolute inset-0 bg-emerald-500/18 border border-emerald-500/35 rounded-xl -z-10 shadow-[0_0_12px_rgba(52,211,153,0.25)]"
+                className="absolute inset-0 bg-emerald-500/18 border border-emerald-500/35 rounded-xl -z-10 shadow-sm"
                 transition={{ type: 'spring', stiffness: 450, damping: 32 }}
               />
             )}
-            <Sparkles className={`w-4 h-4 sm:w-[18px] sm:h-[18px] transition-transform ${activeTab === 'toolkit' ? 'scale-110 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'text-slate-200'}`} />
+            <Sparkles className={`w-4 h-4 sm:w-[18px] sm:h-[18px] transition-transform ${activeTab === 'toolkit' ? 'scale-110 text-emerald-400 drop-shadow-sm' : 'text-slate-200'}`} />
             <span className={`text-[10px] tracking-tight mt-0.5 whitespace-nowrap ${activeTab === 'toolkit' ? 'font-bold text-emerald-400' : 'font-medium text-slate-300'}`}>
               Tools
             </span>
@@ -4151,7 +4057,7 @@ export default function App() {
               setShowMoreMenu(false);
               setActiveTab('groupChat');
             }}
-            className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all cursor-pointer select-none min-h-[44px] ${
+            className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-colors cursor-pointer select-none min-h-[44px] ${
               activeTab === 'groupChat'
                 ? 'text-emerald-400 font-bold'
                 : 'text-slate-300 hover:text-white font-medium'
@@ -4160,11 +4066,11 @@ export default function App() {
             {activeTab === 'groupChat' && (
               <motion.div
                 layoutId="bottomNavIndicator"
-                className="absolute inset-0 bg-emerald-500/18 border border-emerald-500/35 rounded-xl -z-10 shadow-[0_0_12px_rgba(52,211,153,0.25)]"
+                className="absolute inset-0 bg-emerald-500/18 border border-emerald-500/35 rounded-xl -z-10 shadow-sm"
                 transition={{ type: 'spring', stiffness: 450, damping: 32 }}
               />
             )}
-            <MessageSquare className={`w-4 h-4 sm:w-[18px] sm:h-[18px] transition-transform ${activeTab === 'groupChat' ? 'scale-110 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'text-slate-200'}`} />
+            <MessageSquare className={`w-4 h-4 sm:w-[18px] sm:h-[18px] transition-transform ${activeTab === 'groupChat' ? 'scale-110 text-emerald-400 drop-shadow-sm' : 'text-slate-200'}`} />
             <span className={`text-[10px] tracking-tight mt-0.5 whitespace-nowrap ${activeTab === 'groupChat' ? 'font-bold text-emerald-400' : 'font-medium text-slate-300'}`}>
               Study Rooms
             </span>
@@ -4179,7 +4085,7 @@ export default function App() {
                 resetBottomNavTimer();
               }
             }}
-            className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all cursor-pointer select-none min-h-[44px] ${
+            className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-colors cursor-pointer select-none min-h-[44px] ${
               showMoreMenu || ['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab)
                 ? 'text-emerald-400 font-bold'
                 : 'text-slate-300 hover:text-white font-medium'
@@ -4188,14 +4094,14 @@ export default function App() {
             {(showMoreMenu || ['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab)) && (
               <motion.div
                 layoutId="bottomNavIndicator"
-                className="absolute inset-0 bg-emerald-500/18 border border-emerald-500/35 rounded-xl -z-10 shadow-[0_0_12px_rgba(52,211,153,0.25)]"
+                className="absolute inset-0 bg-emerald-500/18 border border-emerald-500/35 rounded-xl -z-10 shadow-sm"
                 transition={{ type: 'spring', stiffness: 450, damping: 32 }}
               />
             )}
             <div className="relative">
-              <LayoutGrid className={`w-4 h-4 sm:w-[18px] sm:h-[18px] transition-transform ${showMoreMenu ? 'scale-110 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'text-slate-200'}`} />
+              <LayoutGrid className={`w-4 h-4 sm:w-[18px] sm:h-[18px] transition-transform ${showMoreMenu ? 'scale-110 text-emerald-400 drop-shadow-sm' : 'text-slate-200'}`} />
               {['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab) && (
-                <span className="absolute -top-0.5 -right-1 w-2 h-2 bg-emerald-400 rounded-full ring-2 ring-slate-900 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+                <span className="absolute -top-0.5 -right-1 w-2 h-2 bg-emerald-400 rounded-full ring-2 ring-slate-900 shadow-sm" />
               )}
             </div>
             <span className={`text-[10px] tracking-tight mt-0.5 whitespace-nowrap ${showMoreMenu || ['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab) ? 'font-bold text-emerald-400' : 'font-medium text-slate-300'}`}>

@@ -188,10 +188,10 @@ app.get("/api/health", (_req, res) => {
 
 // Telemetry endpoint for gateway diagnostics with authorization check
 app.get("/api/admin/ai-health", (req, res) => {
-  const token = req.headers["x-admin-token"] || req.query.token;
-  const expectedToken = process.env.ADMIN_HEALTH_TOKEN || "ascend_secure_health_token";
+  const token = req.headers["x-admin-token"];
+  const expectedToken = process.env.ADMIN_HEALTH_TOKEN;
   
-  if (token !== expectedToken) {
+  if (!expectedToken || expectedToken.trim() === "" || token !== expectedToken) {
     res.status(401).json({ error: "Unauthorized access to telemetry data." });
     return;
   }
@@ -200,7 +200,7 @@ app.get("/api/admin/ai-health", (req, res) => {
 });
 
   // API Route: World-class AI Tutor Answer / Explanation
-  app.post("/api/gemini/answer", rateLimitAi, async (req, res) => {
+  app.post("/api/gemini/answer", requireAuth, rateLimitAi, async (req: AuthRequest, res) => {
     try {
       const { prompt, imageBase64, imagesBase64, studentContext, language, persona, history } = req.body;
       if (!prompt && !imageBase64 && (!imagesBase64 || imagesBase64.length === 0)) {

@@ -782,13 +782,11 @@ export default function QuizSection({
           >
             {/* HERO BANNER WITH GRADIENT ACCENT */}
             <div className="relative overflow-hidden rounded-3xl bg-slate-900 text-white p-6 sm:p-8 border border-indigo-900/40 shadow-xl">
-              <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute bottom-0 left-1/3 -mb-12 w-48 h-48 bg-purple-500/15 rounded-full blur-2xl pointer-events-none" />
 
               {onClose && (
                 <button
                   onClick={onClose}
-                  className="absolute top-5 right-5 p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition cursor-pointer z-20"
+                  className="absolute top-5 right-5 p-2 rounded-xl bg-slate-900 hover:bg-white/20 text-slate-300 hover:text-white transition cursor-pointer z-20"
                   title="Close Quiz Arena"
                 >
                   <X className="w-5 h-5" />
@@ -811,7 +809,7 @@ export default function QuizSection({
 
                 {/* QUICK STATS PILLS */}
                 <div className="flex sm:flex-row md:flex-col gap-2.5 shrink-0">
-                  <div className="px-4 py-2.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 flex items-center space-x-3">
+                  <div className="px-4 py-2.5 rounded-2xl bg-slate-900  border border-white/10 flex items-center space-x-3">
                     <div className="w-8 h-8 rounded-xl bg-amber-400/20 flex items-center justify-center text-amber-400">
                       <Trophy className="w-4 h-4" />
                     </div>
@@ -821,7 +819,7 @@ export default function QuizSection({
                     </div>
                   </div>
 
-                  <div className="px-4 py-2.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 flex items-center space-x-3">
+                  <div className="px-4 py-2.5 rounded-2xl bg-slate-900  border border-white/10 flex items-center space-x-3">
                     <div className="w-8 h-8 rounded-xl bg-emerald-400/20 flex items-center justify-center text-emerald-400">
                       <Zap className="w-4 h-4" />
                     </div>
@@ -875,7 +873,7 @@ export default function QuizSection({
                       className={`py-2 px-3 rounded-2xl text-xs font-bold transition flex items-center justify-center space-x-2 border cursor-pointer ${
                         isSel
                           ? 'bg-indigo-600 border-indigo-400 text-white shadow-md ring-2 ring-indigo-500/40'
-                          : 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-200'
+                          : 'bg-white/5 border-white/10 hover:bg-slate-900 text-slate-200'
                       }`}
                     >
                       <span className="text-sm">{item.flag}</span>
@@ -1506,7 +1504,7 @@ export default function QuizSection({
                         handleFinishQuiz();
                       }
                     }}
-                    className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-indigo-600/30 transition-all duration-200 flex items-center space-x-2.5 cursor-pointer active:scale-95 border border-indigo-400/40"
+                    className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-indigo-600/30 transition-colors duration-200 flex items-center space-x-2.5 cursor-pointer active:scale-95 border border-indigo-400/40"
                   >
                     <span>
                       {currentIndex + 1 < questions.length
@@ -1621,15 +1619,13 @@ Ascend Study Buddy • AI-Powered Education`;
 
               {/* 1. LUXURY SCORECARD HERO HEADER */}
               <div 
-                className="bg-gradient-to-br from-[#070b16] via-[#0d162d] to-[#0a1024] text-white rounded-3xl p-6 sm:p-9 border border-indigo-500/30 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.85)] relative overflow-hidden"
+                className="bg-gradient-to-br from-[#070b16] via-[#0d162d] to-[#0a1024] text-white rounded-3xl p-6 sm:p-9 border border-indigo-500/30 shadow-sm relative overflow-hidden"
                 style={{
                   boxShadow: `0 24px 64px -12px ${badgeInfo.glow}`
                 }}
               >
                 {/* Dynamic Ambient Laser Lighting */}
                 <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-400 via-purple-400 to-emerald-400 opacity-90" />
-                <div className="absolute -top-24 -right-24 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
 
                 <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 sm:gap-8">
                   {/* Left Column: Radial Circular Gauge */}
@@ -1650,7 +1646,7 @@ Ascend Study Buddy • AI-Powered Education`;
                         <span>{isHindi ? badgeInfo.rankHi : badgeInfo.rank}</span>
                       </span>
 
-                      <span className="px-2.5 py-1 rounded-full bg-white/10 text-slate-300 text-[10px] font-bold uppercase tracking-wider border border-white/10">
+                      <span className="px-2.5 py-1 rounded-full bg-slate-900 text-slate-300 text-[10px] font-bold uppercase tracking-wider border border-white/10">
                         {selectedSubject}
                       </span>
                     </div>
@@ -1675,7 +1671,7 @@ Ascend Study Buddy • AI-Powered Education`;
                       <button
                         type="button"
                         onClick={handleCopyReport}
-                        className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 border border-white/15 text-slate-200 hover:text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer active:scale-95 shadow-sm"
+                        className="px-3.5 py-1.5 bg-slate-900 hover:bg-white/20 border border-white/15 text-slate-200 hover:text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer active:scale-95 shadow-sm"
                       >
                         {isReportCopied ? (
                           <>
@@ -1873,7 +1869,7 @@ Ascend Study Buddy • AI-Powered Education`;
                       return (
                         <div
                           key={originalIdx}
-                          className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 ${
+                          className={`p-4 sm:p-5 rounded-2xl border transition-colors duration-200 ${
                             isCorrect
                               ? 'border-emerald-200/90 bg-emerald-50/25 hover:bg-emerald-50/40'
                               : 'border-rose-200/90 bg-rose-50/25 hover:bg-rose-50/40'
@@ -1990,7 +1986,7 @@ Ascend Study Buddy • AI-Powered Education`;
                   <button
                     type="button"
                     onClick={handleStartQuiz}
-                    className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-xs shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-95 border border-indigo-400/30"
+                    className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-xs shadow-lg shadow-indigo-600/30 transition-colors flex items-center justify-center space-x-2 cursor-pointer active:scale-95 border border-indigo-400/30"
                   >
                     <RotateCcw className="w-4 h-4 stroke-[2.5]" />
                     <span>{isHindi ? 'इस विषय का पुनः टेस्ट लें' : 'Retake This Topic'}</span>

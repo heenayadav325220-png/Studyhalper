@@ -349,11 +349,9 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-[#0b1120] border-2 border-indigo-500/60 rounded-3xl shadow-[0_0_50px_rgba(99,102,241,0.35)] overflow-hidden flex flex-col max-h-[92vh] relative text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80  animate-in fade-in duration-200">
+      <div className="w-full max-w-lg bg-[#0b1120] border-2 border-indigo-500/60 rounded-3xl shadow-sm overflow-hidden flex flex-col max-h-[92vh] relative text-slate-100">
         {/* TOP AMBIENT GLOW */}
-        <div className="absolute -top-12 -right-12 w-40 h-40 bg-indigo-500/25 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
 
         {/* HEADER BAR */}
         <div className="p-4 border-b border-slate-800/90 bg-slate-950/80 flex items-center justify-between relative z-10">
@@ -465,12 +463,12 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
               whileHover={{ scale: 1.06 }}
               whileTap={{ scale: 0.94 }}
               onClick={toggleListening}
-              className={`w-18 h-18 sm:w-20 sm:h-20 rounded-full flex flex-col items-center justify-center shadow-xl transition-all cursor-pointer border-2 relative z-10 ${
+              className={`w-18 h-18 sm:w-20 sm:h-20 rounded-full flex flex-col items-center justify-center shadow-xl transition-colors cursor-pointer border-2 relative z-10 ${
                 isListening
-                  ? 'bg-gradient-to-tr from-rose-600 to-pink-500 border-rose-300 text-white shadow-[0_0_30px_rgba(244,63,94,0.6)]'
+                  ? 'bg-gradient-to-tr from-rose-600 to-pink-500 border-rose-300 text-white shadow-sm'
                   : isSpeaking
-                  ? 'bg-gradient-to-tr from-emerald-600 to-teal-500 border-emerald-300 text-white shadow-[0_0_25px_rgba(16,185,129,0.5)]'
-                  : 'bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 border-indigo-300/60 text-white shadow-[0_0_25px_rgba(99,102,241,0.5)]'
+                  ? 'bg-gradient-to-tr from-emerald-600 to-teal-500 border-emerald-300 text-white shadow-sm'
+                  : 'bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 border-indigo-300/60 text-white shadow-sm'
               }`}
             >
               {isListening ? (
@@ -533,7 +531,7 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => speakText(msg.speechText || msg.text)}
-                            className="p-1 hover:bg-white/10 rounded-md text-slate-400 hover:text-white transition cursor-pointer"
+                            className="p-1 hover:bg-slate-900 rounded-md text-slate-400 hover:text-white transition cursor-pointer"
                             title="Replay Audio"
                           >
                             <RotateCcw className="w-3 h-3" />
@@ -541,7 +539,7 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
                           {onSaveToNotebook && (
                             <button
                               onClick={() => handleSaveToNotebook(msg)}
-                              className={`p-1 hover:bg-white/10 rounded-md transition cursor-pointer ${
+                              className={`p-1 hover:bg-slate-900 rounded-md transition cursor-pointer ${
                                 savedDocId === msg.id ? 'text-emerald-400' : 'text-slate-400 hover:text-white'
                               }`}
                               title="Save to Notebook"
@@ -570,7 +568,7 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
                               type="button"
                               onClick={() => handleCopyText(msg.id, msg.text)}
                               title="Copy text"
-                              className="bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium px-2 py-1 rounded-lg flex items-center space-x-1 transition cursor-pointer active:scale-95"
+                              className="bg-slate-900 hover:bg-white/20 text-slate-200 text-[11px] font-medium px-2 py-1 rounded-lg flex items-center space-x-1 transition cursor-pointer active:scale-95"
                             >
                               {copiedId === msg.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-slate-400" />}
                               <span className="hidden xs:inline">{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
@@ -580,7 +578,7 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
                               type="button"
                               onClick={() => speakText(msg.speechText || msg.text)}
                               title="Listen"
-                              className="bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium px-2 py-1 rounded-lg flex items-center space-x-1 transition cursor-pointer active:scale-95"
+                              className="bg-slate-900 hover:bg-white/20 text-slate-200 text-[11px] font-medium px-2 py-1 rounded-lg flex items-center space-x-1 transition cursor-pointer active:scale-95"
                             >
                               <Volume2 className="w-3 h-3 text-slate-400" />
                               <span className="hidden xs:inline">Listen</span>
@@ -590,7 +588,7 @@ export const VoiceTutorModal: React.FC<VoiceTutorModalProps> = ({
                               type="button"
                               onClick={() => handleSaveToNotebook(msg)}
                               title="Save to notebook"
-                              className="bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium px-2 py-1 rounded-lg flex items-center space-x-1 transition cursor-pointer active:scale-95"
+                              className="bg-slate-900 hover:bg-white/20 text-slate-200 text-[11px] font-medium px-2 py-1 rounded-lg flex items-center space-x-1 transition cursor-pointer active:scale-95"
                             >
                               <Bookmark className="w-3 h-3 text-slate-400" />
                               <span className="hidden xs:inline">{savedDocId === msg.id ? 'Saved ✓' : 'Save Note'}</span>

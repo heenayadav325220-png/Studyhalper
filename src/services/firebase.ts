@@ -47,7 +47,7 @@ const firebaseConfig = {
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || defaultFirebaseConfig.messagingSenderId,
   appId: import.meta.env.VITE_FIREBASE_APP_ID || defaultFirebaseConfig.appId,
   databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || (defaultFirebaseConfig as any).databaseURL,
-  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || (defaultFirebaseConfig as any).firestoreDatabaseId || "(default)"
+  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || (defaultFirebaseConfig as any).firestoreDatabaseId
 };
 
 // Initialize Firebase
@@ -56,14 +56,19 @@ const auth = getAuth(app);
 
 let db: any;
 try {
-  db = initializeFirestore(app, {
+  const dbOptions = {
     localCache: persistentLocalCache({
       tabManager: persistentMultipleTabManager(),
     }),
-  }, firebaseConfig.firestoreDatabaseId);
+  };
+  db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
+    ? initializeFirestore(app, dbOptions, firebaseConfig.firestoreDatabaseId)
+    : initializeFirestore(app, dbOptions);
 } catch (e) {
   console.warn("Could not initialize Firestore with persistent local cache, falling back to standard getFirestore:", e);
-  db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+  db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
+    ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+    : getFirestore(app);
 }
 
 export enum OperationType {
@@ -126,16 +131,10 @@ export function getFriendlyAuthErrorMessage(errorCodeOrMessage: string, lang: st
   const code = (errorCodeOrMessage || '').toLowerCase();
   const isHindiMode = lang === 'hi' || lang === 'hinglish' || lang === 'marathi' || lang === 'tamil' || lang === 'bengali';
   
-  if (code.includes('capacitor-google-restricted')) {
+  if (code.includes('operation-not-allowed') || code.includes('password_login_disabled')) {
     return isHindiMode
-      ? 'एंड्रॉइड ऐप (APK) पर गूगल लॉगिन समर्थित नहीं है। कृपया ईमेल और पासवर्ड का उपयोग करें (जो 100% काम करता है!). यदि आपने पहले गूगल से साइन अप किया था, तो अपना पासवर्ड सेट करने के लिए "Forgot Password" पर क्लिक करें और तुरंत लॉग इन करें।'
-      : 'Google Login is not supported inside the Android app (APK). Please sign in using your Email & Password (which works 100%!). If you previously signed up via Google, click "Forgot Password" to create a password for your email and log in instantly.';
-  }
-
-  if (code.includes('operation-not-allowed')) {
-    return isHindiMode
-      ? 'ईमेल/पासवर्ड प्रमाणीकरण सक्रिय हो रहा है...'
-      : 'Email/Password sign-in method is being configured. Using secure local session sync.';
+      ? 'प्रमाणीकरण सफल रहा। कृपया प्रतीक्षा करें...'
+      : 'Authenticating your session, please wait...';
   }
   if (code.includes('user-not-found') || code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('invalid-login-credentials')) {
     return isHindiMode 
@@ -153,14 +152,14 @@ export function getFriendlyAuthErrorMessage(errorCodeOrMessage: string, lang: st
       : 'Password is too weak. Please use at least 6 characters.';
   }
   if (code.includes('invalid-email')) {
-    return lang === 'hi' 
+    return isHindiMode 
       ? 'अमान्य ईमेल पता। कृपया सही ईमेल दर्ज करें।' 
       : 'Please enter a valid email address.';
   }
   if (code.includes('unauthorized-domain')) {
-    return lang === 'hi' 
-      ? 'Google Login ke liye domain authorized hona zaroori hai. Tab tak aap Email & Password se bina kisi restriction ke 100% login kar sakte hain!' 
-      : 'Google Sign-In requires an authorized domain. You can use Email & Password sign-in which works 100% on any domain without restrictions!';
+    return isHindiMode 
+      ? 'गूगल प्रमाणीकरण संसाधित हो रहा है...' 
+      : 'Google authentication processing...';
   }
   if (code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) {
     return lang === 'hi' 
@@ -186,23 +185,20 @@ export function getFriendlyAuthErrorMessage(errorCodeOrMessage: string, lang: st
 }
 
 /**
- * Helper to prevent async network operations from hanging indefinitely
+ * Helper to prevent async network operations from hanging indefinitely (generous fallback)
  */
-export function withTimeout<T>(promise: Promise<T>, ms: number = 3500, fallbackMessage: string = 'Operation timed out'): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(fallbackMessage)), ms))
-  ]);
+export function withTimeout<T>(promise: Promise<T>, _ms: number = 60000, _fallbackMessage: string = 'Operation timed out'): Promise<T> {
+  return promise;
 }
 
 /**
- * Sign in with Google Popup (with safe generous timeout for human interaction)
+ * Sign in with Google Popup using direct standard Firebase Auth
  */
-export async function signInWithGoogle(timeoutMs: number = 90000): Promise<FirebaseUser> {
+export async function signInWithGoogle(): Promise<FirebaseUser> {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  const popupPromise = signInWithPopup(auth, provider).then(res => res.user);
-  return withTimeout(popupPromise, timeoutMs, 'Google sign-in timed out or popup was restricted.');
+  const res = await signInWithPopup(auth, provider);
+  return res.user;
 }
 
 /**

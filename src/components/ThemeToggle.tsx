@@ -19,9 +19,9 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
     return (
       <div 
         onClick={toggleTheme}
-        className={`p-3.5 sm:p-4 rounded-2xl border transition-all duration-200 cursor-pointer select-none ${
+        className={`p-3.5 sm:p-4 rounded-2xl border transition-colors duration-200 cursor-pointer select-none ${
           isDark
-            ? 'bg-slate-900/90 hover:bg-slate-850 border-indigo-500/40 shadow-[0_4px_20px_rgba(99,102,241,0.2)]'
+            ? 'bg-slate-900 hover:bg-slate-850 border-indigo-500/40 shadow-sm'
             : 'bg-white hover:bg-slate-50 border-slate-200 shadow-sm'
         } ${className}`}
       >
@@ -29,7 +29,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
           <div className="flex items-start sm:items-center space-x-3 min-w-0">
             <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 ${
               isDark 
-                ? 'bg-indigo-600/30 text-amber-400 border border-indigo-500/50 shadow-[0_0_12px_rgba(99,102,241,0.4)]' 
+                ? 'bg-indigo-600/30 text-amber-400 border border-indigo-500/50 shadow-sm' 
                 : 'bg-indigo-50 text-indigo-600 border border-indigo-100'
             }`}>
               {isDark ? <Moon className="w-5 h-5 text-amber-400 animate-in spin-in-12 duration-200" /> : <Sun className="w-5 h-5 text-amber-500" />}
@@ -131,7 +131,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
       <button
         type="button"
         onClick={toggleTheme}
-        className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+        className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
           isDark
             ? 'bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700/60 shadow-xs'
             : 'bg-slate-100 hover:bg-slate-200 text-indigo-600 border border-slate-200 shadow-xs'
@@ -157,7 +157,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
     <button
       type="button"
       onClick={toggleTheme}
-      className={`p-1.5 rounded-full transition-all cursor-pointer border active:scale-95 shrink-0 flex items-center justify-center ${
+      className={`p-1.5 rounded-full transition-colors cursor-pointer border active:scale-95 shrink-0 flex items-center justify-center ${
         isDark
           ? 'bg-slate-800 hover:bg-slate-700 text-amber-400 border-slate-700 shadow-xs'
           : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200 shadow-xs'

@@ -185,7 +185,7 @@ export function StreakCelebrationModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 bg-slate-950/80 backdrop-blur-md"
+          className="fixed inset-0 bg-slate-950/80 "
         />
 
         {/* 60fps Particle Canvas layer */}
@@ -200,10 +200,9 @@ export function StreakCelebrationModal({
           animate={{ scale: 1, y: 0, opacity: 1 }}
           exit={{ scale: 0.9, y: 35, opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-          className="relative w-full max-w-md bg-gradient-to-b from-[#1b1108] via-[#0f0a05] to-[#080503] rounded-3xl p-6 border-2 border-amber-500/50 shadow-[0_0_55px_rgba(245,158,11,0.35)] text-center text-amber-100 overflow-hidden z-20"
+          className="relative w-full max-w-md bg-gradient-to-b from-[#1b1108] via-[#0f0a05] to-[#080503] rounded-3xl p-6 border-2 border-amber-500/50 shadow-sm text-center text-amber-100 overflow-hidden z-20"
         >
           {/* Subtle Ambient Radial Glow */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
           
           <div className="relative z-10 flex flex-col items-center">
             
@@ -217,17 +216,17 @@ export function StreakCelebrationModal({
               <motion.div
                 animate={{ scale: [1, 1.15, 1], rotate: [0, 5, -5, 0] }}
                 transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut' }}
-                className="w-20 h-28 rounded-3xl bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 border border-amber-300/40 flex flex-col items-center justify-center shadow-[0_0_35px_rgba(245,158,11,0.65)] relative overflow-hidden"
+                className="w-20 h-28 rounded-3xl bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 border border-amber-300/40 flex flex-col items-center justify-center shadow-sm relative overflow-hidden"
               >
                 {/* Internal Flame Icon */}
-                <Flame className="w-12 h-12 fill-white text-white filter drop-shadow-[0_2px_8px_rgba(234,88,12,0.8)]" />
+                <Flame className="w-12 h-12 fill-white text-white filter drop-shadow-sm" />
                 
                 {/* Numerical glow tick up */}
                 <motion.span 
                   key={displayedStreak}
                   initial={{ scale: 0.5, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  className="font-black text-2xl text-white font-mono leading-none mt-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]"
+                  className="font-black text-2xl text-white font-mono leading-none mt-2 drop-shadow-sm"
                 >
                   {displayedStreak}
                 </motion.span>
@@ -290,7 +289,7 @@ export function StreakCelebrationModal({
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               onClick={onClose}
-              className="w-full mt-6 py-3.5 px-6 rounded-2xl text-xs sm:text-sm font-black text-slate-950 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 border border-amber-200 shadow-[0_0_25px_rgba(245,158,11,0.4)] transition-all cursor-pointer flex items-center justify-center space-x-2 active:scale-95 font-sans"
+              className="w-full mt-6 py-3.5 px-6 rounded-2xl text-xs sm:text-sm font-black text-slate-950 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 border border-amber-200 shadow-sm transition-colors cursor-pointer flex items-center justify-center space-x-2 active:scale-95 font-sans"
             >
               <Check className="w-4 h-4 stroke-[3]" />
               <span>{isHindi ? "सिलसिला जारी रखें!" : "Awesome! Keep it Up"}</span>

@@ -190,10 +190,8 @@ Options: [${optionsText}]`;
   );
 
   return (
-    <div className="bg-[#0b101d]/90 border border-slate-800/80 rounded-[24px] p-4.5 sm:p-5 shadow-xl relative overflow-hidden space-y-4">
+    <div className="bg-[#0b101d] border border-slate-800/80 rounded-[24px] p-4.5 sm:p-5 shadow-xl relative overflow-hidden space-y-4">
       {/* Decorative subtle ambient lights */}
-      <div className="absolute top-0 left-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
 
       {/* HEADER SECTION */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
@@ -242,7 +240,7 @@ Options: [${optionsText}]`;
               className="space-y-4"
             >
               {/* CURRENT CRITICAL NEXT ACTION */}
-              <div className={`p-4 rounded-xl border ${recommendation.color} relative overflow-hidden transition-all duration-300`}>
+              <div className={`p-4 rounded-xl border ${recommendation.color} relative overflow-hidden transition-colors duration-300`}>
                 <div className="flex items-start space-x-3.5 relative z-10">
                   <div className="p-2 bg-slate-950/50 rounded-lg shrink-0 border border-slate-800">
                     <recommendation.icon className="w-5 h-5" />

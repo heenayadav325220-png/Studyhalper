@@ -74,7 +74,7 @@ export function BadgeCelebrationModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 bg-slate-950/85 backdrop-blur-md"
+          className="fixed inset-0 bg-slate-950 "
         />
 
         {/* Modal card */}
@@ -83,10 +83,9 @@ export function BadgeCelebrationModal({
           animate={{ scale: 1, y: 0, opacity: 1 }}
           exit={{ scale: 0.9, y: 30, opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-          className="relative w-full max-w-md bg-gradient-to-b from-[#2d1f14] via-[#1c120a] to-[#120a05] rounded-3xl p-6 border-2 border-amber-500/60 shadow-[0_0_50px_rgba(245,158,11,0.4)] text-center text-amber-100 overflow-hidden"
+          className="relative w-full max-w-md bg-gradient-to-b from-[#2d1f14] via-[#1c120a] to-[#120a05] rounded-3xl p-6 border-2 border-amber-500/60 shadow-sm text-center text-amber-100 overflow-hidden"
         >
           {/* Confetti & Glow particle effects */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
           
           <div className="relative z-10 flex flex-col items-center">
             
@@ -100,9 +99,9 @@ export function BadgeCelebrationModal({
               <motion.div
                 animate={{ scale: [1, 1.1, 1] }}
                 transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-                className="w-18 h-18 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-300 to-amber-500 border border-amber-200/50 flex items-center justify-center shadow-[0_0_25px_rgba(245,158,11,0.5)]"
+                className="w-18 h-18 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-300 to-amber-500 border border-amber-200/50 flex items-center justify-center shadow-sm"
               >
-                <span className="text-4xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)] select-none">
+                <span className="text-4xl filter drop-shadow-sm select-none">
                   {badge.icon}
                 </span>
               </motion.div>
@@ -158,7 +157,7 @@ export function BadgeCelebrationModal({
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               onClick={onClose}
-              className="w-full mt-6 py-3.5 px-6 rounded-2xl text-xs sm:text-sm font-black text-slate-950 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 border border-amber-200 shadow-[0_0_25px_rgba(245,158,11,0.45)] transition-all cursor-pointer flex items-center justify-center space-x-2 active:scale-95 font-sans"
+              className="w-full mt-6 py-3.5 px-6 rounded-2xl text-xs sm:text-sm font-black text-slate-950 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 border border-amber-200 shadow-sm transition-colors cursor-pointer flex items-center justify-center space-x-2 active:scale-95 font-sans"
             >
               <Check className="w-4 h-4 stroke-[3]" />
               <span>{isHindi ? "शानदार! इनाम प्राप्त करें" : "Awesome! Claim Reward"}</span>

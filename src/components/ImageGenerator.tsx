@@ -173,7 +173,6 @@ export default function ImageGenerator({ onSaveToNotebook, onAddXp }: ImageGener
     <div className="space-y-4 max-w-2xl mx-auto pb-12">
       {/* HEADER CARD */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-5 border border-indigo-500/30 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-8 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
         
         <div className="flex items-center justify-between relative z-10">
           <div className="flex items-center space-x-3">
@@ -514,7 +513,7 @@ export default function ImageGenerator({ onSaveToNotebook, onAddXp }: ImageGener
 
       {/* FULLSCREEN MODAL OVERLAY */}
       {fullscreenImage && (
-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-slate-950/90  z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center justify-center space-y-3">
             <button
               type="button"

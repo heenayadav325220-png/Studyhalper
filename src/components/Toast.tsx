@@ -56,7 +56,7 @@ export default function Toast() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={{ duration: 0.2, ease: 'easeOut' }}
-              className={`p-3.5 rounded-2xl border flex items-start gap-3 shadow-2xl backdrop-blur-md pointer-events-auto ${
+              className={`p-3.5 rounded-2xl border flex items-start gap-3 shadow-2xl  pointer-events-auto ${
                 isError
                   ? 'bg-rose-950/90 border-rose-500/30 text-rose-200'
                   : isSuccess
