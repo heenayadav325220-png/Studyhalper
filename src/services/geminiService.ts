@@ -248,10 +248,27 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
       ? `${API_BASE}${input}`
       : input;
 
-    const controller = !modifiedInit.signal ? new AbortController() : null;
-    const timeoutId = controller ? setTimeout(() => controller.abort(), 15000) : null;
-    if (controller) {
+    // FIX: Create controller only if no signal is provided AND if we need timeout
+    let controller: AbortController | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    
+    // Check if signal is already provided
+    const hasExistingSignal = modifiedInit.signal !== undefined;
+    
+    if (!hasExistingSignal) {
+      controller = new AbortController();
       modifiedInit.signal = controller.signal;
+      
+      // Only set timeout if we created a new controller
+      timeoutId = setTimeout(() => {
+        if (controller) {
+          try {
+            controller.abort();
+          } catch (abortError) {
+            console.warn("[SafeFetch] Abort error (signal already consumed):", abortError);
+          }
+        }
+      }, 15000);
     }
 
     let response: Response;
@@ -274,6 +291,12 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
           console.error("Token refresh retry error:", retryErr);
         }
       }
+    } catch (fetchError: any) {
+      // Handle abort errors gracefully
+      if (fetchError.name === 'AbortError') {
+        console.warn("[SafeFetch] Request timeout after 15s");
+      }
+      throw fetchError;
     } finally {
       if (timeoutId) {
         clearTimeout(timeoutId);
@@ -815,5 +838,4 @@ export async function generateAiImage(
     modelUsed: 'Flux-RealAI-Engine'
   };
 }
-
 
