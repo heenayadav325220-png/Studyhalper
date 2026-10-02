@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
   Send,
+  Square,
+  Edit3,
   Trash2,
   Volume2,
   Copy,
@@ -108,6 +110,7 @@ interface ChatMessage {
   mode?: string;
   image?: string;
   images?: string[];
+  isEdited?: boolean;
 }
 
 const SUBJECT_LIST: Subject[] = ['Mathematics', 'Science', 'Physics', 'Chemistry', 'Biology', 'English'];
@@ -704,6 +707,26 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [tutorMode, setTutorMode] = useState<'homework' | 'explain' | 'step' | 'quiz'>('homework');
   const [aiTutorSubMode, setAiTutorSubMode] = useState<string>('direct');
   const [isLoading, setIsLoading] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState<string>('');
+  const [editingImages, setEditingImages] = useState<string[]>([]);
+  const editInputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (editingMessageId && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.setSelectionRange(editInputRef.current.value.length, editInputRef.current.value.length);
+    }
+  }, [editingMessageId]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [savedNoteId, setSavedNoteId] = useState<string | null>(null);
   const [expandedActionsId, setExpandedActionsId] = useState<string | null>(null);
@@ -1710,32 +1733,18 @@ export const AiTutorApp = memo(function AiTutorApp({
     }
   };
 
-  const handleSendMessage = async (customText?: string | unknown) => {
-    const imagesToSend = [...selectedImages];
-    const queryText = typeof customText === 'string' ? customText : inputQuery;
-    const cleanQuery = typeof queryText === 'string' ? queryText.trim() : '';
-    const effectiveQuery = cleanQuery || (imagesToSend.length > 0 ? `Please solve and explain the homework problem(s) shown in the ${imagesToSend.length > 1 ? `${imagesToSend.length} attached pages` : 'attached page'}.` : '');
-
-    if (!effectiveQuery || isLoading) return;
-
-    const userMsgId = 'msg_' + Date.now();
-    const userMsg: ChatMessage = {
-      id: userMsgId,
-      sender: 'user',
-      text: effectiveQuery,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      subject: selectedSubject,
-      mode: tutorMode,
-      images: imagesToSend.length > 0 ? imagesToSend : undefined,
-      image: imagesToSend.length > 0 ? imagesToSend[0] : undefined
-    };
-
-    setMessages((prev) => [...prev, userMsg]);
-    if (typeof customText !== 'string') {
-      setInputQuery('');
-      setStoredValue(`ai_tutor_input_draft_${user.uid}`, null);
+  const executeTutorQuery = async (
+    effectiveQuery: string,
+    imagesToSend: string[],
+    currentMessages: ChatMessage[]
+  ) => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
-    setSelectedImages([]);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsLoading(true);
 
     try {
@@ -1786,9 +1795,9 @@ export const AiTutorApp = memo(function AiTutorApp({
       };
 
       // Construct a sliding context window of history messages (excluding greeting and error blocks)
-      const historyPayload = messages
-        .filter(m => !m.id.startsWith('welcome_') && !m.id.startsWith('msg_err_'))
-        .slice(-8) // Sensible 8-message context window to respect tokens and avoid payload bloat
+      const historyPayload = currentMessages
+        .filter(m => !m.id.startsWith('welcome_') && !m.id.startsWith('msg_err_') && !m.id.startsWith('msg_stopped_'))
+        .slice(-8)
         .map(m => ({
           role: m.sender === 'user' ? ('user' as const) : ('model' as const),
           text: m.text,
@@ -1801,7 +1810,8 @@ export const AiTutorApp = memo(function AiTutorApp({
         studentCtx, 
         selectedLanguage,
         'default',
-        historyPayload
+        historyPayload,
+        controller.signal
       );
 
       const aiMsg: ChatMessage = {
@@ -1827,6 +1837,10 @@ export const AiTutorApp = memo(function AiTutorApp({
 
       if (onAddXp) onAddXp(15);
     } catch (err: any) {
+      if (err?.name === 'AbortError' || err?.message?.includes('aborted') || controller.signal.aborted) {
+        console.log('AI generation stopped by student.');
+        return;
+      }
       console.error(err);
       const errorMsg: ChatMessage = {
         id: 'msg_err_' + Date.now(),
@@ -1837,7 +1851,122 @@ export const AiTutorApp = memo(function AiTutorApp({
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
     }
+  };
+
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
+    setMessages((prev) => {
+      const lastMsg = prev[prev.length - 1];
+      if (lastMsg && lastMsg.sender === 'user') {
+        const stopNotice: ChatMessage = {
+          id: 'msg_stopped_' + Date.now(),
+          sender: 'ai',
+          text: appLanguage === 'hi'
+            ? '⏹️ आपने AI ट्यूटर का उत्तर रोक दिया है। आप ऊपर पेंसिल बटन से अपना सवाल सुधार सकते हैं या नया सवाल पूछ सकते हैं।'
+            : '⏹️ AI response generation was stopped. You can edit your question above or ask a new question.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          subject: selectedSubject,
+          mode: tutorMode
+        };
+        return [...prev, stopNotice];
+      }
+      return prev;
+    });
+  };
+
+  const handleStartEditMessage = (msg: ChatMessage) => {
+    setEditingMessageId(msg.id);
+    setEditingText(msg.text);
+    const imgs = msg.images && msg.images.length > 0
+      ? [...msg.images]
+      : msg.image ? [msg.image] : [];
+    setEditingImages(imgs);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditingText('');
+    setEditingImages([]);
+  };
+
+  const handleRemoveEditingImage = (index: number) => {
+    setEditingImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveAndResendEditedMessage = async (msgId: string) => {
+    const newText = editingText.trim();
+    const newImages = [...editingImages];
+    if (!newText && newImages.length === 0) return;
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    const targetIdx = messages.findIndex(m => m.id === msgId);
+    if (targetIdx === -1) return;
+
+    const originalMsg = messages[targetIdx];
+    const updatedUserMsg: ChatMessage = {
+      ...originalMsg,
+      text: newText || (newImages.length > 0 ? `Please solve and explain the homework problem(s) shown in the ${newImages.length > 1 ? `${newImages.length} attached pages` : 'attached page'}.` : ''),
+      images: newImages.length > 0 ? newImages : undefined,
+      image: newImages.length > 0 ? newImages[0] : undefined,
+      isEdited: true,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    // Replace and truncate downstream replies to keep the conversation coherent
+    const newHistory = [...messages.slice(0, targetIdx), updatedUserMsg];
+    setMessages(newHistory);
+    setEditingMessageId(null);
+    setEditingText('');
+    setEditingImages([]);
+
+    await executeTutorQuery(
+      updatedUserMsg.text,
+      updatedUserMsg.images || (updatedUserMsg.image ? [updatedUserMsg.image] : []),
+      newHistory
+    );
+  };
+
+  const handleSendMessage = async (customText?: string | unknown) => {
+    const imagesToSend = [...selectedImages];
+    const queryText = typeof customText === 'string' ? customText : inputQuery;
+    const cleanQuery = typeof queryText === 'string' ? queryText.trim() : '';
+    const effectiveQuery = cleanQuery || (imagesToSend.length > 0 ? `Please solve and explain the homework problem(s) shown in the ${imagesToSend.length > 1 ? `${imagesToSend.length} attached pages` : 'attached page'}.` : '');
+
+    if (!effectiveQuery || isLoading) return;
+
+    const userMsgId = 'msg_' + Date.now();
+    const userMsg: ChatMessage = {
+      id: userMsgId,
+      sender: 'user',
+      text: effectiveQuery,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      subject: selectedSubject,
+      mode: tutorMode,
+      images: imagesToSend.length > 0 ? imagesToSend : undefined,
+      image: imagesToSend.length > 0 ? imagesToSend[0] : undefined
+    };
+
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
+    if (typeof customText !== 'string') {
+      setInputQuery('');
+      setStoredValue(`ai_tutor_input_draft_${user.uid}`, null);
+    }
+    setSelectedImages([]);
+
+    await executeTutorQuery(effectiveQuery, imagesToSend, newMessages);
   };
 
   const handleExportPdf = async () => {
@@ -2623,32 +2752,113 @@ export const AiTutorApp = memo(function AiTutorApp({
                       <div className="flex items-center space-x-2 pr-1">
                         <span className="text-[11px] text-slate-400 font-medium">
                           {user.name || 'You'} • {msg.timestamp}
+                          {msg.isEdited && (
+                            <span className="ml-1.5 text-[10px] text-indigo-400 font-normal italic">
+                              ({appLanguage === 'hi' ? 'संपादित' : 'edited'})
+                            </span>
+                          )}
                         </span>
                         <button
                           type="button"
+                          onClick={() => handleStartEditMessage(msg)}
+                          className="opacity-70 sm:opacity-0 group-hover/usermsg:opacity-100 transition text-slate-400 hover:text-indigo-400 p-0.5 rounded cursor-pointer"
+                          title={appLanguage === 'hi' ? 'मैसेज एडिट करें' : 'Edit message'}
+                        >
+                          <Edit3 className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleDeleteMessage(msg.id)}
-                          className="opacity-0 group-hover/usermsg:opacity-100 transition text-slate-400 hover:text-rose-500 p-0.5 rounded cursor-pointer"
-                          title="Remove message"
+                          className="opacity-70 sm:opacity-0 group-hover/usermsg:opacity-100 transition text-slate-400 hover:text-rose-500 p-0.5 rounded cursor-pointer"
+                          title={appLanguage === 'hi' ? 'मैसेज हटाएं' : 'Remove message'}
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
                       </div>
 
-                      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 text-white rounded-2xl rounded-tr-xs p-3.5 sm:p-4 border border-slate-700/60 shadow-sm space-y-2.5">
-                        {msg.images && msg.images.length > 0 ? (
-                          <div className={`grid gap-2 ${msg.images.length === 1 ? 'grid-cols-1 max-w-xs' : 'grid-cols-2 max-w-sm'}`}>
-                            {msg.images.map((img, i) => (
-                              <img key={i} src={img} alt={`Attached ${i + 1}`} className="w-full max-h-48 object-contain rounded-xl border border-slate-700 bg-slate-800" />
-                            ))}
+                      {editingMessageId === msg.id ? (
+                        <div className="w-full bg-slate-900 border border-indigo-500/70 rounded-2xl rounded-tr-xs p-3 sm:p-3.5 shadow-lg space-y-2.5">
+                          {editingImages && editingImages.length > 0 && (
+                            <div className="space-y-1.5">
+                              <span className="text-[10px] font-semibold text-indigo-300 uppercase tracking-wider block">
+                                {appLanguage === 'hi' ? 'संलग्न तस्वीरें:' : 'Attached Images:'}
+                              </span>
+                              <div className={`grid gap-2 ${editingImages.length === 1 ? 'grid-cols-1 max-w-xs' : 'grid-cols-2 max-w-sm'}`}>
+                                {editingImages.map((img, i) => (
+                                  <div key={i} className="relative group/editimg rounded-xl overflow-hidden border border-slate-700">
+                                    <img src={img} alt={`Attached ${i + 1}`} className="w-full max-h-36 object-contain bg-slate-800" />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveEditingImage(i)}
+                                      className="absolute top-1 right-1 p-1 bg-rose-600/90 hover:bg-rose-600 text-white rounded-md shadow-xs transition cursor-pointer"
+                                      title={appLanguage === 'hi' ? 'तस्वीर हटाएं' : 'Remove image'}
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          <textarea
+                            ref={editInputRef}
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSaveAndResendEditedMessage(msg.id);
+                              } else if (e.key === 'Escape') {
+                                handleCancelEdit();
+                              }
+                            }}
+                            rows={3}
+                            placeholder={appLanguage === 'hi' ? 'अपना प्रश्न या संदेश सुधारें...' : 'Edit your message or question...'}
+                            className="w-full bg-slate-950/80 border border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-white text-xs sm:text-sm rounded-xl p-2.5 resize-none outline-none leading-relaxed transition font-normal"
+                          />
+
+                          <div className="flex items-center justify-between pt-1 gap-2 flex-wrap">
+                            <span className="text-[10px] text-slate-400 hidden sm:inline">
+                              {appLanguage === 'hi' ? 'Enter से सेव करें, Esc से रद्द करें' : 'Press Enter to save, Esc to cancel'}
+                            </span>
+                            <div className="flex items-center space-x-2 ml-auto">
+                              <button
+                                type="button"
+                                onClick={handleCancelEdit}
+                                className="px-2.5 py-1 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition active:scale-95 cursor-pointer font-medium"
+                              >
+                                {appLanguage === 'hi' ? 'रद्द करें' : 'Cancel'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSaveAndResendEditedMessage(msg.id)}
+                                disabled={!editingText.trim() && (!editingImages || editingImages.length === 0)}
+                                className="px-3 py-1 text-xs text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 rounded-lg transition active:scale-95 cursor-pointer font-semibold flex items-center space-x-1 shadow-sm"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>{appLanguage === 'hi' ? 'सेव और दोबारा भेजें' : 'Save & Resend'}</span>
+                              </button>
+                            </div>
                           </div>
-                        ) : msg.image ? (
-                          <img src={msg.image} alt="Attached homework" className="w-full max-h-56 object-contain rounded-xl border border-slate-700 bg-slate-800" />
-                        ) : null}
-                        <p className="text-xs sm:text-[14.5px] text-slate-100 whitespace-pre-wrap leading-relaxed font-normal">
-                          {msg.text}
-                        </p>
+                        </div>
+                      ) : (
+                        <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 text-white rounded-2xl rounded-tr-xs p-3.5 sm:p-4 border border-slate-700/60 shadow-sm space-y-2.5">
+                          {msg.images && msg.images.length > 0 ? (
+                            <div className={`grid gap-2 ${msg.images.length === 1 ? 'grid-cols-1 max-w-xs' : 'grid-cols-2 max-w-sm'}`}>
+                              {msg.images.map((img, i) => (
+                                <img key={i} src={img} alt={`Attached ${i + 1}`} className="w-full max-h-48 object-contain rounded-xl border border-slate-700 bg-slate-800" />
+                              ))}
+                            </div>
+                          ) : msg.image ? (
+                            <img src={msg.image} alt="Attached homework" className="w-full max-h-56 object-contain rounded-xl border border-slate-700 bg-slate-800" />
+                          ) : null}
+                          <p className="text-xs sm:text-[14.5px] text-slate-100 whitespace-pre-wrap leading-relaxed font-normal">
+                            {msg.text}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                  </div>
 
                     <div className="w-8 h-8 rounded-full ring-2 ring-indigo-500/20 shadow-xs overflow-hidden bg-slate-800 flex items-center justify-center shrink-0 mt-1">
                       {user.avatar ? (
@@ -3254,6 +3464,32 @@ export const AiTutorApp = memo(function AiTutorApp({
             })}
           </div>
 
+          {/* STOP GENERATING FLOATING PILL/BOX ABOVE INPUT */}
+          <AnimatePresence>
+            {isLoading && (
+              <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+                className="flex justify-center -mb-1 relative z-20"
+              >
+                <button
+                  type="button"
+                  onClick={handleStopGeneration}
+                  className="flex items-center space-x-2 px-3.5 py-1.5 bg-slate-900/95 hover:bg-slate-950 text-white rounded-full shadow-lg border border-slate-700/80 hover:border-rose-500/80 active:scale-95 transition-all cursor-pointer text-xs font-semibold backdrop-blur-md group"
+                  title={appLanguage === 'hi' ? 'AI का उत्तर रोकें (Stop Generating)' : 'Stop generating response'}
+                >
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                  <Square className="w-3 h-3 text-rose-400 fill-rose-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-slate-100 font-bold tracking-tight">
+                    {appLanguage === 'hi' ? 'जवाब रोकें (Stop)' : 'Stop Generating'}
+                  </span>
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <div className="relative flex flex-col bg-white border border-slate-250/90 hover:border-slate-350 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/15 rounded-3xl p-3 pb-2.5 transition-colors duration-200 shadow-sm min-h-[96px]">
             {/* Top Row: Full-width Flexible Textarea */}
             <div className={`w-full flex-grow flex ${inputQuery ? 'items-start' : 'items-center'} pb-1`}>
@@ -3266,6 +3502,12 @@ export const AiTutorApp = memo(function AiTutorApp({
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     handleSendMessage();
+                  } else if (e.key === 'ArrowUp' && !inputQuery.trim()) {
+                    const lastUserMsg = [...messages].reverse().find(m => m.sender === 'user');
+                    if (lastUserMsg) {
+                      e.preventDefault();
+                      handleStartEditMessage(lastUserMsg);
+                    }
                   }
                 }}
                 placeholder={
@@ -3530,16 +3772,27 @@ export const AiTutorApp = memo(function AiTutorApp({
                   </button>
                 )}
 
-                {/* SEND BUTTON */}
-                <button
-                  type="button"
-                  onClick={() => handleSendMessage()}
-                  disabled={(!inputQuery.trim() && selectedImages.length === 0) || isLoading}
-                  className="w-9 h-9 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white font-bold rounded-xl shadow-xs transition-colors duration-150 cursor-pointer shrink-0"
-                  title="Send Message"
-                >
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                </button>
+                {/* SEND OR STOP GENERATION BUTTON */}
+                {isLoading ? (
+                  <button
+                    type="button"
+                    onClick={handleStopGeneration}
+                    className="w-9 h-9 flex items-center justify-center bg-slate-900 hover:bg-rose-600 text-white font-bold rounded-xl shadow-xs ring-2 ring-rose-500/40 transition-all duration-150 cursor-pointer shrink-0 group active:scale-95"
+                    title={appLanguage === 'hi' ? 'उत्तर रोकें (Stop Generating)' : 'Stop Generating'}
+                  >
+                    <Square className="w-3.5 h-3.5 fill-rose-500 text-rose-500 group-hover:fill-white group-hover:text-white transition-colors" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleSendMessage()}
+                    disabled={!inputQuery.trim() && selectedImages.length === 0}
+                    className="w-9 h-9 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white font-bold rounded-xl shadow-xs transition-colors duration-150 cursor-pointer shrink-0"
+                    title="Send Message"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           </div>

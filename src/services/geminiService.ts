@@ -187,17 +187,54 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
     } catch (e) {}
   }
 
+  // Helper to retrieve/refresh Firebase ID token
+  const getValidIdToken = async (): Promise<string> => {
+    const { auth } = await import("./firebase");
+    
+    let user = auth.currentUser;
+    if (user) {
+      return await user.getIdToken();
+    }
+
+    const waitForAuthUser = () => new Promise<any>((resolve) => {
+      let resolved = false;
+      const unsubscribe = auth.onAuthStateChanged((u) => {
+        unsubscribe();
+        resolved = true;
+        resolve(u);
+      });
+      setTimeout(() => {
+        if (!resolved) {
+          unsubscribe();
+          resolve(null);
+        }
+      }, 4000);
+    });
+
+    user = await waitForAuthUser();
+    if (user) {
+      return await user.getIdToken();
+    }
+
+    try {
+      const { signInAnonymously } = await import("./firebase");
+      const cred = await signInAnonymously(auth);
+      user = cred.user;
+      return await user.getIdToken();
+    } catch (e: any) {
+      console.warn("⚠️ Anonymous sign-in fallback in safeFetch:", e?.message || e);
+      return "";
+    }
+  };
+
   // Define the core fetch promise
   const executeFetch = async (): Promise<Response> => {
     // Add Firebase Auth ID token if available
     let idToken: string | null = null;
     try {
-      const { auth } = await import("./firebase");
-      if (auth.currentUser) {
-        idToken = await auth.currentUser.getIdToken();
-      }
+      idToken = await getValidIdToken();
     } catch (e) {
-      // Ignore if auth is not loaded or fails
+      console.warn("safeFetch token acquisition error:", e);
     }
 
     const modifiedInit = { ...(init || {}) };
@@ -220,10 +257,31 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
     let response: Response;
     try {
       response = await fetch(resolvedInput, modifiedInit);
+
+      // On 401, force refresh and retry ONCE
+      if (response.status === 401) {
+        console.warn("Received 401, forcing token refresh and retrying...");
+        try {
+          const { auth } = await import("./firebase");
+          if (auth.currentUser) {
+            const newToken = await auth.currentUser.getIdToken(true);
+            const retryHeaders = new Headers(modifiedInit.headers || {});
+            retryHeaders.set("Authorization", `Bearer ${newToken}`);
+            modifiedInit.headers = retryHeaders;
+            response = await fetch(resolvedInput, modifiedInit);
+          }
+        } catch (retryErr) {
+          console.error("Token refresh retry error:", retryErr);
+        }
+      }
     } finally {
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
+    }
+
+    if (response.status === 401) {
+      console.warn("Received 401 status, proceeding with guest fallback.");
     }
 
     try {
@@ -309,7 +367,8 @@ export async function getStudyAnswer(
   studentContext?: { name: string; school: string; className: string; country?: string; memory?: any }, 
   language: string = "English",
   persona: 'default' | 'socratic' | 'debugger' | 'translator' | 'math' = 'default',
-  history?: { role: 'user' | 'model', text: string }[]
+  history?: { role: 'user' | 'model', text: string }[],
+  signal?: AbortSignal
 ): Promise<string> {
   const cleanPrompt = typeof prompt === 'string' ? prompt : String(prompt || '');
 
@@ -328,6 +387,7 @@ export async function getStudyAnswer(
     headers: {
       "Content-Type": "application/json",
     },
+    signal,
     body: JSON.stringify({ 
       prompt: cleanPrompt, 
       imageBase64: imagesArray.length === 1 ? imagesArray[0] : undefined,

@@ -34,7 +34,7 @@ export function parseError(error: any): AppError {
   if (error instanceof Error) {
     rawErrorMessage = error.message;
   } else if (error && typeof error === 'object') {
-    rawErrorMessage = error.message || error.details || error.statusText || JSON.stringify(error);
+    rawErrorMessage = error.message || error.details || error.statusText || error.code || String(error);
   } else {
     rawErrorMessage = String(error || '');
   }

@@ -4,6 +4,7 @@ import {
   db,
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
+  signInAnonymously,
   signOut, 
   onAuthStateChanged,
   signInWithGoogle as firebaseSignInWithGoogle,
@@ -78,12 +79,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let profile: UserProfile = {
       ...DEFAULT_PROFILE,
       uid: user.uid,
-      name: user.displayName || user.email?.split('@')[0] || 'Student',
+      name: user.isAnonymous ? 'Guest Student' : (user.displayName || user.email?.split('@')[0] || 'Student'),
       email: user.email || '',
       photoURL: user.photoURL || undefined,
       avatar: user.photoURL || '🧑‍🎓',
       avatarType: user.photoURL ? 'personal' : 'emoji',
-      authProvider: user.providerData?.[0]?.providerId?.includes('google') ? 'google' : 'password',
+      authProvider: user.isAnonymous ? 'guest' : (user.providerData?.[0]?.providerId?.includes('google') ? 'google' : 'password'),
       lastActive: new Date().toISOString()
     };
 
@@ -165,10 +166,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return profile;
   };
 
+  const [hasAttemptedAnon, setHasAttemptedAnon] = useState(false);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
-      if (user && !user.isAnonymous) {
+      if (user) {
         try {
           await fetchOrInitUserProfile(user);
         } catch (err) {
@@ -176,48 +179,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else {
         setUserProfile(null);
+        if (!hasAttemptedAnon) {
+          setHasAttemptedAnon(true);
+          try {
+            await signInAnonymously(auth);
+          } catch (err: any) {
+            console.warn("⚠️ Anonymous sign-in network/restricted fallback invoked:", err?.message || err);
+          }
+        }
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [hasAttemptedAnon]);
 
   const signInWithEmail = async (email: string, password: string): Promise<FirebaseUser> => {
     setLoading(true);
     setAuthError(null);
     try {
       const cleanEmail = email.trim().toLowerCase();
-      let user: any = null;
-      try {
-        const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
-        user = cred.user;
-        await fetchOrInitUserProfile(user);
-        return user;
-      } catch (fbErr: any) {
-        console.warn('AuthContext signInWithEmail fallback note:', fbErr?.code || fbErr?.message);
-        const code = (fbErr?.code || '').toLowerCase();
-        if (code.includes('wrong-password')) {
-          const msg = getFriendlyAuthErrorMessage(fbErr?.code || fbErr?.message || '');
-          setAuthError(msg);
-          throw new Error(msg);
-        }
-      }
-
-      // Smooth fallback session if Firebase project disabled password auth
-      const uid = user?.uid || auth.currentUser?.uid || `usr_${btoa(cleanEmail).replace(/=/g, '').substring(0, 16)}`;
-      const profile: UserProfile = {
-        ...DEFAULT_PROFILE,
-        uid,
-        email: cleanEmail,
-        name: cleanEmail.split('@')[0] || 'Student',
-        authProvider: 'password',
-        isOnboarded: true,
-        lastActive: new Date().toISOString()
-      };
-      setUserProfile(profile);
-      localStorage.setItem('ascend_user_profile', JSON.stringify(profile));
-      return (user || auth.currentUser || { uid, email: cleanEmail, displayName: profile.name } as any);
+      const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
+      const user = cred.user;
+      await fetchOrInitUserProfile(user);
+      return user;
     } catch (err: any) {
       const msg = getFriendlyAuthErrorMessage(err?.code || err?.message || '');
       setAuthError(msg);
@@ -238,24 +223,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const cleanEmail = email.trim().toLowerCase();
       const cleanName = name.trim() || 'Student';
-      let user: any = null;
+      const cred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+      const user = cred.user;
       try {
-        const cred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
-        user = cred.user;
-        try {
-          await firebaseUpdateProfile(cred.user, { displayName: cleanName });
-        } catch (e) {
-          console.warn('Could not set displayName:', e);
-        }
-      } catch (fbErr: any) {
-        console.warn('AuthContext createUserWithEmail fallback note:', fbErr?.code || fbErr?.message);
+        await firebaseUpdateProfile(user, { displayName: cleanName });
+      } catch (e) {
+        console.warn('Could not set displayName:', e);
       }
       
-      const uid = user?.uid || auth.currentUser?.uid || `usr_${btoa(cleanEmail).replace(/=/g, '').substring(0, 16)}`;
       const newProfile: UserProfile = {
         ...DEFAULT_PROFILE,
         ...extra,
-        uid: uid,
+        uid: user.uid,
         name: cleanName,
         email: cleanEmail,
         xp: 250, // Welcome signup bonus
@@ -270,8 +249,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Create profile in Firestore
       try {
-        const userDocRef = doc(db, 'users', uid);
-        setDoc(userDocRef, {
+        const userDocRef = doc(db, 'users', user.uid);
+        await setDoc(userDocRef, {
           uid: newProfile.uid,
           name: newProfile.name,
           email: newProfile.email,
@@ -290,15 +269,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           targetGoal: newProfile.targetGoal || '',
           authProvider: 'password',
           createdAt: serverTimestamp()
-        }).catch(err => console.warn('Initial Firestore write warning:', err));
-      } catch {}
+        });
+      } catch (err) {
+        console.warn('Initial Firestore write warning:', err);
+      }
 
       setUserProfile(newProfile);
       localStorage.setItem('ascend_user_profile', JSON.stringify(newProfile));
-      localStorage.setItem(`user_profile_${uid}`, JSON.stringify(newProfile));
+      localStorage.setItem(`user_profile_${user.uid}`, JSON.stringify(newProfile));
       localStorage.setItem('ascend_onboarded', 'true');
 
-      return (user || auth.currentUser || { uid, email: cleanEmail, displayName: cleanName } as any);
+      return user;
     } catch (err: any) {
       const msg = getFriendlyAuthErrorMessage(err?.code || err?.message || '');
       setAuthError(msg);
@@ -312,34 +293,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     setAuthError(null);
     try {
-      let user: any = null;
-      try {
-        user = await firebaseSignInWithGoogle();
-        if (user) {
-          await fetchOrInitUserProfile(user);
-          return user;
-        }
-      } catch (fbErr: any) {
-        console.warn('AuthContext Google Sign-In note:', fbErr?.code || fbErr?.message);
+      const user = await firebaseSignInWithGoogle();
+      if (!user) {
+        throw new Error('Google Sign-In returned empty user.');
       }
-
-      // Seamless Google session fallback
-      const uid = user?.uid || auth.currentUser?.uid || `google_${Math.random().toString(36).substring(2, 10)}`;
-      const googleProfile: UserProfile = {
-        ...DEFAULT_PROFILE,
-        uid: uid,
-        name: 'Google Student',
-        email: 'student@gmail.com',
-        authProvider: 'google',
-        isOnboarded: true,
-        xp: 200,
-        lastActive: new Date().toISOString()
-      };
-      setUserProfile(googleProfile);
-      localStorage.setItem('ascend_user_profile', JSON.stringify(googleProfile));
-      localStorage.setItem(`user_profile_${uid}`, JSON.stringify(googleProfile));
-      localStorage.setItem('ascend_onboarded', 'true');
-      return (user || auth.currentUser || { uid, email: googleProfile.email, displayName: googleProfile.name } as any);
+      await fetchOrInitUserProfile(user);
+      return user;
     } catch (err: any) {
       const msg = getFriendlyAuthErrorMessage(err?.code || err?.message || '');
       setAuthError(msg);
@@ -356,6 +315,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(null);
       setUserProfile(null);
       localStorage.removeItem('ascend_user_profile');
+      try {
+        await signInAnonymously(auth);
+      } catch (anonErr: any) {
+        console.warn("⚠️ Anonymous sign-in after logout fallback invoked:", anonErr?.message || anonErr);
+      }
     } catch (err: any) {
       const msg = getFriendlyAuthErrorMessage(err?.code || err?.message || '');
       setAuthError(msg);

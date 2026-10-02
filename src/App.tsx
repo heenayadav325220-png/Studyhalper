@@ -453,8 +453,8 @@ export default function App() {
         try {
           const { signInAnonymously } = await import("firebase/auth");
           await signInAnonymously(auth);
-        } catch (err) {
-          console.warn("Failed to sign in guest anonymously", err);
+        } catch (err: any) {
+          console.warn("⚠️ Anonymous sign-in network/restricted fallback invoked:", err?.message || err);
         }
       } else if (!user.isAnonymous) {
         // Authenticated user detected

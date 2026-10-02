@@ -9,6 +9,7 @@ import path from "path";
 import compression from "compression";
 import { GoogleGenAI } from "@google/genai";
 import { requireAuth, AuthRequest } from "./src/middleware/auth.js";
+import { requireAdminHealthToken } from "./src/middleware/adminAuth.js";
 import { getOrCreateUser, getUserProfile, updateUserStats } from "./src/db/users.js";
 import { getUserNotes, createNote, deleteNote, logStudySession, logMockExam } from "./src/db/notes.js";
 import { securityHeaders, rateLimitAi, rateLimitGeneral, sanitizeInputs } from "./src/middleware/security.js";
@@ -187,20 +188,58 @@ app.get("/api/health", (_req, res) => {
 });
 
 // Telemetry endpoint for gateway diagnostics with authorization check
-app.get("/api/admin/ai-health", (req, res) => {
-  const token = req.headers["x-admin-token"];
-  const expectedToken = process.env.ADMIN_HEALTH_TOKEN;
-  
-  if (!expectedToken || expectedToken.trim() === "" || token !== expectedToken) {
-    res.status(401).json({ error: "Unauthorized access to telemetry data." });
-    return;
-  }
-  
+app.get("/api/admin/ai-health", requireAdminHealthToken, (_req, res) => {
   res.json(getProviderHealth());
 });
 
+const GUEST_DAILY_LIMIT = Number(process.env.GUEST_DAILY_LIMIT) || 15;
+const SIGNED_IN_DAILY_LIMIT = Number(process.env.SIGNED_IN_DAILY_LIMIT) || 100;
+const userDailyUsage = new Map<string, number>();
+
+// Daily sweep of old in-memory limit records (every 12 hours)
+setInterval(() => {
+  const todayStr = new Date().toISOString().split("T")[0];
+  for (const key of userDailyUsage.keys()) {
+    if (!key.endsWith(`:${todayStr}`)) {
+      userDailyUsage.delete(key);
+    }
+  }
+}, 12 * 3600 * 1000);
+
+const checkDailyLimit = async (req: AuthRequest, res: express.Response, next: express.NextFunction): Promise<void> => {
+  const user = req.user;
+  if (!user) {
+    res.status(401).json({ error: "Unauthorized: Missing user authentication details." });
+    return;
+  }
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  const usageKey = `${user.uid}:${todayStr}`;
+  const isGuest = user.firebase?.sign_in_provider === 'anonymous';
+  const limit = isGuest ? GUEST_DAILY_LIMIT : SIGNED_IN_DAILY_LIMIT;
+
+  const currentUsage = userDailyUsage.get(usageKey) || 0;
+
+  if (currentUsage >= limit) {
+    const isHindi = req.headers["accept-language"]?.includes("hi") || req.query.lang === "hi";
+    const message = isHindi 
+      ? `दैनिक सीमा समाप्त हो गई है। अतिथि उपयोगकर्ता: 15 अनुरोध/दिन, पंजीकृत उपयोगकर्ता: 100 अनुरोध/दिन।`
+      : `Daily AI request limit exceeded. Guest limit is ${GUEST_DAILY_LIMIT} requests/day, and Signed-in limit is ${SIGNED_IN_DAILY_LIMIT} requests/day.`;
+    res.status(429).json({
+      error: "Too Many Requests",
+      message,
+      code: "DAILY_LIMIT_EXCEEDED"
+    });
+    return;
+  }
+
+  // Increment usage
+  userDailyUsage.set(usageKey, currentUsage + 1);
+  next();
+};
+
   // API Route: World-class AI Tutor Answer / Explanation
-  app.post("/api/gemini/answer", requireAuth, rateLimitAi, async (req: AuthRequest, res) => {
+  app.post("/api/gemini/answer", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
     try {
       const { prompt, imageBase64, imagesBase64, studentContext, language, persona, history } = req.body;
       if (!prompt && !imageBase64 && (!imagesBase64 || imagesBase64.length === 0)) {
@@ -377,7 +416,7 @@ Make sure you write keywords like "PDF", "Notes", "Summary", "Formula Sheet", "P
   });
 
   // API Route: AI-Powered Adaptive Quiz / Mock Exam
-  app.post("/api/gemini/quiz", rateLimitAi, async (req, res) => {
+  app.post("/api/gemini/quiz", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
     try {
       const { subject, topic, studentContext, language, difficulty, questionCount } = req.body || {};
       const numQuestions = Math.max(3, Math.min(Number(questionCount) || 10, 30));
@@ -488,7 +527,7 @@ Each object in the array must strictly have these keys:
   });
 
   // API Route: Generate AI Mock Exam
-  app.post("/api/generate-exam", rateLimitAi, async (req, res) => {
+  app.post("/api/generate-exam", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
     try {
       const { subject, topic, language, questionCount } = req.body;
       if (!subject || !topic) {
@@ -561,7 +600,7 @@ Each object in the array must strictly have these keys:
   });
 
   // API Route: AI Tutor Contextual Suggestion Engine
-  app.post("/api/gemini/suggestions", rateLimitAi, async (req, res) => {
+  app.post("/api/gemini/suggestions", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
     try {
       const { history, subject, studentContext, language } = req.body;
       const cacheKey = `sugg_${subject || 'gen'}_${language || 'en'}`;
@@ -652,7 +691,7 @@ Each item must have:
   });
 
   // API Route: PDF / Book Scanner - Comprehensive Chapter Summarizer & Quiz Generator
-  app.post("/api/pdf-scan-analyze", rateLimitAi, async (req, res) => {
+  app.post("/api/pdf-scan-analyze", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
     try {
       const { pdfBase64, imageBase64, imagesBase64, textContent, fileName, language } = req.body;
 
@@ -799,7 +838,7 @@ JSON SCHEMA:
   });
 
   // API Route: Voice Tutor Conversational Engine
-  app.post("/api/voice-tutor", rateLimitAi, async (req, res) => {
+  app.post("/api/voice-tutor", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
     const { userSpokenText, history, studentContext, language } = req.body || {};
     try {
       if (!userSpokenText) {
@@ -878,7 +917,7 @@ YOUR VOICE SPEECH GUIDELINES:
   });
 
   // API Route: Cinematic AI Editor & App Redesign Superpower Engine
-  app.post("/api/ai-editor-command", rateLimitAi, async (req, res) => {
+  app.post("/api/ai-editor-command", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
     const { userPrompt, history, currentCustomization, currentTab, language } = req.body || {};
     try {
       if (!userPrompt) {
@@ -1330,7 +1369,7 @@ You MUST output ONLY valid JSON matching this schema:
   });
 
   // API Route: AI Note Synthesizer Generator
-  app.post("/api/gemini/notes-generator", rateLimitAi, async (req, res) => {
+  app.post("/api/gemini/notes-generator", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
     try {
       const { topic, subject, grade, language } = req.body || {};
       if (!topic) {
@@ -1400,7 +1439,7 @@ Ensure there is NO promotional fluff or filler greetings. Open directly with the
   });
 
   // API Route: Deep Concept Explainer
-  app.post("/api/gemini/explain-topic", rateLimitAi, async (req, res) => {
+  app.post("/api/gemini/explain-topic", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
     try {
       const { topic, subject, grade, style, language } = req.body || {};
       if (!topic) {
@@ -1466,7 +1505,7 @@ Format beautifully in Markdown. Do not include any greeting or conversational fi
   });
 
   // API Route: Interactive Mind Map Generator
-  app.post("/api/gemini/mindmap", rateLimitAi, async (req, res) => {
+  app.post("/api/gemini/mindmap", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
     try {
       const { topic, language } = req.body || {};
       if (!topic) {
@@ -1554,7 +1593,7 @@ JSON Format Schema:
   });
 
   // API Route: CBSE & Board Question Paper Generator
-  app.post("/api/gemini/question-paper", rateLimitAi, async (req, res) => {
+  app.post("/api/gemini/question-paper", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
     try {
       const { topic, subject, grade, language } = req.body || {};
       if (!topic) {
@@ -1612,7 +1651,7 @@ Format nicely using standard Markdown. Include the detailed step-by-step marking
   });
 
   // API Route: Vision Textbook OCR Scanner
-  app.post("/api/gemini/ocr", rateLimitAi, async (req, res) => {
+  app.post("/api/gemini/ocr", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
     try {
       const { imageBase64 } = req.body || {};
       if (!imageBase64) {
@@ -1665,7 +1704,7 @@ Preserve the visual structure as clean markdown, lists, and formatted headers. D
   });
 
   // API Route: Document & PDF Analyzer
-  app.post("/api/gemini/pdf-summary", rateLimitAi, async (req, res) => {
+  app.post("/api/gemini/pdf-summary", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
     try {
       const { textContent, language } = req.body || {};
       if (!textContent) {
@@ -1742,7 +1781,7 @@ ${textContent.slice(0, 50000)}`;
   });
 
   // API Route: Analyze and Summarize notes with key study insights
-  app.post("/api/summarize-notes", rateLimitAi, async (req, res) => {
+  app.post("/api/summarize-notes", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
     try {
       const { content, language } = req.body;
       if (!content) {
@@ -1788,7 +1827,7 @@ ${content}`;
   });
 
   // API Route: Academic AI Tutor Chat
-  app.post("/api/tutor-chat", rateLimitAi, async (req, res) => {
+  app.post("/api/tutor-chat", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
     try {
       const { messages, language } = req.body;
       if (!messages || !Array.isArray(messages)) {
@@ -1828,7 +1867,7 @@ Keep your tone encouraging and educational. Use clear formatting, lists, and mar
   });
 
   // API Route: Enhance image prompt for ultra-realistic and aesthetic outputs
-  app.post("/api/enhance-image-prompt", rateLimitAi, async (req, res) => {
+  app.post("/api/enhance-image-prompt", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
     try {
       const { prompt, style } = req.body;
       if (!prompt) {
@@ -1861,7 +1900,7 @@ Rules:
   });
 
   // API Route: Real Image Generator Engine (Gemini 3.1 Flash Image + Imagen 3 + Flux HD Pipeline)
-  app.post("/api/generate-image", rateLimitAi, async (req, res) => {
+  app.post("/api/generate-image", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
     try {
       const { prompt, size, aspectRatio, style, negativePrompt, seed } = req.body;
       if (!prompt || typeof prompt !== 'string') {
@@ -1972,6 +2011,126 @@ Rules:
         height: 1024,
         modelUsed: 'Flux-RealAI-Engine'
       });
+    }
+  });
+
+  // API Route: AI Educational Vector Diagram Generator
+  app.post("/api/gemini/diagram", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
+    try {
+      const { prompt } = req.body;
+      if (!prompt || typeof prompt !== 'string') {
+        res.status(400).json({ error: "Prompt is required." });
+        return;
+      }
+
+      const ai = getAiClient();
+      const validAspect = "1:1";
+      const validSize = "1K";
+
+      let finalPrompt = `${prompt.trim()}, educational vector diagram, clear labeled annotations, academic illustration, clean white background, crisp technical infographic`;
+
+      let imageDataUrl = "";
+      let modelUsed = "";
+
+      if (ai) {
+        try {
+          const geminiImgRes = await (ai.models as any).generateContent({
+            model: 'gemini-3.1-flash-image',
+            contents: {
+              parts: [{ text: finalPrompt }]
+            },
+            config: {
+              imageConfig: {
+                aspectRatio: validAspect,
+                imageSize: validSize
+              }
+            }
+          });
+
+          const parts = geminiImgRes.candidates?.[0]?.content?.parts || [];
+          for (const part of parts) {
+            if (part.inlineData && part.inlineData.data) {
+              const mime = part.inlineData.mimeType || 'image/png';
+              imageDataUrl = `data:${mime};base64,${part.inlineData.data}`;
+              modelUsed = 'gemini-3.1-flash-image';
+              break;
+            }
+          }
+        } catch (_err) {
+          // Fall back seamlessly
+        }
+      }
+
+      if (!imageDataUrl) {
+        const encodedPrompt = encodeURIComponent(finalPrompt);
+        imageDataUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true&enhance=true&model=flux`;
+        modelUsed = 'Flux-RealAI-Engine';
+      }
+
+      res.json({
+        imageUrl: imageDataUrl,
+        modelUsed
+      });
+    } catch (err: any) {
+      console.error("Generate Diagram Error:", err);
+      res.status(500).json({ error: "Failed to generate study diagram." });
+    }
+  });
+
+  // API Route: AI-Powered Flashcard Generator
+  app.post("/api/gemini/flashcard", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
+    try {
+      const { subject, noteTitle, noteContent, count } = req.body;
+      const cardCount = Math.max(3, Math.min(Number(count) || 8, 20));
+
+      const cleanSubject = subject || 'General Study';
+      const cleanTitle = noteTitle || 'Study Notes';
+      const cleanContent = noteContent || '';
+
+      const prompt = `You are the ASCEND FLASHCARD GENERATOR ENGINE.
+Generate exactly ${cardCount} highly educational flashcards for the subject "${cleanSubject}" based on the notes titled "${cleanTitle}".
+Notes content to analyze:
+"${cleanContent.slice(0, 15000)}"
+
+CRITICAL REQUIREMENTS:
+1. Every flashcard must test a core concept, key term, formula, historical event, or scientific law.
+2. Structure: One side has a clear, direct question or cue (front). The other side has a detailed, concise answer or explanation (back).
+3. Do not repeat questions or ask trivial questions. Ensure high academic yield.
+4. Output format: Return STRICTLY a valid JSON array of objects. Do NOT wrap in \`\`\`json markdown codeblocks. Return only raw JSON.
+Each object in the array must strictly have these keys:
+- "front": string (question/cue)
+- "back": string (answer/explanation)`;
+
+      const result = await executeAIRequest({
+        modality: "text",
+        requiresVision: false,
+        modelPreference: 'gemini-2.5-flash'
+      }, {
+        contents: prompt,
+        config: { temperature: 0.7 }
+      });
+
+      if (!result.success || !result.text) {
+        throw new Error(result.error?.message || "Failed to generate flashcards");
+      }
+
+      const text = result.text;
+      const cleanJsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
+      const parsed = JSON.parse(cleanJsonStr);
+
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        res.json(parsed);
+      } else {
+        throw new Error("Invalid output format from AI");
+      }
+    } catch (err: any) {
+      console.error("Flashcards API Error:", err);
+      // Clean fallback flashcards
+      res.json([
+        { front: "What is the primary study method to retain complex educational concepts?", back: "Active Recall combined with spaced repetition." },
+        { front: "How should formulas and derivations be practiced for maximum exam score?", back: "By deriving them step-by-step without looking, and solving at least 3 practice numericals." },
+        { front: "What is the significance of the mistake book pattern in study routines?", back: "It helps identify and target recurring patterns of errors to avoid them in actual exams." }
+      ]);
     }
   });
 

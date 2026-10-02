@@ -64,7 +64,7 @@ export const MODEL_CONFIG = {
 
 // 3. Configuration values
 const COOLDOWN_MS = Number(process.env.AI_PROVIDER_COOLDOWN_MS) || 12000; // 12 seconds cooldown for quick quota recovery
-const REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS) || 25000; // 25 seconds
+const REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS) || 15000; // 15 seconds for blazing speed
 
 // 4. In-Memory Gateway State
 const credentials: ProviderCredential[] = [];
@@ -403,7 +403,7 @@ async function executeProviderRequest(
         // Calculate remaining time relative to the overall global timeout (25 seconds total)
         const elapsed = Date.now() - start;
         const remainingTime = Math.max(2000, REQUEST_TIMEOUT_MS - elapsed);
-        const modelTimeout = Math.min(18000, remainingTime); // Generous timeout up to 18s if time permits
+        const modelTimeout = Math.min(8000, remainingTime); // Fast timeout up to 8s per model trial
 
         const modelController = new AbortController();
         const modelTimeoutId = setTimeout(() => modelController.abort(), modelTimeout);

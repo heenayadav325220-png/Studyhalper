@@ -367,8 +367,30 @@ export default function QuizSection({
   const [loadingStep, setLoadingStep] = useState(0);
   const loadingIntervalRef = useRef<any>(null);
 
+  // Dynamic Quiz-specific Language Selection
+  const [quizLanguage, setQuizLanguage] = useState<QuizLanguage>(() => {
+    if (language && ['en', 'hi', 'hinglish', 'marathi', 'tamil', 'bengali'].includes(language)) {
+      return language as QuizLanguage;
+    }
+    return 'en';
+  });
+
+  // Setup Config
+  const [selectedSubject, setSelectedSubject] = useState<Subject>(prefilledSubject || 'Mathematics');
+  const [customTopic, setCustomTopic] = useState<string>(prefilledTopic || 'Trigonometry & Formulas');
+
+  // Load prefilled subject & topic from Personal Planner recommendations
+  useEffect(() => {
+    if (prefilledSubject) {
+      setSelectedSubject(prefilledSubject);
+    }
+    if (prefilledTopic) {
+      setCustomTopic(prefilledTopic);
+    }
+  }, [prefilledSubject, prefilledTopic]);
+
   const getLoadingSteps = () => {
-    const topicToUse = customTopic.trim() || 'Core Concepts';
+    const topicToUse = (customTopic || '').trim() || 'Core Concepts';
     const stepsMap: Record<string, string[]> = {
       hi: [
         "अस्केंड अकैडमिक इंजन आरंभ हो रहा है...",
@@ -412,7 +434,7 @@ export default function QuizSection({
         `"${topicToUse}" এর মূল ধারণাগুলি বিশ্লেষণ করা হচ্ছে...`,
         "বহুনির্বাচনী প্রশ্ন (MCQs) তৈরি করা হচ্ছে...",
         "ব্যাখ্যা এবং ইঙ্গিত যাচাই করা হচ্ছে...",
-        "বিকল্পগুলি এলোমেলোভাবে সাজানো হচ্ছে...",
+        "বিকল্পগুলি এলোমেলोভাবে সাজানো হচ্ছে...",
         "আপনার মক পরীক্ষার পেপার সম্পূর্ণ প্রস্তুত!"
       ]
     };
@@ -438,14 +460,6 @@ export default function QuizSection({
     };
   }, []);
 
-  // Dynamic Quiz-specific Language Selection
-  const [quizLanguage, setQuizLanguage] = useState<QuizLanguage>(() => {
-    if (language && ['en', 'hi', 'hinglish', 'marathi', 'tamil', 'bengali'].includes(language)) {
-      return language as QuizLanguage;
-    }
-    return 'en';
-  });
-
   // Sync quiz language with app language if app language changes
   useEffect(() => {
     if (language && ['en', 'hi', 'hinglish', 'marathi', 'tamil', 'bengali'].includes(language)) {
@@ -459,20 +473,6 @@ export default function QuizSection({
       onLanguageChange(lang);
     }
   };
-
-  // Setup Config
-  const [selectedSubject, setSelectedSubject] = useState<Subject>('Mathematics');
-  const [customTopic, setCustomTopic] = useState('Trigonometry & Formulas');
-
-  // Load prefilled subject & topic from Personal Planner recommendations
-  useEffect(() => {
-    if (prefilledSubject) {
-      setSelectedSubject(prefilledSubject);
-    }
-    if (prefilledTopic) {
-      setCustomTopic(prefilledTopic);
-    }
-  }, [prefilledSubject, prefilledTopic]);
   const [questionCount, setQuestionCount] = useState<number>(10);
   const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard'>('Medium');
   const [isTimed, setIsTimed] = useState(true);
