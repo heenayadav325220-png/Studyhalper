@@ -34,7 +34,9 @@ import {
   Search,
   Notebook,
   Clock,
-  Target
+  Target,
+  ShieldCheck,
+  Lock
 } from 'lucide-react';
 import InteractiveToolkit from './components/InteractiveToolkit';
 import AiTutorApp from './components/AiTutorApp';
@@ -541,6 +543,77 @@ export default function App() {
       if (hour >= 12 && hour < 17) return 'Good Afternoon';
       if (hour >= 17 && hour < 21) return 'Good Evening';
       return 'Good Night';
+    }
+  };
+
+  const POLICY_VERSION = '2026-09-28';
+
+  const [privacyConsent, setPrivacyConsent] = useState<{ accepted: boolean; date: string; version: string } | null>(() => {
+    try {
+      const saved = localStorage.getItem(`ascend_privacy_consent_${userProfile?.uid || 'guest'}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.version === POLICY_VERSION) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error("Error reading privacy consent", e);
+    }
+    return null;
+  });
+
+  // Re-sync privacy consent on user change to prevent state-sharing between users
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`ascend_privacy_consent_${userProfile?.uid || 'guest'}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.version === POLICY_VERSION) {
+          setPrivacyConsent(parsed);
+          return;
+        }
+      }
+      setPrivacyConsent(null);
+    } catch (e) {
+      setPrivacyConsent(null);
+    }
+  }, [userProfile?.uid]);
+
+  const handleAcceptPrivacyConsent = () => {
+    const consentObj = {
+      accepted: true,
+      date: new Date().toISOString(),
+      version: POLICY_VERSION
+    };
+    try {
+      localStorage.setItem(`ascend_privacy_consent_${userProfile?.uid || 'guest'}`, JSON.stringify(consentObj));
+    } catch (e) {
+      console.error("Error storing privacy consent", e);
+    }
+    setPrivacyConsent(consentObj);
+    showToast(appLanguage === 'hi' ? 'सहमति दर्ज की गई! धन्यवाद।' : 'Consent recorded! Thank you.', 'success');
+  };
+
+  const handleRejectPrivacyConsent = () => {
+    const consentObj = {
+      accepted: false,
+      date: new Date().toISOString(),
+      version: POLICY_VERSION
+    };
+    try {
+      localStorage.setItem(`ascend_privacy_consent_${userProfile?.uid || 'guest'}`, JSON.stringify(consentObj));
+    } catch (e) {
+      console.error("Error storing privacy consent", e);
+    }
+    setPrivacyConsent(consentObj);
+    showToast(appLanguage === 'hi' ? 'गोपनीयता नीति अस्वीकार कर दी गई।' : 'Privacy policy rejected.', 'error');
+  };
+
+  const handleLearnMorePrivacy = () => {
+    if (typeof window !== 'undefined') {
+      window.history.pushState(null, '', '/privacy');
+      setCurrentPath('/privacy');
     }
   };
 
@@ -1521,6 +1594,43 @@ export default function App() {
     );
   }
 
+  // If the user rejected privacy consent, block feature access and display a clean consent blocked overlay
+  if (currentPath !== '/privacy' && privacyConsent?.accepted === false) {
+    const isHi = appLanguage === 'hi';
+    return (
+      <div className="fixed inset-0 bg-[#050811] text-white flex flex-col items-center justify-center p-6 text-center select-none z-[9990] selection:bg-rose-500/30">
+        <div className="w-16 h-16 rounded-2xl bg-indigo-600/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 mb-6 shadow-lg shadow-indigo-500/5 animate-pulse">
+          <Lock className="w-8 h-8" />
+        </div>
+        
+        <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white mb-3">
+          {isHi ? 'सहमति आवश्यक है' : 'Consent Required'}
+        </h2>
+        
+        <p className="max-w-md text-xs sm:text-sm text-slate-400 leading-relaxed mb-8">
+          {isHi
+            ? 'प्रीमियम एआई ट्यूटरिंग, स्कैनिंग और डेटा सिंकिंग सुविधाओं का उपयोग करने के लिए गोपनीयता नीति की सहमति आवश्यक है। आपका खाता या डेटा हटाया नहीं गया है। आप किसी भी समय अपनी सहमति प्रदान कर सकते हैं।'
+            : 'To protect your privacy and satisfy regulatory requirements, Ascend Study requires your consent to process personal study inputs before you can access premium AI, scanner, and tracking features. Your account has not been deleted; you can change your choice at any time.'}
+        </p>
+
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-sm">
+          <button
+            onClick={handleAcceptPrivacyConsent}
+            className="w-full sm:flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 shadow-lg shadow-indigo-600/20 active:scale-95 cursor-pointer text-center"
+          >
+            {isHi ? 'सहमति दें और सक्षम करें' : 'Provide Consent & Enable'}
+          </button>
+          <button
+            onClick={handleLearnMorePrivacy}
+            className="w-full sm:w-auto px-5 py-3 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 font-semibold text-xs sm:text-sm rounded-xl transition-all duration-200 active:scale-95 cursor-pointer text-center"
+          >
+            {isHi ? 'गोपनीयता नीति' : 'Review Policy'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div 
       id="main-app-container" 
@@ -1643,6 +1753,7 @@ export default function App() {
             setPrefilledTopic(undefined);
             setPrefilledImage(undefined);
           }}
+          onOpenAuth={() => setShowAuthModal(true)}
         />
       ) : (
       /* MAIN CONTENT AREA - WITH pb-20 sm:pb-24 FOR FULL-WIDTH STICKY BOTTOM NAVIGATION BAR */
@@ -4210,6 +4321,49 @@ export default function App() {
 
       {/* PWA INSTALL & OFFLINE PROMPT BANNER */}
       <PWAInstallBanner />
+
+      {/* FIRST-LAUNCH PRIVACY POLICY CONSENT POPUP */}
+      {currentPath !== '/privacy' && privacyConsent === null && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 z-[10000] animate-fade-in">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4"
+          >
+            <div className="flex items-center gap-2.5 text-slate-900 dark:text-white font-extrabold text-base sm:text-lg">
+              <ShieldCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <h3>{appLanguage === 'hi' ? 'गोपनीयता और डेटा सहमति' : 'Privacy & Data Consent'}</h3>
+            </div>
+            
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+              {appLanguage === 'hi'
+                ? 'व्यक्तिगत एआई ट्यूटरिंग, स्कैन की गई होमवर्क सामग्री, और प्रगति ट्रैकिंग प्रदान करने के लिए, Ascend Study हमारी गोपनीयता नीति के अनुसार आपके शिक्षण इनपुट को एकत्र औरसंसाधित करता है।'
+                : 'To provide personalized AI tutoring, scanned homework analysis, and progress tracking, Ascend Study collects and processes your learning inputs in accordance with our Privacy Policy.'}
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center gap-2 pt-2">
+              <button
+                onClick={handleAcceptPrivacyConsent}
+                className="w-full sm:flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm rounded-xl transition duration-200 shadow-md active:scale-98 cursor-pointer text-center"
+              >
+                {appLanguage === 'hi' ? 'स्वीकार करें' : 'Accept'}
+              </button>
+              <button
+                onClick={handleRejectPrivacyConsent}
+                className="w-full sm:w-auto px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold text-xs sm:text-sm rounded-xl transition duration-200 active:scale-98 cursor-pointer text-center"
+              >
+                {appLanguage === 'hi' ? 'अस्वीकार करें' : 'Reject'}
+              </button>
+              <button
+                onClick={handleLearnMorePrivacy}
+                className="w-full sm:w-auto px-4 py-2.5 border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900 text-slate-600 dark:text-indigo-400 font-semibold text-xs sm:text-sm rounded-xl transition duration-200 active:scale-98 cursor-pointer text-center"
+              >
+                {appLanguage === 'hi' ? 'और जानें' : 'Learn more'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* GLOBAL TOAST NOTIFICATION CONTAINER */}
       <Toast />

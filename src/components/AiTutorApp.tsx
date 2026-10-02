@@ -99,6 +99,7 @@ interface AiTutorAppProps {
   prefilledTopic?: string;
   prefilledImage?: string;
   onClearPrefilled?: () => void;
+  onOpenAuth?: () => void;
 }
 
 interface ChatMessage {
@@ -650,7 +651,8 @@ export const AiTutorApp = memo(function AiTutorApp({
   prefilledSubject,
   prefilledTopic,
   prefilledImage,
-  onClearPrefilled
+  onClearPrefilled,
+  onOpenAuth
 }: AiTutorAppProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const saved = getStoredValue(`ai_tutor_chat_${user.uid}`);
@@ -2325,6 +2327,21 @@ export const AiTutorApp = memo(function AiTutorApp({
                     <Volume2 className="w-4 h-4 text-indigo-500 shrink-0" />
                     <span>Voice</span>
                   </button>
+
+                  {/* My Account & Settings Option */}
+                  {onOpenAuth && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onOpenAuth();
+                        setShowTopRightMenu(false);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 text-indigo-600 transition flex items-center space-x-2 cursor-pointer"
+                    >
+                      <UserIcon className="w-4 h-4 text-indigo-500 shrink-0" />
+                      <span>{globalAppLanguage === 'hi' ? 'मेरा खाता और सेटिंग्स' : 'My Account & Settings'}</span>
+                    </button>
+                  )}
 
                   {/* Study Tools Settings option */}
                   <button

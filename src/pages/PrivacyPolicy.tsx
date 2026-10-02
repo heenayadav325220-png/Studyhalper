@@ -154,8 +154,8 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
                     {isHi ? 'लोकल ब्राउज़र स्टोरेज (localStorage): ' : 'Local Device Storage (localStorage): '}
                   </strong>
                   {isHi
-                    ? 'आपकी भाषा पसंद (अंग्रेजी या हिंदी), डार्क/लाइट थीम सेटिंग, यूआई अनुकूलन, और ऑफलाइन उपलब्धता के लिए एक स्थानीय सुरक्षित कैश।'
-                    : 'Your theme preference (Dark/Light mode), language selection (English/Hindi), interface layout customizations, and local offline cache to maintain rapid loading speeds without continuous network queries.'}
+                    ? 'आपकी भाषा पसंद (अंग्रेजी या हिंदी), थीम सेटिंग्स, इंटरफ़ेस लेआउट, रीयल-टाइम ड्राफ्ट इनपुट, उपयोगकर्ता प्रोफ़ाइल राज्यों की स्थानीय प्रतियाँ, अध्ययन प्रगति (पूर्ण और कमजोर विषय), कस्टम अध्ययन शैलियाँ, और ऑफ़लाइन उपलब्धता के लिए गलतियों (mistakes) और स्पेस-रिपीटीशन (spaced repetition) की प्रविष्टियों का स्थानीय सुरक्षित कैश। हम कोई संवेदनशील क्रेडेंशियल या पासवर्ड स्थानीय डिवाइस पर संगृहीत नहीं करते हैं।'
+                    : 'Your language preference (English/Hindi), theme setting, layout preferences, text input drafts, local copies of user profile states, study progress metrics (completed and weak topics), custom learning style preferences, and an offline database of logged mistakes and spaced repetition items in the browser\'s localStorage to maintain high speeds and offline availability. We do not store sensitive account credentials or passwords locally.'}
                 </div>
               </li>
             </ul>
@@ -224,11 +224,11 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
                 <CheckCircle2 className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
                 <div>
                   <strong className="text-white font-semibold">
-                    {isHi ? 'एआई प्रदाता (AI Inference Providers): ' : 'AI Intelligence Providers: '}
+                    {isHi ? 'एआई अध्ययन प्रदाता (AI Study Providers): ' : 'AI Study Providers: '}
                   </strong>
                   {isHi
-                    ? 'आपके प्रश्नों का समाधान खोजने के लिए आपके प्रश्न हमारे सर्वर-साइड प्रॉक्सी रूट (/api/gemini/answer) के माध्यम से Google Gemini API (@google/genai), Groq Llama, Groq Qwen, और OpenRouter को भेजे जाते हैं। आपकी API कुंजियाँ कभी भी ब्राउज़र में उजागर नहीं होती हैं और हमारे सर्वर पर सुरक्षित रहती हैं।'
-                    : "When you ask a study question, the text prompt and images are forwarded via our secure server-side proxy endpoint (/api/gemini/answer) to advanced generative AI providers including Google Gemini (@google/genai), Groq (Llama & Qwen), and OpenRouter. All API keys and secrets are strictly retained on our backend server and are never exposed to browser bundles or client devices."}
+                    ? 'जब आप एआई सुविधाओं का उपयोग करते हैं (जैसे एआई ट्यूटर, वॉयस ट्यूटर, नोट्स संपादन, और बुक स्कैनर), तो आपके प्रश्न, संवादी इतिहास, सबमिट की गई सामग्री और अपलोड की गई तस्वीरें एआई प्रदाताओं (Google Gemini API, Groq, और OpenRouter) को संसाधित करने के लिए भेजी जा सकती हैं। मानक डेवलपर एपीआई (developer API) नीतियों के अनुसार, एपीआई के माध्यम से प्रेषित डेटा का उपयोग इन प्रदाताओं द्वारा अपने मॉडलों को प्रशिक्षित (train) करने के लिए नहीं किया जाता है।'
+                    : "When you utilize AI features (including the AI Tutor, Voice Tutor, Homework Scanner, and Notes summary), your prompt queries, active conversation history, submitted study text, and uploaded homework or textbook images may be processed by Google Gemini API, Groq, and OpenRouter solely to generate high-yield educational answers. Under their respective standard developer API policies, data sent via API is typically not utilized for training foundation models."}
                 </div>
               </li>
               <li className="flex items-start gap-2.5">
@@ -236,8 +236,8 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
                 <div>
                   <strong className="text-white font-semibold">Google Workspace (Optional): </strong>
                   {isHi
-                    ? 'यदि आप "Google Workspace" एकीकरण जोड़ते हैं, तो Google Identity Services (GIS) का उपयोग केवल आपकी स्पष्ट अनुमति से Google Drive, Docs, Sheets, Classroom, और Calendar से अध्ययन सामग्री पढ़ने के लिए किया जाता है।'
-                    : 'If you choose to link Google Workspace in the Integrations Hub, client-side Google Identity Services (GIS) tokens are used solely with your explicit consent to read classroom courses or export study guides directly to your own Google Docs or Drive. Tokens reside only in transient browser session storage.'}
+                    ? 'यदि आप "Google Workspace" एकीकरण जोड़ते हैं, तो आपकी स्पष्ट अनुमति से निम्नलिखित पाँच सेवाओं और क्षमताओं का उपयोग किया जाता है: (1) Google Drive: पीडीएफ और दस्तावेज़ सामग्री को पढ़ने के लिए (रीड-ओनली)। (2) Google Docs: सीधे आपके ड्राइव में नए अध्ययन गाइड बनाने और लिखने के लिए। (3) Google Classroom: सक्रिय पाठ्यक्रमों और उनके गृहकार्य (coursework) की सूची पढ़ने के लिए (रीड-ओनली)। (4) Google Calendar: घटनाओं की सूची देखने और सीधे नए अध्ययन सत्रों को शेड्यूल/बनाने के लिए। (5) Google Sheets: स्प्रेडशीट की सूची बनाने, सेल मान पढ़ने और अध्ययन प्रगति लॉग को जोड़ने के लिए।'
+                    : 'If you choose to link Google Workspace in the Integrations Hub, the following connected services and capabilities are utilized with your explicit permission: (1) Google Drive: to list and read selected files and documents (read-only) for study scanning and analysis. (2) Google Docs: to create and write AI-generated study guides, summaries, and lecture notes directly into your documents. (3) Google Classroom: to list active courses and coursework (read-only) to organize homework schedules. (4) Google Calendar: to list upcoming calendar events and automatically schedule or create new study sessions. (5) Google Sheets: to list spreadsheets, read cell values, and write or append study progress metrics.'}
                 </div>
               </li>
               <li className="flex items-start gap-2.5">
@@ -268,12 +268,12 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
             <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-4 text-emerald-200">
               <p className="font-semibold text-emerald-100 flex items-center gap-2 mb-1">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>{isHi ? 'हम आपका व्यक्तिगत डेटा कभी नहीं बेचते' : 'We Never Sell or Rent Your Data'}</span>
+                <span>{isHi ? 'हमारी गैर-बिक्री प्रतिबद्धता' : 'Our Non-Sale Commitment'}</span>
               </p>
               <p className="text-xs sm:text-sm text-emerald-200/90 leading-relaxed">
                 {isHi
-                  ? 'हम आपके किसी भी व्यक्तिगत विवरण, ईमेल, अध्ययन नोट्स, या चैट इतिहास को डेटा ब्रोकरों, विज्ञापन कंपनियों, या तीसरे पक्ष के विपणक को कभी भी नहीं बेचते, किराए पर नहीं देते और न ही मुद्रीकृत करते हैं।'
-                  : 'We do not sell, rent, trade, or monetize your personal information, study documents, quiz answers, or chat history to third-party data brokers or advertising networks under any circumstance.'}
+                  ? 'Ascend Study उपयोगकर्ताओं की व्यक्तिगत जानकारी को तीसरे पक्ष के डेटा दलालों (data brokers) या विज्ञापन नेटवर्क को नहीं बेचता या किराए पर नहीं देता है।'
+                  : "Ascend Study does not sell or rent users' personal information to third-party data brokers or advertising networks."}
               </p>
             </div>
           </section>
@@ -302,8 +302,8 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
                 <CheckCircle2 className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
                 <span>
                   {isHi
-                    ? 'यदि आप अपने पूरे खाते और उससे जुड़े सभी डेटा को स्थायी रूप से हटाना चाहते हैं, तो कृपया नीचे दिए गए ईमेल पर अनुरोध भेजें। आपके अनुरोध की पुष्टि के बाद 7 कार्य दिवसों के भीतर आपका प्रोफ़ाइल, नोट्स और रिकॉर्ड डेटाबेस से पूरी तरह मिटा दिए जाएंगे।'
-                    : 'To request permanent deletion of your account and all associated cloud database records, email our developer address below. Upon verification, your profile, notes, and records will be irrevocably purged within 7 business days.'}
+                    ? 'यदि आप अपने पूरे खाते और उससे जुड़े सभी डेटा को स्थायी रूप से हटाना चाहते हैं, तो आप "My Account" सेक्शन में "Permanently Delete Account" विकल्प पर क्लिक करके तुरंत ऐसा कर सकते हैं। यह प्रक्रिया तुरंत और स्थायी रूप से आपके प्रमाणीकरण क्रेडेंशियल्स, प्रोफ़ाइल डेटा, अध्ययन नोट्स, प्रगति रिकॉर्ड, मॉक परीक्षाओं, गलतियों की पुस्तक (mistake book), शेड्यूल की गई पुनरावृत्तियों (spaced repetition tasks), विषय दक्षता आँकड़ों और स्थानीय ब्राउज़र कैश से आपकी सभी प्राथमिकताओं को मिटा देती है।'
+                    : 'If you wish to permanently delete your entire account and all associated cloud records, you can do so instantly by clicking the "Permanently Delete Account" button in the "My Account" profile area. This process immediately and irrevocably purges your auth credentials, profile, documents, mock exam results, mistakes book, spaced repetition schedules, learning progress/mastery metrics, and all local browser caches of your preferences.'}
                 </span>
               </li>
             </ul>
@@ -338,8 +338,8 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
                 <span className="text-indigo-400 font-bold">·</span>
                 <span>
                   {isHi 
-                    ? 'सभी नेटवर्क संचार उद्योग-मानक HTTPS/TLS 1.3 एन्क्रिप्शन के साथ स्थानांतरित होते हैं।'
-                    : 'All communication between your device and our servers is strictly encrypted in transit via HTTPS/TLS 1.3.'}
+                    ? 'सभी नेटवर्क संचार उद्योग-मानक HTTPS/TLS एन्क्रिप्शन के साथ स्थानांतरित होते हैं।'
+                    : 'All communication between your device and our servers is strictly encrypted in transit via HTTPS/TLS.'}
                 </span>
               </li>
               <li className="flex items-start gap-2">

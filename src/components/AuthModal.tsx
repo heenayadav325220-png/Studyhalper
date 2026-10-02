@@ -15,10 +15,18 @@ import {
   GraduationCap, 
   Target,
   Sparkles,
-  RefreshCw
+  RefreshCw,
+  Trash2
 } from 'lucide-react';
 import { 
   auth,
+  db,
+  collection,
+  doc,
+  deleteDoc,
+  getDocs,
+  query,
+  where,
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signOut, 
@@ -86,6 +94,7 @@ export default function AuthModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Sync tab state when modal opens
   useEffect(() => {
@@ -94,6 +103,7 @@ export default function AuthModal({
       setCurrentTab(hasFirebaseUser ? 'profile' : 'signin');
       setError(null);
       setSuccessMessage(null);
+      setShowDeleteConfirm(false);
     }
   }, [isOpen]);
 
@@ -413,6 +423,153 @@ export default function AuthModal({
     } catch (err: any) {
       console.error('Sign Out Error:', err);
       setError(err?.message || 'Error signing out.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 6. PERMANENT ACCOUNT DELETION
+  const handleDeleteAccount = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      setError(isHi ? 'कोई यूजर लॉग इन नहीं है।' : 'No logged in user found.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    const uid = user.uid;
+
+    try {
+      // 1. Delete associated user-owned data from Firestore:
+      if (db) {
+        // A. Delete user nested subcollections (mistakes, spaced_revisions, learning_state, learning_progress)
+        const subcollections = ['mistakes', 'spaced_revisions', 'learning_state', 'learning_progress'];
+        for (const subcol of subcollections) {
+          try {
+            const colRef = collection(db, 'users', uid, subcol);
+            const snaps = await getDocs(colRef);
+            for (const d of snaps.docs) {
+              await deleteDoc(doc(db, 'users', uid, subcol, d.id));
+            }
+            console.log(`Deleted ${snaps.size} items from subcollection: ${subcol}`);
+          } catch (e) {
+            console.warn(`Error deleting subcollection ${subcol} from Firestore:`, e);
+          }
+        }
+
+        // B. Delete user profile doc
+        try {
+          const userRef = doc(db, 'users', uid);
+          await deleteDoc(userRef);
+          console.log('User document deleted from Firestore');
+        } catch (e) {
+          console.warn('Error deleting user doc from Firestore:', e);
+        }
+
+        // C. Delete mock exams owned by user
+        try {
+          const examsRef = collection(db, 'exams');
+          const examsQuery = query(examsRef, where('userId', '==', uid));
+          const examSnaps = await getDocs(examsQuery);
+          for (const d of examSnaps.docs) {
+            await deleteDoc(doc(db, 'exams', d.id));
+          }
+          console.log(`Deleted ${examSnaps.size} mock exams`);
+        } catch (e) {
+          console.warn('Error deleting user exams from Firestore:', e);
+        }
+
+        // D. Delete study documents owned by user
+        try {
+          const docsRef = collection(db, 'documents');
+          const docsQuery = query(docsRef, where('ownerId', '==', uid));
+          const docSnaps = await getDocs(docsQuery);
+          for (const d of docSnaps.docs) {
+            await deleteDoc(doc(db, 'documents', d.id));
+          }
+          console.log(`Deleted ${docSnaps.size} study documents`);
+        } catch (e) {
+          console.warn('Error deleting user documents from Firestore:', e);
+        }
+      }
+
+      // 2. Clear local storage profile and feature caches
+      const localKeys = [
+        'ascend_user_profile',
+        'ascend_onboarded',
+        `user_profile_${uid}`,
+        `ascend_mistake_book_${uid}`,
+        `ascend_spaced_revision_${uid}`,
+        `ascend_completed_topics_${uid}`,
+        `ascend_weak_topics_${uid}`,
+        `ascend_learning_progress_${uid}`,
+        `sb_preferred_style_${uid}`,
+        `ai_tutor_chat_${uid}`
+      ];
+      localKeys.forEach(key => {
+        try {
+          localStorage.removeItem(key);
+        } catch (e) {}
+      });
+
+      // 3. Delete Firebase Auth User Account
+      try {
+        await user.delete();
+      } catch (authErr: any) {
+        console.error("Firebase auth account deletion error:", authErr);
+        if (authErr.code === 'auth/requires-recent-login' || String(authErr).includes('recent-login')) {
+          setError(isHi
+            ? 'सुरक्षा कारणों से, खाता हटाने से पहले हालिया लॉगिन आवश्यक है। कृपया लॉग आउट करें, फिर से लॉगिन करें और पुनः प्रयास करें।'
+            : 'For security reasons, a recent login is required before you can delete your account. Please sign out, log back in, and try again.'
+          );
+          setLoading(false);
+          return;
+        } else {
+          throw authErr;
+        }
+      }
+
+      // 4. Successful deletion: Sign out locally and clear profile state
+      await signOut(auth);
+      
+      const guestProfile: UserProfile = {
+        uid: `guest_${Date.now().toString(36)}`,
+        name: 'Guest Student',
+        email: '',
+        level: 1,
+        xp: 0,
+        streak: 0,
+        petLevel: 1,
+        petXp: 0,
+        petName: 'Aditya',
+        language: isHi ? 'hi' : 'en',
+        targetGoal: 'Improve Daily Study Habits',
+        className: 'Class 10 (Board Exam Prep)',
+        lastActive: new Date().toISOString(),
+        authProvider: 'guest',
+        isOnboarded: false
+      };
+      
+      setUserProfile(guestProfile);
+      localStorage.setItem('ascend_user_profile', JSON.stringify(guestProfile));
+
+      setSuccessMessage(isHi 
+        ? 'आपका खाता और अध्ययन डेटा स्थायी रूप से मिटा दिया गया है।' 
+        : 'Your account and study data have been permanently deleted.'
+      );
+      setShowDeleteConfirm(false);
+      
+      setTimeout(() => {
+        setCurrentTab('signin');
+        onClose();
+      }, 3000);
+
+    } catch (err: any) {
+      console.error('Account deletion overall error:', err);
+      setError(err?.message || String(err));
     } finally {
       setLoading(false);
     }
@@ -887,25 +1044,74 @@ export default function AuthModal({
               </div>
 
               {/* Action Buttons */}
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  disabled={loading}
-                  className="w-full py-2.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 font-bold text-xs rounded-xl transition flex items-center justify-center space-x-2 cursor-pointer active:scale-98"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span>{isHi ? 'लॉग आउट करें' : 'Sign Out of Account'}</span>
-                </button>
+              {!showDeleteConfirm ? (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    disabled={loading}
+                    className="w-full py-2.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 font-bold text-xs rounded-xl transition flex items-center justify-center space-x-2 cursor-pointer active:scale-98"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>{isHi ? 'लॉग आउट करें' : 'Sign Out of Account'}</span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition cursor-pointer"
-                >
-                  {isHi ? 'बंद करें' : 'Done / Close'}
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={loading}
+                    className="w-full py-2.5 bg-rose-950/40 hover:bg-rose-900/40 text-rose-400 hover:text-rose-300 border border-rose-900/50 hover:border-rose-500/50 font-bold text-xs rounded-xl transition cursor-pointer flex items-center justify-center space-x-2 active:scale-98"
+                  >
+                    <Trash2 className="w-4 h-4 text-rose-500" />
+                    <span>{isHi ? 'खाता स्थायी रूप से हटाएं' : 'Permanently Delete Account'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition cursor-pointer"
+                  >
+                    {isHi ? 'बंद करें' : 'Done / Close'}
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-rose-950/35 border border-rose-500/30 rounded-2xl p-4 space-y-3">
+                  <div className="space-y-1">
+                    <h5 className="text-xs font-extrabold text-rose-300 uppercase tracking-wider">
+                      {isHi ? '⚠️ चेतावनी: खाता हटाने की पुष्टि करें' : '⚠️ Warning: Confirm Deletion'}
+                    </h5>
+                    <p className="text-[11px] text-rose-200/90 leading-relaxed">
+                      {isHi 
+                        ? 'क्या आप वाकई अपना खाता हटाना चाहते हैं? यह क्रिया स्थायी है। आपके सभी अध्ययन नोट्स, दस्तावेज़, क्विज़ स्कोर, एक्सपी (XP), स्तर और प्रोफाइल क्रेडेंशियल्स क्लाउड डेटाबेस से पूरी तरह और स्थायी रूप से मिटा दिए जाएंगे।' 
+                        : 'Are you absolutely sure? This action is permanent. All your study notes, documents, mock exam results, experience points, levels, and profile data will be irrevocably purged from our databases.'}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      disabled={loading}
+                      className="py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition cursor-pointer"
+                    >
+                      {isHi ? 'रद्द करें' : 'Cancel'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteAccount}
+                      disabled={loading}
+                      className="py-2 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl transition cursor-pointer flex items-center justify-center space-x-1 shadow-sm shadow-rose-600/10 active:scale-95 disabled:opacity-40"
+                    >
+                      {loading ? (
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3 h-3" />
+                      )}
+                      <span>{isHi ? 'हाँ, हटाएं' : 'Yes, Delete'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
