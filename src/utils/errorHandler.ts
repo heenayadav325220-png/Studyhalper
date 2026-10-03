@@ -56,7 +56,15 @@ export function parseError(error: any): AppError {
 
   let category: ErrorCategory = 'UNKNOWN_ERROR';
 
-  // Still categorize the error for logging/telemetry, but preserve the exact raw text for the user
+  // Handle AbortError / signal aborted cleanly
+  if (errStr.includes('signal is aborted') || errStr.includes('aborted') || errStr.includes('abort')) {
+    return {
+      category: 'TIMEOUT_ERROR',
+      message: 'AI request timed out or was interrupted. Please try again.',
+      messageHindi: 'एआई अनुरोध का समय समाप्त हो गया या बाधित हुआ। कृपया पुनः प्रयास करें।',
+      originalError: error,
+    };
+  }
   if (
     errStr.includes('network') ||
     errStr.includes('offline') ||

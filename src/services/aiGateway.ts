@@ -64,7 +64,7 @@ export const MODEL_CONFIG = {
 
 // 3. Configuration values
 const COOLDOWN_MS = Number(process.env.AI_PROVIDER_COOLDOWN_MS) || 12000; // 12 seconds cooldown for quick quota recovery
-const REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS) || 15000; // 15 seconds for blazing speed
+const REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS) || 90000; // 90 seconds for robust Advanced Toolkit execution
 
 // 4. In-Memory Gateway State
 const credentials: ProviderCredential[] = [];

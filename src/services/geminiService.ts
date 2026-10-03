@@ -127,17 +127,8 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
   const url = typeof input === "string" ? input : (input as any).url || "";
   const isPost = init?.method === "POST";
   
-  // Identify if this is a cacheable educational study notes/tools endpoint
-  const cacheableEndpoints = [
-    "/api/gemini/notes-generator",
-    "/api/summarize-notes",
-    "/api/gemini/explain-topic",
-    "/api/gemini/mindmap",
-    "/api/gemini/question-paper",
-    "/api/gemini/pdf-summary"
-  ];
-  
-  const isCacheable = cacheableEndpoints.some(ep => url.includes(ep));
+  // All requests fetch live real-time Gemini model data directly with zero offline cache
+  const isCacheable = false;
   
   let country = "Global";
   try {
@@ -248,27 +239,10 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
       ? `${API_BASE}${input}`
       : input;
 
-    // FIX: Create controller only if no signal is provided AND if we need timeout
-    let controller: AbortController | null = null;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    
-    // Check if signal is already provided
-    const hasExistingSignal = modifiedInit.signal !== undefined;
-    
-    if (!hasExistingSignal) {
-      controller = new AbortController();
+    const controller = !modifiedInit.signal ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 90000) : null;
+    if (controller) {
       modifiedInit.signal = controller.signal;
-      
-      // Only set timeout if we created a new controller
-      timeoutId = setTimeout(() => {
-        if (controller) {
-          try {
-            controller.abort();
-          } catch (abortError) {
-            console.warn("[SafeFetch] Abort error (signal already consumed):", abortError);
-          }
-        }
-      }, 15000);
     }
 
     let response: Response;
@@ -291,12 +265,6 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
           console.error("Token refresh retry error:", retryErr);
         }
       }
-    } catch (fetchError: any) {
-      // Handle abort errors gracefully
-      if (fetchError.name === 'AbortError') {
-        console.warn("[SafeFetch] Request timeout after 15s");
-      }
-      throw fetchError;
     } finally {
       if (timeoutId) {
         clearTimeout(timeoutId);
@@ -558,34 +526,7 @@ export async function generateFlashcards(
     }
   } catch (e) {}
 
-  // 1. Try country-specific durability cache
-  const cachedFlashcards = getLocalCache("flashcards", country, subject, cacheKey);
-  if (cachedFlashcards && Array.isArray(cachedFlashcards) && cachedFlashcards.length > 0) {
-    return cachedFlashcards;
-  }
-
-  // 2. Try local memory cache
-  if (clientFlashcardsCache.has(cacheKey)) {
-    console.log(`[Cache Hit - Client Memory] Returning flashcards for: ${cacheKey}`);
-    return clientFlashcardsCache.get(cacheKey)!;
-  }
-
-  // 3. Try localStorage cache fallback
-  try {
-    const localCacheStr = localStorage.getItem('studybuddy_flashcard_api_cache');
-    if (localCacheStr) {
-      const cacheMap = JSON.parse(localCacheStr);
-      if (cacheMap[cacheKey] && Array.isArray(cacheMap[cacheKey]) && cacheMap[cacheKey].length > 0) {
-        console.log(`[Cache Hit - Client LocalStorage] Returning flashcards for: ${cacheKey}`);
-        clientFlashcardsCache.set(cacheKey, cacheMap[cacheKey]);
-        setLocalCache("flashcards", country, subject, cacheKey, cacheMap[cacheKey]);
-        return cacheMap[cacheKey];
-      }
-    }
-  } catch (err) {
-    console.warn("Could not read client flashcard localStorage cache", err);
-  }
-
+  // Direct live call to Gemini server for real-time low-latency response without offline cache
   // 4. Try secure backend server route (Primary route)
   try {
     const response = await safeFetch("/api/gemini/flashcard", {
@@ -771,7 +712,7 @@ export async function summarizePdf(textContent: string, language?: string): Prom
 
 export async function enhanceImagePrompt(prompt: string, style?: string): Promise<string> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  const timeoutId = setTimeout(() => controller.abort(), 90000);
   try {
     const response = await fetch(`${API_BASE}/api/enhance-image-prompt`, {
       method: "POST",
@@ -802,7 +743,7 @@ export async function generateAiImage(
   }
 ): Promise<{ imageUrl: string; size: string; aspectRatio: string; modelUsed?: string; width?: number; height?: number; prompt?: string }> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  const timeoutId = setTimeout(() => controller.abort(), 90000);
   try {
     const response = await fetch(`${API_BASE}/api/generate-image`, {
       method: "POST",
@@ -838,4 +779,5 @@ export async function generateAiImage(
     modelUsed: 'Flux-RealAI-Engine'
   };
 }
+
 

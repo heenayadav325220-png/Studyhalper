@@ -601,11 +601,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
           window.dispatchEvent(new CustomEvent("studybuddy-trigger-ad"));
         }, 1500);
       } else {
-        showToast(appLanguage === "Hindi" ? "ऑफ़लाइन मोड सक्रिय। आंतरिक जनरेटर चल रहा है।" : "Running internal offline generator.", "info");
-        H({
-          title: "Offline Concept Overview",
-          content: `### ${s}\n\nHere is an automated overview of **${s}** for standard Class ${I} syllabus studies. Please check connection to use real-time AI reasoning.`
-        });
+        throw new Error(appLanguage === "Hindi" ? "एआई मॉडल से कोई उत्तर प्राप्त नहीं हुआ। कृपया पुनः प्रयास करें।" : "No response received from AI model. Please try again.");
       }
     } catch (err) {
       logError(err, 'AI_TOOLKIT');

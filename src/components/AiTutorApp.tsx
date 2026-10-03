@@ -33,10 +33,7 @@ import {
   TrendingUp,
   Lightbulb,
   ClipboardList,
-  Table,
-  Languages,
   Zap,
-  HelpCircle,
   ChevronUp,
   ChevronDown,
   Type,
@@ -56,10 +53,10 @@ import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 const CodeHighlighter = SyntaxHighlighter as any;
 import { getStudyAnswer } from '../services/geminiService';
 import { PersonalLearningService } from '../services/personalLearningService';
-import { createGoogleDoc, authorizeGoogleService, getSavedToken, removeToken, fetchDriveFiles, fetchFileContent } from '../services/googleWorkspace';
+import { authorizeGoogleService, getSavedToken, removeToken, fetchDriveFiles, fetchFileContent } from '../services/googleWorkspace';
 import { exportConversationToPdf } from '../utils/pdfExport';
 import { showToast } from './Toast';
-import { parseError, logError } from '../utils/errorHandler';
+import { logError } from '../utils/errorHandler';
 import {
   AcademicSuggestion,
   generateContextualSuggestions,
@@ -731,7 +728,6 @@ export const AiTutorApp = memo(function AiTutorApp({
   }, [editingMessageId]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [savedNoteId, setSavedNoteId] = useState<string | null>(null);
-  const [expandedActionsId, setExpandedActionsId] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [showMathPalette, setShowMathPalette] = useState(false);
   const [activeMathCategory, setActiveMathCategory] = useState<'All' | 'Greek' | 'Algebra' | 'Operators' | 'Calculus'>('All');
@@ -806,8 +802,7 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingSinglePdfId, setIsExportingSinglePdfId] = useState<string | null>(null);
   const [pdfExportSuccess, setPdfExportSuccess] = useState(false);
-  const [isExportingDocId, setIsExportingDocId] = useState<string | null>(null);
-  const [docExportSuccessId, setDocExportSuccessId] = useState<string | null>(null);
+
 
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showCustomVoiceModal, setShowCustomVoiceModal] = useState(false);
@@ -2027,48 +2022,7 @@ export const AiTutorApp = memo(function AiTutorApp({
     }
   };
 
-  const handleExportToGoogleDoc = async (msg: ChatMessage) => {
-    if (isExportingDocId) return;
-    setIsExportingDocId(msg.id);
-    
-    const performExport = async (accessToken: string) => {
-      try {
-        const title = `Ascend AI Tutor Note - ${(msg.subject || selectedSubject).toUpperCase()} (${new Date().toLocaleDateString()})`;
-        const docId = await createGoogleDoc(accessToken, title, msg.text);
-        setDocExportSuccessId(msg.id);
-        if (onAddXp) onAddXp(20);
-        
-        // Open the document in a new tab if successful so they see their work instantly!
-        const openUrl = `https://docs.google.com/document/d/${docId}/edit`;
-        window.open(openUrl, '_blank');
 
-        setTimeout(() => setDocExportSuccessId(null), 4000);
-      } catch (err: any) {
-        logError(err, 'GOOGLE_WORKSPACE_DOC_EXPORT');
-        const parsed = parseError(err);
-        const isHindi = globalAppLanguage === 'Hindi' || globalAppLanguage === 'hi';
-        showToast(`Failed to export to Google Docs: ${isHindi ? parsed.messageHindi : parsed.message}`, 'error');
-      } finally {
-        setIsExportingDocId(null);
-      }
-    };
-
-    const token = getSavedToken("docs");
-    if (token) {
-      await performExport(token);
-    } else {
-      authorizeGoogleService(
-        "docs",
-        async (newToken) => {
-          await performExport(newToken);
-        },
-        (error) => {
-          setIsExportingDocId(null);
-          showToast(`Google Docs connection failed: ${error}. Please authorize Google Workspace services in the Workspace Hub page.`, 'error');
-        }
-      );
-    }
-  };
 
   const handleClearChat = () => {
     if (window.confirm('Clear all AI Tutor conversation history?')) {
@@ -2767,14 +2721,6 @@ export const AiTutorApp = memo(function AiTutorApp({
                   >
                     <div className="flex flex-col items-end max-w-[85%] sm:max-w-[78%] space-y-1">
                       <div className="flex items-center space-x-2 pr-1">
-                        <span className="text-[11px] text-slate-400 font-medium">
-                          {user.name || 'You'} • {msg.timestamp}
-                          {msg.isEdited && (
-                            <span className="ml-1.5 text-[10px] text-indigo-400 font-normal italic">
-                              ({appLanguage === 'hi' ? 'संपादित' : 'edited'})
-                            </span>
-                          )}
-                        </span>
                         <button
                           type="button"
                           onClick={() => handleStartEditMessage(msg)}
@@ -2907,10 +2853,6 @@ export const AiTutorApp = memo(function AiTutorApp({
                         </div>
                         <div className="flex items-center space-x-1.5 text-slate-500">
                           <span className="font-bold text-xs sm:text-sm text-slate-900 tracking-tight">AI Academic Tutor</span>
-                          <span className="text-slate-300 dark:text-slate-700 text-xs select-none" aria-hidden="true">•</span>
-                          <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 select-none">
-                            ✓ Verified Solution
-                          </span>
                         </div>
                       </div>
 
@@ -2928,9 +2870,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                           </span>
                         </button>
 
-                        <span className="text-[11px] text-slate-400 font-medium">
-                          {msg.timestamp}
-                        </span>
+
 
                         <button
                           type="button"
@@ -3008,22 +2948,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                           <span className="hidden xs:inline">{savedNoteId === msg.id ? 'Saved ✓' : 'Save Note'}</span>
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleExportToGoogleDoc(msg)}
-                          disabled={isExportingDocId === msg.id}
-                          className="text-emerald-700 hover:text-emerald-900 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200/80 text-xs font-bold h-8 px-2.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs disabled:opacity-50"
-                          title="Export this tutoring answer to a live Google Document"
-                        >
-                          {isExportingDocId === msg.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600 shrink-0" />
-                          ) : docExportSuccessId === msg.id ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          ) : (
-                            <FileDown className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          )}
-                          <span className="hidden sm:inline">{docExportSuccessId === msg.id ? 'Exported!' : isExportingDocId === msg.id ? 'Exporting...' : 'Export to Docs'}</span>
-                        </button>
+
 
                         <button
                           type="button"
@@ -3043,60 +2968,8 @@ export const AiTutorApp = memo(function AiTutorApp({
                         </button>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setExpandedActionsId(expandedActionsId === msg.id ? null : msg.id)}
-                        title="More study tools"
-                        className={`text-xs font-bold h-8 px-2.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs ${
-                          expandedActionsId === msg.id
-                            ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
-                            : 'text-indigo-600 hover:bg-indigo-50 border border-indigo-200/60'
-                        }`}
-                      >
-                        <SlidersHorizontal className="w-3.5 h-3.5 shrink-0" />
-                        <span>{expandedActionsId === msg.id ? 'Hide Tools' : 'Study Tools'}</span>
-                      </button>
+
                     </div>
-
-                    {expandedActionsId === msg.id && (
-                      <div className="bg-slate-50/50 border-t border-slate-100 px-3.5 py-2.5 sm:px-5 flex flex-wrap items-center gap-1.5 rounded-b-2xl mt-2">
-                        <button
-                          type="button"
-                          onClick={() => handleSendMessage('Can you explain this concept in simpler terms with a super easy everyday analogy?')}
-                          className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
-                        >
-                          <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-                          <span>Explain Simpler</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleSendMessage('Give me 1 practice question based on this topic so I can test my understanding.')}
-                          className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
-                        >
-                          <HelpCircle className="w-3.5 h-3.5 text-indigo-500" />
-                          <span>Practice Question</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleSendMessage('Please explain this in easy Hinglish with important key points for JEE Main / Board exams.')}
-                          className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
-                        >
-                          <Languages className="w-3.5 h-3.5 text-purple-500" />
-                          <span>JEE Main / Hinglish</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleSendMessage('Summarize the key concepts, formulas, and takeaways in a clean structured table.')}
-                          className="border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 bg-white text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-xs"
-                        >
-                          <Table className="w-3.5 h-3.5 text-teal-500" />
-                          <span>Summary Table</span>
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </motion.div>
               );
@@ -3451,35 +3324,37 @@ export const AiTutorApp = memo(function AiTutorApp({
           )}
 
           {/* Cognitive Learning Modes Selector Chips */}
-          <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-1.5 px-0.5 mb-1.5 border-b border-slate-100/10" style={{ scrollbarWidth: 'none' }}>
-            {[
-              { id: 'direct', label: appLanguage === 'hi' ? 'सामान्य 🧑‍🏫' : 'Direct 🧑‍🏫' },
-              { id: 'teach_me', label: appLanguage === 'hi' ? 'पढ़ाएं 📖' : 'Teach Me 📖' },
-              { id: 'solve_with_me', label: appLanguage === 'hi' ? 'साथ हल करें 🤝' : 'Solve With Me 🤝' },
-              { id: 'give_hint', label: appLanguage === 'hi' ? 'संकेत दें 💡' : 'Give Hint 💡' },
-              { id: 'check_answer', label: appLanguage === 'hi' ? 'उत्तर जांचें ✍️' : 'Check Answer ✍️' },
-              { id: 'why_wrong', label: appLanguage === 'hi' ? 'गलत क्यों? ❌' : 'Why Wrong? ❌' },
-              { id: 'similar_question', label: appLanguage === 'hi' ? 'समान प्रश्न 🔁' : 'Similar Q 🔁' },
-              { id: 'challenge', label: appLanguage === 'hi' ? 'चुनौती दें ⚡' : 'Challenge Me ⚡' },
-              { id: 'quick_revision', label: appLanguage === 'hi' ? 'त्वरित दोहराव 📌' : 'Quick Revision 📌' }
-            ].map((mode) => {
-              const active = aiTutorSubMode === mode.id;
-              return (
-                <button
-                  key={mode.id}
-                  type="button"
-                  onClick={() => setAiTutorSubMode(mode.id)}
-                  className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition duration-150 whitespace-nowrap cursor-pointer shrink-0 ${
-                    active
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                  }`}
-                >
-                  {mode.label}
-                </button>
-              );
-            })}
-          </div>
+          {!messages.some(m => m.sender === 'user') && (
+            <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-1.5 px-0.5 mb-1.5 border-b border-slate-100/10" style={{ scrollbarWidth: 'none' }}>
+              {[
+                { id: 'direct', label: appLanguage === 'hi' ? 'सामान्य 🧑‍🏫' : 'Direct 🧑‍🏫' },
+                { id: 'teach_me', label: appLanguage === 'hi' ? 'पढ़ाएं 📖' : 'Teach Me 📖' },
+                { id: 'solve_with_me', label: appLanguage === 'hi' ? 'साथ हल करें 🤝' : 'Solve With Me 🤝' },
+                { id: 'give_hint', label: appLanguage === 'hi' ? 'संकेत दें 💡' : 'Give Hint 💡' },
+                { id: 'check_answer', label: appLanguage === 'hi' ? 'उत्तर जांचें ✍️' : 'Check Answer ✍️' },
+                { id: 'why_wrong', label: appLanguage === 'hi' ? 'गलत क्यों? ❌' : 'Why Wrong? ❌' },
+                { id: 'similar_question', label: appLanguage === 'hi' ? 'समान प्रश्न 🔁' : 'Similar Q 🔁' },
+                { id: 'challenge', label: appLanguage === 'hi' ? 'चुनौती दें ⚡' : 'Challenge Me ⚡' },
+                { id: 'quick_revision', label: appLanguage === 'hi' ? 'त्वरित दोहराव 📌' : 'Quick Revision 📌' }
+              ].map((mode) => {
+                const active = aiTutorSubMode === mode.id;
+                return (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    onClick={() => setAiTutorSubMode(mode.id)}
+                    className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition duration-150 whitespace-nowrap cursor-pointer shrink-0 ${
+                      active
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                    }`}
+                  >
+                    {mode.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* STOP GENERATING FLOATING PILL/BOX ABOVE INPUT */}
           <AnimatePresence>
