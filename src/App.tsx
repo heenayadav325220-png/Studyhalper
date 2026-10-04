@@ -24,7 +24,6 @@ import {
   ChevronDown,
   Mail,
   X,
-  Image as ImageIcon,
   LogIn,
   Edit3,
   User as UserIcon,
@@ -41,7 +40,6 @@ import {
 import InteractiveToolkit from './components/InteractiveToolkit';
 import AiTutorApp from './components/AiTutorApp';
 import PersonalLearningPlanner from './components/PersonalLearningPlanner';
-import ImageGenerator from './components/ImageGenerator';
 import OnboardingModal from './components/OnboardingModal';
 import AuthModal from './components/AuthModal';
 import SelfCustomizeModal, { DEFAULT_UI_CUSTOMIZATION } from './components/SelfCustomizeModal';
@@ -322,7 +320,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [appLanguage]);
 
-  const [activeTab, setActiveTab] = useState<'home' | 'toolkit' | 'groupChat' | 'whiteboard' | 'mockExam' | 'studyDocs' | 'petCompanion' | 'aiTutor' | 'quiz' | 'notebook' | 'planner' | 'imageGen' | 'pdfScanner' | 'googleWorkspace'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'toolkit' | 'groupChat' | 'whiteboard' | 'mockExam' | 'studyDocs' | 'petCompanion' | 'aiTutor' | 'quiz' | 'notebook' | 'planner' | 'pdfScanner' | 'googleWorkspace'>('home');
   const [attachedWorkspaceFiles, setAttachedWorkspaceFiles] = useState<Array<{ id: string; name: string; content: string; type: "drive" | "classroom" | "sheets" }>>([]);
   const [initialTool, setInitialTool] = useState<string | undefined>(undefined);
   const [prefilledTutorPrompt, setPrefilledTutorPrompt] = useState<string | undefined>(undefined);
@@ -2248,41 +2246,7 @@ export default function App() {
                     </motion.button>
                   )}
 
-                  {/* LIST ITEM 2: IMAGE GEN */}
-                  <motion.button
-                    whileHover={{ x: 3, scale: 1.006 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                      playUiSound(uiCustomization.audioFeedback);
-                      setActiveTab('imageGen');
-                    }}
-                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-transparent shadow-sm bg-gradient-to-r from-slate-950 via-[#18092a] to-[#290b47] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-colors duration-300"
-                  >
-                    <NeonBorder color1="#c084fc" color2="#7c3aed" />
 
-                    <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
-                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-purple-500/20 border border-purple-400/50 flex items-center justify-center text-amber-300 group-hover:scale-110 transition-transform shrink-0 shadow-inner">
-                        <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-amber-300" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center space-x-2">
-                          <h4 className="font-black text-sm sm:text-base text-white flex items-center gap-1.5 truncate">
-                            <span>Image Gen Studio</span>
-                            <span className="text-amber-300">🎨</span>
-                          </h4>
-                          <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-slate-900 text-white/90 px-2 py-0.5 rounded-full border border-white/20  shrink-0">
-                            REAL ENGINE
-                          </span>
-                        </div>
-                        <p className="text-[10px] sm:text-[11.5px] text-purple-200/80 font-medium mt-0.5 truncate">
-                          Generate real academic diagrams, charts & visual study art
-                        </p>
-                      </div>
-                    </div>
-                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-300 group-hover:translate-x-1 transition-colors shrink-0 ml-2 shadow-xs">
-                      <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
-                    </div>
-                  </motion.button>
 
                   {/* LIST ITEM 3: QUIZ & PRACTICE */}
                   <motion.button
@@ -2532,47 +2496,6 @@ export default function App() {
                       </div>
                     </motion.button>
                   )}
-
-                  {/* CARD 2: IMAGE GEN - PURPLE NEON GLOW */}
-                  <motion.button
-                    whileHover={{ y: -2, scale: 1.01 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                      playUiSound(uiCustomization.audioFeedback);
-                      setActiveTab('imageGen');
-                    }}
-                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-sm bg-gradient-to-br from-slate-950 via-[#18092a] to-[#290b47] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-colors duration-300"
-                  >
-                    <NeonBorder color1="#c084fc" color2="#a855f7" />
-                    {/* Glowing purple energy wave SVG */}
-                    <div className="absolute inset-0 pointer-events-none opacity-40">
-                      <svg className="w-full h-full" viewBox="0 0 200 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M0 60 C 50 30, 100 80, 200 40" stroke="#c084fc" strokeWidth="1.5" strokeDasharray="3 3" />
-                        <circle cx="65%" cy="35%" r="2" fill="#e879f9" />
-                        <circle cx="85%" cy="55%" r="1.5" fill="#c084fc" />
-                        <circle cx="20%" cy="40%" r="1" fill="#e879f9" />
-                      </svg>
-                    </div>
-
-                    <div className="flex justify-between items-start relative z-10">
-                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl bg-amber-500/20 border border-amber-400/60 flex items-center justify-center text-amber-300 group-hover:scale-110 transition-transform shadow-xs">
-                        <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300" />
-                      </div>
-                      <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-slate-900 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 ">
-                        REAL ENGINE
-                      </span>
-                    </div>
-
-                    <div className="relative z-10">
-                      <h4 className="font-black text-xs sm:text-base text-white flex items-center gap-1 tracking-tight">
-                        <span>Image Gen</span>
-                        <span className="text-amber-300">🎨</span>
-                      </h4>
-                      <p className="text-[9px] sm:text-[11px] text-purple-200/70 font-medium leading-tight mt-0.5 line-clamp-1 sm:line-clamp-none">
-                        Generate real diagrams & visual art
-                      </p>
-                    </div>
-                  </motion.button>
 
                   {/* CARD 3: QUIZ - EMERALD NEON GLOW */}
                   <motion.button
@@ -3860,25 +3783,6 @@ export default function App() {
           </div>
         )}
 
-        {/* AI IMAGE GENERATOR (gemini-3-pro-image-preview) */}
-        {activeTab === 'imageGen' && (
-          <ImageGenerator
-            onSaveToNotebook={async (title, content) => {
-              await saveAndSyncStudyDocument({
-                id: 'doc_' + Date.now(),
-                ownerId: userProfile.uid,
-                title,
-                content,
-                summary: content.slice(0, 150) + '...',
-                tagsJson: JSON.stringify(['AiImage']),
-                isShared: false,
-                timestamp: new Date().toISOString()
-              });
-            }}
-            onAddXp={addXp}
-          />
-        )}
-
         {/* PDF & BOOK SCANNER: CHAPTER SUMMARIES & AUTOMATIC QUIZ */}
         {activeTab === 'pdfScanner' && (
           <PdfBookScanner
@@ -3959,7 +3863,6 @@ export default function App() {
                 {[
                   { id: 'pdfScanner', label: 'PDF Scanner', icon: FileText, color: 'text-cyan-400 bg-cyan-950/60 border-cyan-800/40' },
                   { id: 'voiceTutor', label: 'Voice Tutor', icon: Mic, color: 'text-pink-400 bg-pink-950/60 border-pink-800/40' },
-                  { id: 'imageGen', label: 'Image Gen', icon: ImageIcon, color: 'text-indigo-400 bg-indigo-950/60 border-indigo-800/40' },
                   { id: 'whiteboard', label: 'Whiteboard', icon: PenTool, color: 'text-purple-400 bg-purple-950/60 border-purple-800/40' },
                   { id: 'mockExam', label: 'Mock Exams', icon: GraduationCap, color: 'text-amber-400 bg-amber-950/60 border-amber-800/40' },
                   { id: 'studyDocs', label: 'Notebook', icon: FileText, color: 'text-teal-400 bg-teal-950/60 border-teal-800/40' },
@@ -4197,12 +4100,12 @@ export default function App() {
               }
             }}
             className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-colors cursor-pointer select-none min-h-[44px] ${
-              showMoreMenu || ['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab)
+              showMoreMenu || ['whiteboard', 'mockExam', 'studyDocs', 'petCompanion'].includes(activeTab)
                 ? 'text-emerald-400 font-bold'
                 : 'text-slate-300 hover:text-white font-medium'
             }`}
           >
-            {(showMoreMenu || ['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab)) && (
+            {(showMoreMenu || ['whiteboard', 'mockExam', 'studyDocs', 'petCompanion'].includes(activeTab)) && (
               <motion.div
                 layoutId="bottomNavIndicator"
                 className="absolute inset-0 bg-emerald-500/18 border border-emerald-500/35 rounded-xl -z-10 shadow-sm"
@@ -4211,11 +4114,11 @@ export default function App() {
             )}
             <div className="relative">
               <LayoutGrid className={`w-4 h-4 sm:w-[18px] sm:h-[18px] transition-transform ${showMoreMenu ? 'scale-110 text-emerald-400 drop-shadow-sm' : 'text-slate-200'}`} />
-              {['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab) && (
+              {['whiteboard', 'mockExam', 'studyDocs', 'petCompanion'].includes(activeTab) && (
                 <span className="absolute -top-0.5 -right-1 w-2 h-2 bg-emerald-400 rounded-full ring-2 ring-slate-900 shadow-sm" />
               )}
             </div>
-            <span className={`text-[10px] tracking-tight mt-0.5 whitespace-nowrap ${showMoreMenu || ['whiteboard', 'mockExam', 'studyDocs', 'petCompanion', 'imageGen'].includes(activeTab) ? 'font-bold text-emerald-400' : 'font-medium text-slate-300'}`}>
+            <span className={`text-[10px] tracking-tight mt-0.5 whitespace-nowrap ${showMoreMenu || ['whiteboard', 'mockExam', 'studyDocs', 'petCompanion'].includes(activeTab) ? 'font-bold text-emerald-400' : 'font-medium text-slate-300'}`}>
               More
             </span>
           </motion.button>

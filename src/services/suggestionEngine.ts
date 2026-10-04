@@ -1,5 +1,3 @@
-import { API_BASE } from '../config/apiConfig';
-
 export interface AcademicSuggestion {
   id: string;
   icon: 'question' | 'practice' | 'deepen' | 'analogy' | 'quiz' | 'formula' | 'step' | 'mistake' | 'summary' | 'action';
@@ -391,69 +389,9 @@ export function generateContextualSuggestions(context: SuggestionContext): Acade
   ];
 }
 
-const clientSuggCache = new Map<string, { data: AcademicSuggestion[]; timestamp: number }>();
-
 /**
- * Fetch dynamic AI-generated suggestions from backend (or fallback to heuristic engine)
+ * Return contextual suggestions instantly from local heuristic engine
  */
 export async function getAiTutorSuggestions(context: SuggestionContext): Promise<AcademicSuggestion[]> {
-  const heuristic = generateContextualSuggestions(context);
-
-  // If there are no messages, return standard starter suggestions
-  if (!context.messages || context.messages.length <= 1) {
-    return heuristic;
-  }
-
-  const cacheKey = `${context.subject || 'gen'}_${context.language || 'en'}_${context.messages.length}`;
-  const cached = clientSuggCache.get(cacheKey);
-  if (cached && (Date.now() - cached.timestamp < 5 * 60 * 1000)) {
-    return cached.data;
-  }
-
-  try {
-    const recentMsgs = context.messages.slice(-3).map((m) => ({
-      role: m.sender === 'user' ? 'user' : 'model',
-      text: m.text.slice(0, 400)
-    }));
-
-    // Call backend suggestion generator
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-    try {
-      const res = await fetch(`${API_BASE}/api/gemini/suggestions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          history: recentMsgs,
-          subject: context.subject,
-          studentContext: context.studentContext,
-          language: context.language
-        }),
-        signal: controller.signal
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.suggestions) && data.suggestions.length === 3) {
-          const result = data.suggestions.map((s: any, idx: number) => ({
-            id: `ai_sugg_${Date.now()}_${idx}`,
-            icon: s.icon || (idx === 0 ? 'deepen' : idx === 1 ? 'practice' : 'analogy'),
-            label: s.label || heuristic[idx].label,
-            prompt: s.prompt || heuristic[idx].prompt,
-            subtitle: s.subtitle || heuristic[idx].subtitle,
-            category: s.category || (idx === 0 ? 'deep_dive' : idx === 1 ? 'practice' : 'concept'),
-            badge: s.badge || (idx === 1 ? '+15 XP' : 'High Yield')
-          }));
-          clientSuggCache.set(cacheKey, { data: result, timestamp: Date.now() });
-          return result;
-        }
-      }
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  } catch (e) {
-    // Non-blocking fallback to heuristic
-  }
-
-  return heuristic;
+  return generateContextualSuggestions(context);
 }
