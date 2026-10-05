@@ -7,6 +7,33 @@
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <title>StudyHelper - AI Study Companion | by Rohit Yadav </title>
     
+    <!-- EmailJS Integration -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script type="text/javascript">
+      (function() {
+        emailjs.init("K6Rhz3JgaNux00csy");
+      })();
+
+      function sendReport(reportType, userEmail, userMessage) {
+        const templateParams = {
+          report_type: reportType,
+          email: userEmail || "Not Provided",
+          message: userMessage,
+          user_agent: navigator.userAgent,
+          date: new Date().toLocaleString()
+        };
+
+        return emailjs.send("service_j6xmnod", "template_apd2qal", templateParams)
+          .then((response) => {
+            alert("रिपोर्ट सफलतापूर्वक भेज दी गई है!");
+            return response;
+          }, (error) => {
+            alert("त्रुटि: " + JSON.stringify(error));
+            throw error;
+          });
+      }
+    </script>
+
     <!-- Firebase Analytics Integration -->
     <script type="module">
       // Import the functions you need from the SDKs you need
