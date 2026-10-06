@@ -549,11 +549,31 @@ async function executeProviderRequest(
   }
 }
 
+// High-Performance TTL Response Cache for millions-user concurrency scalability
+const aiResponseCache = new Map<string, { text: string; model: string; usage: any; expiresAt: number }>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 // 11. Central Gateway Entrypoint: Switches across ALL configured keys on failure in 0.1s
 export async function executeAIRequest(
   context: AIRequestContext,
   payload: any
 ): Promise<NormalizedAIResponse> {
+  const requestId = `req_${Math.random().toString(36).substring(2, 9)}`;
+
+  // Check TTL cache for instant sub-millisecond responses under high load
+  const cacheKey = JSON.stringify({ m: context.modality, p: typeof payload === 'string' ? payload : JSON.stringify(payload), sys: context.systemInstruction });
+  const cached = aiResponseCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiresAt) {
+    console.log(`[AI_GATEWAY] [CACHE_HIT] requestId=${requestId}`);
+    return {
+      success: true,
+      text: cached.text,
+      provider: "cache",
+      model: cached.model,
+      usage: cached.usage
+    };
+  }
+
   // Ensure credentials pool is populated
   if (credentials.length === 0) {
     initializeGateway();
@@ -569,7 +589,6 @@ export async function executeAIRequest(
     };
   }
 
-  const requestId = `req_${Math.random().toString(36).substring(2, 9)}`;
   const triedCredentials = new Set<string>();
   const maxAttempts = Math.max(credentials.length, 5);
   let lastError: any = null;
@@ -592,6 +611,14 @@ export async function executeAIRequest(
 
       console.log(`[AI_GATEWAY] [SUCCESS] requestId=${requestId} id=${cred.id} provider=${cred.provider} model=${result.model} latency=${latencyMs}ms`);
       markProviderSuccess(cred.id);
+
+      // Cache successful response
+      aiResponseCache.set(cacheKey, {
+        text: result.text,
+        model: result.model,
+        usage: result.usage,
+        expiresAt: Date.now() + CACHE_TTL_MS
+      });
 
       return {
         success: true,

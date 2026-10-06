@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Camera } from 'lucide-react';
 
 interface UserAvatarProps {
@@ -61,7 +61,7 @@ const SIZE_MAP = {
   }
 };
 
-export default function UserAvatar({
+function UserAvatar({
   avatar,
   name = 'Student',
   avatarBg,
@@ -156,3 +156,5 @@ export default function UserAvatar({
     </div>
   );
 }
+
+export default memo(UserAvatar);

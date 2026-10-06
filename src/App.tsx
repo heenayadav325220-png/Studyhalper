@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, 
@@ -29,25 +29,51 @@ import {
   User as UserIcon,
   Settings2,
   Terminal,
-  Mic,
   Search,
   Notebook,
   Clock,
   Target,
   ShieldCheck,
-  Lock
+  Lock,
+  Loader2
 } from 'lucide-react';
-import InteractiveToolkit from './components/InteractiveToolkit';
-import AiTutorApp from './components/AiTutorApp';
-import PersonalLearningPlanner from './components/PersonalLearningPlanner';
-import OnboardingModal from './components/OnboardingModal';
-import AuthModal from './components/AuthModal';
-import SelfCustomizeModal, { DEFAULT_UI_CUSTOMIZATION } from './components/SelfCustomizeModal';
-import { PdfBookScanner } from './components/PdfBookScanner';
-import { VoiceTutorModal } from './components/VoiceTutorModal';
 
-import IntegrationsHub from './components/IntegrationsHub';
-import PrivacyPolicy from './pages/PrivacyPolicy';
+// Real Lazy Loading / Dynamic Code Splitting for heavy secondary modules
+const InteractiveToolkit = React.lazy(() => import('./components/InteractiveToolkit'));
+const AiTutorApp = React.lazy(() => import('./components/AiTutorApp'));
+const PersonalLearningPlanner = React.lazy(() => import('./components/PersonalLearningPlanner'));
+const OnboardingModal = React.lazy(() => import('./components/OnboardingModal'));
+const AuthModal = React.lazy(() => import('./components/AuthModal'));
+const SelfCustomizeModal = React.lazy(() => import('./components/SelfCustomizeModal'));
+const PdfBookScanner = React.lazy(() => import('./components/PdfBookScanner').then(m => ({ default: m.PdfBookScanner })));
+const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
+const AvatarSelectorModal = React.lazy(() => import('./components/AvatarSelectorModal'));
+const QuizSection = React.lazy(() => import('./components/QuizSection'));
+const BadgeCelebrationModal = React.lazy(() => import('./components/BadgeCelebrationModal').then(m => ({ default: m.BadgeCelebrationModal })));
+const StreakCelebrationModal = React.lazy(() => import('./components/StreakCelebrationModal').then(m => ({ default: m.StreakCelebrationModal })));
+
+// Lightweight Suspense Fallbacks for instant, non-blocking UI transitions
+const TabLoadingSkeleton: React.FC<{ message?: string }> = ({ message = 'Loading module...' }) => (
+  <motion.div 
+    initial={{ opacity: 0, scale: 0.96 }}
+    animate={{ opacity: 1, scale: 1 }}
+    transition={{ duration: 0.2 }}
+    className="flex flex-col items-center justify-center min-h-[340px] p-8 text-center space-y-4"
+  >
+    <div className="relative flex items-center justify-center">
+      <div className="absolute w-14 h-14 rounded-full bg-indigo-500/10 animate-ping opacity-75" />
+      <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/25">
+        <Loader2 className="w-5 h-5 text-white animate-spin" />
+      </div>
+    </div>
+    <div className="space-y-1">
+      <p className="text-xs font-semibold text-slate-200 tracking-tight">{message}</p>
+      <p className="text-[11px] text-slate-400 font-medium">Ascend Study Engine</p>
+    </div>
+  </motion.div>
+);
+
+import type { AvatarSelectionData } from './components/AvatarSelectorModal';
 import { TRANSLATIONS, Language } from './services/translations';
 import { playUiSound } from './services/soundEffects';
 import { 
@@ -70,21 +96,18 @@ import {
   deleteStudyDocument 
 } from './services/firebaseDb';
 import UserAvatar from './components/UserAvatar';
-import AvatarSelectorModal, { AvatarSelectionData } from './components/AvatarSelectorModal';
 import ThemeToggle from './components/ThemeToggle';
-import QuizSection from './components/QuizSection';
 import PWAInstallBanner from './components/PWAInstallBanner';
-import { BadgeCelebrationModal } from './components/BadgeCelebrationModal';
-import { StreakCelebrationModal } from './components/StreakCelebrationModal';
 import Toast, { showToast } from './components/Toast';
-import type { 
+import { 
   UserProfile, 
   RoomChatMessage, 
   WhiteboardElement, 
   MockExam, 
   StudyDocument, 
   Subject,
-  UiCustomization 
+  UiCustomization,
+  DEFAULT_UI_CUSTOMIZATION 
 } from './types';
 
 const SUBJECTS: Subject[] = ['Mathematics', 'Science', 'Biology', 'Physics', 'Chemistry', 'English'];
@@ -274,53 +297,7 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const [appLoading, setAppLoading] = useState(true);
-  const [loadingProgress, setLoadingProgress] = useState(0);
-  const [loadingMessage, setLoadingMessage] = useState('Initializing Study Buddy Engine...');
-
-  useEffect(() => {
-    const isHindi = appLanguage === 'hi';
-    const messages = isHindi ? [
-      'फायरबेस स्टडी रूम्स कनेक्ट हो रहे हैं...',
-      'स्टडी स्ट्रीक और एक्सपी सिंक की जा रही है...',
-      'चिम्पू (स्टडी पेट) को बंबू फीड किया जा रहा है...',
-      '19+ एडवांस्ड एआई एकेडमिक टूल्स सक्रिय हो रहे हैं...',
-      'हार्डवेयर जीपीयू एक्सेलेरेशन सक्षम किया जा रहा है...',
-      'ऐप अब एकदम मक्खन की तरह चलने को तैयार है!'
-    ] : [
-      'Connecting to Firebase Study Rooms...',
-      'Syncing study streak and XP levels...',
-      'Feeding bamboo to Chimpu (Study Pet)...',
-      'Activating 19+ Advanced AI Academic Tools...',
-      'Enabling hardware GPU acceleration layers...',
-      'Ready to run ultra smooth like butter!'
-    ];
-    let step = 0;
-    const interval = setInterval(() => {
-      setLoadingProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setAppLoading(false);
-          }, 450);
-          return 100;
-        }
-        const stepSize = Math.floor(Math.random() * 15) + 12;
-        const next = Math.min(100, prev + stepSize);
-        if (next < 100 && step < messages.length - 1) {
-          setLoadingMessage(messages[step]);
-          step++;
-        } else if (next === 100) {
-          setLoadingMessage(isHindi ? 'पढ़ाई शुरू करने को तैयार! 🔥' : 'Ready to study! 🔥');
-        }
-        return next;
-      });
-    }, 180);
-
-    return () => clearInterval(interval);
-  }, [appLanguage]);
-
-  const [activeTab, setActiveTab] = useState<'home' | 'toolkit' | 'groupChat' | 'whiteboard' | 'mockExam' | 'studyDocs' | 'petCompanion' | 'aiTutor' | 'quiz' | 'notebook' | 'planner' | 'pdfScanner' | 'googleWorkspace'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'toolkit' | 'groupChat' | 'whiteboard' | 'mockExam' | 'studyDocs' | 'petCompanion' | 'aiTutor' | 'quiz' | 'notebook' | 'planner' | 'pdfScanner'>('home');
   const [attachedWorkspaceFiles, setAttachedWorkspaceFiles] = useState<Array<{ id: string; name: string; content: string; type: "drive" | "classroom" | "sheets" }>>([]);
   const [initialTool, setInitialTool] = useState<string | undefined>(undefined);
   const [prefilledTutorPrompt, setPrefilledTutorPrompt] = useState<string | undefined>(undefined);
@@ -331,7 +308,6 @@ export default function App() {
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
-  const [showVoiceTutorModal, setShowVoiceTutorModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [playgroundViewMode, setPlaygroundViewMode] = useState<'list' | 'grid'>('list');
   const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false);
@@ -625,7 +601,6 @@ export default function App() {
     showAuthModal,
     showAvatarModal,
     showCustomizeModal,
-    showVoiceTutorModal,
     showOnboardingModal,
     isEditingProfile,
     showMoreMenu
@@ -637,7 +612,6 @@ export default function App() {
       showAuthModal,
       showAvatarModal,
       showCustomizeModal,
-      showVoiceTutorModal,
       showOnboardingModal,
       isEditingProfile,
       showMoreMenu
@@ -647,7 +621,6 @@ export default function App() {
     showAuthModal,
     showAvatarModal,
     showCustomizeModal,
-    showVoiceTutorModal,
     showOnboardingModal,
     isEditingProfile,
     showMoreMenu
@@ -669,8 +642,6 @@ export default function App() {
             setShowAvatarModal(false);
           } else if (s.showCustomizeModal) {
             setShowCustomizeModal(false);
-          } else if (s.showVoiceTutorModal) {
-            setShowVoiceTutorModal(false);
           } else if (s.isEditingProfile) {
             setIsEditingProfile(false);
           } else if (s.showMoreMenu) {
@@ -1581,14 +1552,16 @@ export default function App() {
 
   if (currentPath === '/privacy') {
     return (
-      <PrivacyPolicy 
-        onBack={() => {
-          if (typeof window !== 'undefined') {
-            window.history.pushState(null, '', '/');
-            setCurrentPath('/');
-          }
-        }} 
-      />
+      <Suspense fallback={<TabLoadingSkeleton message="Loading Privacy Policy..." />}>
+        <PrivacyPolicy 
+          onBack={() => {
+            if (typeof window !== 'undefined') {
+              window.history.pushState(null, '', '/');
+              setCurrentPath('/');
+            }
+          }} 
+        />
+      </Suspense>
     );
   }
 
@@ -1635,66 +1608,6 @@ export default function App() {
       className={`min-h-screen text-slate-100 ${getAppFontClass()} flex flex-col selection:bg-emerald-500 selection:text-white w-full max-w-full overflow-x-clip relative transition-colors duration-300`}
       style={{ backgroundColor: currentBgColor }}
     >
-      {/* STARTUP SPLASH SCREEN / APP INITIAL LOADING FLASHSCR */}
-      <AnimatePresence>
-        {appLoading && (
-          <motion.div
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.35, ease: 'easeInOut' }}
-            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#050811] text-white p-6 select-none"
-          >
-            {/* Ambient Background Lights */}
-
-            {/* Glowing Brand Title Container */}
-            <div className="relative flex flex-col items-center text-center max-w-sm space-y-6 z-10">
-              <motion.div
-                animate={{ scale: [1, 1.04, 1] }}
-                transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-                className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 shadow-sm flex items-center justify-center relative border border-indigo-400/30"
-              >
-                <Sparkles className="w-10 h-10 text-white animate-pulse" />
-                {/* Orbital Loader light around logo */}
-                <div className="absolute inset-0 rounded-3xl border-2 border-indigo-400 animate-ping opacity-25" />
-              </motion.div>
-
-              <div className="space-y-2">
-                <h1 className="text-3xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-indigo-200">
-                  Ascend Study
-                </h1>
-                <p className="text-[10px] font-black text-indigo-400 tracking-widest uppercase">
-                  REMIX STUDY BUDDY
-                </p>
-              </div>
-
-              {/* Progress Bar Container */}
-              <div className="w-64 space-y-3 pt-4">
-                <div className="flex justify-between items-baseline text-xs">
-                  <span className="text-slate-400 font-medium truncate max-w-[190px]">
-                    {loadingMessage}
-                  </span>
-                  <span className="font-mono font-black text-indigo-300 tabular-nums">
-                    {loadingProgress}%
-                  </span>
-                </div>
-
-                {/* Horizontal Progress Track */}
-                <div className="h-2 w-full bg-slate-900/95 border border-slate-800/80 rounded-full p-[2px] overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 rounded-full transition-colors duration-150"
-                    style={{ width: `${loadingProgress}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="text-[10px] text-slate-500 font-bold tracking-wider pt-8 uppercase">
-                {appLanguage === 'hi' ? 'जीपीयू एक्सेलेरेटेड इंजन सक्रिय है' : 'GPU Accelerated Engine Active'}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* DYNAMIC LIVE CUSTOM CSS INJECTED BY AI COPILOT */}
       <style id="ai-editor-live-styles">{uiCustomization.customCss || ''}</style>
       
@@ -1714,45 +1627,47 @@ export default function App() {
 
       {/* STANDALONE DEDICATED FULL AI TUTOR APP INTERFACE - MOUNTED AT ROOT TO PREVENT TRANSFORM/CONTAINING-BLOCK CLIPPING */}
       {activeTab === 'aiTutor' ? (
-        <AiTutorApp
-          user={userProfile}
-          onBack={() => setActiveTab('home')}
-          onAddNote={async (note) => {
-            await saveAndSyncStudyDocument({
-              id: 'doc_' + Date.now(),
-              ownerId: userProfile.uid,
-              title: note.title,
-              content: note.content,
-              summary: note.content.slice(0, 150) + '...',
-              tagsJson: JSON.stringify([note.subject]),
-              isShared: false,
-              timestamp: new Date().toISOString()
-            });
-          }}
-          onAddXp={addXp}
-          attachedWorkspaceFiles={attachedWorkspaceFiles}
-          onRemoveAttachedWorkspaceFile={(id) => {
-            setAttachedWorkspaceFiles(prev => prev.filter(f => f.id !== id));
-          }}
-          globalAppLanguage={appLanguage}
-          onLanguageChange={(lang: any) => {
-            setAppLanguage(lang);
-            updateUserProfile(userProfile.uid, { language: lang });
-          }}
-          isBottomNavVisible={isBottomNavVisible}
-          onShowBottomNav={showBottomNav}
-          prefilledPrompt={prefilledTutorPrompt}
-          prefilledSubject={prefilledSubject}
-          prefilledTopic={prefilledTopic}
-          prefilledImage={prefilledImage}
-          onClearPrefilled={() => {
-            setPrefilledTutorPrompt(undefined);
-            setPrefilledSubject(undefined);
-            setPrefilledTopic(undefined);
-            setPrefilledImage(undefined);
-          }}
-          onOpenAuth={() => setShowAuthModal(true)}
-        />
+        <Suspense fallback={<TabLoadingSkeleton message={appLanguage === 'hi' ? 'एआई ट्यूटर लोड हो रहा है...' : 'Loading AI Academic Tutor...'} />}>
+          <AiTutorApp
+            user={userProfile}
+            onBack={() => setActiveTab('home')}
+            onAddNote={async (note) => {
+              await saveAndSyncStudyDocument({
+                id: 'doc_' + Date.now(),
+                ownerId: userProfile.uid,
+                title: note.title,
+                content: note.content,
+                summary: note.content.slice(0, 150) + '...',
+                tagsJson: JSON.stringify([note.subject]),
+                isShared: false,
+                timestamp: new Date().toISOString()
+              });
+            }}
+            onAddXp={addXp}
+            attachedWorkspaceFiles={attachedWorkspaceFiles}
+            onRemoveAttachedWorkspaceFile={(id) => {
+              setAttachedWorkspaceFiles(prev => prev.filter(f => f.id !== id));
+            }}
+            globalAppLanguage={appLanguage}
+            onLanguageChange={(lang: any) => {
+              setAppLanguage(lang);
+              updateUserProfile(userProfile.uid, { language: lang });
+            }}
+            isBottomNavVisible={isBottomNavVisible}
+            onShowBottomNav={showBottomNav}
+            prefilledPrompt={prefilledTutorPrompt}
+            prefilledSubject={prefilledSubject}
+            prefilledTopic={prefilledTopic}
+            prefilledImage={prefilledImage}
+            onClearPrefilled={() => {
+              setPrefilledTutorPrompt(undefined);
+              setPrefilledSubject(undefined);
+              setPrefilledTopic(undefined);
+              setPrefilledImage(undefined);
+            }}
+            onOpenAuth={() => setShowAuthModal(true)}
+          />
+        </Suspense>
       ) : (
       /* MAIN CONTENT AREA - WITH pb-20 sm:pb-24 FOR FULL-WIDTH STICKY BOTTOM NAVIGATION BAR */
       <main className={`relative z-10 flex-1 p-3.5 sm:p-5 md:p-6 mx-auto w-full pb-20 sm:pb-24 overflow-x-clip transition-colors duration-300 ${activeTab === 'studyDocs' ? 'max-w-7xl' : 'max-w-xl space-y-4 sm:space-y-5'}`}>
@@ -1943,55 +1858,57 @@ export default function App() {
             )}
 
             {/* PERSONAL AI LEARNING PLANNER & NEXT ACTIONS */}
-            <PersonalLearningPlanner
-              user={userProfile}
-              appLanguage={appLanguage}
-              onNavigateToTab={(tab, initialTool, topicName, subjectName, promptText) => {
-                setPrefilledSubject(subjectName);
-                setPrefilledTopic(topicName);
-                setPrefilledTutorPrompt(promptText);
-                if (initialTool) {
-                  setInitialTool(initialTool);
-                }
-                setActiveTab(tab);
-              }}
-              savedExams={mockExams}
-            />
+            <Suspense fallback={<div className="h-44 bg-slate-900/40 border border-slate-800/60 rounded-2xl animate-pulse" />}>
+              <PersonalLearningPlanner
+                user={userProfile}
+                appLanguage={appLanguage}
+                onNavigateToTab={(tab, initialTool, topicName, subjectName, promptText) => {
+                  setPrefilledSubject(subjectName);
+                  setPrefilledTopic(topicName);
+                  setPrefilledTutorPrompt(promptText);
+                  if (initialTool) {
+                    setInitialTool(initialTool);
+                  }
+                  setActiveTab(tab);
+                }}
+                savedExams={mockExams}
+              />
+            </Suspense>
 
             {/* HIGH-POWER QUICK ACTION DUO: VOICE TUTOR & PDF/BOOK SCANNER */}
             <div id="quick-actions-section" className="grid grid-cols-2 gap-3 sm:gap-3.5">
-              {/* 1. VOICE TUTOR LAUNCHER */}
+              {/* 1. AI STUDY CENTER LAUNCHER */}
               <motion.button
                 whileHover={{ y: -3, scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => {
                   playUiSound(uiCustomization.audioFeedback);
-                  setShowVoiceTutorModal(true);
+                  setActiveTab('aiTutor');
                 }}
-                className="p-3.5 sm:p-4 rounded-2xl border border-pink-500/50 hover:border-pink-400 shadow-sm bg-[#0c1220] hover:bg-[#12192e]  text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-colors duration-200 min-h-[112px] sm:min-h-[120px]"
+                className="p-3.5 sm:p-4 rounded-2xl border border-indigo-500/50 hover:border-indigo-400 shadow-sm bg-[#0c1220] hover:bg-[#12192e]  text-white text-left relative overflow-hidden flex flex-col justify-between group cursor-pointer transition-colors duration-200 min-h-[112px] sm:min-h-[120px]"
               >
                 {/* Subtle Ambient Glow */}
 
                 {/* Sleek Micro-Pill Badge in Top-Right Corner */}
                 <div className="absolute top-3 right-3 z-10">
-                  <span className="text-[7.5px] sm:text-[8px] font-black tracking-widest uppercase bg-pink-950/90 text-pink-300 px-2 py-0.5 rounded-full border border-pink-500/40 shadow-xs">
-                    VOICE AI
+                  <span className="text-[7.5px] sm:text-[8px] font-black tracking-widest uppercase bg-indigo-950/90 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/40 shadow-xs">
+                    AI TUTOR
                   </span>
                 </div>
 
                 <div className="relative z-10 mb-2 sm:mb-2.5">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-pink-950/80 border border-pink-500/50 flex items-center justify-center text-pink-400 shrink-0 shadow-sm group-hover:scale-105 transition-transform">
-                    <Mic className="w-4 h-4 sm:w-5 sm:h-5 text-pink-400" />
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-950/80 border border-indigo-500/50 flex items-center justify-center text-indigo-400 shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+                    <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400" />
                   </div>
                 </div>
 
                 <div className="relative z-10 space-y-0.5">
                   <h4 className="font-bold text-xs sm:text-sm text-white flex items-center gap-1">
-                    <span className="truncate">{appLanguage === 'hi' ? 'वॉयस ट्यूटर' : 'Voice Tutor'}</span>
-                    <span className="text-pink-400 shrink-0 text-xs sm:text-sm">🎙️</span>
+                    <span className="truncate">{appLanguage === 'hi' ? 'एआई ट्यूटर' : 'AI Study Tutor'}</span>
+                    <span className="text-indigo-400 shrink-0 text-xs sm:text-sm">✨</span>
                   </h4>
                   <p className="text-[10.5px] sm:text-[11px] text-slate-300 font-medium leading-tight truncate">
-                    {appLanguage === 'hi' ? 'बोलकर तुरंत पूछें व सुनें' : 'Live Voice Q&A Tutor'}
+                    {appLanguage === 'hi' ? 'सवालों के तुरंत उत्तर पाएं' : 'Instant AI answers & study help'}
                   </p>
                 </div>
               </motion.button>
@@ -2320,41 +2237,7 @@ export default function App() {
                     </div>
                   </motion.button>
 
-                  {/* LIST ITEM 5: GOOGLE WORKSPACE */}
-                  <motion.button
-                    whileHover={{ x: 3, scale: 1.006 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                      playUiSound(uiCustomization.audioFeedback);
-                      setActiveTab('googleWorkspace');
-                    }}
-                    className="w-full p-3 sm:p-3.5 rounded-2xl border-2 border-transparent shadow-sm bg-gradient-to-r from-slate-950 via-[#0e162d] to-[#121c3b] text-white text-left relative overflow-hidden flex items-center justify-between group cursor-pointer transition-colors duration-300"
-                  >
-                    <NeonBorder color1="#818cf8" color2="#9333ea" />
 
-                    <div className="flex items-center space-x-3 sm:space-x-3.5 relative z-10 min-w-0 flex-1">
-                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-indigo-500/20 border border-indigo-400/50 flex items-center justify-center text-indigo-300 group-hover:scale-110 transition-transform shrink-0 shadow-inner">
-                        <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-300" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center space-x-2">
-                          <h4 className="font-black text-sm sm:text-base text-white flex items-center gap-1.5 truncate">
-                            <span>Google Workspace Hub</span>
-                            <span className="text-indigo-400">💼</span>
-                          </h4>
-                          <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-wider bg-slate-900 text-white/90 px-2 py-0.5 rounded-full border border-white/20  shrink-0">
-                            WORKSPACE
-                          </span>
-                        </div>
-                        <p className="text-[10px] sm:text-[11.5px] text-indigo-100/80 font-medium mt-0.5 truncate font-sans">
-                          Sync with Google Drive, Docs, Classroom, Calendar & Sheets
-                        </p>
-                      </div>
-                    </div>
-                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-indigo-300 group-hover:translate-x-1 transition-colors shrink-0 ml-2 shadow-xs">
-                      <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
-                    </div>
-                  </motion.button>
                 </div>
               ) : (
                 /* GRID VIEW (ALTERNATIVE VIEW) */
@@ -2577,45 +2460,7 @@ export default function App() {
                     </div>
                   </motion.button>
 
-                  {/* CARD 5: GOOGLE WORKSPACE - INDIGO NEON GLOW */}
-                  <motion.button
-                    whileHover={{ y: -2, scale: 1.01 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                      playUiSound(uiCustomization.audioFeedback);
-                      setActiveTab('googleWorkspace');
-                    }}
-                    className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-transparent shadow-sm bg-gradient-to-br from-slate-950 via-[#0e162d] to-[#121c3b] text-white text-left relative overflow-hidden flex flex-col justify-between h-34 sm:h-38 group cursor-pointer transition-colors duration-300 col-span-2 sm:col-span-1"
-                  >
-                    <NeonBorder color1="#6366f1" color2="#4f46e5" />
-                    <div className="absolute inset-0 pointer-events-none opacity-20 flex items-center justify-center">
-                      <svg className="w-40 h-40" viewBox="0 0 100 100" fill="none" stroke="#6366f1" strokeWidth="0.75">
-                        <polygon points="50 5, 90 25, 90 75, 50 95, 10 75, 10 25" />
-                        <line x1="50" y1="5" x2="50" y2="95" />
-                        <line x1="10" y1="25" x2="90" y2="75" />
-                        <line x1="90" y1="25" x2="10" y2="75" />
-                      </svg>
-                    </div>
 
-                    <div className="flex justify-between items-start relative z-10">
-                      <div className="text-indigo-300 group-hover:scale-110 transition-transform">
-                        <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-300" />
-                      </div>
-                      <span className="text-[7.5px] sm:text-[9px] font-black uppercase tracking-wider bg-slate-900 text-white/90 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/20 ">
-                        WORKSPACE
-                      </span>
-                    </div>
-
-                    <div className="relative z-10">
-                      <h4 className="font-black text-xs sm:text-base text-white flex items-center gap-1 tracking-tight">
-                        <span>Workspace Hub</span>
-                        <span className="text-indigo-400">💼</span>
-                      </h4>
-                      <p className="text-[9px] sm:text-[11px] text-indigo-100/70 font-medium leading-tight mt-0.5 line-clamp-1 sm:line-clamp-none">
-                        Sync Drive, Docs, Calendar
-                      </p>
-                    </div>
-                  </motion.button>
                 </div>
               )}
             </div>
@@ -2704,9 +2549,6 @@ export default function App() {
                         if (tool.id === 'pdf_scanner') {
                           playUiSound(uiCustomization.audioFeedback);
                           setActiveTab('pdfScanner');
-                        } else if (tool.id === 'voice_tutor') {
-                          playUiSound(uiCustomization.audioFeedback);
-                          setShowVoiceTutorModal(true);
                         } else {
                           openToolkitWithTool(tool.id);
                         }
@@ -3285,30 +3127,32 @@ export default function App() {
         {/* TOOLKIT TAB */}
         {activeTab === 'toolkit' && (
           <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-xs">
-            <InteractiveToolkit
-              onClose={() => setActiveTab('home')}
-              appLanguage={appLanguage}
-              firebaseUser={{ uid: userProfile.uid }}
-              user={userProfile}
-              notes={studyDocs}
-              onAddNote={async (note) => {
-                await saveAndSyncStudyDocument({
-                  id: 'doc_' + Date.now(),
-                  ownerId: userProfile.uid,
-                  title: note.title,
-                  content: note.content,
-                  summary: note.content.slice(0, 150) + '...',
-                  tagsJson: JSON.stringify([note.subject]),
-                  isShared: false,
-                  timestamp: new Date().toISOString()
-                });
-                addXp(20);
-              }}
-              onAddProgress={async (score, total) => {
-                addXp(Math.round((score / Math.max(1, total)) * 50));
-              }}
-              initialTool={initialTool}
-            />
+            <Suspense fallback={<TabLoadingSkeleton message={appLanguage === 'hi' ? 'इंटरएक्टिव टूलकिट लोड हो रही है...' : 'Loading Interactive Toolkit...'} />}>
+              <InteractiveToolkit
+                onClose={() => setActiveTab('home')}
+                appLanguage={appLanguage}
+                firebaseUser={{ uid: userProfile.uid }}
+                user={userProfile}
+                notes={studyDocs}
+                onAddNote={async (note) => {
+                  await saveAndSyncStudyDocument({
+                    id: 'doc_' + Date.now(),
+                    ownerId: userProfile.uid,
+                    title: note.title,
+                    content: note.content,
+                    summary: note.content.slice(0, 150) + '...',
+                    tagsJson: JSON.stringify([note.subject]),
+                    isShared: false,
+                    timestamp: new Date().toISOString()
+                  });
+                  addXp(20);
+                }}
+                onAddProgress={async (score, total) => {
+                  addXp(Math.round((score / Math.max(1, total)) * 50));
+                }}
+                initialTool={initialTool}
+              />
+            </Suspense>
           </div>
         )}
 
@@ -3460,16 +3304,18 @@ export default function App() {
 
         {/* AI MOCK EXAMS & PRACTICE QUIZZES TAB */}
         {(activeTab === 'mockExam' || activeTab === 'quiz') && (
-          <QuizSection
-            user={userProfile}
-            onAddXp={addXp}
-            onSaveMockExam={saveMockExam}
-            savedExams={mockExams}
-            onClose={() => setActiveTab('home')}
-            language={appLanguage}
-            prefilledSubject={prefilledSubject}
-            prefilledTopic={prefilledTopic}
-          />
+          <Suspense fallback={<TabLoadingSkeleton message={appLanguage === 'hi' ? 'क्विज़ और मॉक टेस्ट लोड हो रहे हैं...' : 'Loading Quizzes & Mock Exams...'} />}>
+            <QuizSection
+              user={userProfile}
+              onAddXp={addXp}
+              onSaveMockExam={saveMockExam}
+              savedExams={mockExams}
+              onClose={() => setActiveTab('home')}
+              language={appLanguage}
+              prefilledSubject={prefilledSubject}
+              prefilledTopic={prefilledTopic}
+            />
+          </Suspense>
         )}
 
         {/* STUDY DOCS / NOTEBOOK TAB */}
@@ -3785,43 +3631,29 @@ export default function App() {
 
         {/* PDF & BOOK SCANNER: CHAPTER SUMMARIES & AUTOMATIC QUIZ */}
         {activeTab === 'pdfScanner' && (
-          <PdfBookScanner
-            user={userProfile}
-            appLanguage={appLanguage}
-            onSaveToNotebook={async (title, content, tags) => {
-              await saveAndSyncStudyDocument({
-                id: 'doc_' + Date.now(),
-                ownerId: userProfile.uid,
-                title,
-                content,
-                summary: content.slice(0, 150) + '...',
-                tagsJson: JSON.stringify(tags || ['PDF Scanner']),
-                isShared: false,
-                timestamp: new Date().toISOString()
-              });
-            }}
-            onAddXp={addXp}
-            onClose={() => setActiveTab('home')}
-          />
+          <Suspense fallback={<TabLoadingSkeleton message={appLanguage === 'hi' ? 'पीडीएफ स्कैनर लोड हो रहा है...' : 'Loading PDF & Book Scanner...'} />}>
+            <PdfBookScanner
+              user={userProfile}
+              appLanguage={appLanguage}
+              onSaveToNotebook={async (title, content, tags) => {
+                await saveAndSyncStudyDocument({
+                  id: 'doc_' + Date.now(),
+                  ownerId: userProfile.uid,
+                  title,
+                  content,
+                  summary: content.slice(0, 150) + '...',
+                  tagsJson: JSON.stringify(tags || ['PDF Scanner']),
+                  isShared: false,
+                  timestamp: new Date().toISOString()
+                });
+              }}
+              onAddXp={addXp}
+              onClose={() => setActiveTab('home')}
+            />
+          </Suspense>
         )}
 
-        {/* GOOGLE PRODUCTIVITY WORKSPACE INTEGRATIONS HUB */}
-        {activeTab === 'googleWorkspace' && (
-          <IntegrationsHub
-            appLanguage={appLanguage}
-            audioFeedbackEnabled={uiCustomization.audioFeedback !== 'silent'}
-            attachedFiles={attachedWorkspaceFiles}
-            onAttachFile={(file) => {
-              setAttachedWorkspaceFiles(prev => {
-                if (prev.some(f => f.id === file.id)) return prev;
-                return [...prev, file];
-              });
-            }}
-            onRemoveAttachedFile={(id) => {
-              setAttachedWorkspaceFiles(prev => prev.filter(f => f.id !== id));
-            }}
-          />
-        )}
+
         </motion.div>
         </AnimatePresence>
       </main>
@@ -3862,7 +3694,6 @@ export default function App() {
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { id: 'pdfScanner', label: 'PDF Scanner', icon: FileText, color: 'text-cyan-400 bg-cyan-950/60 border-cyan-800/40' },
-                  { id: 'voiceTutor', label: 'Voice Tutor', icon: Mic, color: 'text-pink-400 bg-pink-950/60 border-pink-800/40' },
                   { id: 'whiteboard', label: 'Whiteboard', icon: PenTool, color: 'text-purple-400 bg-purple-950/60 border-purple-800/40' },
                   { id: 'mockExam', label: 'Mock Exams', icon: GraduationCap, color: 'text-amber-400 bg-amber-950/60 border-amber-800/40' },
                   { id: 'studyDocs', label: 'Notebook', icon: FileText, color: 'text-teal-400 bg-teal-950/60 border-teal-800/40' },
@@ -3876,9 +3707,7 @@ export default function App() {
                       key={item.id}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => {
-                        if (item.id === 'voiceTutor') {
-                          setShowVoiceTutorModal(true);
-                        } else if (item.id === 'account') {
+                        if (item.id === 'account') {
                           setShowAuthModal(true);
                         } else {
                           setActiveTab(item.id as any);
@@ -4126,101 +3955,100 @@ export default function App() {
       </motion.nav>
 
       {/* ONBOARDING & PROFILE EDIT MODAL */}
-      <OnboardingModal
-        isOpen={showOnboardingModal}
-        initialData={{
-          name: userProfile.name || '',
-          email: userProfile.email || '',
-          avatar: userProfile.avatar || '🧑‍🎓',
-          avatarType: userProfile.avatarType || 'emoji',
-          avatarBg: userProfile.avatarBg || 'bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600',
-          schoolName: userProfile.schoolName || '',
-          className: userProfile.className || '',
-          targetGoal: userProfile.targetGoal || ''
-        }}
-        onSave={handleSaveProfile}
-        onClose={() => setShowOnboardingModal(false)}
-        isEditing={isEditingProfile}
-        onOpenAuth={() => setShowAuthModal(true)}
-      />
+      {showOnboardingModal && (
+        <Suspense fallback={null}>
+          <OnboardingModal
+            isOpen={showOnboardingModal}
+            initialData={{
+              name: userProfile.name || '',
+              email: userProfile.email || '',
+              avatar: userProfile.avatar || '🧑‍🎓',
+              avatarType: userProfile.avatarType || 'emoji',
+              avatarBg: userProfile.avatarBg || 'bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600',
+              schoolName: userProfile.schoolName || '',
+              className: userProfile.className || '',
+              targetGoal: userProfile.targetGoal || ''
+            }}
+            onSave={handleSaveProfile}
+            onClose={() => setShowOnboardingModal(false)}
+            isEditing={isEditingProfile}
+            onOpenAuth={() => setShowAuthModal(true)}
+          />
+        </Suspense>
+      )}
 
       {/* AVATAR STUDIO MODAL */}
-      <AvatarSelectorModal
-        isOpen={showAvatarModal}
-        currentAvatar={userProfile.avatar || '🧑‍🎓'}
-        currentAvatarType={userProfile.avatarType || 'emoji'}
-        currentAvatarBg={userProfile.avatarBg}
-        userName={userProfile.name || 'Student'}
-        equippedAccessory={equippedAccessory}
-        onSave={handleSaveAvatar}
-        onClose={() => setShowAvatarModal(false)}
-      />
+      {showAvatarModal && (
+        <Suspense fallback={null}>
+          <AvatarSelectorModal
+            isOpen={showAvatarModal}
+            currentAvatar={userProfile.avatar || '🧑‍🎓'}
+            currentAvatarType={userProfile.avatarType || 'emoji'}
+            currentAvatarBg={userProfile.avatarBg}
+            userName={userProfile.name || 'Student'}
+            equippedAccessory={equippedAccessory}
+            onSave={handleSaveAvatar}
+            onClose={() => setShowAvatarModal(false)}
+          />
+        </Suspense>
+      )}
 
       {/* AUTHENTICATION MODAL (SIGN IN, SIGN UP, GOOGLE, FORGOT PASSWORD) */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        userProfile={userProfile}
-        setUserProfile={setUserProfile}
-        appLanguage={appLanguage}
-        onAuthSuccess={(newProfile) => {
-          setUserProfile(newProfile);
-          if (newProfile && newProfile.email) {
-            setShowAuthModal(false);
-          }
-        }}
-      />
+      {showAuthModal && (
+        <Suspense fallback={null}>
+          <AuthModal
+            isOpen={showAuthModal}
+            onClose={() => setShowAuthModal(false)}
+            userProfile={userProfile}
+            setUserProfile={setUserProfile}
+            appLanguage={appLanguage}
+            onAuthSuccess={(newProfile) => {
+              setUserProfile(newProfile);
+              if (newProfile && newProfile.email) {
+                setShowAuthModal(false);
+              }
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* SELF CUSTOMIZE STUDIO MODAL (USER EDITABLE UI, 4-UI PER OBJECT, LIGHTING, THEMES) */}
-      <SelfCustomizeModal
-        isOpen={showCustomizeModal}
-        onClose={() => setShowCustomizeModal(false)}
-        customization={uiCustomization}
-        onUpdate={handleUpdateCustomization}
-        language={appLanguage}
-      />
-
-      {/* LIVE VOICE TUTOR MODAL */}
-      <VoiceTutorModal
-        isOpen={showVoiceTutorModal}
-        onClose={() => setShowVoiceTutorModal(false)}
-        user={userProfile}
-        appLanguage={appLanguage}
-        onAddXp={addXp}
-        onSaveToNotebook={async (title, content, tags) => {
-          await saveAndSyncStudyDocument({
-            id: 'doc_' + Date.now(),
-            ownerId: userProfile.uid,
-            title,
-            content,
-            summary: content.slice(0, 150) + '...',
-            tagsJson: JSON.stringify(tags || ['Voice Tutor']),
-            isShared: false,
-            timestamp: new Date().toISOString()
-          });
-        }}
-      />
-
-
-
-
+      {showCustomizeModal && (
+        <Suspense fallback={null}>
+          <SelfCustomizeModal
+            isOpen={showCustomizeModal}
+            onClose={() => setShowCustomizeModal(false)}
+            customization={uiCustomization}
+            onUpdate={handleUpdateCustomization}
+            language={appLanguage}
+          />
+        </Suspense>
+      )}
 
       {/* STREAK CELEBRATION MODAL OVERLAY */}
-      <StreakCelebrationModal
-        isOpen={isStreakCelebrationOpen}
-        streakCount={userProfile.streak || 1}
-        userName={userProfile.name || (appLanguage === 'hi' ? 'छात्र' : 'Student')}
-        language={appLanguage}
-        onClose={() => setIsStreakCelebrationOpen(false)}
-      />
+      {isStreakCelebrationOpen && (
+        <Suspense fallback={null}>
+          <StreakCelebrationModal
+            isOpen={isStreakCelebrationOpen}
+            streakCount={userProfile.streak || 1}
+            userName={userProfile.name || (appLanguage === 'hi' ? 'छात्र' : 'Student')}
+            language={appLanguage}
+            onClose={() => setIsStreakCelebrationOpen(false)}
+          />
+        </Suspense>
+      )}
 
       {/* BADGE CELEBRATION MODAL OVERLAY */}
-      <BadgeCelebrationModal
-        badge={unlockedBadgeCelebration}
-        userName={userProfile.name || (appLanguage === 'hi' ? 'छात्र' : 'Student')}
-        language={appLanguage}
-        onClose={() => setUnlockedBadgeCelebration(null)}
-      />
+      {unlockedBadgeCelebration && (
+        <Suspense fallback={null}>
+          <BadgeCelebrationModal
+            badge={unlockedBadgeCelebration}
+            userName={userProfile.name || (appLanguage === 'hi' ? 'छात्र' : 'Student')}
+            language={appLanguage}
+            onClose={() => setUnlockedBadgeCelebration(null)}
+          />
+        </Suspense>
+      )}
 
       {/* PWA INSTALL & OFFLINE PROMPT BANNER */}
       <PWAInstallBanner />

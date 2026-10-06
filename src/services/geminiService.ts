@@ -122,6 +122,12 @@ export function setLocalCache(category: string, country: string, topic: string, 
 
 const inFlightRequests = new Map<string, Promise<Response>>();
 
+// High-performance Auth Token Cache (Firebase ID tokens are valid for 1 hour)
+let cachedAuthToken: { token: string; expiresAt: number } | null = null;
+export function invalidateAuthTokenCache() {
+  cachedAuthToken = null;
+}
+
 // Safe custom fetch wrapper with built-in localized caching for notes & AI tools
 export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const url = typeof input === "string" ? input : (input as any).url || "";
@@ -180,11 +186,21 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
 
   // Helper to retrieve/refresh Firebase ID token
   const getValidIdToken = async (): Promise<string> => {
+    if (cachedAuthToken && Date.now() < cachedAuthToken.expiresAt) {
+      return cachedAuthToken.token;
+    }
+
     const { auth } = await import("./firebase");
     
     let user = auth.currentUser;
     if (user) {
-      return await user.getIdToken();
+      try {
+        const token = await user.getIdToken();
+        cachedAuthToken = { token, expiresAt: Date.now() + 50 * 60 * 1000 };
+        return token;
+      } catch (e) {
+        console.warn("Failed to read idToken from currentUser:", e);
+      }
     }
 
     const waitForAuthUser = () => new Promise<any>((resolve) => {
@@ -199,19 +215,25 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
           unsubscribe();
           resolve(null);
         }
-      }, 4000);
+      }, 800);
     });
 
     user = await waitForAuthUser();
     if (user) {
-      return await user.getIdToken();
+      try {
+        const token = await user.getIdToken();
+        cachedAuthToken = { token, expiresAt: Date.now() + 50 * 60 * 1000 };
+        return token;
+      } catch (e) {}
     }
 
     try {
       const { signInAnonymously } = await import("./firebase");
       const cred = await signInAnonymously(auth);
       user = cred.user;
-      return await user.getIdToken();
+      const token = await user.getIdToken();
+      cachedAuthToken = { token, expiresAt: Date.now() + 50 * 60 * 1000 };
+      return token;
     } catch (e: any) {
       console.warn("⚠️ Anonymous sign-in fallback in safeFetch:", e?.message || e);
       return "";
@@ -249,13 +271,15 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
     try {
       response = await fetch(resolvedInput, modifiedInit);
 
-      // On 401, force refresh and retry ONCE
+      // On 401, invalidate cached token, force refresh and retry ONCE
       if (response.status === 401) {
+        invalidateAuthTokenCache();
         console.warn("Received 401, forcing token refresh and retrying...");
         try {
           const { auth } = await import("./firebase");
           if (auth.currentUser) {
             const newToken = await auth.currentUser.getIdToken(true);
+            cachedAuthToken = { token: newToken, expiresAt: Date.now() + 50 * 60 * 1000 };
             const retryHeaders = new Headers(modifiedInit.headers || {});
             retryHeaders.set("Authorization", `Bearer ${newToken}`);
             modifiedInit.headers = retryHeaders;
@@ -505,61 +529,7 @@ export async function generateQuiz(
   }
 }
 
-// Client-side flashcard cache
-const clientFlashcardsCache = new Map<string, Array<{ front: string; back: string }>>();
 
-export async function generateFlashcards(
-  subject: string,
-  noteTitle?: string,
-  noteContent?: string,
-  count: number = 5
-): Promise<Array<{ front: string; back: string }>> {
-  const cacheKey = `${subject}_${noteTitle || ""}_${noteContent || ""}_${count}`;
-
-  // Read active country
-  let country = "Global";
-  try {
-    const profileStr = localStorage.getItem('studybuddy_local_profile');
-    if (profileStr) {
-      const parsed = JSON.parse(profileStr);
-      if (parsed && parsed.country) country = parsed.country;
-    }
-  } catch (e) {}
-
-  // Direct live call to Gemini server for real-time low-latency response without offline cache
-  // 4. Try secure backend server route (Primary route)
-  try {
-    const response = await safeFetch("/api/gemini/flashcard", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ subject, noteTitle, noteContent, count }),
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      if (Array.isArray(data) && data.length > 0) {
-        // Cache success
-        setLocalCache("flashcards", country, subject, cacheKey, data);
-        clientFlashcardsCache.set(cacheKey, data);
-        try {
-          const localCacheStr = localStorage.getItem('studybuddy_flashcard_api_cache') || '{}';
-          const cacheMap = JSON.parse(localCacheStr);
-          cacheMap[cacheKey] = data;
-          localStorage.setItem('studybuddy_flashcard_api_cache', JSON.stringify(cacheMap));
-        } catch (cErr) {
-          console.warn("Failed to store local cache", cErr);
-        }
-        return data;
-      }
-    }
-  } catch (error) {
-    console.warn("Backend Gemini flashcards route unreachable:", error);
-  }
-
-  throw new Error("Unable to generate flashcards from AI at this moment. Please try again.");
-}
 
 export async function generateNotes(
   topic: string,

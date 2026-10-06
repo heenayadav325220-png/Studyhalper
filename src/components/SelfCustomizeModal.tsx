@@ -32,21 +32,10 @@ import type {
   NeonIntensity,
   AudioFeedback
 } from '../types';
+import { DEFAULT_UI_CUSTOMIZATION } from '../types';
 import { playUiSound } from '../services/soundEffects';
 
-export const DEFAULT_UI_CUSTOMIZATION: UiCustomization = {
-  appThemeLook: 'cyber_glass',
-  lightingEffect: 'rainbow_spin',
-  fontFamilyStyle: 'sans',
-  aiTutorCardStyle: 'cyber_neon',
-  statBoxesLayout: '3_col_compact',
-  dashboardLayoutPreset: 'tutor_first',
-  neonIntensity: 'high',
-  cardBorderRadius: 'curved',
-  wallpaperAmbiance: 'pure_black',
-  audioFeedback: 'cyber_synth',
-  leaderboardTheme: 'default'
-};
+export { DEFAULT_UI_CUSTOMIZATION };
 
 interface SelfCustomizeModalProps {
   isOpen: boolean;

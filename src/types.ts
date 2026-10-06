@@ -182,3 +182,17 @@ export interface UiCustomization {
   customCss?: string;
   customThemeName?: string;
 }
+
+export const DEFAULT_UI_CUSTOMIZATION: UiCustomization = {
+  appThemeLook: 'cyber_glass',
+  lightingEffect: 'rainbow_spin',
+  fontFamilyStyle: 'sans',
+  aiTutorCardStyle: 'cyber_neon',
+  statBoxesLayout: '3_col_compact',
+  dashboardLayoutPreset: 'tutor_first',
+  neonIntensity: 'high',
+  cardBorderRadius: 'curved',
+  wallpaperAmbiance: 'pure_black',
+  audioFeedback: 'cyber_synth',
+  leaderboardTheme: 'default'
+};

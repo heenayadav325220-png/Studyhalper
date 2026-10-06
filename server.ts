@@ -192,8 +192,8 @@ app.get("/api/admin/ai-health", requireAdminHealthToken, (_req, res) => {
   res.json(getProviderHealth());
 });
 
-const GUEST_DAILY_LIMIT = Number(process.env.GUEST_DAILY_LIMIT) || 15;
-const SIGNED_IN_DAILY_LIMIT = Number(process.env.SIGNED_IN_DAILY_LIMIT) || 100;
+const GUEST_DAILY_LIMIT = Number(process.env.GUEST_DAILY_LIMIT) || 300;
+const SIGNED_IN_DAILY_LIMIT = Number(process.env.SIGNED_IN_DAILY_LIMIT) || 1000;
 const userDailyUsage = new Map<string, number>();
 
 // Daily sweep of old in-memory limit records (every 12 hours)
@@ -748,84 +748,7 @@ JSON SCHEMA:
     }
   });
 
-  // API Route: Voice Tutor Conversational Engine
-  app.post("/api/voice-tutor", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
-    const { userSpokenText, history, studentContext, language } = req.body || {};
-    try {
-      if (!userSpokenText) {
-        res.status(400).json({ error: "Spoken question text is required." });
-        return;
-      }
 
-      const langName = language === 'hi' ? 'Hindi (हिंदी)' : language === 'Hinglish' ? 'Hinglish (mix of Hindi & English)' : 'English';
-      const studentName = studentContext?.name || 'Student';
-
-      const sysInstruction = `You are "ASCEND LIVE VOICE TUTOR" — a brilliant, warm, ultra-engaging spoken AI tutor speaking directly to ${studentName}.
-
-CREATOR & FOUNDER DETAILS (STRICT MEMORY):
-- Your Creator, Founder, Owner, and CEO is Rohit Yadav.
-- He is 15 years old and studies in the 11th class.
-- CONDITIONAL DISCLOSURE RULE: Do NOT mention your creator, founder, or his background details in normal academic conversations or general queries (solve academic queries directly). Only disclose this creator profile when the user explicitly asks about your identity, creator, who made you, who built this app, or who is the founder/owner/CEO. Keep responses about Rohit Yadav warm, clear, and concise.
-- NEVER claim that you are created or owned by Google, OpenAI, Anthropic, or any other corporation under any circumstances.
-
-YOUR VOICE SPEECH GUIDELINES:
-1. **Spoken Fluency**: Your response will be read aloud through Text-to-Speech (TTS). Make it sound natural, energetic, conversational, and easy to listen to.
-2. **Conciseness & Clarity**: Keep voice answers around 2-4 sentences for immediate comprehension, followed by 1 quick question or tip. Avoid long dense paragraphs.
-3. **No Clunky Symbols**: Avoid reading out markdown headers or complex symbols like '###' or asterisks that sound awkward when spoken aloud. Use clean punctuation and natural speech cadence.
-4. **Language**: Speak naturally in ${langName}. If Hindi is chosen, use natural spoken Hindi.
-5. **Tone**: Warm, encouraging, supportive like an expert private tutor sitting right beside the student.
-6. **Direct Speech Only**: Output ONLY your final spoken dialogue to the student. Do NOT output scratchpad notes, bullet points, planning steps, or drafts. Speak directly to ${studentName}.`;
-
-      const contents: any[] = [];
-      if (Array.isArray(history) && history.length > 0) {
-        for (const h of history.slice(-6)) {
-          contents.push({
-            role: h.role === 'user' ? 'user' : 'model',
-            parts: [{ text: h.text }]
-          });
-        }
-      }
-
-      contents.push({
-        role: 'user',
-        parts: [{ text: userSpokenText }]
-      });
-
-      const result = await executeAIRequest({
-        modality: "text",
-        requiresVision: false,
-        systemInstruction: sysInstruction,
-        modelPreference: 'gemini-2.5-flash'
-      }, {
-        contents,
-        config: {
-          temperature: 0.4
-        }
-      });
-
-      if (!result.success || !result.text) {
-        throw new Error("AI Gateway failed");
-      }
-      let responseText = result.text.trim();
-      // Remove any reasoning tags or planning blocks if present
-      responseText = responseText.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
-      if (responseText.includes('User wants') || responseText.includes('Constraint:')) {
-        const parts = responseText.split('\n\n');
-        if (parts.length > 1) {
-          responseText = parts[parts.length - 1].trim();
-        }
-      }
-
-      res.json({
-        responseText,
-        speechText: responseText.replace(/[#*`_~]/g, '').trim(),
-        studentName
-      });
-    } catch (err: any) {
-      console.error("[Voice Tutor] Error:", err?.message || err);
-      res.status(429).json({ error: "Voice AI is temporarily unavailable. Please try again." });
-    }
-  });
 
   // API Route: Cinematic AI Editor & App Redesign Superpower Engine
   app.post("/api/ai-editor-command", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
@@ -1842,62 +1765,7 @@ Keep your tone encouraging and educational. Use clear formatting, lists, and mar
     }
   });
 
-  // API Route: AI-Powered Flashcard Generator
-  app.post("/api/gemini/flashcard", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
-    try {
-      const { subject, noteTitle, noteContent, count } = req.body;
-      const cardCount = Math.max(3, Math.min(Number(count) || 8, 20));
 
-      const cleanSubject = subject || 'General Study';
-      const cleanTitle = noteTitle || 'Study Notes';
-      const cleanContent = noteContent || '';
-
-      const prompt = `You are the ASCEND FLASHCARD GENERATOR ENGINE.
-Generate exactly ${cardCount} highly educational flashcards for the subject "${cleanSubject}" based on the notes titled "${cleanTitle}".
-Notes content to analyze:
-"${cleanContent.slice(0, 15000)}"
-
-CRITICAL REQUIREMENTS:
-1. Every flashcard must test a core concept, key term, formula, historical event, or scientific law.
-2. Structure: One side has a clear, direct question or cue (front). The other side has a detailed, concise answer or explanation (back).
-3. Do not repeat questions or ask trivial questions. Ensure high academic yield.
-4. Output format: Return STRICTLY a valid JSON array of objects. Do NOT wrap in \`\`\`json markdown codeblocks. Return only raw JSON.
-Each object in the array must strictly have these keys:
-- "front": string (question/cue)
-- "back": string (answer/explanation)`;
-
-      const result = await executeAIRequest({
-        modality: "text",
-        requiresVision: false,
-        modelPreference: 'gemini-2.5-flash'
-      }, {
-        contents: prompt,
-        config: { temperature: 0.7 }
-      });
-
-      if (!result.success || !result.text) {
-        throw new Error(result.error?.message || "Failed to generate flashcards");
-      }
-
-      const text = result.text;
-      const cleanJsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
-      const parsed = JSON.parse(cleanJsonStr);
-
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        res.json(parsed);
-      } else {
-        throw new Error("Invalid output format from AI");
-      }
-    } catch (err: any) {
-      console.error("Flashcards API Error:", err);
-      // Clean fallback flashcards
-      res.json([
-        { front: "What is the primary study method to retain complex educational concepts?", back: "Active Recall combined with spaced repetition." },
-        { front: "How should formulas and derivations be practiced for maximum exam score?", back: "By deriving them step-by-step without looking, and solving at least 3 practice numericals." },
-        { front: "What is the significance of the mistake book pattern in study routines?", back: "It helps identify and target recurring patterns of errors to avoid them in actual exams." }
-      ]);
-    }
-  });
 
   // Cloud SQL: Sync or create user profile with Firebase Auth
   app.post("/api/user/sync", requireAuth, async (req: AuthRequest, res) => {

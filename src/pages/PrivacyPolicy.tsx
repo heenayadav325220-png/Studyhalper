@@ -192,8 +192,8 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
                 </div>
                 <p className="text-xs text-slate-400">
                   {isHi
-                    ? 'केवल तब सक्रिय होता है जब आप वॉइस ट्यूटर या माइक बटन दबाकर बोलकर सवाल पूछते हैं (Web Speech / getUserMedia के माध्यम से)।'
-                    : 'Used exclusively when you activate the Voice Tutor or press the microphone icon to ask a study question aloud via browser speech recognition.'}
+                    ? 'केवल तब सक्रिय होता है जब आप चैट में माइक बटन दबाकर बोलकर सवाल पूछते हैं (getUserMedia के माध्यम से)।'
+                    : 'Used exclusively when you press the microphone icon in chat to ask a study question aloud via speech recognition.'}
                 </p>
               </div>
             </div>
@@ -227,17 +227,8 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
                     {isHi ? 'एआई अध्ययन प्रदाता (AI Study Providers): ' : 'AI Study Providers: '}
                   </strong>
                   {isHi
-                    ? 'जब आप एआई सुविधाओं का उपयोग करते हैं (जैसे एआई ट्यूटर, वॉयस ट्यूटर, नोट्स संपादन, और बुक स्कैनर), तो आपके प्रश्न, संवादी इतिहास, सबमिट की गई सामग्री और अपलोड की गई तस्वीरें एआई प्रदाताओं (Google Gemini API, Groq, और OpenRouter) को संसाधित करने के लिए भेजी जा सकती हैं। मानक डेवलपर एपीआई (developer API) नीतियों के अनुसार, एपीआई के माध्यम से प्रेषित डेटा का उपयोग इन प्रदाताओं द्वारा अपने मॉडलों को प्रशिक्षित (train) करने के लिए नहीं किया जाता है।'
-                    : "When you utilize AI features (including the AI Tutor, Voice Tutor, Homework Scanner, and Notes summary), your prompt queries, active conversation history, submitted study text, and uploaded homework or textbook images may be processed by Google Gemini API, Groq, and OpenRouter solely to generate high-yield educational answers. Under their respective standard developer API policies, data sent via API is typically not utilized for training foundation models."}
-                </div>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-                <div>
-                  <strong className="text-white font-semibold">Google Workspace (Optional): </strong>
-                  {isHi
-                    ? 'यदि आप "Google Workspace" एकीकरण जोड़ते हैं, तो आपकी स्पष्ट अनुमति से निम्नलिखित पाँच सेवाओं और क्षमताओं का उपयोग किया जाता है: (1) Google Drive: पीडीएफ और दस्तावेज़ सामग्री को पढ़ने के लिए (रीड-ओनली)। (2) Google Docs: सीधे आपके ड्राइव में नए अध्ययन गाइड बनाने और लिखने के लिए। (3) Google Classroom: सक्रिय पाठ्यक्रमों और उनके गृहकार्य (coursework) की सूची पढ़ने के लिए (रीड-ओनली)। (4) Google Calendar: घटनाओं की सूची देखने और सीधे नए अध्ययन सत्रों को शेड्यूल/बनाने के लिए। (5) Google Sheets: स्प्रेडशीट की सूची बनाने, सेल मान पढ़ने और अध्ययन प्रगति लॉग को जोड़ने के लिए।'
-                    : 'If you choose to link Google Workspace in the Integrations Hub, the following connected services and capabilities are utilized with your explicit permission: (1) Google Drive: to list and read selected files and documents (read-only) for study scanning and analysis. (2) Google Docs: to create and write AI-generated study guides, summaries, and lecture notes directly into your documents. (3) Google Classroom: to list active courses and coursework (read-only) to organize homework schedules. (4) Google Calendar: to list upcoming calendar events and automatically schedule or create new study sessions. (5) Google Sheets: to list spreadsheets, read cell values, and write or append study progress metrics.'}
+                    ? 'जब आप एआई सुविधाओं का उपयोग करते हैं (जैसे एआई ट्यूटर, नोट्स संपादन, और बुक स्कैनर), तो आपके प्रश्न, संवादी इतिहास, सबमिट की गई सामग्री और अपलोड की गई तस्वीरें एआई प्रदाताओं (Google Gemini API, Groq, और OpenRouter) को संसाधित करने के लिए भेजी जा सकती हैं। मानक डेवलपर एपीआई (developer API) नीतियों के अनुसार, एपीआई के माध्यम से प्रेषित डेटा का उपयोग इन प्रदाताओं द्वारा अपने मॉडलों को प्रशिक्षित (train) करने के लिए नहीं किया जाता है।'
+                    : "When you utilize AI features (including the AI Tutor, Homework Scanner, and Notes summary), your prompt queries, active conversation history, submitted study text, and uploaded homework or textbook images may be processed by Google Gemini API, Groq, and OpenRouter solely to generate high-yield educational answers. Under their respective standard developer API policies, data sent via API is typically not utilized for training foundation models."}
                 </div>
               </li>
               <li className="flex items-start gap-2.5">

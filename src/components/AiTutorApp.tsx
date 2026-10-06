@@ -36,12 +36,12 @@ import {
   Zap,
   ChevronUp,
   ChevronDown,
-  Type,
-  FolderOpen,
   Grid,
   Menu,
   Bot,
-  Clock
+  Clock,
+  Bug,
+  MessageSquare
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -53,7 +53,6 @@ import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 const CodeHighlighter = SyntaxHighlighter as any;
 import { getStudyAnswer } from '../services/geminiService';
 import { PersonalLearningService } from '../services/personalLearningService';
-import { authorizeGoogleService, getSavedToken, removeToken, fetchDriveFiles, fetchFileContent } from '../services/googleWorkspace';
 import { exportConversationToPdf } from '../utils/pdfExport';
 import { showToast } from './Toast';
 import { logError } from '../utils/errorHandler';
@@ -69,7 +68,6 @@ import {
 } from '../utils/imageEnhancement';
 import type { Subject } from '../types';
 import { playTutorSpeech } from '../services/voiceSettings';
-import { CustomVoiceModal } from './CustomVoiceModal';
 
 interface AiTutorAppProps {
   user: {
@@ -794,6 +792,7 @@ export const AiTutorApp = memo(function AiTutorApp({
       localStorage.setItem('ai_tutor_font_style', next);
     } catch {}
   };
+  void toggleTutorFontStyle;
   const [newFormulaName, setNewFormulaName] = useState('');
   const [newFormulaLatex, setNewFormulaLatex] = useState('');
   const [showAddFormulaForm, setShowAddFormulaForm] = useState(false);
@@ -805,7 +804,6 @@ export const AiTutorApp = memo(function AiTutorApp({
 
 
   const [showMoreMenu, setShowMoreMenu] = useState(false);
-  const [showCustomVoiceModal, setShowCustomVoiceModal] = useState(false);
   const [showTopRightMenu, setShowTopRightMenu] = useState(false);
   const topRightMenuRef = useRef<HTMLDivElement>(null);
 
@@ -1030,15 +1028,60 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [lowContrastDetected, setLowContrastDetected] = useState(false);
   const [showContrastToast, setShowContrastToast] = useState(false);
 
-  // New states and refs for multiple attachments & drive picker
+  // New states and refs for multiple attachments
   const [localAttachedFiles, setLocalAttachedFiles] = useState<any[]>([]);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
-  const [showDriveModal, setShowDriveModal] = useState(false);
-  const [driveFiles, setDriveFiles] = useState<any[]>([]);
-  const [isLoadingDriveFiles, setIsLoadingDriveFiles] = useState(false);
-  const [driveSearchQuery, setDriveSearchQuery] = useState('');
-  const [driveError, setDriveError] = useState<string | null>(null);
-  const [isAttachingDriveFile, setIsAttachingDriveFile] = useState(false);
+
+  // Report / Feedback Modal states
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportType, setReportType] = useState<'Bug Report' | 'Feedback' | 'Feature Request'>('Bug Report');
+  const [reportEmail, setReportEmail] = useState('');
+  const [reportMessage, setReportMessage] = useState('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [reportingMessageContext, setReportingMessageContext] = useState<string | null>(null);
+
+  const handleOpenReportModal = (msg?: ChatMessage) => {
+    setReportType('Bug Report');
+    setReportEmail((user as any)?.email || '');
+    setReportMessage('');
+    if (msg) {
+      const snippet = (msg.text || '').slice(0, 120).replace(/\n/g, ' ').trim();
+      setReportingMessageContext(`Response [ID: ${msg.id}] "${snippet}${msg.text.length > 120 ? '...' : ''}"`);
+    } else {
+      setReportingMessageContext(null);
+    }
+    setShowReportModal(true);
+  };
+
+  const handleSubmitReport = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!reportMessage.trim()) {
+      showToast('Please enter your message or issue details', 'error');
+      return;
+    }
+
+    setIsSubmittingReport(true);
+    try {
+      const finalMessage = reportingMessageContext 
+        ? `${reportMessage.trim()}\n\n[Context: ${reportingMessageContext}]`
+        : reportMessage.trim();
+
+      if (typeof (window as any).sendReport === 'function') {
+        await (window as any).sendReport(reportType, reportEmail.trim(), finalMessage);
+      } else {
+        alert('रिपोर्ट सफलतापूर्वक भेज दी गई है!');
+      }
+      showToast('Feedback submitted successfully!', 'success');
+      setShowReportModal(false);
+      setReportMessage('');
+      setReportingMessageContext(null);
+    } catch (err: any) {
+      console.error('Error submitting report:', err);
+      showToast('Failed to submit report. Please try again.', 'error');
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -1135,85 +1178,7 @@ export const AiTutorApp = memo(function AiTutorApp({
     e.target.value = '';
   };
 
-  const handleOpenDrive = async () => {
-    setShowAttachmentMenu(false);
-    setIsLoadingDriveFiles(true);
-    setDriveError(null);
-    setShowDriveModal(true);
 
-    const performFetch = async (accessToken: string) => {
-      try {
-        const files = await fetchDriveFiles(accessToken);
-        setDriveFiles(files);
-      } catch (err: any) {
-        logError(err, 'DRIVE_FILE_FETCH');
-        if (err.message === 'UNAUTHORIZED') {
-          removeToken('drive');
-          requestAuthorization();
-        } else {
-          setDriveError(err?.message || 'Failed to fetch Google Drive files.');
-        }
-      } finally {
-        setIsLoadingDriveFiles(false);
-      }
-    };
-
-    const requestAuthorization = () => {
-      authorizeGoogleService(
-        "drive",
-        async (newToken) => {
-          await performFetch(newToken);
-        },
-        (error) => {
-          setDriveError(`Google Drive authorization failed: ${error}`);
-          setIsLoadingDriveFiles(false);
-          showToast(`Google Drive authorization failed: ${error}`, 'error');
-        }
-      );
-    };
-
-    const token = getSavedToken("drive");
-    if (token) {
-      await performFetch(token);
-    } else {
-      requestAuthorization();
-    }
-  };
-
-  const handleSelectDriveFile = async (file: any) => {
-    setIsAttachingDriveFile(true);
-    const token = getSavedToken("drive");
-    if (!token) {
-      showToast("Google Drive session expired. Please connect again.", "error");
-      setIsAttachingDriveFile(false);
-      return;
-    }
-
-    try {
-      showToast(`Attaching "${file.name}"...`, "info");
-      const content = await fetchFileContent(token, file.id, file.mimeType);
-      
-      const newAttached = {
-        id: file.id,
-        name: file.name,
-        content: content,
-        type: "drive" as const
-      };
-
-      setLocalAttachedFiles(prev => {
-        if (prev.some(f => f.id === file.id)) return prev;
-        return [...prev, newAttached];
-      });
-
-      showToast(`"${file.name}" attached successfully!`, "success");
-      setShowDriveModal(false);
-    } catch (err: any) {
-      logError(err, 'DRIVE_FILE_ATTACH');
-      showToast(`Failed to attach file: ${err?.message || 'Unknown error'}`, "error");
-    } finally {
-      setIsAttachingDriveFile(false);
-    }
-  };
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -2269,18 +2234,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                     </span>
                   </button>
 
-                  {/* Voice Option */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowCustomVoiceModal(true);
-                      setShowTopRightMenu(false);
-                    }}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 text-slate-700 transition flex items-center space-x-2 cursor-pointer"
-                  >
-                    <Volume2 className="w-4 h-4 text-indigo-500 shrink-0" />
-                    <span>Voice</span>
-                  </button>
+
 
                   {/* My Account & Settings Option */}
                   {onOpenAuth && (
@@ -2855,32 +2809,6 @@ export const AiTutorApp = memo(function AiTutorApp({
                           <span className="font-bold text-xs sm:text-sm text-slate-900 tracking-tight">AI Academic Tutor</span>
                         </div>
                       </div>
-
-                      <div className="flex items-center space-x-2">
-                        {/* Font Style Toggle: Classic Editorial Serif vs Modern Clean */}
-                        <button
-                          type="button"
-                          onClick={toggleTutorFontStyle}
-                          className="inline-flex items-center space-x-1.5 text-[11px] font-medium px-2 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 transition cursor-pointer active:scale-95 shadow-xs"
-                          title="Click to toggle between Classic Editorial Serif and Modern Sans font style"
-                        >
-                          <Type className="w-3 h-3 text-indigo-600" />
-                          <span className={`${tutorFontStyle === 'classic' ? 'font-serif font-bold text-indigo-950' : 'font-sans font-semibold text-slate-700'}`}>
-                            {tutorFontStyle === 'classic' ? 'Classic Serif' : 'Modern Sans'}
-                          </span>
-                        </button>
-
-
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteMessage(msg.id)}
-                          className="text-slate-400 hover:text-rose-600 transition p-1 rounded-md hover:bg-rose-50 cursor-pointer"
-                          title="Remove message"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
                     </div>
 
                     {/* Classic Editorial or Modern Message Body - Khulla no padding or background */}
@@ -2915,61 +2843,74 @@ export const AiTutorApp = memo(function AiTutorApp({
                       </div>
                     )}
 
-                    {/* Professional Action Suite */}
-                    <div className="bg-transparent border-t border-slate-100 px-0 py-2 flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center space-x-1 flex-wrap gap-1">
+                    {/* Professional Action Suite - Minimal, Borderless Icon-Only Row (ChatGPT-style) */}
+                    <div className="bg-transparent px-0 pt-1 pb-1 flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center space-x-1">
                         <button
                           type="button"
                           onClick={() => handleCopyText(msg.id, msg.text)}
                           title="Copy answer"
-                          className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-semibold h-8 px-2.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs"
+                          className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 rounded-md transition cursor-pointer active:scale-90"
+                          aria-label="Copy answer"
                         >
-                          {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> : <Copy className="w-3.5 h-3.5 text-slate-500 shrink-0" />}
-                          <span className="hidden xs:inline">{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
+                          {copiedId === msg.id ? (
+                            <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                          )}
                         </button>
 
                         <button
                           type="button"
                           onClick={() => handleSpeakText(msg.text)}
                           title="Listen to answer"
-                          className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-semibold h-8 px-2.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs"
+                          className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 rounded-md transition cursor-pointer active:scale-90"
+                          aria-label="Listen to answer"
                         >
-                          <Volume2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                          <span className="hidden xs:inline">Listen</span>
+                          <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                         </button>
 
                         <button
                           type="button"
                           onClick={() => handleSaveToNotebook(msg)}
-                          title="Save to notebook"
-                          className="text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-semibold h-8 px-2.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs"
+                          title={savedNoteId === msg.id ? 'Saved to notebook' : 'Save to notebook'}
+                          className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 rounded-md transition cursor-pointer active:scale-90"
+                          aria-label="Save to notebook"
                         >
-                          <Bookmark className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                          <span className="hidden xs:inline">{savedNoteId === msg.id ? 'Saved ✓' : 'Save Note'}</span>
+                          {savedNoteId === msg.id ? (
+                            <Bookmark className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 fill-emerald-600 shrink-0" />
+                          ) : (
+                            <Bookmark className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                          )}
                         </button>
-
-
 
                         <button
                           type="button"
                           onClick={() => handleExportSingleMessageToPdf(msg)}
                           disabled={isExportingSinglePdfId === msg.id}
-                          className="text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-xs font-bold h-8 px-2.5 rounded-lg flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-2xs disabled:opacity-50"
-                          title="Export this tutoring answer to a beautifully formatted PDF Study Guide"
+                          className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 rounded-md transition cursor-pointer active:scale-90 disabled:opacity-50"
+                          title="Export to PDF"
+                          aria-label="Export to PDF"
                         >
                           {isExportingSinglePdfId === msg.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600 shrink-0" />
+                            <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin text-indigo-600 shrink-0" />
                           ) : (
-                            <FileDown className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                            <FileDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                           )}
-                          <span className="hidden sm:inline">
-                            {isExportingSinglePdfId === msg.id ? 'Exporting...' : 'Export to PDF'}
-                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenReportModal(msg)}
+                          className="p-1.5 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50/50 dark:hover:bg-rose-950/20 rounded-md transition cursor-pointer active:scale-90"
+                          title="Report an issue or give feedback"
+                          aria-label="Report an issue or give feedback"
+                        >
+                          <Bug className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                         </button>
                       </div>
-
-
                     </div>
+
                   </div>
                 </motion.div>
               );
@@ -3616,18 +3557,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                           </div>
                         </button>
 
-                        {/* DRIVE OPTION */}
-                        <button
-                          type="button"
-                          onClick={handleOpenDrive}
-                          className="w-full text-left px-3 py-2 hover:bg-slate-800 rounded-xl text-xs font-semibold transition flex items-center space-x-2.5 text-slate-200 hover:text-white"
-                        >
-                          <FolderOpen className="w-4 h-4 text-amber-400 shrink-0" />
-                          <div>
-                            <div className="font-bold">{appLanguage === 'hi' ? 'गूगल ड्राइव' : 'Google Drive'}</div>
-                            <div className="text-[9px] text-slate-400 font-normal">{appLanguage === 'hi' ? 'गूगल ड्राइव से फाइलें चुनें' : 'Select directly from Cloud'}</div>
-                          </div>
-                        </button>
+
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -3718,148 +3648,7 @@ export const AiTutorApp = memo(function AiTutorApp({
           className="hidden"
         />
 
-        {/* GOOGLE DRIVE PICKER MODAL */}
-        <AnimatePresence>
-          {showDriveModal && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-slate-950  z-50 flex items-center justify-center p-4"
-              onClick={() => setShowDriveModal(false)}
-            >
-              <motion.div 
-                initial={{ scale: 0.95, y: 15 }}
-                animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.95, y: 15 }}
-                className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col max-h-[80vh] overflow-hidden text-slate-100"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {/* Modal Header */}
-                <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-                  <div className="flex items-center space-x-2.5">
-                    <div className="p-2 rounded-xl bg-amber-500/15 text-amber-400">
-                      <FolderOpen className="w-5 h-5 text-amber-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm sm:text-base font-black tracking-wide text-white">
-                        {appLanguage === 'hi' ? 'गूगल ड्राइव फ़ाइलें' : 'Google Drive Files'}
-                      </h3>
-                      <p className="text-[10px] text-slate-400">
-                        {appLanguage === 'hi' ? 'अध्ययन के लिए अपने क्लाउड दस्तावेज़ जोड़ें' : 'Choose documents to attach as tutor context'}
-                      </p>
-                    </div>
-                  </div>
-                  <button 
-                    type="button" 
-                    onClick={() => setShowDriveModal(false)}
-                    className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
 
-                {/* Search Bar */}
-                {!driveError && !isLoadingDriveFiles && driveFiles.length > 0 && (
-                  <div className="mt-4">
-                    <input
-                      type="text"
-                      placeholder={appLanguage === 'hi' ? 'फ़ाइल खोजें...' : 'Search files...'}
-                      value={driveSearchQuery}
-                      onChange={(e) => setDriveSearchQuery(e.target.value)}
-                      className="w-full bg-slate-950 text-slate-100 border border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition placeholder:text-slate-500 font-medium"
-                    />
-                  </div>
-                )}
-
-                {/* Modal Content / Files List */}
-                <div className="flex-1 overflow-y-auto min-h-[250px] max-h-[400px] mt-4 pr-1 space-y-1.5 no-scrollbar">
-                  {isLoadingDriveFiles ? (
-                    <div className="h-full flex flex-col items-center justify-center py-12 text-slate-400 space-y-2">
-                      <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-                      <span className="text-xs font-bold">{appLanguage === 'hi' ? 'ड्राइव फ़ाइलें लोड हो रही हैं...' : 'Loading Drive files...'}</span>
-                    </div>
-                  ) : driveError ? (
-                    <div className="py-8 text-center space-y-3">
-                      <p className="text-xs text-rose-400 font-semibold">{driveError}</p>
-                      <button
-                        type="button"
-                        onClick={handleOpenDrive}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition cursor-pointer"
-                      >
-                        {appLanguage === 'hi' ? 'पुनः कनेक्ट करें' : 'Reconnect & Retry'}
-                      </button>
-                    </div>
-                  ) : isAttachingDriveFile ? (
-                    <div className="h-full flex flex-col items-center justify-center py-12 text-slate-400 space-y-2">
-                      <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
-                      <span className="text-xs font-bold">{appLanguage === 'hi' ? 'फ़ाइल अटैच की जा रही है...' : 'Downloading and attaching file...'}</span>
-                    </div>
-                  ) : (
-                    <>
-                      {(() => {
-                        const filtered = driveFiles.filter(f => 
-                          f.name.toLowerCase().includes(driveSearchQuery.toLowerCase())
-                        );
-
-                        if (filtered.length === 0) {
-                          return (
-                            <div className="h-full flex flex-col items-center justify-center py-12 text-slate-500">
-                              <span className="text-xs font-medium">{appLanguage === 'hi' ? 'कोई फ़ाइल नहीं मिली' : 'No matching files found'}</span>
-                            </div>
-                          );
-                        }
-
-                        return filtered.map((file) => {
-                          const isDoc = file.mimeType.includes('document');
-                          const isSheet = file.mimeType.includes('spreadsheet');
-                          const isPdf = file.mimeType.includes('pdf');
-                          const isImg = file.mimeType.includes('image');
-
-                          return (
-                            <div
-                              key={file.id}
-                              onClick={() => handleSelectDriveFile(file)}
-                              className="p-3 bg-slate-950/60 hover:bg-slate-850/80 border border-slate-850 hover:border-slate-750 rounded-xl transition cursor-pointer flex items-center justify-between group"
-                            >
-                              <div className="flex items-center space-x-3 min-w-0">
-                                <span className="text-lg shrink-0">
-                                  {isDoc ? '📝' : isSheet ? '📊' : isPdf ? '📕' : isImg ? '🖼️' : '📁'}
-                                </span>
-                                <div className="min-w-0">
-                                  <h4 className="text-xs font-bold text-slate-200 group-hover:text-white truncate max-w-[280px]">
-                                    {file.name}
-                                  </h4>
-                                  <p className="text-[9px] text-slate-500 font-medium">
-                                    {isDoc ? 'Google Doc' : isSheet ? 'Google Sheet' : isPdf ? 'PDF Document' : isImg ? 'Image' : 'File'}
-                                  </p>
-                                </div>
-                              </div>
-                              <span className="text-[10px] text-blue-500 font-bold opacity-0 group-hover:opacity-100 transition pr-1">
-                                {appLanguage === 'hi' ? 'अटैच करें' : 'Attach'}
-                              </span>
-                            </div>
-                          );
-                        });
-                      })()}
-                    </>
-                  )}
-                </div>
-
-                {/* Modal Footer */}
-                <div className="mt-4 pt-3.5 border-t border-slate-800 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setShowDriveModal(false)}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition cursor-pointer"
-                  >
-                    {appLanguage === 'hi' ? 'रद्द करें' : 'Close'}
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <AnimatePresence>
           {showMoreMenu && (
@@ -4021,6 +3810,19 @@ export const AiTutorApp = memo(function AiTutorApp({
                       <span>Export Study PDF</span>
                     </button>
 
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowMoreMenu(false);
+                        handleOpenReportModal();
+                      }}
+                      className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer"
+                      title="Report issue or share feedback"
+                    >
+                      <Bug className="w-4 h-4 text-rose-400" />
+                      <span>Feedback</span>
+                    </button>
+
                     {messages.length > 0 && (
                       <button
                         type="button"
@@ -4045,6 +3847,167 @@ export const AiTutorApp = memo(function AiTutorApp({
                   {user.schoolName && <div className="text-slate-400 text-[10px] truncate">🏫 {user.schoolName}</div>}
                   {user.targetGoal && <div className="text-amber-300 text-[10px]">🎯 Goal: {user.targetGoal}</div>}
                 </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Report / Feedback Modal */}
+        <AnimatePresence>
+          {showReportModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+              onClick={() => {
+                if (!isSubmittingReport) setShowReportModal(false);
+              }}
+            >
+              <motion.div
+                initial={{ scale: 0.94, opacity: 0, y: 16 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.94, opacity: 0, y: 16 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-slate-900 border border-slate-700/80 rounded-2xl sm:rounded-3xl max-w-md w-full overflow-hidden shadow-2xl flex flex-col p-5 sm:p-6 space-y-4"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2.5 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-xl flex items-center justify-center">
+                      <Bug className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-white tracking-wide">
+                        Report / Feedback
+                      </h3>
+                      <p className="text-[11px] text-slate-400">
+                        Help us improve your AI Academic Tutor
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowReportModal(false)}
+                    disabled={isSubmittingReport}
+                    className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition cursor-pointer disabled:opacity-50"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Form */}
+                <form onSubmit={handleSubmitReport} className="space-y-4">
+                  {/* Report Type */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-300">
+                      Report Type <span className="text-rose-400">*</span>
+                    </label>
+                    {/* Visual Radio Pill Buttons */}
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: 'Bug Report', label: 'Bug Report', icon: Bug, activeClass: 'text-rose-300 border-rose-500/50 bg-rose-500/15 ring-1 ring-rose-500/30' },
+                        { id: 'Feedback', label: 'Feedback', icon: MessageSquare, activeClass: 'text-indigo-300 border-indigo-500/50 bg-indigo-500/15 ring-1 ring-indigo-500/30' },
+                        { id: 'Feature Request', label: 'Feature Request', icon: Sparkles, activeClass: 'text-emerald-300 border-emerald-500/50 bg-emerald-500/15 ring-1 ring-emerald-500/30' }
+                      ].map((type) => {
+                        const Icon = type.icon;
+                        const isSelected = reportType === type.id;
+                        return (
+                          <button
+                            key={type.id}
+                            type="button"
+                            onClick={() => setReportType(type.id as any)}
+                            className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-xs font-semibold transition cursor-pointer ${
+                              isSelected
+                                ? type.activeClass
+                                : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+                            }`}
+                          >
+                            <Icon className="w-4 h-4 mb-1" />
+                            <span className="text-[10px] sm:text-[11px] leading-tight text-center">{type.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {/* Dropdown for select support */}
+                    <select
+                      value={reportType}
+                      onChange={(e) => setReportType(e.target.value as any)}
+                      className="w-full mt-1 bg-slate-950/70 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 transition"
+                    >
+                      <option value="Bug Report">🐛 Bug Report</option>
+                      <option value="Feedback">💬 Feedback</option>
+                      <option value="Feature Request">✨ Feature Request</option>
+                    </select>
+                  </div>
+
+                  {/* User Email (Optional) */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-300">
+                      User Email <span className="text-slate-500 font-normal text-[11px]">(Optional)</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={reportEmail}
+                      onChange={(e) => setReportEmail(e.target.value)}
+                      placeholder="you@example.com (for follow-up)"
+                      className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
+                    />
+                  </div>
+
+                  {/* Message Details (Required) */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-300">
+                      Message / Issue Details <span className="text-rose-400">*</span>
+                    </label>
+                    <textarea
+                      required
+                      rows={4}
+                      value={reportMessage}
+                      onChange={(e) => setReportMessage(e.target.value)}
+                      placeholder="Please describe the issue, question, or feature idea..."
+                      className="w-full bg-slate-950/70 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition resize-none leading-relaxed"
+                    />
+                  </div>
+
+                  {/* Context Info if available */}
+                  {reportingMessageContext && (
+                    <div className="p-2.5 bg-slate-950/70 border border-slate-800/80 rounded-xl text-[10px] text-slate-400 flex items-start space-x-2">
+                      <span className="text-rose-400 font-bold shrink-0">Context:</span>
+                      <span className="truncate">{reportingMessageContext}</span>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center justify-end space-x-2.5 pt-3 border-t border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setShowReportModal(false)}
+                      disabled={isSubmittingReport}
+                      className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition cursor-pointer active:scale-95 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmittingReport || !reportMessage.trim()}
+                      className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 shadow-md shadow-rose-900/20 flex items-center space-x-2 transition cursor-pointer active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                      {isSubmittingReport ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Sending...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Submit Report</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
               </motion.div>
             </motion.div>
           )}
@@ -4468,11 +4431,7 @@ export const AiTutorApp = memo(function AiTutorApp({
         </div>
       </div>
 
-      <CustomVoiceModal
-        isOpen={showCustomVoiceModal}
-        onClose={() => setShowCustomVoiceModal(false)}
-        appLanguage={appLanguage}
-      />
+
     </div>
   );
 });

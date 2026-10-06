@@ -46,15 +46,17 @@ html.dark ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.35); }
 }
 /* Game-grade scrolling rendering optimizations (Erases blank flashes on scroll) */
 .game-smooth-scroll {
-  
-  
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   will-change: scroll-position;
   transform: translate3d(0,0,0);
+  backface-visibility: hidden;
 }
 .scroll-item-contain {
   content-visibility: auto;
-  contain-intrinsic-size: 80px 400px;
-  contain: layout style;
+  contain-intrinsic-size: 0 400px;
+  contain: layout style paint;
+  transform: translate3d(0,0,0);
 }
 @keyframes spinSlow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .animate-spin-slow { animation: spinSlow 6s linear infinite; }
