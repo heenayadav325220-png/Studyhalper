@@ -501,6 +501,23 @@ html.dark #main-app-container .backdrop-blur-lg,
   margin-bottom: 0.75rem;
 }
 
+/* Resilient Text Wrap & Clipping Prevention rules for AI Tutor Content */
+.markdown-body, .tutor-editorial, .tutor-modern {
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  white-space: normal !important;
+  max-width: 100% !important;
+}
+.markdown-body p, .tutor-editorial p, .tutor-modern p {
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  white-space: normal !important;
+}
+.markdown-body pre, .markdown-body code {
+  white-space: pre-wrap !important;
+  word-break: break-all !important;
+}
+
 /* Composer and suggestions */
 #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer { position: relative; z-index: 20; border-top: 1px solid #e7eaf0; background: rgba(248, 250, 252, 0.94); padding: 10px clamp(14px, 3vw, 32px); }
 #main-app-container > div.fixed.inset-0.z-50.bg-\[\#f8fafc\] > footer > div { max-width: 880px; }
