@@ -116,6 +116,8 @@ function UserAvatar({
               src={avatar}
               alt={alt || `${name}'s Avatar`}
               referrerPolicy="no-referrer"
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover"
               onError={() => setImageError(true)}
             />

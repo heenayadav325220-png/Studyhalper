@@ -192,19 +192,183 @@ app.get("/api/admin/ai-health", requireAdminHealthToken, (_req, res) => {
   res.json(getProviderHealth());
 });
 
-const GUEST_DAILY_LIMIT = Number(process.env.GUEST_DAILY_LIMIT) || 300;
-const SIGNED_IN_DAILY_LIMIT = Number(process.env.SIGNED_IN_DAILY_LIMIT) || 1000;
-const userDailyUsage = new Map<string, number>();
+import { adminDb, adminAuth } from "./src/lib/firebase-admin.js";
 
-// Daily sweep of old in-memory limit records (every 12 hours)
+const AI_LIMITS = {
+  aiTutor: 30,
+  notes: 5,
+  quiz: 10,
+  mockExam: 3,
+  questionPaper: 3,
+  ocr: 10,
+  mindmap: 5,
+  explainTopic: 15,
+  aiEditor: 15,
+  default: 10
+};
+
+function getQuotaKeyForPath(path: string): string {
+  if (path.includes("/gemini/answer") || path.includes("/tutor-chat") || path.includes("/gemini/diagram")) {
+    return "aiTutor";
+  }
+  if (path.includes("/gemini/notes-generator") || path.includes("/summarize-notes") || path.includes("/gemini/pdf-summary")) {
+    return "notes";
+  }
+  if (path.includes("/gemini/quiz")) {
+    return "quiz";
+  }
+  if (path.includes("/generate-exam")) {
+    return "mockExam";
+  }
+  if (path.includes("/gemini/question-paper")) {
+    return "questionPaper";
+  }
+  if (path.includes("/gemini/ocr") || path.includes("/pdf-scan-analyze")) {
+    return "ocr";
+  }
+  if (path.includes("/gemini/mindmap")) {
+    return "mindmap";
+  }
+  if (path.includes("/gemini/explain-topic")) {
+    return "explainTopic";
+  }
+  if (path.includes("/ai-editor-command")) {
+    return "aiEditor";
+  }
+  return "other";
+}
+
+function getAttachmentCount(body: any): number {
+  let count = 0;
+  if (body?.pdfBase64) count += 1;
+  if (body?.imagesBase64 && Array.isArray(body.imagesBase64)) {
+    count += body.imagesBase64.length;
+  } else if (body?.imageBase64) {
+    count += 1;
+  }
+  return count;
+}
+
+interface DailyUsageRecord {
+  aiTutor: number;
+  notes: number;
+  quiz: number;
+  mockExam: number;
+  questionPaper: number;
+  ocr: number;
+  mindmap: number;
+  explainTopic: number;
+  aiEditor: number;
+  other: number;
+  [key: string]: number;
+}
+
+const serverUsageStore = new Map<string, DailyUsageRecord>();
+let firestoreUnavailable = false;
+
+// Periodic cleanup of expired in-memory daily limit records
 setInterval(() => {
   const todayStr = new Date().toISOString().split("T")[0];
-  for (const key of userDailyUsage.keys()) {
+  for (const key of serverUsageStore.keys()) {
     if (!key.endsWith(`:${todayStr}`)) {
-      userDailyUsage.delete(key);
+      serverUsageStore.delete(key);
     }
   }
-}, 12 * 3600 * 1000);
+}, 6 * 3600 * 1000);
+
+function getOrCreateMemoryUsage(userId: string, dateStr: string): DailyUsageRecord {
+  const key = `${userId}:${dateStr}`;
+  if (!serverUsageStore.has(key)) {
+    serverUsageStore.set(key, {
+      aiTutor: 0,
+      notes: 0,
+      quiz: 0,
+      mockExam: 0,
+      questionPaper: 0,
+      ocr: 0,
+      mindmap: 0,
+      explainTopic: 0,
+      aiEditor: 0,
+      other: 0,
+    });
+  }
+  return serverUsageStore.get(key)!;
+}
+
+async function checkAndIncrementQuota(userId: string, feature: string, increment: boolean = false): Promise<{ allowed: boolean; current: number; limit: number }> {
+  const dateStr = new Date().toISOString().split("T")[0];
+  const limit = AI_LIMITS[feature as keyof typeof AI_LIMITS] || AI_LIMITS.default;
+  const memRecord = getOrCreateMemoryUsage(userId, dateStr);
+
+  // If Firestore is available and hasn't permanently failed with 5 NOT_FOUND, attempt Firestore transaction
+  if (!firestoreUnavailable && adminDb) {
+    try {
+      const quotaDocRef = adminDb.collection("usage").doc(userId).collection("daily").doc(dateStr);
+      let allowed = false;
+      let current = 0;
+
+      await adminDb.runTransaction(async (transaction) => {
+        const doc = await transaction.get(quotaDocRef);
+        const data = doc.data() || {};
+        current = Math.max(data[feature] || 0, memRecord[feature] || 0);
+
+        if (current < limit) {
+          allowed = true;
+          if (increment) {
+            transaction.set(quotaDocRef, { ...data, [feature]: current + 1 }, { merge: true });
+            current += 1;
+            memRecord[feature] = current;
+          }
+        } else {
+          allowed = false;
+        }
+      });
+
+      return { allowed, current, limit };
+    } catch (err: any) {
+      if (!firestoreUnavailable) {
+        console.warn("[Quota Engine] Firestore unavailable (" + (err?.message || err) + "). Switching to authoritative server-side store.");
+        firestoreUnavailable = true;
+      }
+    }
+  }
+
+  // Authoritative server-side memory enforcement
+  let current = memRecord[feature] || 0;
+  if (current < limit) {
+    if (increment) {
+      memRecord[feature] = current + 1;
+      current += 1;
+    }
+    return { allowed: true, current, limit };
+  } else {
+    return { allowed: false, current, limit };
+  }
+}
+
+async function decrementQuota(userId: string, feature: string): Promise<void> {
+  const dateStr = new Date().toISOString().split("T")[0];
+  const memRecord = getOrCreateMemoryUsage(userId, dateStr);
+  if (memRecord[feature] && memRecord[feature] > 0) {
+    memRecord[feature] -= 1;
+  }
+
+  if (!firestoreUnavailable && adminDb) {
+    try {
+      const quotaDocRef = adminDb.collection("usage").doc(userId).collection("daily").doc(dateStr);
+      await adminDb.runTransaction(async (transaction) => {
+        const doc = await transaction.get(quotaDocRef);
+        const data = doc.data() || {};
+        const current = data[feature] || 0;
+        if (current > 0) {
+          transaction.set(quotaDocRef, { ...data, [feature]: current - 1 }, { merge: true });
+        }
+      });
+    } catch (err) {
+      // Ignore Firestore rollback errors as memory store is authoritative
+    }
+  }
+}
 
 const checkDailyLimit = async (req: AuthRequest, res: express.Response, next: express.NextFunction): Promise<void> => {
   const user = req.user;
@@ -213,29 +377,68 @@ const checkDailyLimit = async (req: AuthRequest, res: express.Response, next: ex
     return;
   }
 
-  const todayStr = new Date().toISOString().split("T")[0];
-  const usageKey = `${user.uid}:${todayStr}`;
-  const isGuest = user.firebase?.sign_in_provider === 'anonymous';
-  const limit = isGuest ? GUEST_DAILY_LIMIT : SIGNED_IN_DAILY_LIMIT;
-
-  const currentUsage = userDailyUsage.get(usageKey) || 0;
-
-  if (currentUsage >= limit) {
-    const isHindi = req.headers["accept-language"]?.includes("hi") || req.query.lang === "hi";
-    const message = isHindi 
-      ? `दैनिक सीमा समाप्त हो गई है। अतिथि उपयोगकर्ता: 15 अनुरोध/दिन, पंजीकृत उपयोगकर्ता: 100 अनुरोध/दिन।`
-      : `Daily AI request limit exceeded. Guest limit is ${GUEST_DAILY_LIMIT} requests/day, and Signed-in limit is ${SIGNED_IN_DAILY_LIMIT} requests/day.`;
-    res.status(429).json({
-      error: "Too Many Requests",
-      message,
-      code: "DAILY_LIMIT_EXCEEDED"
-    });
-    return;
+  // Maximum 80,000 characters for extracted text, preserving existing truncation behavior
+  if (req.body && typeof req.body === "object" && typeof req.body.textContent === "string") {
+    if (req.body.textContent.length > 80000) {
+      req.body.textContent = req.body.textContent.slice(0, 80000);
+    }
   }
 
-  // Increment usage
-  userDailyUsage.set(usageKey, currentUsage + 1);
-  next();
+  const quotaKey = getQuotaKeyForPath(req.path);
+
+  // AI Tutor attachment enforcement (Max 5 attachments)
+  if (quotaKey === "aiTutor") {
+    const attachmentCount = getAttachmentCount(req.body);
+    if (attachmentCount > 5) {
+      res.status(400).json({
+        error: "Too Many Attachments",
+        message: "AI Tutor allows a maximum of 5 attachments in a single message. Please remove some attachments and try again."
+      });
+      return;
+    }
+  }
+
+  try {
+    const { allowed, limit } = await checkAndIncrementQuota(user.uid, quotaKey, true);
+    if (!allowed) {
+      const isHindi = req.headers["accept-language"]?.includes("hi") || req.query.lang === "hi";
+      const displayName = quotaKey === "aiTutor" ? "AI Tutor" : quotaKey;
+      const message = isHindi
+        ? `दैनिक सीमा समाप्त हो गई है। ${displayName} की सीमा ${limit} अनुरोध/दिन है। दैनिक सीमा 00:00 UTC पर रीसेट होती है।`
+        : `${displayName} daily limit exceeded. Limit is ${limit} requests/day. Daily limit resets at 00:00 UTC. Try again tomorrow!`;
+      res.status(429).json({
+        error: "Too Many Requests",
+        message,
+        code: "DAILY_LIMIT_EXCEEDED"
+      });
+      return;
+    }
+
+    // Intercept responses to refund/decrement the reserved quota on failure or error responses
+    let quotaConsumed = true;
+    const originalJson = res.json;
+    res.json = function (body) {
+      const statusCode = res.statusCode;
+      if (quotaConsumed && (statusCode >= 400 || (body && body.error))) {
+        quotaConsumed = false;
+        decrementQuota(user.uid, quotaKey).catch((err) => console.error("Error decrementing quota:", err));
+      }
+      return originalJson.call(this, body);
+    };
+
+    res.on("finish", () => {
+      const statusCode = res.statusCode;
+      if (quotaConsumed && statusCode >= 400) {
+        quotaConsumed = false;
+        decrementQuota(user.uid, quotaKey).catch((err) => console.error("Error decrementing quota:", err));
+      }
+    });
+
+    next();
+  } catch (err: any) {
+    console.error("Authoritative quota check failed:", err);
+    res.status(500).json({ error: "Failed to verify AI usage limits." });
+  }
 };
 
   // API Route: World-class AI Tutor Answer / Explanation
@@ -1798,6 +2001,123 @@ Keep your tone encouraging and educational. Use clear formatting, lists, and mar
     } catch (err: any) {
       console.error("Get profile error:", err);
       res.status(500).json({ error: err.message || "Failed to fetch profile." });
+    }
+  });
+
+  // Authoritative AI Quota stats
+  app.get("/api/user/ai-usage", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const user = req.user;
+      if (!user) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      const dateStr = new Date().toISOString().split("T")[0];
+      const memRecord = getOrCreateMemoryUsage(user.uid, dateStr);
+      let usage = { ...memRecord };
+
+      if (!firestoreUnavailable && adminDb) {
+        try {
+          const quotaDocRef = adminDb.collection("usage").doc(user.uid).collection("daily").doc(dateStr);
+          const doc = await quotaDocRef.get();
+          if (doc.exists) {
+            const data = doc.data() || {};
+            usage = {
+              aiTutor: Math.max(data.aiTutor || 0, memRecord.aiTutor || 0),
+              notes: Math.max(data.notes || 0, memRecord.notes || 0),
+              quiz: Math.max(data.quiz || 0, memRecord.quiz || 0),
+              mockExam: Math.max(data.mockExam || 0, memRecord.mockExam || 0),
+              questionPaper: Math.max(data.questionPaper || 0, memRecord.questionPaper || 0),
+              ocr: Math.max(data.ocr || 0, memRecord.ocr || 0),
+              mindmap: Math.max(data.mindmap || 0, memRecord.mindmap || 0),
+              explainTopic: Math.max(data.explainTopic || 0, memRecord.explainTopic || 0),
+              aiEditor: Math.max(data.aiEditor || 0, memRecord.aiEditor || 0),
+              other: Math.max(data.other || 0, memRecord.other || 0),
+            };
+          }
+        } catch (e) {
+          // Graceful fallback to memory store
+        }
+      }
+      
+      const featureKeys = ['aiTutor', 'notes', 'quiz', 'mockExam', 'questionPaper', 'ocr', 'mindmap', 'explainTopic', 'aiEditor', 'other'] as const;
+      const safeUsage = {
+        aiTutor: usage.aiTutor || 0,
+        notes: usage.notes || 0,
+        quiz: usage.quiz || 0,
+        mockExam: usage.mockExam || 0,
+        questionPaper: usage.questionPaper || 0,
+        ocr: usage.ocr || 0,
+        mindmap: usage.mindmap || 0,
+        explainTopic: usage.explainTopic || 0,
+        aiEditor: usage.aiEditor || 0,
+        other: usage.other || 0,
+      };
+
+      const details: Record<string, { used: number; limit: number; remaining: number; percentage: number }> = {};
+      for (const k of featureKeys) {
+        const used = safeUsage[k];
+        const limit = AI_LIMITS[k as keyof typeof AI_LIMITS] || AI_LIMITS.default;
+        const remaining = Math.max(0, limit - used);
+        const percentage = Math.min(100, Math.round((used / limit) * 100));
+        details[k] = { used, limit, remaining, percentage };
+      }
+
+      res.json({
+        limits: AI_LIMITS,
+        usage: safeUsage,
+        details,
+        date: dateStr,
+        resetTime: "00:00 UTC"
+      });
+    } catch (error: any) {
+      console.error("Get AI usage error:", error);
+      res.status(500).json({ error: "Failed to fetch AI usage stats." });
+    }
+  });
+
+  // Delete user account and associated personal data
+  app.delete("/api/user/account", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      // 1. Clear in-memory / cache data
+      for (const key of serverUsageStore.keys()) {
+        if (key.startsWith(`${uid}:`)) {
+          serverUsageStore.delete(key);
+        }
+      }
+
+      // 2. Clean Firestore usage records if present
+      if (!firestoreUnavailable && adminDb) {
+        try {
+          const usageCollections = await adminDb.collection("usage").doc(uid).collection("daily").listDocuments();
+          for (const docRef of usageCollections) {
+            await docRef.delete();
+          }
+          await adminDb.collection("usage").doc(uid).delete();
+        } catch (e) {
+          // Continue with deletion
+        }
+      }
+
+      // 3. Delete from Firebase Auth if real user
+      if (adminAuth && !uid.startsWith('guest_')) {
+        try {
+          await adminAuth.deleteUser(uid);
+        } catch (e: any) {
+          console.warn("Firebase admin deleteUser warning:", e?.message || e);
+        }
+      }
+
+      res.json({ success: true, message: "User account and usage data successfully deleted." });
+    } catch (err: any) {
+      console.error("Delete account error:", err);
+      res.status(500).json({ error: err.message || "Failed to delete account." });
     }
   });
 

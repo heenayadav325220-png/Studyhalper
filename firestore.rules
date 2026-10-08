@@ -189,5 +189,11 @@ service cloud.firestore {
       allow update: if isSignedIn() && existing().ownerId == request.auth.uid && incoming().ownerId == existing().ownerId && isValidStudyDocument(incoming());
       allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
     }
+
+    // 6. Quota Usage: System-only daily AI limits. User can read their own, but never write client-side.
+    match /usage/{userId}/daily/{date} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow write: if false;
+    }
   }
 }

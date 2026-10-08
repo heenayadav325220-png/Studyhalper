@@ -8,10 +8,17 @@
     <title>StudyHelper - AI Study Companion | by Rohit Yadav </title>
     
     <!-- EmailJS Integration -->
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js" defer></script>
     <script type="text/javascript">
       (function() {
-        emailjs.init("K6Rhz3JgaNux00csy");
+        function initEmailJS() {
+          if (typeof emailjs !== 'undefined') {
+            emailjs.init("K6Rhz3JgaNux00csy");
+          } else {
+            setTimeout(initEmailJS, 100);
+          }
+        }
+        initEmailJS();
       })();
 
       function sendReport(reportType, userEmail, userMessage) {

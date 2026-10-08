@@ -86,7 +86,8 @@ class SlidingWindowRateLimiter {
 }
 
 // Global Limiter Instances
-const aiEndpointLimiter = new SlidingWindowRateLimiter(60, 60); // 60 AI calls/min per IP
+const aiLimiterPerIp = new SlidingWindowRateLimiter(10, 60); // 10 per IP per min
+const aiLimiterPerUser = new SlidingWindowRateLimiter(30, 60); // 30 per User per min
 const generalApiLimiter = new SlidingWindowRateLimiter(150, 60); // 150 general API calls/min per IP
 
 function getClientIp(req: Request): string {
@@ -99,19 +100,36 @@ function getClientIp(req: Request): string {
 
 export function rateLimitAi(req: Request, res: Response, next: NextFunction): void {
   const ip = getClientIp(req);
-  const result = aiEndpointLimiter.check(ip);
+  const user = (req as any).user;
+  const userId = user?.uid;
 
-  res.setHeader("X-RateLimit-Limit", "60");
-  res.setHeader("X-RateLimit-Remaining", result.remaining.toString());
+  // 1. IP rate check (Max 10 requests/minute)
+  const ipResult = aiLimiterPerIp.check(ip);
+  res.setHeader("X-RateLimit-Limit", "10");
+  res.setHeader("X-RateLimit-Remaining", ipResult.remaining.toString());
 
-  if (!result.allowed) {
-    res.setHeader("Retry-After", result.resetTime.toString());
+  if (!ipResult.allowed) {
+    res.setHeader("Retry-After", ipResult.resetTime.toString());
     res.status(429).json({
       error: "Too Many Requests",
-      message: `Rate limit exceeded. To protect system security and prevent abuse, please retry in ${result.resetTime} seconds.`,
+      message: `Abuse protection rate limit exceeded (Max 10 requests/min per IP). Please try again in ${ipResult.resetTime} seconds.`,
       code: "RATE_LIMIT_EXCEEDED"
     });
     return;
+  }
+
+  // 2. User rate check (Max 30 requests/minute)
+  if (userId) {
+    const userResult = aiLimiterPerUser.check(userId);
+    if (!userResult.allowed) {
+      res.setHeader("Retry-After", userResult.resetTime.toString());
+      res.status(429).json({
+        error: "Too Many Requests",
+        message: `User security rate limit exceeded (Max 30 requests/min). Please try again in ${userResult.resetTime} seconds.`,
+        code: "RATE_LIMIT_EXCEEDED"
+      });
+      return;
+    }
   }
 
   next();

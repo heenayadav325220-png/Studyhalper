@@ -69,7 +69,9 @@ import {
   getToolkitUsage,
   getStudyAnswer,
   generateQuiz,
-  isAiQuotaExceeded
+  isAiQuotaExceeded,
+  currentQuotaUsage,
+  AI_LIMITS
 } from '../services/geminiService';
 
 interface InteractiveToolkitProps {
@@ -271,6 +273,81 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
       window.removeEventListener("toolkit-usage-updated", handleUsageChange);
     };
   }, []);
+
+  const [quotaUsage, setQuotaUsage] = useState(currentQuotaUsage);
+
+  useEffect(() => {
+    const handleQuotaUpdated = () => {
+      setQuotaUsage({ ...currentQuotaUsage });
+    };
+    window.addEventListener("quota-usage-updated", handleQuotaUpdated);
+    handleQuotaUpdated();
+    return () => {
+      window.removeEventListener("quota-usage-updated", handleQuotaUpdated);
+    };
+  }, []);
+
+  const getFeatureKeyForMode = (mode: string): string => {
+    if (mode === "notes" || mode === "summarize" || mode === "pdf") return "notes";
+    if (mode === "explain") return "explainTopic";
+    if (mode === "mindmap") return "mindmap";
+    if (mode === "qpaper") return "questionPaper";
+    if (mode === "ocr") return "ocr";
+    return "default";
+  };
+
+  const checkModeLimit = (mode: string, showToastError: boolean = true): boolean => {
+    const key = getFeatureKeyForMode(mode);
+    const count = quotaUsage[key as keyof typeof quotaUsage] || 0;
+    const limit = AI_LIMITS[key as keyof typeof AI_LIMITS] || AI_LIMITS.default;
+    
+    if (count >= limit) {
+      if (showToastError) {
+        showToast(
+          appLanguage === "Hindi"
+            ? `⚠️ इस एआई फीचर की दैनिक सीमा (${limit}) समाप्त हो गई है। दैनिक सीमा 00:00 UTC पर रीसेट होती है।`
+            : `⚠️ Your daily limit for this AI feature (${limit} requests) has been reached. Daily limit resets at 00:00 UTC.`,
+          "error"
+        );
+      }
+      return true;
+    }
+    return false;
+  };
+
+  const checkQuizLimit = (showToastError: boolean = true): boolean => {
+    const count = quotaUsage.quiz || 0;
+    const limit = AI_LIMITS.quiz;
+    if (count >= limit) {
+      if (showToastError) {
+        showToast(
+          appLanguage === "Hindi"
+            ? `⚠️ क्विज़ जनरेटर की दैनिक सीमा (${limit}) समाप्त हो गई है। दैनिक सीमा 00:00 UTC पर रीसेट होती है।`
+            : `⚠️ Your daily Quiz generator limit (${limit} requests) has been reached. Daily limit resets at 00:00 UTC.`,
+          "error"
+        );
+      }
+      return true;
+    }
+    return false;
+  };
+
+  const checkOtherLimit = (showToastError: boolean = true): boolean => {
+    const count = quotaUsage.other || 0;
+    const limit = AI_LIMITS.default;
+    if (count >= limit) {
+      if (showToastError) {
+        showToast(
+          appLanguage === "Hindi"
+            ? `⚠️ इस एआई एक्शन की दैनिक सीमा (${limit}) समाप्त हो गई है। दैनिक सीमा 00:00 UTC पर रीसेट होती है।`
+            : `⚠️ Your daily limit for this AI action (${limit} requests) has been reached. Daily limit resets at 00:00 UTC.`,
+          "error"
+        );
+      }
+      return true;
+    }
+    return false;
+  };
 
   const [quizSubject, setQuizSubject] = useState("Science"); // quizSubject
   const [Ce, Vt] = useState("10"); // quizGrade
@@ -569,13 +646,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
       showToast(appLanguage === "Hindi" ? "कृपया पहले विषय या पाठ दर्ज करें!" : "Please specify a topic or text first!", "info");
       return;
     }
-    if (c.count >= c.limit) {
-      showToast(
-        appLanguage === "Hindi"
-          ? "⚠️ आपके एडवांस्ड टूलकिट की दैनिक सीमा (50 मैसेजेस) समाप्त हो गई है। कृपया कल पुनः प्रयास करें।"
-          : "⚠️ Your daily Advanced Toolkit limit of 50 messages has been reached. Please try again tomorrow!",
-        "error"
-      );
+    if (checkModeLimit(p)) {
       return;
     }
     je(true);
@@ -618,13 +689,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
       showToast(appLanguage === "Hindi" ? "कृपया सर्वर सुरक्षा के लिए अनुरोधों के बीच 3 सेकंड प्रतीक्षा करें!" : "Please wait 3 seconds between requests to protect the server!", "info");
       return;
     }
-    if (c.count >= c.limit) {
-      showToast(
-        appLanguage === "Hindi"
-          ? "⚠️ आपके एडवांस्ड टूलकिट की दैनिक सीमा (50 मैसेजेस) समाप्त हो गई है। कृपया कल पुनः प्रयास करें।"
-          : "⚠️ Your daily Advanced Toolkit limit of 50 messages has been reached. Please try again tomorrow!",
-        "error"
-      );
+    if (checkQuizLimit()) {
       return;
     }
     Ee(true);
@@ -685,13 +750,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
 
   const Gt = async () => {
     if (y) {
-      if (c.count >= c.limit) {
-        showToast(
-          appLanguage === "Hindi"
-            ? "⚠️ आपके एडवांस्ड टूलकिट की दैनिक सीमा (50 मैसेजेस) समाप्त हो गई है। कृपया कल पुनः प्रयास करें।"
-            : "⚠️ Your daily Advanced Toolkit limit of 50 messages has been reached. Please try again tomorrow!",
-          "error"
-        );
+      if (checkOtherLimit()) {
         return;
       }
       Re(true);
@@ -1540,7 +1599,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                         </div>
                         {Y && (
                           <div className="relative overflow-hidden rounded-xl border border-indigo-200 shadow-sm mt-2">
-                            <img src={Y} alt="OCR Upload Preview" className="w-full h-28 object-cover" />
+                            <img src={Y} alt="OCR Upload Preview" loading="lazy" decoding="async" className="w-full h-28 object-cover" />
                             {G && (
                               <div className="absolute inset-0 bg-indigo-900/30 flex items-center justify-center">
                                 <div className="w-full h-1 bg-cyan-400 shadow-sm animate-bounce" />
@@ -2214,7 +2273,6 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                         {D.map((t) => (
                           <motion.div
                             key={t.id}
-                            layout
                             initial={{ opacity: 0, x: -8 }}
                             animate={{ opacity: 1, x: 0 }}
                             className="flex items-center justify-between p-2.5 bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs hover:border-indigo-300 dark:hover:border-indigo-700 transition"
@@ -2302,7 +2360,6 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                         z.map((t) => (
                           <motion.div
                             key={t.id}
-                            layout
                             className="flex items-center justify-between p-2.5 bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs"
                           >
                             <div className="flex items-center gap-2">

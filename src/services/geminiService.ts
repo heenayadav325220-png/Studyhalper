@@ -1,7 +1,178 @@
 import { API_BASE } from "../config/apiConfig";
+import { db, doc, onSnapshot } from "./firebase";
 
 export let isAiQuotaExceeded = false;
 export let lastAiErrorMessage: string | null = null;
+
+export interface QuotaUsage {
+  aiTutor: number;
+  notes: number;
+  quiz: number;
+  mockExam: number;
+  questionPaper: number;
+  ocr: number;
+  mindmap: number;
+  explainTopic: number;
+  aiEditor: number;
+  other: number;
+}
+
+export interface QuotaFeatureDetail {
+  used: number;
+  limit: number;
+  remaining: number;
+  percentage: number;
+}
+
+export interface QuotaDetailsResponse {
+  limits: Record<string, number>;
+  usage: QuotaUsage;
+  details: Record<string, QuotaFeatureDetail>;
+  date: string;
+  resetTime: string;
+}
+
+export async function fetchAiUsageDetails(): Promise<QuotaDetailsResponse | null> {
+  try {
+    const res = await safeFetch("/api/user/ai-usage");
+    if (res.ok) {
+      const data = await res.json();
+      return data as QuotaDetailsResponse;
+    }
+  } catch (err) {
+    console.warn("fetchAiUsageDetails error:", err);
+  }
+  return null;
+}
+
+export const AI_LIMITS = {
+  aiTutor: 30,
+  notes: 5,
+  quiz: 10,
+  mockExam: 3,
+  questionPaper: 3,
+  ocr: 10,
+  mindmap: 5,
+  explainTopic: 15,
+  aiEditor: 15,
+  default: 10
+};
+
+export let currentQuotaUsage: QuotaUsage = {
+  aiTutor: 0,
+  notes: 0,
+  quiz: 0,
+  mockExam: 0,
+  questionPaper: 0,
+  ocr: 0,
+  mindmap: 0,
+  explainTopic: 0,
+  aiEditor: 0,
+  other: 0,
+};
+
+let unsubscribeUsage: (() => void) | null = null;
+let fallbackInterval: any = null;
+
+export async function refreshQuotaUsageFromServer(onUpdate?: (usage: QuotaUsage) => void): Promise<QuotaUsage> {
+  try {
+    const res = await safeFetch("/api/user/ai-usage");
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.usage) {
+        currentQuotaUsage = {
+          aiTutor: data.usage.aiTutor || 0,
+          notes: data.usage.notes || 0,
+          quiz: data.usage.quiz || 0,
+          mockExam: data.usage.mockExam || 0,
+          questionPaper: data.usage.questionPaper || 0,
+          ocr: data.usage.ocr || 0,
+          mindmap: data.usage.mindmap || 0,
+          explainTopic: data.usage.explainTopic || 0,
+          aiEditor: data.usage.aiEditor || 0,
+          other: data.usage.other || 0,
+        };
+        if (onUpdate) onUpdate(currentQuotaUsage);
+        window.dispatchEvent(new CustomEvent("quota-usage-updated", { detail: currentQuotaUsage }));
+        window.dispatchEvent(new CustomEvent("toolkit-usage-updated", { detail: getToolkitUsage() }));
+      }
+    }
+  } catch (err) {
+    // Graceful network resilience
+  }
+  return currentQuotaUsage;
+}
+
+export function subscribeToQuotaUsage(uid: string, onUpdate?: (usage: QuotaUsage) => void) {
+  if (unsubscribeUsage) {
+    unsubscribeUsage();
+    unsubscribeUsage = null;
+  }
+  if (fallbackInterval) {
+    clearInterval(fallbackInterval);
+    fallbackInterval = null;
+  }
+  if (!uid) return;
+
+  // Immediately synchronize authoritative quota from backend
+  refreshQuotaUsageFromServer(onUpdate);
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  try {
+    const usageDocRef = doc(db, 'usage', uid, 'daily', todayStr);
+    unsubscribeUsage = onSnapshot(usageDocRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        currentQuotaUsage = {
+          aiTutor: data.aiTutor || 0,
+          notes: data.notes || 0,
+          quiz: data.quiz || 0,
+          mockExam: data.mockExam || 0,
+          questionPaper: data.questionPaper || 0,
+          ocr: data.ocr || 0,
+          mindmap: data.mindmap || 0,
+          explainTopic: data.explainTopic || 0,
+          aiEditor: data.aiEditor || 0,
+          other: data.other || 0,
+        };
+      } else {
+        currentQuotaUsage = {
+          aiTutor: 0,
+          notes: 0,
+          quiz: 0,
+          mockExam: 0,
+          questionPaper: 0,
+          ocr: 0,
+          mindmap: 0,
+          explainTopic: 0,
+          aiEditor: 0,
+          other: 0,
+        };
+      }
+      if (onUpdate) onUpdate(currentQuotaUsage);
+      window.dispatchEvent(new CustomEvent("quota-usage-updated", { detail: currentQuotaUsage }));
+      window.dispatchEvent(new CustomEvent("toolkit-usage-updated", { detail: getToolkitUsage() }));
+    }, (_err) => {
+      // In environments where Firestore isn't provisioned or is offline, seamlessly poll server endpoint
+      if (!fallbackInterval) {
+        fallbackInterval = setInterval(() => {
+          refreshQuotaUsageFromServer(onUpdate);
+        }, 20000);
+      }
+    });
+  } catch (e) {
+    if (!fallbackInterval) {
+      fallbackInterval = setInterval(() => {
+        refreshQuotaUsageFromServer(onUpdate);
+      }, 20000);
+    }
+  }
+
+  return () => {
+    if (unsubscribeUsage) unsubscribeUsage();
+    if (fallbackInterval) clearInterval(fallbackInterval);
+  };
+}
 
 export interface AiUsageData {
   date: string;
@@ -16,75 +187,30 @@ export interface ToolkitUsageData {
 }
 
 export function getDailyAiUsage(): AiUsageData {
-  if (typeof window === "undefined") {
-    return { date: "", count: 0, limit: 999999 };
-  }
   const todayStr = new Date().toISOString().split("T")[0];
-  const stored = localStorage.getItem("studybuddy_daily_ai_usage");
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      if (parsed && parsed.date === todayStr) {
-        return { date: todayStr, count: parsed.count || 0, limit: 999999 };
-      }
-    } catch (e) {
-      console.error("Failed to parse daily AI usage", e);
-    }
-  }
-  // Initialize or reset for the new day
-  const initial: AiUsageData = { date: todayStr, count: 0, limit: 999999 };
-  localStorage.setItem("studybuddy_daily_ai_usage", JSON.stringify(initial));
-  return initial;
+  return { date: todayStr, count: currentQuotaUsage.aiTutor, limit: AI_LIMITS.aiTutor };
 }
 
 export function incrementDailyAiUsage(): AiUsageData {
-  if (typeof window === "undefined") {
-    return { date: "", count: 0, limit: 999999 };
-  }
-  const current = getDailyAiUsage();
-  current.count += 1;
-  localStorage.setItem("studybuddy_daily_ai_usage", JSON.stringify(current));
-  
-  // Dispatch custom event so UI components can update React state automatically!
-  window.dispatchEvent(new CustomEvent("ai-usage-updated", { detail: current }));
-  
-  return current;
+  const todayStr = new Date().toISOString().split("T")[0];
+  // No-op locally since the backend handles authoritative increments
+  return { date: todayStr, count: currentQuotaUsage.aiTutor, limit: AI_LIMITS.aiTutor };
 }
 
 export function getToolkitUsage(): ToolkitUsageData {
-  if (typeof window === "undefined") {
-    return { date: "", count: 0, limit: 50 };
-  }
   const todayStr = new Date().toISOString().split("T")[0];
-  const stored = localStorage.getItem("studybuddy_toolkit_usage");
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      if (parsed && parsed.date === todayStr) {
-        return { date: todayStr, count: parsed.count || 0, limit: 50 };
-      }
-    } catch (e) {
-      console.error("Failed to parse toolkit usage", e);
-    }
-  }
-  // Initialize or reset for the new day
-  const initial: ToolkitUsageData = { date: todayStr, count: 0, limit: 50 };
-  localStorage.setItem("studybuddy_toolkit_usage", JSON.stringify(initial));
-  return initial;
+  // Calculate aggregate toolkit count
+  const count = currentQuotaUsage.notes + 
+                currentQuotaUsage.explainTopic + 
+                currentQuotaUsage.mindmap + 
+                currentQuotaUsage.questionPaper + 
+                currentQuotaUsage.ocr;
+  return { date: todayStr, count, limit: 50 };
 }
 
 export function incrementToolkitUsage(): ToolkitUsageData {
-  if (typeof window === "undefined") {
-    return { date: "", count: 0, limit: 50 };
-  }
-  const current = getToolkitUsage();
-  current.count += 1;
-  localStorage.setItem("studybuddy_toolkit_usage", JSON.stringify(current));
-  
-  // Dispatch custom event so UI components can update React state automatically!
-  window.dispatchEvent(new CustomEvent("toolkit-usage-updated", { detail: current }));
-  
-  return current;
+  // No-op locally since backend increment is authoritative
+  return getToolkitUsage();
 }
 
 export function setAiQuotaExceeded(val: boolean, msg: string | null = null) {
@@ -300,9 +426,15 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
     }
 
     try {
-      const isAiEndpoint = url.includes("/api/gemini/") || url.includes("generativelanguage.googleapis.com");
+      const isAiEndpoint = url.includes("/api/gemini/") || 
+                           url.includes("/api/generate-exam") || 
+                           url.includes("/api/ai-editor-command") || 
+                           url.includes("/api/summarize-notes") || 
+                           url.includes("/api/tutor-chat") || 
+                           url.includes("generativelanguage.googleapis.com");
       if (isAiEndpoint && response.ok) {
         incrementDailyAiUsage();
+        refreshQuotaUsageFromServer();
       }
       const quotaHeader = response.headers.get("x-gemini-quota-exceeded");
       if (quotaHeader === "true") {

@@ -1007,7 +1007,7 @@ export default function AuthModal({
                 <div className="flex items-center space-x-3">
                   <div className="w-12 h-12 rounded-2xl bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-2xl shrink-0">
                     {userProfile.photoURL ? (
-                      <img src={userProfile.photoURL} alt="Avatar" className="w-full h-full rounded-2xl object-cover" />
+                      <img src={userProfile.photoURL} alt="Avatar" loading="lazy" decoding="async" className="w-full h-full rounded-2xl object-cover" />
                     ) : (
                       userProfile.avatar || '🧑‍🎓'
                     )}

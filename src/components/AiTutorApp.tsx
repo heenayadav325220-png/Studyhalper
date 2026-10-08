@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, memo } from 'react';
+import { useState, useRef, useEffect, memo, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
@@ -51,7 +51,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const CodeHighlighter = SyntaxHighlighter as any;
-import { getStudyAnswer } from '../services/geminiService';
+import { getStudyAnswer, currentQuotaUsage, AI_LIMITS } from '../services/geminiService';
 import { PersonalLearningService } from '../services/personalLearningService';
 import { exportConversationToPdf } from '../utils/pdfExport';
 import { showToast } from './Toast';
@@ -367,7 +367,7 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
   isLatest?: boolean;
   fontStyle?: 'classic' | 'modern';
 }) {
-  const blocks = parseMarkdownBlocks(text);
+  const blocks = useMemo(() => parseMarkdownBlocks(text), [text]);
   const [visibleCount, setVisibleCount] = useState(() => (isLatest ? 1 : blocks.length));
   const isAllRevealed = visibleCount >= blocks.length;
 
@@ -680,6 +680,19 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [selectedSubject, setSelectedSubject] = useState<Subject>('Science');
   const [selectedLanguage, setSelectedLanguage] = useState<string>(() => getStoredValue(`ai_tutor_language_${user.uid}`, 'Hinglish'));
   const [preferredStyle, setPreferredStyle] = useState<string>(() => PersonalLearningService.getPreferredStyle(user.uid));
+
+  const [quotaUsage, setQuotaUsage] = useState(currentQuotaUsage);
+
+  useEffect(() => {
+    const handleQuotaUpdated = () => {
+      setQuotaUsage({ ...currentQuotaUsage });
+    };
+    window.addEventListener("quota-usage-updated", handleQuotaUpdated);
+    handleQuotaUpdated();
+    return () => {
+      window.removeEventListener("quota-usage-updated", handleQuotaUpdated);
+    };
+  }, []);
 
   // Load prefilled recommendation context from Personal Planner / Whiteboard
   useEffect(() => {
@@ -1909,6 +1922,16 @@ export const AiTutorApp = memo(function AiTutorApp({
 
     if (!effectiveQuery || isLoading) return;
 
+    if (quotaUsage.aiTutor >= AI_LIMITS.aiTutor) {
+      showToast(
+        appLanguage === 'hi'
+          ? `⚠️ आपकी दैनिक एआई ट्यूटर सीमा (${AI_LIMITS.aiTutor} संदेश) समाप्त हो गई है। दैनिक सीमा 00:00 UTC पर रीसेट होती है।`
+          : `⚠️ Your daily AI Tutor limit of ${AI_LIMITS.aiTutor} messages has been reached. Daily limit resets at 00:00 UTC.`,
+        "error"
+      );
+      return;
+    }
+
     const userMsgId = 'msg_' + Date.now();
     const userMsg: ChatMessage = {
       id: userMsgId,
@@ -2667,10 +2690,9 @@ export const AiTutorApp = memo(function AiTutorApp({
                 return (
                   <motion.div
                     key={msg.id}
-                    layout
-                    initial={{ opacity: 0, y: 18, scale: 0.94, filter: 'blur(4px)' }}
-                    animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
-                    exit={{ opacity: 0, y: -16, scale: 0.88, filter: 'blur(4px)', transition: { duration: 0.22, ease: 'easeOut' } }}
+                    initial={{ opacity: 0, y: 18, scale: 0.94 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -16, scale: 0.88, transition: { duration: 0.22, ease: 'easeOut' } }}
                     transition={{ type: 'spring', stiffness: 400, damping: 28, mass: 0.8 }}
                     className="flex items-start justify-end space-x-2.5 group/usermsg w-full"
                   >
@@ -2704,7 +2726,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                               <div className={`grid gap-2 ${editingImages.length === 1 ? 'grid-cols-1 max-w-xs' : 'grid-cols-2 max-w-sm'}`}>
                                 {editingImages.map((img, i) => (
                                   <div key={i} className="relative group/editimg rounded-xl overflow-hidden border border-slate-700">
-                                    <img src={img} alt={`Attached ${i + 1}`} className="w-full max-h-36 object-contain bg-slate-800" />
+                                    <img src={img} alt={`Attached ${i + 1}`} loading="lazy" decoding="async" className="w-full max-h-36 object-contain bg-slate-800" />
                                     <button
                                       type="button"
                                       onClick={() => handleRemoveEditingImage(i)}
@@ -2792,7 +2814,6 @@ export const AiTutorApp = memo(function AiTutorApp({
               return (
                 <motion.div
                   key={msg.id}
-                  layout
                   initial={{ opacity: 0, y: 14 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10, transition: { duration: 0.18, ease: 'easeOut' } }}
@@ -3340,6 +3361,18 @@ export const AiTutorApp = memo(function AiTutorApp({
                     : 'flex-row items-center justify-between rounded-full py-1.5 px-3.5 min-h-[46px] sm:min-h-[48px] cursor-pointer'
                 }`}
               >
+                {isInputActive && (
+                  <div className="flex justify-between items-center px-2 mb-1.5 select-none w-full border-b border-slate-100 pb-1.5">
+                    <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase">AI TUTOR STATUS</span>
+                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                      quotaUsage.aiTutor >= AI_LIMITS.aiTutor
+                        ? "bg-rose-50 text-rose-600"
+                        : "bg-indigo-50 text-indigo-600"
+                    }`}>
+                      {quotaUsage.aiTutor} / {AI_LIMITS.aiTutor} {appLanguage === 'hi' ? 'आज उपयोग किया' : 'Today'}
+                    </span>
+                  </div>
+                )}
                 {/* Textarea Area */}
                 <div className={`flex-grow flex ${isInputActive && inputQuery ? 'items-start' : 'items-center'} pb-0`}>
                   <textarea

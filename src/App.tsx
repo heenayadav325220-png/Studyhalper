@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, 
@@ -99,6 +99,8 @@ import UserAvatar from './components/UserAvatar';
 import ThemeToggle from './components/ThemeToggle';
 import PWAInstallBanner from './components/PWAInstallBanner';
 import Toast, { showToast } from './components/Toast';
+import ProfileCenter from './components/ProfileCenter';
+import { subscribeToQuotaUsage, currentQuotaUsage } from './services/geminiService';
 import { 
   UserProfile, 
   RoomChatMessage, 
@@ -215,14 +217,14 @@ const DEFAULT_USER: UserProfile = {
   lastStreakDate: ''
 };
 
-// High-performance rotating neon border component with custom masking to preserve card gradients and details
+// High-performance static neon border component with custom masking to preserve card gradients and details
 const NeonBorder: React.FC<{
   color1?: string;
   color2?: string;
   className?: string;
   duration?: string;
   borderWidth?: string;
-}> = ({ color1 = '#10b981', color2 = '#6366f1', className = '', duration = '4s', borderWidth = '1.5px' }) => {
+}> = ({ color1 = '#10b981', color2 = '#6366f1', className = '', borderWidth = '1.5px' }) => {
   return (
     <div 
       className={`absolute inset-0 rounded-[inherit] pointer-events-none overflow-hidden z-20 ${className}`} 
@@ -238,16 +240,118 @@ const NeonBorder: React.FC<{
         } as any}
       >
         <div 
-          className="absolute inset-[-250%] opacity-100"
+          className="absolute inset-0 opacity-85"
           style={{
-            background: `conic-gradient(from 0deg, transparent 35%, ${color1} 46%, ${color2} 54%, transparent 65%)`,
-            animation: `spin ${duration} linear infinite`
+            background: `linear-gradient(135deg, ${color1}, ${color2})`,
           }}
         />
       </div>
     </div>
   );
 };
+
+interface FocusSessionCardProps {
+  onSessionComplete: () => void;
+}
+
+const FocusSessionCard: React.FC<FocusSessionCardProps> = React.memo(({ onSessionComplete }) => {
+  const [selectedSubject, setSelectedSubject] = useState<Subject>('Mathematics');
+  const [durationMinutes, setDurationMinutes] = useState<number>(25);
+  const [timerSeconds, setTimerSeconds] = useState<number>(25 * 60);
+  const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false);
+
+  useEffect(() => {
+    setTimerSeconds(durationMinutes * 60);
+  }, [durationMinutes]);
+
+  useEffect(() => {
+    let interval: any = null;
+    if (isTimerRunning && timerSeconds > 0) {
+      interval = setInterval(() => {
+        setTimerSeconds((prev) => prev - 1);
+      }, 1000);
+    } else if (timerSeconds === 0 && isTimerRunning) {
+      setIsTimerRunning(false);
+      onSessionComplete();
+    }
+    return () => clearInterval(interval);
+  }, [isTimerRunning, timerSeconds, onSessionComplete]);
+
+  const toggleTimer = () => setIsTimerRunning(!isTimerRunning);
+  const resetTimer = () => {
+    setIsTimerRunning(false);
+    setTimerSeconds(durationMinutes * 60);
+  };
+
+  const formatTimerTime = (totalSecs: number) => {
+    const mins = Math.floor(totalSecs / 60);
+    const secs = totalSecs % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="bg-[#0b101d]  rounded-2xl p-4 sm:p-5 border border-transparent space-y-3.5 shadow-xl relative overflow-hidden">
+      <NeonBorder color1="#6366f1" color2="#06b6d4" duration="5s" />
+      {/* Header: Subject Selector & Time Duration Pills */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="relative min-w-[130px] sm:min-w-[160px]">
+          <select
+            value={selectedSubject}
+            onChange={(e) => setSelectedSubject(e.target.value as Subject)}
+            className="w-full appearance-none px-3 py-1.5 bg-[#070c18] border border-slate-800 rounded-xl text-xs font-bold text-slate-100 focus:outline-none focus:border-indigo-500/50 shadow-xs pr-8 cursor-pointer"
+          >
+            {SUBJECTS.map((s) => (
+              <option key={s} value={s} className="bg-slate-900 text-white">{s}</option>
+            ))}
+          </select>
+          <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        </div>
+
+        <div className="flex items-center space-x-1 p-0.5 bg-[#070c18] border border-slate-800 rounded-xl">
+          {[5, 25, 50].map((mins) => (
+            <button
+              key={mins}
+              onClick={() => setDurationMinutes(mins)}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                durationMinutes === mins
+                  ? 'bg-slate-800 text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {mins}m
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* TIMER DISPLAY - LOW-PROFILE MODERN INTERFACE */}
+      <div className="py-2.5 px-4 bg-[#070c18] border border-slate-800 rounded-xl text-center relative overflow-hidden flex items-center justify-between">
+        <span className="text-[9.5px] font-black text-slate-400 tracking-wider uppercase">
+          FOCUS TIMER
+        </span>
+        <div className="text-2xl sm:text-3xl font-mono font-black tracking-tight text-white select-none">
+          {formatTimerTime(timerSeconds)}
+        </div>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={toggleTimer}
+            className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500/20 text-white font-bold rounded-lg transition flex items-center space-x-1 text-[11px] cursor-pointer active:scale-95 shadow-xs"
+          >
+            {isTimerRunning ? <Pause className="w-2.5 h-2.5 fill-white" /> : <Play className="w-2.5 h-2.5 fill-white ml-0.5" />}
+            <span>{isTimerRunning ? 'Pause' : 'Start'}</span>
+          </button>
+          <button
+            onClick={resetTimer}
+            className="w-7 h-7 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-lg transition border border-slate-800 shadow-xs flex items-center justify-center cursor-pointer active:scale-95"
+            title="Reset Timer"
+          >
+            <RotateCcw className="w-3 h-3 text-slate-400" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 export default function App() {
   const [appLanguage, setAppLanguage] = useState<Language>(() => {
@@ -308,7 +412,19 @@ export default function App() {
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
+  const [showProfileCenter, setShowProfileCenter] = useState(false);
+  const [quotaUsage, setQuotaUsage] = useState(currentQuotaUsage);
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+
+  useEffect(() => {
+    const handleQuotaEvent = (e: any) => {
+      if (e.detail) {
+        setQuotaUsage(e.detail);
+      }
+    };
+    window.addEventListener('quota-usage-updated', handleQuotaEvent);
+    return () => window.removeEventListener('quota-usage-updated', handleQuotaEvent);
+  }, []);
   const [playgroundViewMode, setPlaygroundViewMode] = useState<'list' | 'grid'>('list');
   const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false);
 
@@ -751,6 +867,15 @@ export default function App() {
     setIsEditingProfile(false);
   };
 
+  // Subscribe to real-time AI quota usage
+  useEffect(() => {
+    if (!userProfile?.uid) return;
+    const unsubscribe = subscribeToQuotaUsage(userProfile.uid);
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [userProfile?.uid]);
+
   // Subscribe to User Profile
   useEffect(() => {
     const unsubscribe = subscribeUserProfile(userProfile.uid, (profile) => {
@@ -886,6 +1011,7 @@ export default function App() {
   const [day1GoalCompleted, setDay1GoalCompleted] = useState(false);
 
   const [activeSecondsToday, setActiveSecondsToday] = useState<number>(0);
+  const activeSecondsRef = useRef<number>(0);
   const [isStreakCelebrationOpen, setIsStreakCelebrationOpen] = useState(false);
   const lastInteractionTimeRef = useRef<number>(Date.now());
 
@@ -908,9 +1034,11 @@ export default function App() {
     if (storedDate !== todayStr) {
       localStorage.setItem(`study_seconds_date_${userProfile.uid}`, todayStr);
       localStorage.setItem(`study_seconds_today_${userProfile.uid}`, '0');
+      activeSecondsRef.current = 0;
       setActiveSecondsToday(0);
     } else {
       const storedSecs = Number(localStorage.getItem(`study_seconds_today_${userProfile.uid}`) || '0');
+      activeSecondsRef.current = storedSecs;
       setActiveSecondsToday(storedSecs);
     }
   }, [userProfile?.uid]);
@@ -994,18 +1122,23 @@ export default function App() {
       const activeStudyTabs = ['aiTutor', 'quiz', 'mockExam', 'whiteboard', 'groupChat', 'studyDocs'];
       if (!activeStudyTabs.includes(activeTab)) return;
 
-      setActiveSecondsToday((prev) => {
-        const next = prev + 1;
+      activeSecondsRef.current += 1;
+      const next = activeSecondsRef.current;
+
+      if (next % 15 === 0) {
         localStorage.setItem(`study_seconds_today_${userProfile.uid}`, String(next));
+      }
 
-        const todayStr = getLocalDateString();
-        // Check if 10-minute (600s) threshold is reached AND streak not completed today yet
-        if (next >= 600 && userProfile.lastStreakDate !== todayStr) {
-          triggerDailyStreakCompletion(todayStr);
-        }
+      const todayStr = getLocalDateString();
+      // Check if 10-minute (600s) threshold is reached AND streak not completed today yet
+      if (next >= 600 && userProfile.lastStreakDate !== todayStr) {
+        triggerDailyStreakCompletion(todayStr);
+      }
 
-        return next;
-      });
+      // Update state only every 30 seconds (or immediately at 600s streak completion)
+      if (next % 30 === 0 || next === 600) {
+        setActiveSecondsToday(next);
+      }
     }, 1000);
 
     return () => clearInterval(interval);
@@ -1079,51 +1212,6 @@ export default function App() {
       }
       return q;
     }));
-  };
-
-  // --- FOCUS SESSION TIMER STATE ---
-  const [selectedSubject, setSelectedSubject] = useState<Subject>('Mathematics');
-  const [durationMinutes, setDurationMinutes] = useState<number>(25);
-  const [timerSeconds, setTimerSeconds] = useState<number>(25 * 60);
-  const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false);
-
-  useEffect(() => {
-    setTimerSeconds(durationMinutes * 60);
-  }, [durationMinutes]);
-
-  useEffect(() => {
-    let interval: any = null;
-    if (isTimerRunning && timerSeconds > 0) {
-      interval = setInterval(() => {
-        setTimerSeconds(prev => prev - 1);
-      }, 1000);
-    } else if (timerSeconds === 0 && isTimerRunning) {
-      setIsTimerRunning(false);
-      
-      // Increment completed sessions count
-      const curCount = parseInt(localStorage.getItem('ascend_pomodoro_completed_count') || '0', 10);
-      localStorage.setItem('ascend_pomodoro_completed_count', (curCount + 1).toString());
-      
-      addXp(50);
-      alert('Focus Study Session Complete! Great job! +50 XP Earned!');
-      
-      setTimeout(() => {
-        runBadgeEvaluation();
-      }, 300);
-    }
-    return () => clearInterval(interval);
-  }, [isTimerRunning, timerSeconds]);
-
-  const toggleTimer = () => setIsTimerRunning(!isTimerRunning);
-  const resetTimer = () => {
-    setIsTimerRunning(false);
-    setTimerSeconds(durationMinutes * 60);
-  };
-
-  const formatTimerTime = (totalSecs: number) => {
-    const mins = Math.floor(totalSecs / 60);
-    const secs = totalSecs % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   // --- CHIMPU SANCTUARY (PET) STATE ---
@@ -1441,6 +1529,16 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [studyDocs.length, mockExams.length, userProfile.petLevel, userProfile.streak]);
 
+  const handlePomodoroSessionComplete = useCallback(() => {
+    const curCount = parseInt(localStorage.getItem('ascend_pomodoro_completed_count') || '0', 10);
+    localStorage.setItem('ascend_pomodoro_completed_count', (curCount + 1).toString());
+    addXp(50);
+    alert('Focus Study Session Complete! Great job! +50 XP Earned!');
+    setTimeout(() => {
+      runBadgeEvaluation();
+    }, 300);
+  }, []);
+
   const [isAddingDoc, setIsAddingDoc] = useState(false);
   const [newDocTitle, setNewDocTitle] = useState('');
   const [newDocContent, setNewDocContent] = useState('');
@@ -1733,13 +1831,13 @@ export default function App() {
                         <ThemeToggle variant="compact-switch" />
                       </div>
 
-                      {/* Self Customize Settings Gear Button */}
+                      {/* Profile & Settings Center Gear Button */}
                       <motion.button
                         whileHover={{ rotate: 15, scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={() => setShowCustomizeModal(true)}
+                        onClick={() => setShowProfileCenter(true)}
                         className="p-2 text-slate-300 hover:text-white bg-slate-900 border border-slate-700/60 rounded-xl transition cursor-pointer hover:border-slate-500 flex items-center justify-center shadow-xs"
-                        title="Self Customize UI / Settings"
+                        title="Profile & Settings Center"
                       >
                         <Settings2 className="w-3.5 h-3.5 text-indigo-300" />
                       </motion.button>
@@ -2819,66 +2917,7 @@ export default function App() {
             </div>
 
             {/* 6. FOCUS SESSION & TIMER - SOPHISTICATED ACADEMIC */}
-            <div className="bg-[#0b101d]  rounded-2xl p-4 sm:p-5 border border-transparent space-y-3.5 shadow-xl relative overflow-hidden">
-              <NeonBorder color1="#6366f1" color2="#06b6d4" duration="5s" />
-              {/* Header: Subject Selector & Time Duration Pills */}
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="relative min-w-[130px] sm:min-w-[160px]">
-                  <select
-                    value={selectedSubject}
-                    onChange={(e) => setSelectedSubject(e.target.value as Subject)}
-                    className="w-full appearance-none px-3 py-1.5 bg-[#070c18] border border-slate-800 rounded-xl text-xs font-bold text-slate-100 focus:outline-none focus:border-indigo-500/50 shadow-xs pr-8 cursor-pointer"
-                  >
-                    {SUBJECTS.map((s) => (
-                      <option key={s} value={s} className="bg-slate-900 text-white">{s}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-
-                <div className="flex items-center space-x-1 p-0.5 bg-[#070c18] border border-slate-800 rounded-xl">
-                  {[5, 25, 50].map((mins) => (
-                    <button
-                      key={mins}
-                      onClick={() => setDurationMinutes(mins)}
-                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
-                        durationMinutes === mins
-                          ? 'bg-slate-800 text-white shadow-xs'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      {mins}m
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* TIMER DISPLAY - LOW-PROFILE MODERN INTERFACE */}
-              <div className="py-2.5 px-4 bg-[#070c18] border border-slate-800 rounded-xl text-center relative overflow-hidden flex items-center justify-between">
-                <span className="text-[9.5px] font-black text-slate-400 tracking-wider uppercase">
-                  FOCUS TIMER
-                </span>
-                <div className="text-2xl sm:text-3xl font-mono font-black tracking-tight text-white select-none">
-                  {formatTimerTime(timerSeconds)}
-                </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={toggleTimer}
-                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500/20 text-white font-bold rounded-lg transition flex items-center space-x-1 text-[11px] cursor-pointer active:scale-95 shadow-xs"
-                  >
-                    {isTimerRunning ? <Pause className="w-2.5 h-2.5 fill-white" /> : <Play className="w-2.5 h-2.5 fill-white ml-0.5" />}
-                    <span>{isTimerRunning ? 'Pause' : 'Start'}</span>
-                  </button>
-                  <button
-                    onClick={resetTimer}
-                    className="w-7 h-7 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-lg transition border border-slate-800 shadow-xs flex items-center justify-center cursor-pointer active:scale-95"
-                    title="Reset Timer"
-                  >
-                    <RotateCcw className="w-3 h-3 text-slate-400" />
-                  </button>
-                </div>
-              </div>
-            </div>
+            <FocusSessionCard onSessionComplete={handlePomodoroSessionComplete} />
 
             {/* 7. ACADEMIC BADGES - COMPACT MATTE PARCHMENT & BRONZE AESTHETIC */}
             {(() => {
@@ -3691,6 +3730,47 @@ export default function App() {
                 </button>
               </div>
 
+              {/* DEDICATED PROFILE & SETTINGS BUTTON AT THE TOP OF MORE SECTION */}
+              <motion.button
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  setShowProfileCenter(true);
+                }}
+                className="w-full p-2.5 rounded-2xl bg-gradient-to-r from-indigo-950/80 via-slate-900 to-indigo-950/40 border border-indigo-500/40 hover:border-indigo-400 text-left transition cursor-pointer flex items-center justify-between shadow-md group"
+              >
+                <div className="flex items-center space-x-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-slate-950 p-0.5 ring-1.5 ring-indigo-500/50 shadow-inner flex items-center justify-center shrink-0">
+                    <UserAvatar
+                      avatar={userProfile.avatar}
+                      name={userProfile.name || 'Student'}
+                      avatarType={userProfile.avatarType}
+                      avatarBg={userProfile.avatarBg}
+                      size="sm"
+                      className="w-full h-full rounded-[10px]"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-black text-white flex items-center gap-1.5 truncate">
+                      <span className="truncate">{userProfile.name?.trim() ? userProfile.name : 'Student Profile'}</span>
+                      <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                        Settings
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 truncate flex items-center gap-1">
+                      <span>AI Quota & Profile Center</span>
+                      <span>•</span>
+                      <span className="text-emerald-400 font-semibold">{quotaUsage.aiTutor}/30 tutor</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-1.5 rounded-xl bg-indigo-600/20 text-indigo-300 group-hover:bg-indigo-600 group-hover:text-white transition-colors shrink-0">
+                  <Settings2 className="w-4 h-4" />
+                </div>
+              </motion.button>
+
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { id: 'pdfScanner', label: 'PDF Scanner', icon: FileText, color: 'text-cyan-400 bg-cyan-950/60 border-cyan-800/40' },
@@ -4010,6 +4090,35 @@ export default function App() {
             }}
           />
         </Suspense>
+      )}
+
+      {/* PROFILE & SETTINGS CENTER MODAL */}
+      {showProfileCenter && (
+        <ProfileCenter
+          isOpen={showProfileCenter}
+          onClose={() => setShowProfileCenter(false)}
+          userProfile={userProfile}
+          onUpdateProfile={(updated) => {
+            setUserProfile((prev) => ({ ...prev, ...updated }));
+          }}
+          onOpenAvatarModal={() => {
+            setShowProfileCenter(false);
+            setShowAvatarModal(true);
+          }}
+          onOpenAuthModal={() => {
+            setShowProfileCenter(false);
+            setShowAuthModal(true);
+          }}
+          onOpenCustomizeModal={() => {
+            setShowProfileCenter(false);
+            setShowCustomizeModal(true);
+          }}
+          appLanguage={appLanguage}
+          onLanguageChange={handleLanguageChange}
+          customization={uiCustomization}
+          onUpdateCustomization={handleUpdateCustomization}
+          onShowToast={(msg, type) => showToast(msg, type || 'info')}
+        />
       )}
 
       {/* SELF CUSTOMIZE STUDIO MODAL (USER EDITABLE UI, 4-UI PER OBJECT, LIGHTING, THEMES) */}

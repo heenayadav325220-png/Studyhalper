@@ -282,9 +282,30 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["subject", "topic", "attempts", "correct", "incorrect", "accuracy", "lastStudied", "mastery", "updatedAt"]
+    },
+    "quotaUsage": {
+      "title": "QuotaUsage",
+      "description": "Daily AI features usage logs for rate-limiting",
+      "type": "object",
+      "properties": {
+        "aiTutor": { "type": "integer" },
+        "notes": { "type": "integer" },
+        "quiz": { "type": "integer" },
+        "mockExam": { "type": "integer" },
+        "questionPaper": { "type": "integer" },
+        "ocr": { "type": "integer" },
+        "mindmap": { "type": "integer" },
+        "explainTopic": { "type": "integer" },
+        "aiEditor": { "type": "integer" },
+        "other": { "type": "integer" }
+      }
     }
   },
   "firestore": {
+    "usage/{userId}/daily/{date}": {
+      "schema": "quotaUsage",
+      "description": "Daily AI request usage counts for abuse prevention"
+    },
     "users/{userId}": {
       "schema": "user",
       "description": "Collection storing user profiles and gamification stats"
