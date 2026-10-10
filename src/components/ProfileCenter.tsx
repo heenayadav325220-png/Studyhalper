@@ -192,7 +192,24 @@ export default function ProfileCenter({
       const res = await safeFetch('/api/user/ai-usage');
       if (res.ok) {
         const data: UsageApiResponse = await res.json();
-        setUsageData(data);
+        const mergedUsage: Record<string, number> = {};
+        const mergedDetails: Record<string, UsageDetailItem> = {};
+        const keys = Object.keys(FEATURE_META);
+        for (const k of keys) {
+          const serverUsed = data.usage?.[k] || 0;
+          const localUsed = (currentQuotaUsage as any)[k] || 0;
+          const used = Math.max(serverUsed, localUsed);
+          const limit = data.limits?.[k] || (AI_LIMITS as any)[k] || AI_LIMITS.default;
+          const remaining = Math.max(0, limit - used);
+          const percentage = Math.min(100, Math.round((used / limit) * 100));
+          mergedUsage[k] = used;
+          mergedDetails[k] = { used, limit, remaining, percentage };
+        }
+        setUsageData({
+          ...data,
+          usage: mergedUsage,
+          details: mergedDetails
+        });
       } else {
         // Fallback to locally synchronized currentQuotaUsage
         fallbackToLocalSync();
@@ -237,6 +254,7 @@ export default function ProfileCenter({
   // Listen to live quota events
   useEffect(() => {
     const handleQuotaUpdated = () => {
+      fallbackToLocalSync();
       fetchAuthoritativeUsage();
     };
     window.addEventListener('quota-usage-updated', handleQuotaUpdated);
@@ -342,16 +360,19 @@ export default function ProfileCenter({
   // Filter features based on search query
   const filteredFeatures = useMemo(() => {
     const list = Object.entries(FEATURE_META).map(([key, meta]) => {
-      const detail = usageData?.details?.[key] || {
-        used: (currentQuotaUsage as any)[key] || 0,
-        limit: (AI_LIMITS as any)[key] || AI_LIMITS.default,
-        remaining: Math.max(0, ((AI_LIMITS as any)[key] || AI_LIMITS.default) - ((currentQuotaUsage as any)[key] || 0)),
-        percentage: Math.min(100, Math.round((((currentQuotaUsage as any)[key] || 0) / ((AI_LIMITS as any)[key] || AI_LIMITS.default)) * 100))
-      };
+      const serverDetail = usageData?.details?.[key];
+      const localUsed = (currentQuotaUsage as any)[key] || 0;
+      const limit = serverDetail?.limit || (AI_LIMITS as any)[key] || AI_LIMITS.default;
+      const used = Math.max(serverDetail?.used || 0, localUsed);
+      const remaining = Math.max(0, limit - used);
+      const percentage = Math.min(100, Math.round((used / limit) * 100));
       return {
         key,
         ...meta,
-        ...detail
+        used,
+        limit,
+        remaining,
+        percentage
       };
     });
 

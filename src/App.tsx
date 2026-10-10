@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, 
@@ -445,10 +445,10 @@ export default function App() {
     }
   };
 
-  const showBottomNav = () => {
+  const showBottomNav = useCallback(() => {
     setIsBottomNavVisible(true);
     resetBottomNavTimer();
-  };
+  }, []);
 
   useEffect(() => {
     if (activeTab !== 'aiTutor') {
@@ -932,7 +932,7 @@ export default function App() {
 
 
   // Helper to add XP and update level / pet level
-  const addXp = (amount: number) => {
+  const addXp = useCallback((amount: number) => {
     setUserProfile((prev) => {
       const newXp = Math.max(0, (prev.xp || 0) + amount);
       const newLevel = Math.floor(newXp / 100) + 1;
@@ -953,7 +953,7 @@ export default function App() {
 
       return updated;
     });
-  };
+  }, []);
 
   // --- STREAK & GOALS STATE ---
 
@@ -1553,7 +1553,7 @@ export default function App() {
     return () => unsubscribe();
   }, [userProfile?.uid]);
 
-  const saveAndSyncStudyDocument = async (docData: StudyDocument) => {
+  const saveAndSyncStudyDocument = useCallback(async (docData: StudyDocument) => {
     await saveStudyDocument(docData);
     setStudyDocs((prev) => {
       const exists = prev.some((d) => d.id === docData.id);
@@ -1563,7 +1563,7 @@ export default function App() {
         return [docData, ...prev];
       }
     });
-  };
+  }, []);
 
   const handleSaveDoc = async () => {
     if (!newDocTitle.trim()) return;
@@ -1597,6 +1597,74 @@ export default function App() {
     setInitialTool(toolName);
     setActiveTab('toolkit');
   };
+
+  // Memoized handlers for child components (AiTutorApp, InteractiveToolkit, QuizSection, PersonalLearningPlanner)
+  const handleBackToHome = useCallback(() => {
+    setActiveTab('home');
+  }, []);
+
+  const handleAiTutorAddNote = useCallback(async (note: { title: string; content: string; subject: string }) => {
+    await saveAndSyncStudyDocument({
+      id: 'doc_' + Date.now(),
+      ownerId: userProfile.uid,
+      title: note.title,
+      content: note.content,
+      summary: note.content.slice(0, 150) + '...',
+      tagsJson: JSON.stringify([note.subject]),
+      isShared: false,
+      timestamp: new Date().toISOString()
+    });
+  }, [userProfile.uid, saveAndSyncStudyDocument]);
+
+  const handleRemoveAttachedWorkspaceFile = useCallback((id: string) => {
+    setAttachedWorkspaceFiles((prev) => prev.filter((f) => f.id !== id));
+  }, []);
+
+  const handleAiTutorLanguageChange = useCallback((lang: any) => {
+    setAppLanguage(lang);
+    updateUserProfile(userProfile.uid, { language: lang });
+  }, [userProfile.uid]);
+
+  const handleClearPrefilled = useCallback(() => {
+    setPrefilledTutorPrompt(undefined);
+    setPrefilledSubject(undefined);
+    setPrefilledTopic(undefined);
+    setPrefilledImage(undefined);
+  }, []);
+
+  const handleOpenAuthModal = useCallback(() => {
+    setShowAuthModal(true);
+  }, []);
+
+  const handlePlannerNavigate = useCallback((tab: any, initialToolName?: string, topicName?: string, subjectName?: Subject, promptText?: string) => {
+    setPrefilledSubject(subjectName);
+    setPrefilledTopic(topicName);
+    setPrefilledTutorPrompt(promptText);
+    if (initialToolName) {
+      setInitialTool(initialToolName);
+    }
+    setActiveTab(tab);
+  }, []);
+
+  const handleToolkitAddNote = useCallback(async (note: any) => {
+    await saveAndSyncStudyDocument({
+      id: 'doc_' + Date.now(),
+      ownerId: userProfile.uid,
+      title: note.title,
+      content: note.content,
+      summary: note.content.slice(0, 150) + '...',
+      tagsJson: JSON.stringify([note.subject]),
+      isShared: false,
+      timestamp: new Date().toISOString()
+    });
+    addXp(20);
+  }, [userProfile.uid, saveAndSyncStudyDocument, addXp]);
+
+  const handleToolkitAddProgress = useCallback(async (score: number, total: number) => {
+    addXp(Math.round((score / Math.max(1, total)) * 50));
+  }, [addXp]);
+
+  const toolkitFirebaseUser = useMemo(() => ({ uid: userProfile.uid }), [userProfile?.uid]);
 
   // Helper for font family class based on user customization
   const getAppFontClass = () => {
@@ -1728,42 +1796,21 @@ export default function App() {
         <Suspense fallback={<TabLoadingSkeleton message={appLanguage === 'hi' ? 'एआई ट्यूटर लोड हो रहा है...' : 'Loading AI Academic Tutor...'} />}>
           <AiTutorApp
             user={userProfile}
-            onBack={() => setActiveTab('home')}
-            onAddNote={async (note) => {
-              await saveAndSyncStudyDocument({
-                id: 'doc_' + Date.now(),
-                ownerId: userProfile.uid,
-                title: note.title,
-                content: note.content,
-                summary: note.content.slice(0, 150) + '...',
-                tagsJson: JSON.stringify([note.subject]),
-                isShared: false,
-                timestamp: new Date().toISOString()
-              });
-            }}
+            onBack={handleBackToHome}
+            onAddNote={handleAiTutorAddNote}
             onAddXp={addXp}
             attachedWorkspaceFiles={attachedWorkspaceFiles}
-            onRemoveAttachedWorkspaceFile={(id) => {
-              setAttachedWorkspaceFiles(prev => prev.filter(f => f.id !== id));
-            }}
+            onRemoveAttachedWorkspaceFile={handleRemoveAttachedWorkspaceFile}
             globalAppLanguage={appLanguage}
-            onLanguageChange={(lang: any) => {
-              setAppLanguage(lang);
-              updateUserProfile(userProfile.uid, { language: lang });
-            }}
+            onLanguageChange={handleAiTutorLanguageChange}
             isBottomNavVisible={isBottomNavVisible}
             onShowBottomNav={showBottomNav}
             prefilledPrompt={prefilledTutorPrompt}
             prefilledSubject={prefilledSubject}
             prefilledTopic={prefilledTopic}
             prefilledImage={prefilledImage}
-            onClearPrefilled={() => {
-              setPrefilledTutorPrompt(undefined);
-              setPrefilledSubject(undefined);
-              setPrefilledTopic(undefined);
-              setPrefilledImage(undefined);
-            }}
-            onOpenAuth={() => setShowAuthModal(true)}
+            onClearPrefilled={handleClearPrefilled}
+            onOpenAuth={handleOpenAuthModal}
           />
         </Suspense>
       ) : (
@@ -1960,15 +2007,7 @@ export default function App() {
               <PersonalLearningPlanner
                 user={userProfile}
                 appLanguage={appLanguage}
-                onNavigateToTab={(tab, initialTool, topicName, subjectName, promptText) => {
-                  setPrefilledSubject(subjectName);
-                  setPrefilledTopic(topicName);
-                  setPrefilledTutorPrompt(promptText);
-                  if (initialTool) {
-                    setInitialTool(initialTool);
-                  }
-                  setActiveTab(tab);
-                }}
+                onNavigateToTab={handlePlannerNavigate}
                 savedExams={mockExams}
               />
             </Suspense>
@@ -2585,7 +2624,7 @@ export default function App() {
                       onClick={() => openToolkitWithTool()}
                       className="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-400/50 flex items-center justify-center text-indigo-300 shrink-0 shadow-sm cursor-pointer mt-0.5"
                     >
-                      <Sparkles className="w-5 h-5 text-indigo-300 animate-subtle-pulse" />
+                      <Sparkles className="w-5 h-5 text-indigo-300" />
                     </motion.div>
 
                     <div className="space-y-1">
@@ -2594,7 +2633,7 @@ export default function App() {
                           FEATURED SUITE • 18+ TOOLS
                         </span>
                         <span className="flex items-center gap-1 text-[8.5px] font-bold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                           <span>ACTIVE</span>
                         </span>
                       </div>
@@ -2724,7 +2763,7 @@ export default function App() {
  
                 {/* Streak Badge Pill */}
                 <div className="px-3 py-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 rounded-xl text-xs font-black text-amber-300 flex items-center gap-2 shadow-sm shrink-0 self-start sm:self-center">
-                  <span className="text-base animate-pulse">🔥</span>
+                  <span className="text-base">🔥</span>
                   <div className="leading-tight text-right sm:text-left">
                     <div className="font-black text-xs text-amber-100">{userProfile.streak} Days</div>
                     <div className="text-[8.5px] font-bold text-amber-400 uppercase tracking-widest">STREAK</div>
@@ -3168,27 +3207,13 @@ export default function App() {
           <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-xs">
             <Suspense fallback={<TabLoadingSkeleton message={appLanguage === 'hi' ? 'इंटरएक्टिव टूलकिट लोड हो रही है...' : 'Loading Interactive Toolkit...'} />}>
               <InteractiveToolkit
-                onClose={() => setActiveTab('home')}
+                onClose={handleBackToHome}
                 appLanguage={appLanguage}
-                firebaseUser={{ uid: userProfile.uid }}
+                firebaseUser={toolkitFirebaseUser}
                 user={userProfile}
                 notes={studyDocs}
-                onAddNote={async (note) => {
-                  await saveAndSyncStudyDocument({
-                    id: 'doc_' + Date.now(),
-                    ownerId: userProfile.uid,
-                    title: note.title,
-                    content: note.content,
-                    summary: note.content.slice(0, 150) + '...',
-                    tagsJson: JSON.stringify([note.subject]),
-                    isShared: false,
-                    timestamp: new Date().toISOString()
-                  });
-                  addXp(20);
-                }}
-                onAddProgress={async (score, total) => {
-                  addXp(Math.round((score / Math.max(1, total)) * 50));
-                }}
+                onAddNote={handleToolkitAddNote}
+                onAddProgress={handleToolkitAddProgress}
                 initialTool={initialTool}
               />
             </Suspense>
@@ -3235,10 +3260,9 @@ export default function App() {
                     return (
                       <motion.div 
                         key={msg.id}
-                        layout
-                        initial={{ opacity: 0, y: 16, scale: 0.94, filter: 'blur(3px)' }}
-                        animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
-                        exit={{ opacity: 0, y: -12, scale: 0.9, filter: 'blur(3px)', transition: { duration: 0.2, ease: 'easeOut' } }}
+                        initial={{ opacity: 0, y: 16, scale: 0.94 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -12, scale: 0.9, transition: { duration: 0.2, ease: 'easeOut' } }}
                         transition={{ type: 'spring', stiffness: 420, damping: 28, mass: 0.8 }}
                         className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                       >
@@ -3349,7 +3373,7 @@ export default function App() {
               onAddXp={addXp}
               onSaveMockExam={saveMockExam}
               savedExams={mockExams}
-              onClose={() => setActiveTab('home')}
+              onClose={handleBackToHome}
               language={appLanguage}
               prefilledSubject={prefilledSubject}
               prefilledTopic={prefilledTopic}
@@ -3369,7 +3393,7 @@ export default function App() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white  border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs">
               <div className="space-y-1">
                 <h3 className="font-extrabold text-slate-900 text-sm tracking-wide uppercase flex items-center space-x-2">
-                  <Notebook className="w-5 h-5 text-indigo-600 animate-pulse" />
+                  <Notebook className="w-5 h-5 text-indigo-600" />
                   <span>Interactive Sticky Notes</span>
                 </h3>
                 <p className="text-[11px] text-slate-500 font-medium">

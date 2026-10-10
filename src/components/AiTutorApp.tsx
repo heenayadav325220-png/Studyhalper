@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, memo, useMemo } from 'react';
+import { useState, useRef, useEffect, memo, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
@@ -67,6 +67,7 @@ import {
   applyFilterToCanvas
 } from '../utils/imageEnhancement';
 import type { Subject } from '../types';
+import type { Language } from '../services/translations';
 import { playTutorSpeech } from '../services/voiceSettings';
 
 interface AiTutorAppProps {
@@ -631,6 +632,321 @@ const DEFAULT_SAVED_FORMULAS: SavedFormula[] = [
   { id: 'f6', name: 'Kinetic Energy', latex: 'K = \\frac{1}{2}mv^2' },
 ];
 
+const EMPTY_STRING_ARRAY: string[] = [];
+
+interface UserChatMessageItemProps {
+  msg: ChatMessage;
+  user: { avatar?: string; name: string };
+  isEditing: boolean;
+  editingImages: string[];
+  editingText: string;
+  editInputRef: React.RefObject<HTMLTextAreaElement>;
+  appLanguage: Language;
+  onStartEdit: (msg: ChatMessage) => void;
+  onDelete: (id: string) => void;
+  onRemoveEditingImage: (index: number) => void;
+  onEditingTextChange: (text: string) => void;
+  onSaveAndResend: (id: string) => void;
+  onCancelEdit: () => void;
+}
+
+const UserChatMessageItem: React.FC<UserChatMessageItemProps> = memo(({
+  msg,
+  user,
+  isEditing,
+  editingImages,
+  editingText,
+  editInputRef,
+  appLanguage,
+  onStartEdit,
+  onDelete,
+  onRemoveEditingImage,
+  onEditingTextChange,
+  onSaveAndResend,
+  onCancelEdit
+}) => {
+  return (
+    <motion.div
+      key={msg.id}
+      initial={{ opacity: 0, y: 18, scale: 0.94 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -16, scale: 0.88, transition: { duration: 0.22, ease: 'easeOut' } }}
+      transition={{ type: 'spring', stiffness: 400, damping: 28, mass: 0.8 }}
+      className="flex items-start justify-end space-x-2.5 group/usermsg w-full"
+    >
+      <div className="flex flex-col items-end max-w-[85%] sm:max-w-[78%] space-y-1">
+        <div className="flex items-center space-x-2 pr-1">
+          <button
+            type="button"
+            onClick={() => onStartEdit(msg)}
+            className="opacity-70 sm:opacity-0 group-hover/usermsg:opacity-100 transition text-slate-400 hover:text-indigo-400 p-0.5 rounded cursor-pointer"
+            title={appLanguage === 'hi' ? 'मैसेज एडिट करें' : 'Edit message'}
+          >
+            <Edit3 className="w-3 h-3" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(msg.id)}
+            className="opacity-70 sm:opacity-0 group-hover/usermsg:opacity-100 transition text-slate-400 hover:text-rose-500 p-0.5 rounded cursor-pointer"
+            title={appLanguage === 'hi' ? 'मैसेज हटाएं' : 'Remove message'}
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
+
+        {isEditing ? (
+          <div className="w-full bg-slate-900 border border-indigo-500/70 rounded-2xl rounded-tr-xs p-3 sm:p-3.5 shadow-lg space-y-2.5">
+            {editingImages && editingImages.length > 0 && (
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-semibold text-indigo-300 uppercase tracking-wider block">
+                  {appLanguage === 'hi' ? 'संलग्न तस्वीरें:' : 'Attached Images:'}
+                </span>
+                <div className={`grid gap-2 ${editingImages.length === 1 ? 'grid-cols-1 max-w-xs' : 'grid-cols-2 max-w-sm'}`}>
+                  {editingImages.map((img, i) => (
+                    <div key={i} className="relative group/editimg rounded-xl overflow-hidden border border-slate-700">
+                      <img src={img} alt={`Attached ${i + 1}`} loading="lazy" decoding="async" className="w-full max-h-36 object-contain bg-slate-800" />
+                      <button
+                        type="button"
+                        onClick={() => onRemoveEditingImage(i)}
+                        className="absolute top-1 right-1 p-1 bg-rose-600/90 hover:bg-rose-600 text-white rounded-md shadow-xs transition cursor-pointer"
+                        title={appLanguage === 'hi' ? 'तस्वीर हटाएं' : 'Remove image'}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <textarea
+              ref={editInputRef}
+              value={editingText}
+              onChange={(e) => onEditingTextChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  onSaveAndResend(msg.id);
+                } else if (e.key === 'Escape') {
+                  onCancelEdit();
+                }
+              }}
+              rows={3}
+              placeholder={appLanguage === 'hi' ? 'अपना प्रश्न या संदेश सुधारें...' : 'Edit your message or question...'}
+              className="w-full bg-slate-950/80 border border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-white text-xs sm:text-sm rounded-xl p-2.5 resize-none outline-none leading-relaxed transition font-normal"
+            />
+
+            <div className="flex items-center justify-between pt-1 gap-2 flex-wrap">
+              <span className="text-[10px] text-slate-400 hidden sm:inline">
+                {appLanguage === 'hi' ? 'Enter से सेव करें, Esc से रद्द करें' : 'Press Enter to save, Esc to cancel'}
+              </span>
+              <div className="flex items-center space-x-2 ml-auto">
+                <button
+                  type="button"
+                  onClick={onCancelEdit}
+                  className="px-2.5 py-1 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition active:scale-95 cursor-pointer font-medium"
+                >
+                  {appLanguage === 'hi' ? 'रद्द करें' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSaveAndResend(msg.id)}
+                  disabled={!editingText.trim() && (!editingImages || editingImages.length === 0)}
+                  className="px-3 py-1 text-xs text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 rounded-lg transition active:scale-95 cursor-pointer font-semibold flex items-center space-x-1 shadow-sm"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{appLanguage === 'hi' ? 'सेव और दोबारा भेजें' : 'Save & Resend'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 text-white rounded-2xl rounded-tr-xs p-3.5 sm:p-4 border border-slate-700/60 shadow-sm space-y-2.5">
+            {msg.images && msg.images.length > 0 ? (
+              <div className={`grid gap-2 ${msg.images.length === 1 ? 'grid-cols-1 max-w-xs' : 'grid-cols-2 max-w-sm'}`}>
+                {msg.images.map((img, i) => (
+                  <img key={i} src={img} alt={`Attached ${i + 1}`} loading="lazy" decoding="async" className="w-full max-h-48 object-contain rounded-xl border border-slate-700 bg-slate-800" />
+                ))}
+              </div>
+            ) : msg.image ? (
+              <img src={msg.image} alt="Attached homework" loading="lazy" decoding="async" className="w-full max-h-56 object-contain rounded-xl border border-slate-700 bg-slate-800" />
+            ) : null}
+            <p className="text-xs sm:text-[14.5px] text-slate-100 whitespace-pre-wrap leading-relaxed font-normal">
+              {msg.text}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="w-8 h-8 rounded-full ring-2 ring-indigo-500/20 shadow-xs overflow-hidden bg-slate-800 flex items-center justify-center shrink-0 mt-1">
+        {user.avatar ? (
+          <img src={user.avatar} alt={user.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+        ) : (
+          <UserIcon className="w-4 h-4 text-slate-300" />
+        )}
+      </div>
+    </motion.div>
+  );
+});
+
+interface AiChatMessageItemProps {
+  msg: ChatMessage;
+  isLatest: boolean;
+  tutorFontStyle: 'classic' | 'modern';
+  appLanguage: Language;
+  isPdf: boolean;
+  isExporting: boolean;
+  isCopied: boolean;
+  isSaved: boolean;
+  onExportPdf: (msg: ChatMessage) => void;
+  onCopy: (id: string, text: string) => void;
+  onSpeak: (text: string) => void;
+  onSaveToNotebook: (msg: ChatMessage) => void;
+  onOpenReportModal: (msg: ChatMessage) => void;
+}
+
+const AiChatMessageItem: React.FC<AiChatMessageItemProps> = memo(({
+  msg,
+  isLatest,
+  tutorFontStyle,
+  appLanguage,
+  isPdf,
+  isExporting,
+  isCopied,
+  isSaved,
+  onExportPdf,
+  onCopy,
+  onSpeak,
+  onSaveToNotebook,
+  onOpenReportModal
+}) => {
+  return (
+    <motion.div
+      key={msg.id}
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10, transition: { duration: 0.18, ease: 'easeOut' } }}
+      transition={{ duration: 0.28, ease: 'easeOut' }}
+      className="flex justify-start w-full group/aimsg my-2"
+    >
+      <div className="w-full max-w-[820px] bg-transparent border-0 overflow-visible transition-colors">
+        {/* Professional Header Bar */}
+        <div className="bg-transparent border-b border-slate-100 px-0 py-2 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-indigo-800 text-white flex items-center justify-center shadow-xs">
+              <GraduationCap className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex items-center space-x-1.5 text-slate-500">
+              <span className="font-bold text-xs sm:text-sm text-slate-900 tracking-tight">AI Academic Tutor</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Classic Editorial or Modern Message Body */}
+        <div className={`pt-1 pb-2 px-0 ${tutorFontStyle === 'classic' ? 'tutor-editorial font-serif' : 'tutor-modern font-sans'}`}>
+          <StaggeredRevealMarkdown text={msg.text} isLatest={isLatest} fontStyle={tutorFontStyle} />
+        </div>
+
+        {isPdf && (
+          <div className="mt-3 mb-2 p-3.5 bg-gradient-to-r from-amber-50/80 via-amber-50/50 to-indigo-50/40 border border-amber-200/80 rounded-2xl flex items-center justify-between shadow-xs">
+            <div className="flex items-center space-x-3">
+              <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-xs shrink-0">
+                <FileDown className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                  {appLanguage === 'hi' ? 'पीडीएफ अध्ययन सामग्री तैयार है!' : 'PDF Study Guide Ready!'}
+                </h4>
+                <p className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">
+                  {appLanguage === 'hi' ? 'इसे ऑफलाइन पढ़ने के लिए प्रिंट या सेव करें' : 'Export this curated study guide into a formatted PDF instantly'}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onExportPdf(msg)}
+              disabled={isExporting}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-black text-xs rounded-xl shadow-md shadow-amber-500/10 active:scale-95 transition cursor-pointer flex items-center space-x-1.5 shrink-0"
+            >
+              {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-4 h-4 text-amber-100" />}
+              <span>{appLanguage === 'hi' ? 'पीडीएफ डाउनलोड' : 'Download PDF'}</span>
+            </button>
+          </div>
+        )}
+
+        {/* Professional Action Suite */}
+        <div className="bg-transparent px-0 pt-1 pb-1 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center space-x-1">
+            <button
+              type="button"
+              onClick={() => onCopy(msg.id, msg.text)}
+              title="Copy answer"
+              className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 rounded-md transition cursor-pointer active:scale-90"
+              aria-label="Copy answer"
+            >
+              {isCopied ? (
+                <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSpeak(msg.text)}
+              title="Listen to answer"
+              className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 rounded-md transition cursor-pointer active:scale-90"
+              aria-label="Listen to answer"
+            >
+              <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSaveToNotebook(msg)}
+              title={isSaved ? 'Saved to notebook' : 'Save to notebook'}
+              className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 rounded-md transition cursor-pointer active:scale-90"
+              aria-label="Save to notebook"
+            >
+              {isSaved ? (
+                <Bookmark className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 fill-emerald-600 shrink-0" />
+              ) : (
+                <Bookmark className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onExportPdf(msg)}
+              disabled={isExporting}
+              className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 rounded-md transition cursor-pointer active:scale-90 disabled:opacity-50"
+              title="Export to PDF"
+              aria-label="Export to PDF"
+            >
+              {isExporting ? (
+                <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin text-indigo-600 shrink-0" />
+              ) : (
+                <FileDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onOpenReportModal(msg)}
+              className="p-1.5 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50/50 dark:hover:bg-rose-950/20 rounded-md transition cursor-pointer active:scale-90"
+              title="Report an issue or give feedback"
+              aria-label="Report an issue or give feedback"
+            >
+              <Bug className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </motion.div>
+  );
+});
+
 export const AiTutorApp = memo(function AiTutorApp({
   user,
   onBack,
@@ -1054,7 +1370,7 @@ export const AiTutorApp = memo(function AiTutorApp({
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const [reportingMessageContext, setReportingMessageContext] = useState<string | null>(null);
 
-  const handleOpenReportModal = (msg?: ChatMessage) => {
+  const handleOpenReportModal = useCallback((msg?: ChatMessage) => {
     setReportType('Bug Report');
     setReportEmail((user as any)?.email || '');
     setReportMessage('');
@@ -1065,7 +1381,7 @@ export const AiTutorApp = memo(function AiTutorApp({
       setReportingMessageContext(null);
     }
     setShowReportModal(true);
-  };
+  }, [user]);
 
   const handleSubmitReport = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -1858,24 +2174,24 @@ export const AiTutorApp = memo(function AiTutorApp({
     });
   };
 
-  const handleStartEditMessage = (msg: ChatMessage) => {
+  const handleStartEditMessage = useCallback((msg: ChatMessage) => {
     setEditingMessageId(msg.id);
     setEditingText(msg.text);
     const imgs = msg.images && msg.images.length > 0
       ? [...msg.images]
       : msg.image ? [msg.image] : [];
     setEditingImages(imgs);
-  };
+  }, []);
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = useCallback(() => {
     setEditingMessageId(null);
     setEditingText('');
     setEditingImages([]);
-  };
+  }, []);
 
-  const handleRemoveEditingImage = (index: number) => {
+  const handleRemoveEditingImage = useCallback((index: number) => {
     setEditingImages(prev => prev.filter((_, i) => i !== index));
-  };
+  }, []);
 
   const handleSaveAndResendEditedMessage = async (msgId: string) => {
     const newText = editingText.trim();
@@ -1982,7 +2298,7 @@ export const AiTutorApp = memo(function AiTutorApp({
     }
   };
 
-  const handleExportSingleMessageToPdf = async (msg: ChatMessage) => {
+  const handleExportSingleMessageToPdf = useCallback(async (msg: ChatMessage) => {
     if (isExportingSinglePdfId) return;
     setIsExportingSinglePdfId(msg.id);
     try {
@@ -2009,9 +2325,7 @@ export const AiTutorApp = memo(function AiTutorApp({
     } finally {
       setIsExportingSinglePdfId(null);
     }
-  };
-
-
+  }, [isExportingSinglePdfId, messages, user, selectedSubject, tutorMode, onAddXp]);
 
   const handleClearChat = () => {
     if (window.confirm('Clear all AI Tutor conversation history?')) {
@@ -2020,26 +2334,26 @@ export const AiTutorApp = memo(function AiTutorApp({
     }
   };
 
-  const handleDeleteMessage = (id: string) => {
+  const handleDeleteMessage = useCallback((id: string) => {
     setMessages((prev) => prev.filter((m) => m.id !== id));
-  };
+  }, []);
 
-  const handleCopyText = async (id: string, text: string | unknown) => {
+  const handleCopyText = useCallback(async (id: string, text: string | unknown) => {
     const cleanStr = typeof text === 'string' ? text : String(text || '');
     const copied = await safeClipboardWrite(cleanStr);
     if (copied) {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
     }
-  };
+  }, []);
 
-  const handleSpeakText = (text: string | unknown) => {
+  const handleSpeakText = useCallback((text: string | unknown) => {
     const cleanStr = typeof text === 'string' ? text : String(text || '');
     if (!cleanStr) return;
     playTutorSpeech(cleanStr);
-  };
+  }, []);
 
-  const handleSaveToNotebook = async (msg: ChatMessage) => {
+  const handleSaveToNotebook = useCallback(async (msg: ChatMessage) => {
     try {
       if (onAddNote) {
         await onAddNote({
@@ -2065,7 +2379,7 @@ export const AiTutorApp = memo(function AiTutorApp({
     } catch (e) {
       console.error('Error saving note:', e);
     }
-  };
+  }, [onAddNote, selectedSubject, onAddXp]);
 
   const handleVoiceInputToggle = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -2688,253 +3002,42 @@ export const AiTutorApp = memo(function AiTutorApp({
 
               if (msg.sender === 'user') {
                 return (
-                  <motion.div
+                  <UserChatMessageItem
                     key={msg.id}
-                    initial={{ opacity: 0, y: 18, scale: 0.94 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -16, scale: 0.88, transition: { duration: 0.22, ease: 'easeOut' } }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 28, mass: 0.8 }}
-                    className="flex items-start justify-end space-x-2.5 group/usermsg w-full"
-                  >
-                    <div className="flex flex-col items-end max-w-[85%] sm:max-w-[78%] space-y-1">
-                      <div className="flex items-center space-x-2 pr-1">
-                        <button
-                          type="button"
-                          onClick={() => handleStartEditMessage(msg)}
-                          className="opacity-70 sm:opacity-0 group-hover/usermsg:opacity-100 transition text-slate-400 hover:text-indigo-400 p-0.5 rounded cursor-pointer"
-                          title={appLanguage === 'hi' ? 'मैसेज एडिट करें' : 'Edit message'}
-                        >
-                          <Edit3 className="w-3 h-3" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteMessage(msg.id)}
-                          className="opacity-70 sm:opacity-0 group-hover/usermsg:opacity-100 transition text-slate-400 hover:text-rose-500 p-0.5 rounded cursor-pointer"
-                          title={appLanguage === 'hi' ? 'मैसेज हटाएं' : 'Remove message'}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-
-                      {editingMessageId === msg.id ? (
-                        <div className="w-full bg-slate-900 border border-indigo-500/70 rounded-2xl rounded-tr-xs p-3 sm:p-3.5 shadow-lg space-y-2.5">
-                          {editingImages && editingImages.length > 0 && (
-                            <div className="space-y-1.5">
-                              <span className="text-[10px] font-semibold text-indigo-300 uppercase tracking-wider block">
-                                {appLanguage === 'hi' ? 'संलग्न तस्वीरें:' : 'Attached Images:'}
-                              </span>
-                              <div className={`grid gap-2 ${editingImages.length === 1 ? 'grid-cols-1 max-w-xs' : 'grid-cols-2 max-w-sm'}`}>
-                                {editingImages.map((img, i) => (
-                                  <div key={i} className="relative group/editimg rounded-xl overflow-hidden border border-slate-700">
-                                    <img src={img} alt={`Attached ${i + 1}`} loading="lazy" decoding="async" className="w-full max-h-36 object-contain bg-slate-800" />
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRemoveEditingImage(i)}
-                                      className="absolute top-1 right-1 p-1 bg-rose-600/90 hover:bg-rose-600 text-white rounded-md shadow-xs transition cursor-pointer"
-                                      title={appLanguage === 'hi' ? 'तस्वीर हटाएं' : 'Remove image'}
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          <textarea
-                            ref={editInputRef}
-                            value={editingText}
-                            onChange={(e) => setEditingText(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSaveAndResendEditedMessage(msg.id);
-                              } else if (e.key === 'Escape') {
-                                handleCancelEdit();
-                              }
-                            }}
-                            rows={3}
-                            placeholder={appLanguage === 'hi' ? 'अपना प्रश्न या संदेश सुधारें...' : 'Edit your message or question...'}
-                            className="w-full bg-slate-950/80 border border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-white text-xs sm:text-sm rounded-xl p-2.5 resize-none outline-none leading-relaxed transition font-normal"
-                          />
-
-                          <div className="flex items-center justify-between pt-1 gap-2 flex-wrap">
-                            <span className="text-[10px] text-slate-400 hidden sm:inline">
-                              {appLanguage === 'hi' ? 'Enter से सेव करें, Esc से रद्द करें' : 'Press Enter to save, Esc to cancel'}
-                            </span>
-                            <div className="flex items-center space-x-2 ml-auto">
-                              <button
-                                type="button"
-                                onClick={handleCancelEdit}
-                                className="px-2.5 py-1 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition active:scale-95 cursor-pointer font-medium"
-                              >
-                                {appLanguage === 'hi' ? 'रद्द करें' : 'Cancel'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleSaveAndResendEditedMessage(msg.id)}
-                                disabled={!editingText.trim() && (!editingImages || editingImages.length === 0)}
-                                className="px-3 py-1 text-xs text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 rounded-lg transition active:scale-95 cursor-pointer font-semibold flex items-center space-x-1 shadow-sm"
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                                <span>{appLanguage === 'hi' ? 'सेव और दोबारा भेजें' : 'Save & Resend'}</span>
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 text-white rounded-2xl rounded-tr-xs p-3.5 sm:p-4 border border-slate-700/60 shadow-sm space-y-2.5">
-                          {msg.images && msg.images.length > 0 ? (
-                            <div className={`grid gap-2 ${msg.images.length === 1 ? 'grid-cols-1 max-w-xs' : 'grid-cols-2 max-w-sm'}`}>
-                              {msg.images.map((img, i) => (
-                                <img key={i} src={img} alt={`Attached ${i + 1}`} className="w-full max-h-48 object-contain rounded-xl border border-slate-700 bg-slate-800" />
-                              ))}
-                            </div>
-                          ) : msg.image ? (
-                            <img src={msg.image} alt="Attached homework" className="w-full max-h-56 object-contain rounded-xl border border-slate-700 bg-slate-800" />
-                          ) : null}
-                          <p className="text-xs sm:text-[14.5px] text-slate-100 whitespace-pre-wrap leading-relaxed font-normal">
-                            {msg.text}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="w-8 h-8 rounded-full ring-2 ring-indigo-500/20 shadow-xs overflow-hidden bg-slate-800 flex items-center justify-center shrink-0 mt-1">
-                      {user.avatar ? (
-                        <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <UserIcon className="w-4 h-4 text-slate-300" />
-                      )}
-                    </div>
-                  </motion.div>
+                    msg={msg}
+                    user={user}
+                    isEditing={editingMessageId === msg.id}
+                    editingImages={editingMessageId === msg.id ? editingImages : EMPTY_STRING_ARRAY}
+                    editingText={editingMessageId === msg.id ? editingText : ''}
+                    editInputRef={editInputRef}
+                    appLanguage={appLanguage}
+                    onStartEdit={handleStartEditMessage}
+                    onDelete={handleDeleteMessage}
+                    onRemoveEditingImage={handleRemoveEditingImage}
+                    onEditingTextChange={setEditingText}
+                    onSaveAndResend={handleSaveAndResendEditedMessage}
+                    onCancelEdit={handleCancelEdit}
+                  />
                 );
               }
 
               return (
-                <motion.div
+                <AiChatMessageItem
                   key={msg.id}
-                  initial={{ opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10, transition: { duration: 0.18, ease: 'easeOut' } }}
-                  transition={{ duration: 0.28, ease: 'easeOut' }}
-                  className="flex justify-start w-full group/aimsg my-2"
-                >
-                  <div className="w-full max-w-[820px] bg-transparent border-0 overflow-visible transition-colors">
-                    {/* Professional Header Bar */}
-                    <div className="bg-transparent border-b border-slate-100 px-0 py-2 flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center space-x-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-indigo-800 text-white flex items-center justify-center shadow-xs">
-                          <GraduationCap className="w-4 h-4 text-white" />
-                        </div>
-                        <div className="flex items-center space-x-1.5 text-slate-500">
-                          <span className="font-bold text-xs sm:text-sm text-slate-900 tracking-tight">AI Academic Tutor</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Classic Editorial or Modern Message Body - Khulla no padding or background */}
-                    <div className={`pt-1 pb-2 px-0 ${tutorFontStyle === 'classic' ? 'tutor-editorial font-serif' : 'tutor-modern font-sans'}`}>
-                      <StaggeredRevealMarkdown text={msg.text} isLatest={isLatest} fontStyle={tutorFontStyle} />
-                    </div>
-
-                    {isPdfMaterial(msg.text) && (
-                      <div className="mt-3 mb-2 p-3.5 bg-gradient-to-r from-amber-50/80 via-amber-50/50 to-indigo-50/40 border border-amber-200/80 rounded-2xl flex items-center justify-between shadow-xs">
-                        <div className="flex items-center space-x-3">
-                          <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-xs shrink-0">
-                            <FileDown className="w-5 h-5 text-white" />
-                          </div>
-                          <div>
-                            <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide">
-                              {appLanguage === 'hi' ? 'पीडीएफ अध्ययन सामग्री तैयार है!' : 'PDF Study Guide Ready!'}
-                            </h4>
-                            <p className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">
-                              {appLanguage === 'hi' ? 'इसे ऑफलाइन पढ़ने के लिए प्रिंट या सेव करें' : 'Export this curated study guide into a formatted PDF instantly'}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleExportSingleMessageToPdf(msg)}
-                          disabled={isExportingSinglePdfId === msg.id}
-                          className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-black text-xs rounded-xl shadow-md shadow-amber-500/10 active:scale-95 transition cursor-pointer flex items-center space-x-1.5 shrink-0"
-                        >
-                          {isExportingSinglePdfId === msg.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-4 h-4 text-amber-100" />}
-                          <span>{appLanguage === 'hi' ? 'पीडीएफ डाउनलोड' : 'Download PDF'}</span>
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Professional Action Suite - Minimal, Borderless Icon-Only Row (ChatGPT-style) */}
-                    <div className="bg-transparent px-0 pt-1 pb-1 flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center space-x-1">
-                        <button
-                          type="button"
-                          onClick={() => handleCopyText(msg.id, msg.text)}
-                          title="Copy answer"
-                          className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 rounded-md transition cursor-pointer active:scale-90"
-                          aria-label="Copy answer"
-                        >
-                          {copiedId === msg.id ? (
-                            <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                          )}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleSpeakText(msg.text)}
-                          title="Listen to answer"
-                          className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 rounded-md transition cursor-pointer active:scale-90"
-                          aria-label="Listen to answer"
-                        >
-                          <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleSaveToNotebook(msg)}
-                          title={savedNoteId === msg.id ? 'Saved to notebook' : 'Save to notebook'}
-                          className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 rounded-md transition cursor-pointer active:scale-90"
-                          aria-label="Save to notebook"
-                        >
-                          {savedNoteId === msg.id ? (
-                            <Bookmark className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 fill-emerald-600 shrink-0" />
-                          ) : (
-                            <Bookmark className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                          )}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleExportSingleMessageToPdf(msg)}
-                          disabled={isExportingSinglePdfId === msg.id}
-                          className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 rounded-md transition cursor-pointer active:scale-90 disabled:opacity-50"
-                          title="Export to PDF"
-                          aria-label="Export to PDF"
-                        >
-                          {isExportingSinglePdfId === msg.id ? (
-                            <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin text-indigo-600 shrink-0" />
-                          ) : (
-                            <FileDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                          )}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleOpenReportModal(msg)}
-                          className="p-1.5 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50/50 dark:hover:bg-rose-950/20 rounded-md transition cursor-pointer active:scale-90"
-                          title="Report an issue or give feedback"
-                          aria-label="Report an issue or give feedback"
-                        >
-                          <Bug className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                        </button>
-                      </div>
-                    </div>
-
-                  </div>
-                </motion.div>
+                  msg={msg}
+                  isLatest={isLatest}
+                  tutorFontStyle={tutorFontStyle}
+                  appLanguage={appLanguage}
+                  isPdf={isPdfMaterial(msg.text)}
+                  isExporting={isExportingSinglePdfId === msg.id}
+                  isCopied={copiedId === msg.id}
+                  isSaved={savedNoteId === msg.id}
+                  onExportPdf={handleExportSingleMessageToPdf}
+                  onCopy={handleCopyText}
+                  onSpeak={handleSpeakText}
+                  onSaveToNotebook={handleSaveToNotebook}
+                  onOpenReportModal={handleOpenReportModal}
+                />
               );
             })}
           </AnimatePresence>
@@ -3218,6 +3321,8 @@ export const AiTutorApp = memo(function AiTutorApp({
                       <img
                         src={img}
                         alt={`Page ${idx + 1}`}
+                        loading="lazy"
+                        decoding="async"
                         className="w-14 h-14 rounded-xl object-cover border border-slate-300 shadow-2xs bg-white"
                       />
                       <span className="absolute bottom-1 left-1 px-1 py-0.2 bg-slate-900/80  text-[8px] font-black text-white rounded">
@@ -3319,31 +3424,7 @@ export const AiTutorApp = memo(function AiTutorApp({
             </div>
           )}
 
-          {/* STOP GENERATING FLOATING PILL/BOX ABOVE INPUT */}
-          <AnimatePresence>
-            {isLoading && (
-              <motion.div
-                initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                transition={{ duration: 0.18, ease: 'easeOut' }}
-                className="flex justify-center -mb-1 relative z-20"
-              >
-                <button
-                  type="button"
-                  onClick={handleStopGeneration}
-                  className="flex items-center space-x-2 px-3.5 py-1.5 bg-slate-900/95 hover:bg-slate-950 text-white rounded-full shadow-lg border border-slate-700/80 hover:border-rose-500/80 active:scale-95 transition-all cursor-pointer text-xs font-semibold backdrop-blur-md group"
-                  title={appLanguage === 'hi' ? 'AI का उत्तर रोकें (Stop Generating)' : 'Stop generating response'}
-                >
-                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                  <Square className="w-3 h-3 text-rose-400 fill-rose-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-slate-100 font-bold tracking-tight">
-                    {appLanguage === 'hi' ? 'जवाब रोकें (Stop)' : 'Stop Generating'}
-                  </span>
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
+
 
           {/* DYNAMIC COLLAPSIBLE COMPOSER CONTAINER */}
           {(() => {
@@ -3361,18 +3442,6 @@ export const AiTutorApp = memo(function AiTutorApp({
                     : 'flex-row items-center justify-between rounded-full py-1.5 px-3.5 min-h-[46px] sm:min-h-[48px] cursor-pointer'
                 }`}
               >
-                {isInputActive && (
-                  <div className="flex justify-between items-center px-2 mb-1.5 select-none w-full border-b border-slate-100 pb-1.5">
-                    <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase">AI TUTOR STATUS</span>
-                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                      quotaUsage.aiTutor >= AI_LIMITS.aiTutor
-                        ? "bg-rose-50 text-rose-600"
-                        : "bg-indigo-50 text-indigo-600"
-                    }`}>
-                      {quotaUsage.aiTutor} / {AI_LIMITS.aiTutor} {appLanguage === 'hi' ? 'आज उपयोग किया' : 'Today'}
-                    </span>
-                  </div>
-                )}
                 {/* Textarea Area */}
                 <div className={`flex-grow flex ${isInputActive && inputQuery ? 'items-start' : 'items-center'} pb-0`}>
                   <textarea
@@ -3449,19 +3518,33 @@ export const AiTutorApp = memo(function AiTutorApp({
                       <Plus className="w-3.5 h-3.5" />
                     </button>
 
-                    {/* SEND BUTTON */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSendMessage();
-                      }}
-                      disabled={!inputQuery.trim() && selectedImages.length === 0}
-                      className="w-8 h-8 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white rounded-full shadow-2xs transition shrink-0"
-                      title="Send Message"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                    </button>
+                    {/* SEND OR STOP BUTTON */}
+                    {isLoading ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStopGeneration();
+                        }}
+                        className="w-8 h-8 flex items-center justify-center bg-slate-900 hover:bg-rose-600 text-white rounded-full shadow-2xs transition shrink-0 ring-2 ring-rose-500/40 cursor-pointer"
+                        title={appLanguage === 'hi' ? 'उत्तर रोकें (Stop Generating)' : 'Stop Generating'}
+                      >
+                        <Square className="w-3.5 h-3.5 fill-rose-500 text-rose-500 hover:fill-white hover:text-white transition-colors" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSendMessage();
+                        }}
+                        disabled={!inputQuery.trim() && selectedImages.length === 0}
+                        className="w-8 h-8 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white rounded-full shadow-2xs transition shrink-0"
+                        title="Send Message"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -4435,6 +4518,8 @@ export const AiTutorApp = memo(function AiTutorApp({
                             <img 
                               src={img} 
                               alt={`Page ${idx + 1}`} 
+                              loading="lazy"
+                              decoding="async"
                               className={`w-12 h-12 rounded-lg object-cover border transition ${
                                 filterPreviewImageIndex === idx 
                                   ? 'border-indigo-400 ring-2 ring-indigo-500/50 scale-105' 

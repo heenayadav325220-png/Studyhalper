@@ -58,18 +58,96 @@ export const AI_LIMITS = {
   default: 10
 };
 
-export let currentQuotaUsage: QuotaUsage = {
-  aiTutor: 0,
-  notes: 0,
-  quiz: 0,
-  mockExam: 0,
-  questionPaper: 0,
-  ocr: 0,
-  mindmap: 0,
-  explainTopic: 0,
-  aiEditor: 0,
-  other: 0,
-};
+export function getPersistentUserId(): string {
+  if (typeof window === "undefined") return "server_user";
+  try {
+    const profileStr = localStorage.getItem('user_profile_data') || localStorage.getItem('ascend_user_profile');
+    if (profileStr) {
+      const parsed = JSON.parse(profileStr);
+      if (parsed?.uid) return parsed.uid;
+    }
+    const legacyId = localStorage.getItem('studybuddy_uid') || localStorage.getItem('ascend_user_id');
+    if (legacyId) return legacyId;
+    const newId = 'user_' + Math.random().toString(36).substring(2, 12);
+    localStorage.setItem('ascend_user_id', newId);
+    return newId;
+  } catch (e) {
+    return 'guest_user';
+  }
+}
+
+function getTodayDateString(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function loadStoredQuotaUsage(): QuotaUsage {
+  const todayStr = getTodayDateString();
+  const defaultUsage: QuotaUsage = {
+    aiTutor: 0,
+    notes: 0,
+    quiz: 0,
+    mockExam: 0,
+    questionPaper: 0,
+    ocr: 0,
+    mindmap: 0,
+    explainTopic: 0,
+    aiEditor: 0,
+    other: 0,
+  };
+
+  if (typeof window === "undefined") return defaultUsage;
+
+  try {
+    const savedDate = localStorage.getItem("ascend_quota_date");
+    if (savedDate !== todayStr) {
+      localStorage.setItem("ascend_quota_date", todayStr);
+      localStorage.setItem("ascend_quota_usage_" + todayStr, JSON.stringify(defaultUsage));
+      return defaultUsage;
+    }
+    const raw = localStorage.getItem("ascend_quota_usage_" + todayStr);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        aiTutor: Number(parsed.aiTutor) || 0,
+        notes: Number(parsed.notes) || 0,
+        quiz: Number(parsed.quiz) || 0,
+        mockExam: Number(parsed.mockExam) || 0,
+        questionPaper: Number(parsed.questionPaper) || 0,
+        ocr: Number(parsed.ocr) || 0,
+        mindmap: Number(parsed.mindmap) || 0,
+        explainTopic: Number(parsed.explainTopic) || 0,
+        aiEditor: Number(parsed.aiEditor) || 0,
+        other: Number(parsed.other) || 0,
+      };
+    }
+  } catch (e) {}
+
+  return defaultUsage;
+}
+
+function saveStoredQuotaUsage(usage: QuotaUsage) {
+  if (typeof window === "undefined") return;
+  const todayStr = getTodayDateString();
+  try {
+    localStorage.setItem("ascend_quota_date", todayStr);
+    localStorage.setItem("ascend_quota_usage_" + todayStr, JSON.stringify(usage));
+  } catch (e) {}
+}
+
+export let currentQuotaUsage: QuotaUsage = loadStoredQuotaUsage();
+
+export function trackFeatureUsageLocally(feature: keyof QuotaUsage) {
+  currentQuotaUsage[feature] = (currentQuotaUsage[feature] || 0) + 1;
+  saveStoredQuotaUsage(currentQuotaUsage);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("quota-usage-updated", { detail: { ...currentQuotaUsage } }));
+    window.dispatchEvent(new CustomEvent("toolkit-usage-updated", { detail: getToolkitUsage() }));
+  }
+}
 
 let unsubscribeUsage: (() => void) | null = null;
 let fallbackInterval: any = null;
@@ -81,20 +159,23 @@ export async function refreshQuotaUsageFromServer(onUpdate?: (usage: QuotaUsage)
       const data = await res.json();
       if (data && data.usage) {
         currentQuotaUsage = {
-          aiTutor: data.usage.aiTutor || 0,
-          notes: data.usage.notes || 0,
-          quiz: data.usage.quiz || 0,
-          mockExam: data.usage.mockExam || 0,
-          questionPaper: data.usage.questionPaper || 0,
-          ocr: data.usage.ocr || 0,
-          mindmap: data.usage.mindmap || 0,
-          explainTopic: data.usage.explainTopic || 0,
-          aiEditor: data.usage.aiEditor || 0,
-          other: data.usage.other || 0,
+          aiTutor: Math.max(currentQuotaUsage.aiTutor, Number(data.usage.aiTutor) || 0),
+          notes: Math.max(currentQuotaUsage.notes, Number(data.usage.notes) || 0),
+          quiz: Math.max(currentQuotaUsage.quiz, Number(data.usage.quiz) || 0),
+          mockExam: Math.max(currentQuotaUsage.mockExam, Number(data.usage.mockExam) || 0),
+          questionPaper: Math.max(currentQuotaUsage.questionPaper, Number(data.usage.questionPaper) || 0),
+          ocr: Math.max(currentQuotaUsage.ocr, Number(data.usage.ocr) || 0),
+          mindmap: Math.max(currentQuotaUsage.mindmap, Number(data.usage.mindmap) || 0),
+          explainTopic: Math.max(currentQuotaUsage.explainTopic, Number(data.usage.explainTopic) || 0),
+          aiEditor: Math.max(currentQuotaUsage.aiEditor, Number(data.usage.aiEditor) || 0),
+          other: Math.max(currentQuotaUsage.other, Number(data.usage.other) || 0),
         };
-        if (onUpdate) onUpdate(currentQuotaUsage);
-        window.dispatchEvent(new CustomEvent("quota-usage-updated", { detail: currentQuotaUsage }));
-        window.dispatchEvent(new CustomEvent("toolkit-usage-updated", { detail: getToolkitUsage() }));
+        saveStoredQuotaUsage(currentQuotaUsage);
+        if (onUpdate) onUpdate({ ...currentQuotaUsage });
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("quota-usage-updated", { detail: { ...currentQuotaUsage } }));
+          window.dispatchEvent(new CustomEvent("toolkit-usage-updated", { detail: getToolkitUsage() }));
+        }
       }
     }
   } catch (err) {
@@ -114,57 +195,50 @@ export function subscribeToQuotaUsage(uid: string, onUpdate?: (usage: QuotaUsage
   }
   if (!uid) return;
 
+  // Immediately notify listener with existing local stored usage
+  if (onUpdate) onUpdate({ ...currentQuotaUsage });
+
   // Immediately synchronize authoritative quota from backend
   refreshQuotaUsageFromServer(onUpdate);
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getTodayDateString();
   try {
     const usageDocRef = doc(db, 'usage', uid, 'daily', todayStr);
     unsubscribeUsage = onSnapshot(usageDocRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         currentQuotaUsage = {
-          aiTutor: data.aiTutor || 0,
-          notes: data.notes || 0,
-          quiz: data.quiz || 0,
-          mockExam: data.mockExam || 0,
-          questionPaper: data.questionPaper || 0,
-          ocr: data.ocr || 0,
-          mindmap: data.mindmap || 0,
-          explainTopic: data.explainTopic || 0,
-          aiEditor: data.aiEditor || 0,
-          other: data.other || 0,
+          aiTutor: Math.max(currentQuotaUsage.aiTutor, Number(data.aiTutor) || 0),
+          notes: Math.max(currentQuotaUsage.notes, Number(data.notes) || 0),
+          quiz: Math.max(currentQuotaUsage.quiz, Number(data.quiz) || 0),
+          mockExam: Math.max(currentQuotaUsage.mockExam, Number(data.mockExam) || 0),
+          questionPaper: Math.max(currentQuotaUsage.questionPaper, Number(data.questionPaper) || 0),
+          ocr: Math.max(currentQuotaUsage.ocr, Number(data.ocr) || 0),
+          mindmap: Math.max(currentQuotaUsage.mindmap, Number(data.mindmap) || 0),
+          explainTopic: Math.max(currentQuotaUsage.explainTopic, Number(data.explainTopic) || 0),
+          aiEditor: Math.max(currentQuotaUsage.aiEditor, Number(data.aiEditor) || 0),
+          other: Math.max(currentQuotaUsage.other, Number(data.other) || 0),
         };
-      } else {
-        currentQuotaUsage = {
-          aiTutor: 0,
-          notes: 0,
-          quiz: 0,
-          mockExam: 0,
-          questionPaper: 0,
-          ocr: 0,
-          mindmap: 0,
-          explainTopic: 0,
-          aiEditor: 0,
-          other: 0,
-        };
+        saveStoredQuotaUsage(currentQuotaUsage);
+        if (onUpdate) onUpdate({ ...currentQuotaUsage });
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("quota-usage-updated", { detail: { ...currentQuotaUsage } }));
+          window.dispatchEvent(new CustomEvent("toolkit-usage-updated", { detail: getToolkitUsage() }));
+        }
       }
-      if (onUpdate) onUpdate(currentQuotaUsage);
-      window.dispatchEvent(new CustomEvent("quota-usage-updated", { detail: currentQuotaUsage }));
-      window.dispatchEvent(new CustomEvent("toolkit-usage-updated", { detail: getToolkitUsage() }));
     }, (_err) => {
-      // In environments where Firestore isn't provisioned or is offline, seamlessly poll server endpoint
+      // In environments where Firestore isn't provisioned or is offline, poll server endpoint
       if (!fallbackInterval) {
         fallbackInterval = setInterval(() => {
           refreshQuotaUsageFromServer(onUpdate);
-        }, 20000);
+        }, 15000);
       }
     });
   } catch (e) {
     if (!fallbackInterval) {
       fallbackInterval = setInterval(() => {
         refreshQuotaUsageFromServer(onUpdate);
-      }, 20000);
+      }, 15000);
     }
   }
 
@@ -187,29 +261,29 @@ export interface ToolkitUsageData {
 }
 
 export function getDailyAiUsage(): AiUsageData {
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getTodayDateString();
   return { date: todayStr, count: currentQuotaUsage.aiTutor, limit: AI_LIMITS.aiTutor };
 }
 
 export function incrementDailyAiUsage(): AiUsageData {
-  const todayStr = new Date().toISOString().split("T")[0];
-  // No-op locally since the backend handles authoritative increments
+  trackFeatureUsageLocally('aiTutor');
+  const todayStr = getTodayDateString();
   return { date: todayStr, count: currentQuotaUsage.aiTutor, limit: AI_LIMITS.aiTutor };
 }
 
 export function getToolkitUsage(): ToolkitUsageData {
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getTodayDateString();
   // Calculate aggregate toolkit count
-  const count = currentQuotaUsage.notes + 
-                currentQuotaUsage.explainTopic + 
-                currentQuotaUsage.mindmap + 
-                currentQuotaUsage.questionPaper + 
-                currentQuotaUsage.ocr;
+  const count = (currentQuotaUsage.notes || 0) + 
+                (currentQuotaUsage.explainTopic || 0) + 
+                (currentQuotaUsage.mindmap || 0) + 
+                (currentQuotaUsage.questionPaper || 0) + 
+                (currentQuotaUsage.ocr || 0);
   return { date: todayStr, count, limit: 50 };
 }
 
-export function incrementToolkitUsage(): ToolkitUsageData {
-  // No-op locally since backend increment is authoritative
+export function incrementToolkitUsage(feature?: keyof QuotaUsage): ToolkitUsageData {
+  trackFeatureUsageLocally(feature || 'notes');
   return getToolkitUsage();
 }
 
@@ -377,11 +451,15 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
     }
 
     const modifiedInit = { ...(init || {}) };
+    const headers = new Headers(modifiedInit.headers || {});
     if (idToken) {
-      const headers = new Headers(modifiedInit.headers || {});
       headers.set("Authorization", `Bearer ${idToken}`);
-      modifiedInit.headers = headers;
     }
+    const persistentUserId = getPersistentUserId();
+    if (persistentUserId) {
+      headers.set("x-user-id", persistentUserId);
+    }
+    modifiedInit.headers = headers;
 
     const resolvedInput = typeof input === "string" && input.startsWith("/api/")
       ? `${API_BASE}${input}`
@@ -408,6 +486,9 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
             cachedAuthToken = { token: newToken, expiresAt: Date.now() + 50 * 60 * 1000 };
             const retryHeaders = new Headers(modifiedInit.headers || {});
             retryHeaders.set("Authorization", `Bearer ${newToken}`);
+            if (persistentUserId) {
+              retryHeaders.set("x-user-id", persistentUserId);
+            }
             modifiedInit.headers = retryHeaders;
             response = await fetch(resolvedInput, modifiedInit);
           }
@@ -433,7 +514,28 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
                            url.includes("/api/tutor-chat") || 
                            url.includes("generativelanguage.googleapis.com");
       if (isAiEndpoint && response.ok) {
-        incrementDailyAiUsage();
+        let featureKey: keyof QuotaUsage = 'other';
+        if (url.includes("/gemini/answer") || url.includes("/tutor-chat") || url.includes("/gemini/diagram")) {
+          featureKey = 'aiTutor';
+        } else if (url.includes("/gemini/notes-generator") || url.includes("/summarize-notes") || url.includes("/gemini/pdf-summary")) {
+          featureKey = 'notes';
+        } else if (url.includes("/gemini/quiz")) {
+          featureKey = 'quiz';
+        } else if (url.includes("/generate-exam")) {
+          featureKey = 'mockExam';
+        } else if (url.includes("/gemini/question-paper")) {
+          featureKey = 'questionPaper';
+        } else if (url.includes("/gemini/ocr") || url.includes("/pdf-scan-analyze")) {
+          featureKey = 'ocr';
+        } else if (url.includes("/gemini/mindmap")) {
+          featureKey = 'mindmap';
+        } else if (url.includes("/gemini/explain-topic")) {
+          featureKey = 'explainTopic';
+        } else if (url.includes("/ai-editor-command")) {
+          featureKey = 'aiEditor';
+        }
+
+        trackFeatureUsageLocally(featureKey);
         refreshQuotaUsageFromServer();
       }
       const quotaHeader = response.headers.get("x-gemini-quota-exceeded");

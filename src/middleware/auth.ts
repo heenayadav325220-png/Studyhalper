@@ -29,12 +29,13 @@ export const requireAuth = async (
   }
 
   // Graceful Guest Fallback: never block unauthenticated users with 401!
-  // Assign a guest session so they can use all AI features under the guest daily limit (15 req/day).
+  // Assign a session using persistent client x-user-id header or client IP
+  const customUserId = typeof req.headers["x-user-id"] === "string" && req.headers["x-user-id"].trim() ? req.headers["x-user-id"].trim() : null;
   const forwarded = req.headers["x-forwarded-for"];
   const clientIp = typeof forwarded === "string" ? forwarded.split(",")[0].trim() : (req.socket.remoteAddress || "127.0.0.1");
   
   req.user = {
-    uid: `guest_${clientIp.replace(/[^a-zA-Z0-9]/g, '_')}`,
+    uid: customUserId || `guest_${clientIp.replace(/[^a-zA-Z0-9]/g, '_')}`,
     firebase: { sign_in_provider: 'anonymous' }
   } as any;
 
