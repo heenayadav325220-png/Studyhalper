@@ -35,8 +35,10 @@ import {
   Target,
   ShieldCheck,
   Lock,
-  Loader2
+  Loader2,
+  Music
 } from 'lucide-react';
+import { MusicPlayerModal } from './components/MusicPlayerModal';
 
 // Real Lazy Loading / Dynamic Code Splitting for heavy secondary modules
 const InteractiveToolkit = React.lazy(() => import('./components/InteractiveToolkit'));
@@ -409,6 +411,7 @@ export default function App() {
   const [prefilledTopic, setPrefilledTopic] = useState<string | undefined>(undefined);
   const [prefilledImage, setPrefilledImage] = useState<string | undefined>(undefined);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showMusicModal, setShowMusicModal] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
@@ -3802,6 +3805,7 @@ export default function App() {
                   { id: 'mockExam', label: 'Mock Exams', icon: GraduationCap, color: 'text-amber-400 bg-amber-950/60 border-amber-800/40' },
                   { id: 'studyDocs', label: 'Notebook', icon: FileText, color: 'text-teal-400 bg-teal-950/60 border-teal-800/40' },
                   { id: 'petCompanion', label: 'Sanctuary', icon: Heart, color: 'text-rose-400 bg-rose-950/60 border-rose-800/40' },
+                  { id: 'studyMusic', label: appLanguage === 'hi' ? 'स्टडी म्यूज़िक' : 'Study Music', icon: Music, color: 'text-indigo-400 bg-indigo-950/60 border-indigo-800/40' },
                   { id: 'account', label: currentUser && !currentUser.isAnonymous ? 'My Account' : 'Sign In / Login', icon: LogIn, color: 'text-indigo-400 bg-indigo-950/60 border-indigo-800/40' },
                 ].map((item) => {
                   const Icon = item.icon;
@@ -3813,6 +3817,8 @@ export default function App() {
                       onClick={() => {
                         if (item.id === 'account') {
                           setShowAuthModal(true);
+                        } else if (item.id === 'studyMusic') {
+                          setShowMusicModal(true);
                         } else {
                           setActiveTab(item.id as any);
                         }
@@ -4228,6 +4234,25 @@ export default function App() {
           </motion.div>
         </div>
       )}
+
+      {/* FLOATING MUSIC BUTTON */}
+      <div className="fixed bottom-16 right-4 z-40">
+        <button
+          type="button"
+          onClick={() => setShowMusicModal(true)}
+          className="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg flex items-center justify-center cursor-pointer transition active:scale-95 border border-indigo-400/50 relative group"
+          title="Study Music & Songs"
+        >
+          <Music className="w-5 h-5 group-hover:scale-110 transition-transform" />
+          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full ring-2 ring-slate-950 flex items-center justify-center text-[8px] font-black">♪</span>
+        </button>
+      </div>
+
+      <MusicPlayerModal
+        isOpen={showMusicModal}
+        onClose={() => setShowMusicModal(false)}
+        appLanguage={appLanguage}
+      />
 
       {/* GLOBAL TOAST NOTIFICATION CONTAINER */}
       <Toast />
