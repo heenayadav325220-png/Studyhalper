@@ -68,7 +68,7 @@ import {
 } from '../utils/imageEnhancement';
 import type { Subject } from '../types';
 import type { Language } from '../services/translations';
-import { playTutorSpeech } from '../services/voiceSettings';
+import { playElevenLabsSpeech } from '../services/voiceSettings';
 
 interface AiTutorAppProps {
   user: {
@@ -798,9 +798,10 @@ interface AiChatMessageItemProps {
   isExporting: boolean;
   isCopied: boolean;
   isSaved: boolean;
+  isSpeaking: boolean;
   onExportPdf: (msg: ChatMessage) => void;
   onCopy: (id: string, text: string) => void;
-  onSpeak: (text: string) => void;
+  onSpeak: (id: string, text: string) => void;
   onSaveToNotebook: (msg: ChatMessage) => void;
   onOpenReportModal: (msg: ChatMessage) => void;
 }
@@ -814,6 +815,7 @@ const AiChatMessageItem: React.FC<AiChatMessageItemProps> = memo(({
   isExporting,
   isCopied,
   isSaved,
+  isSpeaking,
   onExportPdf,
   onCopy,
   onSpeak,
@@ -893,12 +895,16 @@ const AiChatMessageItem: React.FC<AiChatMessageItemProps> = memo(({
 
             <button
               type="button"
-              onClick={() => onSpeak(msg.text)}
+              onClick={() => onSpeak(msg.id, msg.text)}
               title="Listen to answer"
-              className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 rounded-md transition cursor-pointer active:scale-90"
+              className={`p-1.5 rounded-md transition cursor-pointer active:scale-90 ${isSpeaking ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/50' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50'}`}
               aria-label="Listen to answer"
             >
-              <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              {isSpeaking ? (
+                <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin text-indigo-600 shrink-0" />
+              ) : (
+                <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              )}
             </button>
 
             <button
@@ -1055,6 +1061,7 @@ export const AiTutorApp = memo(function AiTutorApp({
   }, [editingMessageId]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [savedNoteId, setSavedNoteId] = useState<string | null>(null);
+  const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [showMathPalette, setShowMathPalette] = useState(false);
   const [activeMathCategory, setActiveMathCategory] = useState<'All' | 'Greek' | 'Algebra' | 'Operators' | 'Calculus'>('All');
@@ -2347,10 +2354,16 @@ export const AiTutorApp = memo(function AiTutorApp({
     }
   }, []);
 
-  const handleSpeakText = useCallback((text: string | unknown) => {
+  const handleSpeakText = useCallback(async (msgId: string, text: string | unknown) => {
     const cleanStr = typeof text === 'string' ? text : String(text || '');
     if (!cleanStr) return;
-    playTutorSpeech(cleanStr);
+    setSpeakingMsgId(msgId);
+    await playElevenLabsSpeech(
+      cleanStr,
+      () => setSpeakingMsgId(msgId),
+      () => setSpeakingMsgId(null),
+      () => setSpeakingMsgId(null)
+    );
   }, []);
 
   const handleSaveToNotebook = useCallback(async (msg: ChatMessage) => {
@@ -3032,6 +3045,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                   isExporting={isExportingSinglePdfId === msg.id}
                   isCopied={copiedId === msg.id}
                   isSaved={savedNoteId === msg.id}
+                  isSpeaking={speakingMsgId === msg.id}
                   onExportPdf={handleExportSingleMessageToPdf}
                   onCopy={handleCopyText}
                   onSpeak={handleSpeakText}

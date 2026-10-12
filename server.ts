@@ -193,6 +193,8 @@ app.get("/api/admin/ai-health", requireAdminHealthToken, (_req, res) => {
 });
 
 import { adminDb, adminAuth } from "./src/lib/firebase-admin.js";
+import { setupElevenLabsRoute } from "./src/services/elevenlabsService.js";
+setupElevenLabsRoute(app);
 
 const AI_LIMITS = {
   aiTutor: 30,

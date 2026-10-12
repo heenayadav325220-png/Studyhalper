@@ -1,3 +1,5 @@
+import { API_BASE } from "../config/apiConfig";
+
 export interface CustomVoiceConfig {
   voiceURI: string;
   voiceName: string;
@@ -307,3 +309,66 @@ export function playTutorSpeech(
 
   window.speechSynthesis.speak(utterance);
 }
+
+/**
+ * Generates and plays audio using the ElevenLabs TTS API with Pari M voice (eleven_multilingual_v2).
+ * Sends the audio buffer directly to the HTML5 Audio player component.
+ */
+export async function playElevenLabsSpeech(
+  text: string,
+  onStart?: () => void,
+  onEnd?: () => void,
+  onError?: (err: any) => void
+): Promise<void> {
+  const cleanText = cleanTextForSpeech(text);
+  if (!cleanText) {
+    onError?.("No text provided for ElevenLabs TTS");
+    return;
+  }
+
+  try {
+    onStart?.();
+    const res = await fetch(`${API_BASE}/api/tts/elevenlabs`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ text: cleanText })
+    });
+
+    const contentType = res.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      const data = await res.json();
+      if (data.fallback) {
+        playTutorSpeech(text, undefined, onStart, onEnd, onError);
+        return;
+      }
+    }
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || `ElevenLabs request failed with status ${res.status}`);
+    }
+
+    const audioBlob = await res.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
+    const audioElement = new Audio(audioUrl);
+
+    audioElement.onended = () => {
+      onEnd?.();
+      URL.revokeObjectURL(audioUrl);
+    };
+
+    audioElement.onerror = (e) => {
+      onError?.(e);
+      URL.revokeObjectURL(audioUrl);
+    };
+
+    await audioElement.play();
+  } catch (err: any) {
+    console.warn("ElevenLabs TTS playback error, falling back to browser TTS:", err);
+    // Fallback to standard natural browser TTS if network or key is missing
+    playTutorSpeech(text, undefined, onStart, onEnd, onError);
+  }
+}
+
