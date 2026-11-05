@@ -41,6 +41,7 @@ class AudioEngine {
   private volumeState = 0.9;
   private currentTimeState = 0;
   private isShuffle = false;
+  private isLoopOne = false;
   private sleepTimerTimeout: any = null;
   private listeners: Set<() => void> = new Set();
   
@@ -134,6 +135,15 @@ class AudioEngine {
 
   public prevTrack() {
     this.playTrack(this.currentTrackIndex - 1);
+  }
+
+  public toggleLoop() {
+    this.isLoopOne = !this.isLoopOne;
+    this.notify();
+  }
+
+  public getIsLoopOne() {
+    return this.isLoopOne;
   }
 
   public setVolume(vol: number) {

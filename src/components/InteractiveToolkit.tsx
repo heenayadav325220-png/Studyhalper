@@ -195,6 +195,151 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
   const [h, $] = useState<any>(null); // mindmapExplainNode
   const [De, Ve] = useState(false); // mindmapExplainLoading
 
+  // Flashcard Mode States & Handlers
+  const [flashcardDecks, setFlashcardDecks] = useState<any[]>(() => {
+    const saved = localStorage.getItem("studybuddy_flashcard_decks");
+    if (saved) {
+      try { return JSON.parse(saved); } catch {}
+    }
+    return [
+      {
+        id: "deck-1",
+        title: "Physics Core Formulas & Laws",
+        subject: "Physics",
+        createdAt: new Date().toISOString(),
+        cards: [
+          { id: "c1", front: "Newton's Second Law", back: "F = ma (Force equals mass times acceleration)", interval: 1, repetition: 0, easeFactor: 2.5, dueDate: new Date().toISOString() },
+          { id: "c2", front: "Einstein Energy-Mass Relation", back: "E = mc² (Energy equals mass multiplied by speed of light squared)", interval: 1, repetition: 0, easeFactor: 2.5, dueDate: new Date().toISOString() },
+          { id: "c3", front: "Ohm's Law", back: "V = IR (Voltage equals current multiplied by resistance)", interval: 3, repetition: 1, easeFactor: 2.5, dueDate: new Date().toISOString() }
+        ]
+      },
+      {
+        id: "deck-2",
+        title: "Organic Chemistry Reactions",
+        subject: "Chemistry",
+        createdAt: new Date().toISOString(),
+        cards: [
+          { id: "c4", front: "SN2 Reaction Mechanism", back: "Bimolecular nucleophilic substitution with inversion of configuration in a single concerted step.", interval: 1, repetition: 0, easeFactor: 2.5, dueDate: new Date().toISOString() },
+          { id: "c5", front: "Markovnikov's Rule", back: "In addition of HX to an alkene, the hydrogen attaches to the carbon with more hydrogens.", interval: 2, repetition: 1, easeFactor: 2.5, dueDate: new Date().toISOString() }
+        ]
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("studybuddy_flashcard_decks", JSON.stringify(flashcardDecks));
+  }, [flashcardDecks]);
+
+  const [activeDeckId, setActiveDeckId] = useState<string | null>(null);
+  const [isReviewingDeck, setIsReviewingDeck] = useState(false);
+  const [reviewCardIndex, setReviewCardIndex] = useState(0);
+  const [isCardFlipped, setIsCardFlipped] = useState(false);
+  const [showNewDeckModal, setShowNewDeckModal] = useState(false);
+  const [aiDeckTopic, setAiDeckTopic] = useState("");
+  const [newDeckSubject, setNewDeckSubject] = useState("Science");
+  const [isAiGeneratingDeck, setIsAiGeneratingDeck] = useState(false);
+
+  const generateAiFlashcardsFromTopic = async (topicStr: string) => {
+    if (!topicStr.trim()) {
+      showToast(appLanguage === "Hindi" ? "कृपया विषय दर्ज करें!" : "Please enter a topic or select a note!", "info");
+      return;
+    }
+    setIsAiGeneratingDeck(true);
+    try {
+      const prompt = `Create 6 high-yield study flashcards for the topic "${topicStr}" in subject "${newDeckSubject}" at grade 10 level. Format your response ONLY as valid JSON array of objects: [{"front": "Question or Term", "back": "Clear concise answer or definition"}]. No markdown fences.`;
+      const resText = await getStudyAnswer(prompt, undefined, undefined, toolkitLanguage);
+      let trimmed = resText.trim();
+      if (trimmed.startsWith("```json")) trimmed = trimmed.substring(7);
+      else if (trimmed.startsWith("```")) trimmed = trimmed.substring(3);
+      if (trimmed.endsWith("```")) trimmed = trimmed.substring(0, trimmed.length - 3);
+      const parsedCards = JSON.parse(trimmed.trim());
+      
+      const newDeck = {
+        id: `deck-${Date.now()}`,
+        title: `${topicStr} AI Deck`,
+        subject: newDeckSubject,
+        createdAt: new Date().toISOString(),
+        cards: parsedCards.map((c: any, idx: number) => ({
+          id: `card-${Date.now()}-${idx}`,
+          front: c.front || c.term || "Question",
+          back: c.back || c.definition || "Answer",
+          interval: 1,
+          repetition: 0,
+          easeFactor: 2.5,
+          dueDate: new Date().toISOString()
+        }))
+      };
+      
+      setFlashcardDecks(prev => [newDeck, ...prev]);
+      setShowNewDeckModal(false);
+      setAiDeckTopic("");
+      showToast(appLanguage === "Hindi" ? "🎉 AI फ्लैशकार्ड डेक सफलतापूर्वक जनरेट हो गया!" : "🎉 AI Flashcard Deck generated successfully!", "success");
+      incrementToolkitUsage();
+    } catch (err) {
+      console.error(err);
+      const fallbackDeck = {
+        id: `deck-${Date.now()}`,
+        title: `${topicStr} Deck`,
+        subject: newDeckSubject,
+        createdAt: new Date().toISOString(),
+        cards: [
+          { id: `card-1`, front: `What is ${topicStr}?`, back: `Core fundamental concept in ${newDeckSubject}.`, interval: 1, repetition: 0, easeFactor: 2.5, dueDate: new Date().toISOString() },
+          { id: `card-2`, front: `Key application of ${topicStr}`, back: `Used extensively in examinations and problem solving.`, interval: 1, repetition: 0, easeFactor: 2.5, dueDate: new Date().toISOString() }
+        ]
+      };
+      setFlashcardDecks(prev => [fallbackDeck, ...prev]);
+      setShowNewDeckModal(false);
+      setAiDeckTopic("");
+      showToast(appLanguage === "Hindi" ? "फ्लेशकार्ड डेक सहेजा गया।" : "Flashcard deck created with fallback items.", "success");
+    } finally {
+      setIsAiGeneratingDeck(false);
+    }
+  };
+
+  const handleSpacedRating = (rating: 'again' | 'hard' | 'good' | 'easy') => {
+    const deck = flashcardDecks.find(d => d.id === activeDeckId);
+    if (!deck) return;
+    const card = deck.cards[reviewCardIndex];
+    if (!card) return;
+
+    let newInterval = card.interval;
+    let newRepetition = card.repetition + 1;
+    
+    if (rating === 'again') {
+      newInterval = 1;
+      newRepetition = 0;
+    } else if (rating === 'hard') {
+      newInterval = Math.max(1, Math.round(card.interval * 1.2));
+    } else if (rating === 'good') {
+      newInterval = Math.max(1, Math.round(card.interval * 2.5));
+    } else if (rating === 'easy') {
+      newInterval = Math.max(2, Math.round(card.interval * 4));
+    }
+
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + newInterval);
+
+    const updatedCards = deck.cards.map((c: any) => {
+      if (c.id === card.id) {
+        return { ...c, interval: newInterval, repetition: newRepetition, dueDate: dueDate.toISOString() };
+      }
+      return c;
+    });
+
+    setFlashcardDecks(prev => prev.map(d => d.id === activeDeckId ? { ...d, cards: updatedCards } : d));
+    setIsCardFlipped(false);
+
+    if (reviewCardIndex + 1 < deck.cards.length) {
+      setReviewCardIndex(prev => prev + 1);
+    } else {
+      setIsReviewingDeck(false);
+      showToast(appLanguage === "Hindi" ? "🎯 डेक समीक्षा पूर्ण! शानदार अभ्यास!" : "🎯 Deck review complete! Great active recall session!", "success");
+      if (onAddProgress) {
+        onAddProgress(deck.cards.length, deck.cards.length, deck.subject);
+      }
+    }
+  };
+
   useEffect(() => {
     if (p === "mindmap" && a && a.children) {
       const initialExpanded: Record<string, boolean> = {};
@@ -1461,7 +1606,8 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                     { id: "mindmap", label: "Mind Map", icon: "🌳" },
                     { id: "qpaper", label: "Question Paper", icon: "📄" },
                     { id: "ocr", label: "Vision OCR", icon: "📷" },
-                    { id: "pdf", label: "PDF / Doc", icon: "📂" }
+                    { id: "pdf", label: "PDF / Doc", icon: "📂" },
+                    { id: "flashcards", label: "AI Flashcards", icon: "📇" }
                   ].map((t) => {
                     const isSelected = p === t.id;
                     return (
@@ -1486,7 +1632,70 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                   })}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {p === "flashcards" && (
+                  <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm space-y-6">
+                    {/* Flashcard Header & Actions */}
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200/60 dark:border-slate-800 pb-4">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">📇</span>
+                        <div>
+                          <h2 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white uppercase tracking-tight">
+                            AI Flashcards & Spaced Repetition (Leitner System)
+                          </h2>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                            Create decks from study notes, review with 3D flip cards, and schedule smart recall intervals.
+                          </p>
+                        </div>
+                      </div>
+                      <motion.button
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.96 }}
+                        onClick={() => setShowNewDeckModal(true)}
+                        className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md shadow-indigo-600/25 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Plus size={15} strokeWidth={2.5} />
+                        <span>Create AI Deck ⚡</span>
+                      </motion.button>
+                    </div>
+
+                    {isReviewingDeck && activeDeckId ? (
+                      <FlashcardReviewSession
+                        deck={flashcardDecks.find((d: any) => d.id === activeDeckId)}
+                        reviewCardIndex={reviewCardIndex}
+                        isCardFlipped={isCardFlipped}
+                        setIsCardFlipped={setIsCardFlipped}
+                        setIsReviewingDeck={setIsReviewingDeck}
+                        handleSpacedRating={handleSpacedRating}
+                        Q={Q}
+                      />
+                    ) : (
+                      <FlashcardDecksGrid
+                        flashcardDecks={flashcardDecks}
+                        setFlashcardDecks={setFlashcardDecks}
+                        setActiveDeckId={setActiveDeckId}
+                        setReviewCardIndex={setReviewCardIndex}
+                        setIsCardFlipped={setIsCardFlipped}
+                        setIsReviewingDeck={setIsReviewingDeck}
+                        showToast={showToast}
+                      />
+                    )}
+
+                    <FlashcardNewDeckModal
+                      showNewDeckModal={showNewDeckModal}
+                      setShowNewDeckModal={setShowNewDeckModal}
+                      newDeckSubject={newDeckSubject}
+                      setNewDeckSubject={setNewDeckSubject}
+                      aiDeckTopic={aiDeckTopic}
+                      setAiDeckTopic={setAiDeckTopic}
+                      notes={notes}
+                      isAiGeneratingDeck={isAiGeneratingDeck}
+                      generateAiFlashcardsFromTopic={generateAiFlashcardsFromTopic}
+                    />
+                  </div>
+                )}
+
+                {p !== "flashcards" && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* Left Column: AI Control Parameters */}
                   <motion.div
                     initial={{ opacity: 0, x: -10 }}
@@ -1961,7 +2170,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                                 {(() => {
                                   const raw = a.content || a.summary || a.explanation || a.paperText || a.text || safeJsonStringify(a);
                                   return typeof raw === 'string'
-                                    ? raw.replace(/\\\[([\s\S]*?)\\\]/g, (_m, math) => `\n$$\n${math.trim()}\n$$\n`).replace(/\\\(([\s\S]*?)\\\)/g, (_m, math) => `$${math.trim()}$`)
+                                    ? raw
                                     : String(raw || '');
                                 })()}
                               </ReactMarkdown>
@@ -1994,6 +2203,7 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
                     )}
                   </div>
                 </div>
+              )}
               </motion.div>
             )}
 
@@ -2803,5 +3013,308 @@ const InteractiveToolkit = memo(function InteractiveToolkit({
     </div>
   );
 });
+
+function FlashcardReviewSession({
+  deck,
+  reviewCardIndex,
+  isCardFlipped,
+  setIsCardFlipped,
+  setIsReviewingDeck,
+  handleSpacedRating,
+  Q
+}: any) {
+  if (!deck || !deck.cards || deck.cards.length === 0) {
+    return <div className="p-8 text-center text-slate-500">No cards in this deck.</div>;
+  }
+  const currentCard = deck.cards[reviewCardIndex];
+  const progressPercent = Math.round((reviewCardIndex / deck.cards.length) * 100);
+
+  return (
+    <div className="space-y-6 max-w-2xl mx-auto py-4">
+      <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-black uppercase text-indigo-600 dark:text-indigo-400">{deck.title}</span>
+          <span className="text-[10px] font-mono text-slate-400">({deck.subject})</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-300">
+            Card {reviewCardIndex + 1} of {deck.cards.length}
+          </span>
+          <button
+            onClick={() => setIsReviewingDeck(false)}
+            className="text-xs text-rose-600 dark:text-rose-400 hover:underline font-bold"
+          >
+            Exit Review
+          </button>
+        </div>
+      </div>
+
+      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 h-full transition-all duration-300" style={{ width: `${progressPercent}%` }} />
+      </div>
+
+      <div
+        onClick={() => setIsCardFlipped(!isCardFlipped)}
+        className="min-h-[260px] sm:min-h-[300px] bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-950 text-white rounded-3xl p-8 border-2 border-indigo-500/40 shadow-xl flex flex-col justify-between cursor-pointer transform hover:scale-[1.01] transition-all relative overflow-hidden group"
+      >
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          <span className="text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+            {isCardFlipped ? "Back: Answer 💡" : "Front: Term / Question ❓"}
+          </span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              Q(isCardFlipped ? currentCard.back : currentCard.front);
+            }}
+            className="p-1.5 rounded-lg bg-indigo-900/60 hover:bg-indigo-800 text-indigo-300 transition"
+            title="Listen audio"
+          >
+            <Volume2 size={14} />
+          </button>
+        </div>
+
+        <div className="my-auto text-center space-y-3 px-4">
+          <span className="text-[10px] font-mono font-black uppercase text-indigo-400 tracking-widest block">
+            {isCardFlipped ? "Answer / Definition" : "Active Recall Question"}
+          </span>
+          <h3 className="text-lg sm:text-xl font-extrabold leading-snug tracking-tight text-white">
+            {isCardFlipped ? currentCard.back : currentCard.front}
+          </h3>
+        </div>
+
+        <div className="text-center pt-4 border-t border-indigo-900/60 flex justify-between items-center text-[10px] text-indigo-300 font-bold">
+          <span>Click card anywhere to flip</span>
+          <span className="text-yellow-400 font-mono">Interval: +{currentCard.interval}d</span>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block text-center">
+          Rate your recall difficulty (Leitner Spaced Interval):
+        </span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => handleSpacedRating('again')}
+            className="py-3 px-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-300 rounded-2xl text-xs font-black uppercase tracking-wider transition shadow-xs flex flex-col items-center gap-0.5 cursor-pointer"
+          >
+            <span>Again 🔄</span>
+            <span className="text-[9px] font-normal text-rose-500">1 day interval</span>
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => handleSpacedRating('hard')}
+            className="py-3 px-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-700 dark:text-amber-300 rounded-2xl text-xs font-black uppercase tracking-wider transition shadow-xs flex flex-col items-center gap-0.5 cursor-pointer"
+          >
+            <span>Hard ⚡</span>
+            <span className="text-[9px] font-normal text-amber-500">Short interval</span>
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => handleSpacedRating('good')}
+            className="py-3 px-3 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/60 text-indigo-700 dark:text-indigo-300 rounded-2xl text-xs font-black uppercase tracking-wider transition shadow-xs flex flex-col items-center gap-0.5 cursor-pointer"
+          >
+            <span>Good 👍</span>
+            <span className="text-[9px] font-normal text-indigo-500">Standard interval</span>
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => handleSpacedRating('easy')}
+            className="py-3 px-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 text-emerald-700 dark:text-emerald-300 rounded-2xl text-xs font-black uppercase tracking-wider transition shadow-xs flex flex-col items-center gap-0.5 cursor-pointer"
+          >
+            <span>Easy 🌟</span>
+            <span className="text-[9px] font-normal text-emerald-500">Long interval</span>
+          </motion.button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FlashcardDecksGrid({
+  flashcardDecks,
+  setFlashcardDecks,
+  setActiveDeckId,
+  setReviewCardIndex,
+  setIsCardFlipped,
+  setIsReviewingDeck,
+  showToast
+}: any) {
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="font-black text-xs uppercase text-slate-700 dark:text-slate-300 tracking-wider">
+          Your Revision Decks ({flashcardDecks.length})
+        </h3>
+        <span className="text-[10px] text-slate-400">Powered by Gemini AI & Leitner Spaced Repetition</span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        {flashcardDecks.map((deck: any) => (
+          <motion.div
+            key={deck.id}
+            whileHover={{ y: -2 }}
+            className="p-5 bg-slate-50/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-3xl flex flex-col justify-between space-y-4 shadow-xs"
+          >
+            <div className="space-y-2">
+              <div className="flex justify-between items-start">
+                <span className="px-2.5 py-0.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 rounded-lg text-[9px] font-black uppercase">
+                  {deck.subject}
+                </span>
+                <button
+                  onClick={() => {
+                    setFlashcardDecks((prev: any[]) => prev.filter((d: any) => d.id !== deck.id));
+                    showToast("Deck deleted successfully.", "info");
+                  }}
+                  className="text-slate-400 hover:text-rose-600 p-1 rounded-lg transition"
+                  title="Delete Deck"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+              <h4 className="font-extrabold text-sm text-slate-900 dark:text-white leading-tight">
+                {deck.title}
+              </h4>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                {deck.cards?.length || 0} flashcards ready for recall
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
+              <button
+                onClick={() => {
+                  setActiveDeckId(deck.id);
+                  setReviewCardIndex(0);
+                  setIsCardFlipped(false);
+                  setIsReviewingDeck(true);
+                }}
+                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex justify-center items-center gap-1.5 transition shadow-xs cursor-pointer"
+              >
+                <Play size={13} />
+                <span>Review Deck 🚀</span>
+              </button>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FlashcardNewDeckModal({
+  showNewDeckModal,
+  setShowNewDeckModal,
+  newDeckSubject,
+  setNewDeckSubject,
+  aiDeckTopic,
+  setAiDeckTopic,
+  notes,
+  isAiGeneratingDeck,
+  generateAiFlashcardsFromTopic
+}: any) {
+  if (!showNewDeckModal) return null;
+  return (
+    <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4"
+      >
+        <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
+          <h3 className="font-extrabold text-sm text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+            <Sparkles size={16} className="text-indigo-600" /> Generate AI Flashcard Deck
+          </h3>
+          <button
+            onClick={() => setShowNewDeckModal(false)}
+            className="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg transition"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-[10px] uppercase font-black text-slate-400 tracking-wider mb-1">
+              Subject
+            </label>
+            <select
+              value={newDeckSubject}
+              onChange={(e) => setNewDeckSubject(e.target.value)}
+              className="w-full p-2.5 text-xs border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-medium"
+            >
+              {["Mathematics", "Science", "Biology", "Physics", "Chemistry", "English", "History"].map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[10px] uppercase font-black text-slate-400 tracking-wider mb-1">
+              Study Topic / Chapter / Notes summary
+            </label>
+            <textarea
+              value={aiDeckTopic}
+              onChange={(e) => setAiDeckTopic(e.target.value)}
+              placeholder="e.g. Photosynthesis, Quantum Mechanics, Electrostatics, Cell Division..."
+              className="w-full h-28 p-3 text-xs border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none resize-none font-medium"
+            />
+          </div>
+
+          {notes && notes.length > 0 && (
+            <div className="space-y-1.5">
+              <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider block">Or pick from your study notes:</span>
+              <div className="flex gap-1 flex-wrap max-h-20 overflow-y-auto">
+                {notes.map((note: any, idx: number) => (
+                  <button
+                    key={idx}
+                    onClick={() => setAiDeckTopic(note.title + ": " + (note.content || "").substring(0, 100))}
+                    className="text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/50 px-2.5 py-1 rounded-xl hover:bg-indigo-100 transition truncate max-w-[180px]"
+                  >
+                    📝 {note.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+          <button
+            onClick={() => setShowNewDeckModal(false)}
+            className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition"
+          >
+            Cancel
+          </button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => generateAiFlashcardsFromTopic(aiDeckTopic)}
+            disabled={isAiGeneratingDeck}
+            className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md shadow-indigo-600/25 flex items-center gap-2 cursor-pointer"
+          >
+            {isAiGeneratingDeck ? (
+              <>
+                <Activity className="w-4 h-4 animate-spin text-cyan-200" />
+                <span>Generating Deck...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                <span>Generate Flashcards ⚡</span>
+              </>
+            )}
+          </motion.button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
 
 export default InteractiveToolkit;
