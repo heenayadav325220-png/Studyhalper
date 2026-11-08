@@ -8,36 +8,47 @@ export interface AuthRequest extends Request {
 
 export const requireAuth = async (
   req: AuthRequest,
-  _res: Response,
+  res: Response,
   next: NextFunction
 ): Promise<void> => {
   const authHeader = req.headers.authorization;
   
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split('Bearer ')[1]?.trim();
-    if (token) {
-      try {
-        const decodedToken = await adminAuth.verifyIdToken(token);
-        req.user = decodedToken;
-        next();
-        return;
-      } catch (error) {
-        // Token verification failed (expired/mismatched project) - fallback gracefully to guest mode
-        console.warn('Firebase token verification warning (falling back to guest session):', error);
-      }
-    }
+  if (!authHeader) {
+    res.status(401).json({ error: 'Missing authorization header' });
+    return;
   }
 
-  // Graceful Guest Fallback: never block unauthenticated users with 401!
-  // Assign a session using persistent client x-user-id header or client IP
-  const customUserId = typeof req.headers["x-user-id"] === "string" && req.headers["x-user-id"].trim() ? req.headers["x-user-id"].trim() : null;
-  const forwarded = req.headers["x-forwarded-for"];
-  const clientIp = typeof forwarded === "string" ? forwarded.split(",")[0].trim() : (req.socket.remoteAddress || "127.0.0.1");
-  
-  req.user = {
-    uid: customUserId || `guest_${clientIp.replace(/[^a-zA-Z0-9]/g, '_')}`,
-    firebase: { sign_in_provider: 'anonymous' }
-  } as any;
+  if (!authHeader.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Malformed authorization header' });
+    return;
+  }
 
-  next();
+  const token = authHeader.split('Bearer ')[1]?.trim();
+  if (!token) {
+    res.status(401).json({ error: 'Empty authorization token' });
+    return;
+  }
+
+  try {
+    const decodedToken = await adminAuth.verifyIdToken(token);
+    req.user = decodedToken;
+    next();
+  } catch (error: any) {
+    const errorCode = error?.code || '';
+    const errorMessage = (error?.message || '').toLowerCase();
+
+    if (
+      errorCode === 'auth/network-request-failed' ||
+      errorCode === 'auth/internal-error' ||
+      errorMessage.includes('network') ||
+      errorMessage.includes('timeout') ||
+      errorMessage.includes('unavailable') ||
+      errorMessage.includes('socket')
+    ) {
+      res.status(503).json({ error: 'Authentication service unavailable' });
+      return;
+    }
+
+    res.status(401).json({ error: 'Invalid or expired token' });
+  }
 };
