@@ -27,15 +27,10 @@ import {
   getDocs,
   query,
   where,
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
   signOut, 
-  signInWithGoogle, 
-  sendUserPasswordReset,
-  updateProfile,
   getFriendlyAuthErrorMessage
 } from '../services/firebase';
-import { updateUserProfile } from '../services/firebaseDb';
+import { useAuth } from '../contexts/AuthContext';
 import type { UserProfile } from '../types';
 import type { Language } from '../services/translations';
 
@@ -78,6 +73,7 @@ export default function AuthModal({
 }: AuthModalProps) {
   const isHi = appLanguage === 'hi';
   const isLoggedIn = !!(auth.currentUser && !auth.currentUser.isAnonymous);
+  const { signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword } = useAuth();
 
   // Tab State
   const [currentTab, setCurrentTab] = useState<AuthTab>('signin');
@@ -131,69 +127,19 @@ export default function AuthModal({
       setError(isHi ? 'कृपया ईमेल और पासवर्ड दर्ज करें।' : 'Please enter both email and password.');
       return;
     }
-
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
-
     try {
-      let user: any = null;
-      try {
-        const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
-        user = userCredential.user;
-      } catch (fbErr: any) {
-        console.warn('Firebase direct email signin note:', fbErr?.code || fbErr?.message || fbErr);
-        const code = (fbErr?.code || '').toLowerCase();
-        if (code.includes('wrong-password') || (code.includes('invalid-credential') && !code.includes('operation-not-allowed') && !code.includes('password_login_disabled'))) {
-          const localAcc = localStorage.getItem(`account_${cleanEmail}`);
-          if (localAcc) {
-            try {
-              const parsed = JSON.parse(localAcc);
-              if (parsed.password && parsed.password !== password) {
-                setError(isHi ? 'गलत पासवर्ड। कृपया पुनः प्रयास करें।' : 'Incorrect password. Please try again.');
-                setLoading(false);
-                return;
-              }
-            } catch {}
-          }
-        }
-      }
-
-      const uid = user?.uid || auth.currentUser?.uid || `usr_${btoa(cleanEmail).replace(/=/g, '').substring(0, 16)}`;
-      const displayName = user?.displayName || (userProfile.name && userProfile.name !== 'Student' && userProfile.name !== 'Guest Student' ? userProfile.name : cleanEmail.split('@')[0]);
-
-      const updatedProfile: UserProfile = {
-        ...userProfile,
-        uid: uid,
-        email: user?.email || cleanEmail,
-        name: displayName,
-        authProvider: 'password',
-        isOnboarded: true,
-        lastActive: new Date().toISOString()
-      };
-
-      setUserProfile(updatedProfile);
-      localStorage.setItem('ascend_user_profile', JSON.stringify(updatedProfile));
-      localStorage.setItem(`user_profile_${uid}`, JSON.stringify(updatedProfile));
-      localStorage.setItem(`ascend_onboarded_${uid}`, 'true');
-      localStorage.setItem('ascend_onboarded', 'true');
-
-      // Non-blocking background Firestore sync
-      updateUserProfile(uid, updatedProfile).catch(dbErr => {
-        console.warn('Firestore sync note:', dbErr);
-      });
-
+      await signInWithEmail(cleanEmail, password);
       setSuccessMessage(isHi ? 'सफलतापूर्वक लॉग इन किया गया! 🎉' : 'Logged in successfully! Welcome back 🎉');
-      if (onAuthSuccess) onAuthSuccess(updatedProfile);
-
+      if (onAuthSuccess && userProfile) onAuthSuccess(userProfile);
       setTimeout(() => {
         onClose();
         resetForm();
       }, 700);
     } catch (err: any) {
-      console.warn('Sign In Handled:', err?.code || err?.message || err);
-      const friendly = getFriendlyAuthErrorMessage(err?.code || err?.message || '', appLanguage);
-      setError(friendly);
+      setError(getFriendlyAuthErrorMessage(err?.message || err?.code || '', appLanguage));
     } finally {
       setLoading(false);
     }
@@ -204,168 +150,50 @@ export default function AuthModal({
     e.preventDefault();
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = fullName.trim();
-
     if (!cleanEmail || !password || !cleanName) {
       setError(isHi ? 'कृपया सभी आवश्यक फ़ील्ड भरें।' : 'Please complete all required fields.');
       return;
     }
-
     if (password.length < 6) {
       setError(isHi ? 'पासवर्ड कम से कम 6 अक्षरों का होना चाहिए।' : 'Password must be at least 6 characters.');
       return;
     }
-
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
-
     try {
-      let user: any = null;
-      try {
-        const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
-        user = userCredential.user;
-        try {
-          await updateProfile(user, { displayName: cleanName });
-        } catch (profileErr) {
-          console.warn('Could not set displayName in Auth:', profileErr);
-        }
-      } catch (fbErr: any) {
-        console.warn('Firebase createUser note:', fbErr?.code || fbErr?.message || fbErr);
-        const code = (fbErr?.code || '').toLowerCase();
-        if (code.includes('email-already-in-use')) {
-          try {
-            const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
-            user = userCredential.user;
-          } catch {}
-        }
-      }
-
-      const uid = user?.uid || auth.currentUser?.uid || `usr_${btoa(cleanEmail).replace(/=/g, '').substring(0, 16)}`;
-
-      const updatedProfile: UserProfile = {
-        ...userProfile,
-        uid: uid,
-        email: cleanEmail,
-        name: cleanName,
+      await signUpWithEmail(cleanEmail, password, cleanName, {
         className: selectedClass,
-        targetGoal: selectedGoal,
-        authProvider: 'password',
-        isOnboarded: true,
-        xp: (userProfile.xp || 100) + 150, // Bonus signup XP
-        level: userProfile.level || 1,
-        lastActive: new Date().toISOString()
-      };
-
-      try {
-        localStorage.setItem(`account_${cleanEmail}`, JSON.stringify({
-          email: cleanEmail,
-          password: password,
-          name: cleanName,
-          uid: uid
-        }));
-      } catch {}
-
-      setUserProfile(updatedProfile);
-      localStorage.setItem('ascend_user_profile', JSON.stringify(updatedProfile));
-      localStorage.setItem(`user_profile_${uid}`, JSON.stringify(updatedProfile));
-      localStorage.setItem(`ascend_onboarded_${uid}`, 'true');
-      localStorage.setItem('ascend_onboarded', 'true');
-
-      // Non-blocking background Firestore sync
-      updateUserProfile(uid, updatedProfile).catch(dbErr => {
-        console.warn('Firestore sync note:', dbErr);
+        targetGoal: selectedGoal
       });
-
-      setSuccessMessage(isHi ? 'खाता सफलतापूर्वक बनाया गया! +150 XP बोनस मिला 🚀' : 'Account created successfully! +150 XP bonus earned 🚀');
-      if (onAuthSuccess) onAuthSuccess(updatedProfile);
-
+      setSuccessMessage(isHi ? 'खाता सफलतापूर्वक बनाया गया! +250 XP बोनस मिला 🚀' : 'Account created successfully! +250 XP bonus earned 🚀');
+      if (onAuthSuccess && userProfile) onAuthSuccess(userProfile);
       setTimeout(() => {
         onClose();
         resetForm();
       }, 800);
     } catch (err: any) {
-      console.warn('Sign Up Handled:', err?.code || err?.message || err);
-      const friendly = getFriendlyAuthErrorMessage(err?.code || err?.message || '', appLanguage);
-      setError(friendly);
+      setError(getFriendlyAuthErrorMessage(err?.message || err?.code || '', appLanguage));
     } finally {
       setLoading(false);
     }
   };
 
-  // 3. CONTINUE WITH GOOGLE (FAST, GUARANTEED 1-CLICK AUTH)
+  // 3. CONTINUE WITH GOOGLE
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
-
     try {
-      let user: any = null;
-      try {
-        user = await signInWithGoogle();
-      } catch (googleErr: any) {
-        console.warn('Firebase Google Sign-In note:', googleErr?.code || googleErr?.message || googleErr);
-      }
-
-      const displayName = user?.displayName || (userProfile.name && userProfile.name !== 'Student' && userProfile.name !== 'Guest Student' ? userProfile.name : 'Google Student');
-      const photoURL = user?.photoURL || userProfile.photoURL || undefined;
-      const userEmail = user?.email || (userProfile.email && userProfile.email.includes('@') ? userProfile.email : 'student@gmail.com');
-      const uid = user?.uid || auth.currentUser?.uid || `google_${Math.random().toString(36).substring(2, 10)}`;
-
-      const updatedProfile: UserProfile = {
-        ...userProfile,
-        uid: uid,
-        email: userEmail,
-        name: displayName,
-        photoURL: photoURL,
-        avatar: photoURL || userProfile.avatar || '🧑‍🎓',
-        avatarType: photoURL ? 'personal' : userProfile.avatarType,
-        authProvider: 'google',
-        isOnboarded: true,
-        xp: (userProfile.xp || 100) + 100, // Google sign-in XP bonus
-        lastActive: new Date().toISOString()
-      };
-
-      setUserProfile(updatedProfile);
-      localStorage.setItem('ascend_user_profile', JSON.stringify(updatedProfile));
-      localStorage.setItem(`user_profile_${uid}`, JSON.stringify(updatedProfile));
-      localStorage.setItem(`ascend_onboarded_${uid}`, 'true');
-      localStorage.setItem('ascend_onboarded', 'true');
-
-      // Non-blocking Firestore sync
-      updateUserProfile(uid, updatedProfile).catch(dbErr => {
-        console.warn('Firestore sync note:', dbErr);
-      });
-
-      setSuccessMessage(isHi ? `स्वागत है, ${displayName}! गूगल के साथ प्रमाणित हुआ 🎉` : `Welcome, ${displayName}! Signed in with Google 🎉`);
-      if (onAuthSuccess) onAuthSuccess(updatedProfile);
-
+      await signInWithGoogle();
+      setSuccessMessage(isHi ? 'गूगल के साथ सफलतापूर्वक प्रमाणित हुआ! 🎉' : 'Signed in with Google successfully! 🎉');
+      if (onAuthSuccess && userProfile) onAuthSuccess(userProfile);
       setTimeout(() => {
         onClose();
         resetForm();
       }, 700);
     } catch (err: any) {
-      console.warn('Google Sign-In Fallback Error:', err);
-      const fallbackName = userProfile.name || 'Student';
-      const fallbackUid = userProfile.uid || `google_${Math.random().toString(36).substring(2, 10)}`;
-      const fallbackProfile: UserProfile = {
-        ...userProfile,
-        uid: fallbackUid,
-        email: userProfile.email || 'student@gmail.com',
-        name: fallbackName,
-        authProvider: 'google',
-        isOnboarded: true,
-        xp: (userProfile.xp || 100) + 100,
-        lastActive: new Date().toISOString()
-      };
-      setUserProfile(fallbackProfile);
-      localStorage.setItem('ascend_user_profile', JSON.stringify(fallbackProfile));
-      localStorage.setItem('ascend_onboarded', 'true');
-      setSuccessMessage(isHi ? `स्वागत है, ${fallbackName}! गूगल के साथ प्रमाणित हुआ 🎉` : `Welcome, ${fallbackName}! Signed in with Google 🎉`);
-      if (onAuthSuccess) onAuthSuccess(fallbackProfile);
-      setTimeout(() => {
-        onClose();
-        resetForm();
-      }, 700);
+      setError(getFriendlyAuthErrorMessage(err?.message || err?.code || '', appLanguage));
     } finally {
       setLoading(false);
     }
@@ -379,18 +207,14 @@ export default function AuthModal({
       setError(isHi ? 'कृपया पासवर्ड रीसेट के लिए अपना ईमेल दर्ज करें।' : 'Please enter your email to receive the password reset link.');
       return;
     }
-
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
-
     try {
-      await sendUserPasswordReset(cleanEmail);
+      await resetPassword(cleanEmail);
       setSuccessMessage(isHi ? 'पासवर्ड रीसेट लिंक आपके ईमेल पर भेज दिया गया है।' : 'Password reset link sent to your email. Please check your inbox.');
     } catch (err: any) {
-      console.warn('Password Reset Handled:', err?.message || err);
-      const friendly = getFriendlyAuthErrorMessage(err?.code || err?.message || '', appLanguage);
-      setError(friendly);
+      setError(getFriendlyAuthErrorMessage(err?.message || err?.code || '', appLanguage));
     } finally {
       setLoading(false);
     }

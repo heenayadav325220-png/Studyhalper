@@ -1,41 +1,28 @@
-# Superfast AI Response Optimization & Direct API Streamlining
+# Implementation Plan - Ascend Study Authentication System Hardening
 
-## User Review & Critical Decisions
+## Overview
+Fix and harden the Ascend Study authentication system to ensure robust, real, and trustworthy Firebase Authentication and Firestore data synchronization across Chrome desktop, mobile browsers, and the Android APK/AAB. Remove all fallback mocks and plaintext password storage in localStorage.
 
-> [!IMPORTANT]
-> Based on your preferences, we are optimizing all AI features (AI Tutor, Notes Generator, Summarizer, Quiz, Flashcards, Mindmap, OCR, PDF Scanner) to use direct server-side calls with `gemini-3.8-flash` and `gemini-3.1-flash-lite`, bypassing any unnecessary middleware gateways and enabling lightning-fast response streaming and timeout tuning.
+## Proposed Changes
 
-- **Confirmed Decision 1**: Prioritize ultra-fast `gemini-3.8-flash` and `gemini-3.1-flash-lite` models with direct server-side `@google/genai` SDK invocation.
-- **Confirmed Decision 2**: Streamline API request routing to eliminate overhead and ensure sub-second initial token response times.
+### 1. Security & Cleanup (`localStorage` & Mock Fallbacks)
+- Clear any existing `account_` keys from `localStorage` on app startup.
+- Remove all mock user fabrication in `AuthContext`, `AuthModal`, and service files. Never fake success on failure.
 
----
+### 2. Authentication Flow (`src/contexts/AuthContext.tsx` & `src/services/firebase.ts`)
+- **Email Sign-Up**: If current user is anonymous, upgrade with `linkWithCredential(EmailAuthProvider.credential(email, password))` and update profile displayName. Otherwise, `createUserWithEmailAndPassword`. Handle errors cleanly with bilingual mapping.
+- **Email Sign-In**: Strict `signInWithEmailAndPassword`. Any failure surfaces the error and does not log in.
+- **Google Sign-In**:
+  - Web: `signInWithPopup`, with fallback to `signInWithRedirect` if blocked or unsupported.
+  - Native Android (`Capacitor.isNativePlatform()`): Use `@capacitor-firebase/authentication` plugin (`FirebaseAuthentication.signInWithGoogle()`), extract `idToken`, build `GoogleAuthProvider.credential(idToken)`, and sign in with the Firebase Web SDK.
+  - Link with credential if user is anonymous.
+- **Password Reset & Account Deletion**: Ensure `sendPasswordResetEmail` and account deletion (re-authenticating when required, deleting Auth user + Firestore document) function reliably.
 
-### 1. Overview & Core Concept
+### 3. Firestore Profile Synchronization
+- Ensure user profile documents strictly sync to `users/{auth.currentUser.uid}`.
+- Payload adheres to `firestore.rules` (`isValidUserCreate`: `uid == request.auth.uid`, numeric `xp` and `streak`, NO `role` field).
+- Graceful error handling and retry mechanism for profile sync.
 
-- **What It Does**: Optimizes all AI endpoints in `server.ts` and `src/services/geminiService.ts` to connect directly to Gemini API models with minimal latency, optimized payload serialization, and response streaming.
-- **Key Value**: Delivers instant, superfast responses across the web app and APK for all study tools and AI Tutor chats.
-
-### 2. User Experience & Visual Design
-
-- **Speed & Feedback**: Instant loading skeletons and streaming typing indicators so users perceive zero delay during AI queries.
-- **Reliability**: Robust error handling with graceful offline fallbacks and clear performance indicators.
-
-### 3. Key Product Decisions & Trade-Offs
-
-- **Decision 1**: Direct SDK Routing
-  - *Chosen Approach*: Call `@google/genai` directly on the server without wrapper latency.
-  - *Why*: Eliminates intermediary bottlenecks and speeds up response time.
-
-### 4. Technical Architecture & Data Strategy
-
-```
-┌─────────────────────────┐          ┌─────────────────────────┐          ┌─────────────────────────┐
-│     Client Frontend     │ ───────> │  Express Backend Proxy  │ ───────> │  Google Gemini API      │
-│  (React / Vite / PWA)   │          │  (Direct SDK @google/genai)│        │  (gemini-3.8-flash)     │
-└─────────────────────────┘          └─────────────────────────┘          └─────────────────────────┘
-```
-
-- **Execution Plan**:
-  1. Audit `server.ts` and `src/services/geminiService.ts` to ensure all Gemini calls use `gemini-3.8-flash` / `gemini-3.1-flash-lite` with optimal config (`thinkingLevel: LOW` where appropriate).
-  2. Streamline server proxy routes to handle requests with minimal payload overhead.
-  3. Verify build stability with `compile_applet`.
+### 4. Build & Verification
+- Run `compile_applet` and `lint_applet` to ensure zero TypeScript errors or build issues.
+- Verify sign-up, sign-in, Google auth, and profile persistence flow.

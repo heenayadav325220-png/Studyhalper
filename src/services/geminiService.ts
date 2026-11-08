@@ -427,17 +427,14 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
       } catch (e) {}
     }
 
-    try {
-      const { signInAnonymously } = await import("./firebase");
-      const cred = await signInAnonymously(auth);
-      user = cred.user;
-      const token = await user.getIdToken();
-      cachedAuthToken = { token, expiresAt: Date.now() + 50 * 60 * 1000 };
-      return token;
-    } catch (e: any) {
-      console.warn("⚠️ Anonymous sign-in fallback in safeFetch:", e?.message || e);
-      return "";
+    if (auth.currentUser) {
+      try {
+        const token = await auth.currentUser.getIdToken();
+        cachedAuthToken = { token, expiresAt: Date.now() + 50 * 60 * 1000 };
+        return token;
+      } catch (e) {}
     }
+    return "";
   };
 
   // Define the core fetch promise

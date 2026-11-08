@@ -8,6 +8,10 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  linkWithCredential,
+  EmailAuthProvider,
   updateProfile,
   sendPasswordResetEmail,
   User as FirebaseUser
@@ -184,21 +188,28 @@ export function getFriendlyAuthErrorMessage(errorCodeOrMessage: string, lang: st
   return errorCodeOrMessage || (lang === 'hi' ? 'प्रमाणीकरण विफल रहा।' : 'Authentication failed.');
 }
 
-/**
- * Helper to prevent async network operations from hanging indefinitely (generous fallback)
- */
 export function withTimeout<T>(promise: Promise<T>, _ms: number = 60000, _fallbackMessage: string = 'Operation timed out'): Promise<T> {
   return promise;
 }
 
 /**
- * Sign in with Google Popup using direct standard Firebase Auth
+ * Sign in with Google Popup with fallback to redirect
  */
 export async function signInWithGoogle(): Promise<FirebaseUser> {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  const res = await signInWithPopup(auth, provider);
-  return res.user;
+  try {
+    const res = await signInWithPopup(auth, provider);
+    return res.user;
+  } catch (err: any) {
+    const code = (err?.code || '').toLowerCase();
+    if (code.includes('popup-blocked') || code.includes('popup-closed-by-user') || code.includes('operation-not-supported-in-this-environment') || code.includes('cancelled-popup-request')) {
+      await signInWithRedirect(auth, provider);
+      const res = await getRedirectResult(auth);
+      if (res?.user) return res.user;
+    }
+    throw err;
+  }
 }
 
 /**
@@ -219,6 +230,10 @@ export {
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  linkWithCredential,
+  EmailAuthProvider,
   updateProfile,
   sendPasswordResetEmail,
   collection,

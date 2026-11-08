@@ -4,14 +4,12 @@ import {
   db,
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signInAnonymously,
   signOut, 
   onAuthStateChanged,
   signInWithGoogle as firebaseSignInWithGoogle,
   sendUserPasswordReset,
   updateProfile as firebaseUpdateProfile,
   getFriendlyAuthErrorMessage,
-  withTimeout,
   doc,
   getDoc,
   setDoc,
@@ -59,6 +57,19 @@ const DEFAULT_PROFILE: UserProfile = {
   unlockedBadges: []
 };
 
+// Clean up legacy plaintext password records from localStorage
+if (typeof window !== 'undefined') {
+  try {
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('account_')) {
+        localStorage.removeItem(key);
+      }
+    });
+  } catch (e) {
+    // ignore
+  }
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
@@ -79,22 +90,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let profile: UserProfile = {
       ...DEFAULT_PROFILE,
       uid: user.uid,
-      name: user.isAnonymous ? 'Guest Student' : (user.displayName || user.email?.split('@')[0] || 'Student'),
+      name: user.displayName || user.email?.split('@')[0] || 'Student',
       email: user.email || '',
       photoURL: user.photoURL || undefined,
       avatar: user.photoURL || '🧑‍🎓',
       avatarType: user.photoURL ? 'personal' : 'emoji',
-      authProvider: user.isAnonymous ? 'guest' : (user.providerData?.[0]?.providerId?.includes('google') ? 'google' : 'password'),
+      authProvider: user.providerData?.[0]?.providerId?.includes('google') ? 'google' : 'password',
       lastActive: new Date().toISOString()
     };
 
     try {
-      const snap = await withTimeout(getDoc(userDocRef), 2000, 'getDoc timeout');
+      const snap = await getDoc(userDocRef);
       if (snap.exists()) {
         const data = snap.data() as Partial<UserProfile>;
         let unlocked = Array.isArray(data.unlockedBadges) ? data.unlockedBadges : [];
         if (unlocked.length === 0) {
-          // Migration from localStorage backward compatibility
           try {
             const saved = localStorage.getItem('ascend_celebrated_badges');
             if (saved) {
@@ -112,8 +122,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profile = {
           ...profile,
           ...data,
-          uid: user.uid, // Ensure uid strictly matches
+          uid: user.uid,
           name: data.name || profile.name,
+          email: user.email || data.email || '',
           xp: typeof data.xp === 'number' ? data.xp : 100,
           streak: typeof data.streak === 'number' ? data.streak : 0,
           level: typeof data.level === 'number' ? data.level : 1,
@@ -122,7 +133,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           unlockedBadges: unlocked
         };
 
-        // Non-blocking update lastActive timestamp in Firestore (throttled to once every 15 minutes)
         const lastActiveTime = data.lastActive ? new Date(data.lastActive).getTime() : 0;
         if (Date.now() - lastActiveTime > 15 * 60 * 1000) {
           updateDoc(userDocRef, {
@@ -130,8 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }).catch(() => {});
         }
       } else {
-        // Create initial user document complying with firestore.rules (isValidUser)
-        setDoc(userDocRef, {
+        await setDoc(userDocRef, {
           uid: profile.uid,
           name: profile.name,
           email: profile.email || '',
@@ -148,13 +157,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isOnboarded: profile.isOnboarded || false,
           authProvider: profile.authProvider,
           createdAt: serverTimestamp()
-        }).catch(() => {});
+        }, { merge: true });
       }
     } catch (err) {
-      console.warn('Firestore profile fetch warning (using local fallback):', err);
+      console.warn('Firestore profile fetch/init warning (using local fallback):', err);
     }
 
-    // Persist to localStorage
     try {
       localStorage.setItem('ascend_user_profile', JSON.stringify(profile));
       localStorage.setItem(`user_profile_${user.uid}`, JSON.stringify(profile));
@@ -165,8 +173,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUserProfile(profile);
     return profile;
   };
-
-  const [hasAttemptedAnon, setHasAttemptedAnon] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -179,20 +185,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else {
         setUserProfile(null);
-        if (!hasAttemptedAnon) {
-          setHasAttemptedAnon(true);
-          try {
-            await signInAnonymously(auth);
-          } catch (err: any) {
-            console.warn("⚠️ Anonymous sign-in network/restricted fallback invoked:", err?.message || err);
-          }
-        }
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [hasAttemptedAnon]);
+  }, []);
 
   const signInWithEmail = async (email: string, password: string): Promise<FirebaseUser> => {
     setLoading(true);
@@ -223,61 +221,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const cleanEmail = email.trim().toLowerCase();
       const cleanName = name.trim() || 'Student';
+      let user: FirebaseUser;
+
       const cred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
-      const user = cred.user;
+      user = cred.user;
+
       try {
         await firebaseUpdateProfile(user, { displayName: cleanName });
       } catch (e) {
         console.warn('Could not set displayName:', e);
       }
-      
-      const newProfile: UserProfile = {
-        ...DEFAULT_PROFILE,
+
+      const profile = await fetchOrInitUserProfile(user);
+      const updatedProfile: UserProfile = {
+        ...profile,
         ...extra,
-        uid: user.uid,
         name: cleanName,
         email: cleanEmail,
-        xp: 250, // Welcome signup bonus
-        streak: 0,
-        level: 1,
-        unlockedBadges: [],
-        isOnboarded: true,
         authProvider: 'password',
-        lastActive: new Date().toISOString(),
-        lastStreakDate: ''
+        isOnboarded: true
       };
 
-      // Create profile in Firestore
+      setUserProfile(updatedProfile);
+      localStorage.setItem('ascend_user_profile', JSON.stringify(updatedProfile));
+      localStorage.setItem(`user_profile_${user.uid}`, JSON.stringify(updatedProfile));
+      localStorage.setItem('ascend_onboarded', 'true');
+
       try {
         const userDocRef = doc(db, 'users', user.uid);
-        await setDoc(userDocRef, {
-          uid: newProfile.uid,
-          name: newProfile.name,
-          email: newProfile.email,
-          xp: newProfile.xp,
-          level: newProfile.level,
-          streak: newProfile.streak,
-          petLevel: newProfile.petLevel,
-          petXp: newProfile.petXp,
-          petName: newProfile.petName,
-          language: newProfile.language,
-          lastActive: newProfile.lastActive,
-          lastStreakDate: '',
-          unlockedBadges: [],
+        await updateDoc(userDocRef, {
+          name: cleanName,
+          email: cleanEmail,
           isOnboarded: true,
-          className: newProfile.className || '',
-          targetGoal: newProfile.targetGoal || '',
-          authProvider: 'password',
-          createdAt: serverTimestamp()
+          authProvider: 'password'
         });
-      } catch (err) {
-        console.warn('Initial Firestore write warning:', err);
+      } catch (e) {
+        console.warn('Profile update sync error:', e);
       }
-
-      setUserProfile(newProfile);
-      localStorage.setItem('ascend_user_profile', JSON.stringify(newProfile));
-      localStorage.setItem(`user_profile_${user.uid}`, JSON.stringify(newProfile));
-      localStorage.setItem('ascend_onboarded', 'true');
 
       return user;
     } catch (err: any) {
@@ -294,9 +274,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAuthError(null);
     try {
       const user = await firebaseSignInWithGoogle();
-      if (!user) {
-        throw new Error('Google Sign-In returned empty user.');
-      }
       await fetchOrInitUserProfile(user);
       return user;
     } catch (err: any) {
@@ -315,11 +292,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(null);
       setUserProfile(null);
       localStorage.removeItem('ascend_user_profile');
-      try {
-        await signInAnonymously(auth);
-      } catch (anonErr: any) {
-        console.warn("⚠️ Anonymous sign-in after logout fallback invoked:", anonErr?.message || anonErr);
-      }
     } catch (err: any) {
       const msg = getFriendlyAuthErrorMessage(err?.code || err?.message || '');
       setAuthError(msg);
@@ -349,13 +321,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     let finalData = { ...data };
 
-    // Anti-cheat guard: prevent client-side tampering of massive XP increments
     if (finalData.xp !== undefined && userProfile) {
       const currentXp = userProfile.xp || 0;
       const proposedXp = finalData.xp;
       const diffXp = proposedXp - currentXp;
       if (diffXp > 500) {
-        console.warn(`[Anti-Cheat Alert] Suspicious XP change rejected: proposed +${diffXp} XP (single update limit is 500). Capping at safe max of +500.`);
         finalData.xp = currentXp + 500;
       }
     }

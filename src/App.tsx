@@ -413,7 +413,14 @@ export default function App() {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showMusicModal, setShowMusicModal] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(() => {
+    try {
+      const firstLaunchDone = localStorage.getItem('ascend_first_launch_done') === 'true';
+      return !firstLaunchDone;
+    } catch {
+      return true;
+    }
+  });
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [showProfileCenter, setShowProfileCenter] = useState(false);
   const [quotaUsage, setQuotaUsage] = useState(currentQuotaUsage);
@@ -543,16 +550,7 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
-      if (!user) {
-        // Automatically sign in anonymously so that guest sessions still have secure cryptographically signed tokens!
-        try {
-          const { signInAnonymously } = await import("firebase/auth");
-          await signInAnonymously(auth);
-        } catch (err: any) {
-          console.warn("⚠️ Anonymous sign-in network/restricted fallback invoked:", err?.message || err);
-        }
-      } else if (!user.isAnonymous) {
-        // Authenticated user detected
+      if (user) {
         setUserProfile(prev => {
           const updated: UserProfile = {
             ...prev,
@@ -790,10 +788,14 @@ export default function App() {
     };
   }, []);
 
-  // Onboarding Check - Trigger if profile is not onboarded and name is missing
+  // First-launch check & Onboarding Check
   useEffect(() => {
+    const firstLaunchDone = localStorage.getItem('ascend_first_launch_done') === 'true';
     const isDone = localStorage.getItem(`ascend_onboarded_${userProfile.uid}`) === 'true' || localStorage.getItem('ascend_onboarded') === 'true';
-    if (!isDone && (!userProfile.name || !userProfile.isOnboarded)) {
+
+    if (!firstLaunchDone) {
+      setShowAuthModal(true);
+    } else if (!isDone && (!userProfile.name || !userProfile.isOnboarded)) {
       setShowOnboardingModal(true);
     }
   }, [userProfile.uid, userProfile.isOnboarded, userProfile.name]);
@@ -4114,8 +4116,11 @@ export default function App() {
             appLanguage={appLanguage}
             onAuthSuccess={(newProfile) => {
               setUserProfile(newProfile);
-              if (newProfile && newProfile.email) {
-                setShowAuthModal(false);
+              localStorage.setItem('ascend_first_launch_done', 'true');
+              setShowAuthModal(false);
+              const isDone = localStorage.getItem(`ascend_onboarded_${newProfile.uid}`) === 'true' || localStorage.getItem('ascend_onboarded') === 'true';
+              if (!isDone || !newProfile.name || !newProfile.isOnboarded) {
+                setShowOnboardingModal(true);
               }
             }}
           />
