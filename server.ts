@@ -251,124 +251,51 @@ function getAttachmentCount(body: any): number {
   return count;
 }
 
-interface DailyUsageRecord {
-  aiTutor: number;
-  notes: number;
-  quiz: number;
-  mockExam: number;
-  questionPaper: number;
-  ocr: number;
-  mindmap: number;
-  explainTopic: number;
-  aiEditor: number;
-  other: number;
-  [key: string]: number;
-}
-
-const serverUsageStore = new Map<string, DailyUsageRecord>();
-let firestoreUnavailable = false;
-
-// Periodic cleanup of expired in-memory daily limit records
-setInterval(() => {
-  const todayStr = new Date().toISOString().split("T")[0];
-  for (const key of serverUsageStore.keys()) {
-    if (!key.endsWith(`:${todayStr}`)) {
-      serverUsageStore.delete(key);
-    }
-  }
-}, 6 * 3600 * 1000);
-
-function getOrCreateMemoryUsage(userId: string, dateStr: string): DailyUsageRecord {
-  const key = `${userId}:${dateStr}`;
-  if (!serverUsageStore.has(key)) {
-    serverUsageStore.set(key, {
-      aiTutor: 0,
-      notes: 0,
-      quiz: 0,
-      mockExam: 0,
-      questionPaper: 0,
-      ocr: 0,
-      mindmap: 0,
-      explainTopic: 0,
-      aiEditor: 0,
-      other: 0,
-    });
-  }
-  return serverUsageStore.get(key)!;
-}
 
 async function checkAndIncrementQuota(userId: string, feature: string, increment: boolean = false): Promise<{ allowed: boolean; current: number; limit: number }> {
+  if (!adminDb) {
+    throw new Error("Firestore database service unavailable for quota enforcement.");
+  }
   const dateStr = new Date().toISOString().split("T")[0];
   const limit = AI_LIMITS[feature as keyof typeof AI_LIMITS] || AI_LIMITS.default;
-  const memRecord = getOrCreateMemoryUsage(userId, dateStr);
+  const quotaDocRef = adminDb.collection("usage").doc(userId).collection("daily").doc(dateStr);
+  let allowed = false;
+  let current = 0;
 
-  // If Firestore is available and hasn't permanently failed with 5 NOT_FOUND, attempt Firestore transaction
-  if (!firestoreUnavailable && adminDb) {
-    try {
-      const quotaDocRef = adminDb.collection("usage").doc(userId).collection("daily").doc(dateStr);
-      let allowed = false;
-      let current = 0;
+  await adminDb.runTransaction(async (transaction) => {
+    const doc = await transaction.get(quotaDocRef);
+    const data = doc.data() || {};
+    current = data[feature] || 0;
 
-      await adminDb.runTransaction(async (transaction) => {
-        const doc = await transaction.get(quotaDocRef);
-        const data = doc.data() || {};
-        current = Math.max(data[feature] || 0, memRecord[feature] || 0);
-
-        if (current < limit) {
-          allowed = true;
-          if (increment) {
-            transaction.set(quotaDocRef, { ...data, [feature]: current + 1 }, { merge: true });
-            current += 1;
-            memRecord[feature] = current;
-          }
-        } else {
-          allowed = false;
-        }
-      });
-
-      return { allowed, current, limit };
-    } catch (err: any) {
-      if (!firestoreUnavailable) {
-        console.warn("[Quota Engine] Firestore unavailable (" + (err?.message || err) + "). Switching to authoritative server-side store.");
-        firestoreUnavailable = true;
+    if (current < limit) {
+      allowed = true;
+      if (increment) {
+        transaction.set(quotaDocRef, { ...data, [feature]: current + 1 }, { merge: true });
+        current += 1;
       }
+    } else {
+      allowed = false;
     }
-  }
+  });
 
-  // Authoritative server-side memory enforcement
-  let current = memRecord[feature] || 0;
-  if (current < limit) {
-    if (increment) {
-      memRecord[feature] = current + 1;
-      current += 1;
-    }
-    return { allowed: true, current, limit };
-  } else {
-    return { allowed: false, current, limit };
-  }
+  return { allowed, current, limit };
 }
 
 async function decrementQuota(userId: string, feature: string): Promise<void> {
+  if (!adminDb) return;
   const dateStr = new Date().toISOString().split("T")[0];
-  const memRecord = getOrCreateMemoryUsage(userId, dateStr);
-  if (memRecord[feature] && memRecord[feature] > 0) {
-    memRecord[feature] -= 1;
-  }
-
-  if (!firestoreUnavailable && adminDb) {
-    try {
-      const quotaDocRef = adminDb.collection("usage").doc(userId).collection("daily").doc(dateStr);
-      await adminDb.runTransaction(async (transaction) => {
-        const doc = await transaction.get(quotaDocRef);
-        const data = doc.data() || {};
-        const current = data[feature] || 0;
-        if (current > 0) {
-          transaction.set(quotaDocRef, { ...data, [feature]: current - 1 }, { merge: true });
-        }
-      });
-    } catch (err) {
-      // Ignore Firestore rollback errors as memory store is authoritative
-    }
+  const quotaDocRef = adminDb.collection("usage").doc(userId).collection("daily").doc(dateStr);
+  try {
+    await adminDb.runTransaction(async (transaction) => {
+      const doc = await transaction.get(quotaDocRef);
+      const data = doc.data() || {};
+      const current = data[feature] || 0;
+      if (current > 0) {
+        transaction.set(quotaDocRef, { ...data, [feature]: current - 1 }, { merge: true });
+      }
+    });
+  } catch (err) {
+    console.warn("Error decrementing quota in Firestore:", err);
   }
 }
 
@@ -2014,46 +1941,27 @@ Keep your tone encouraging and educational. Use clear formatting, lists, and mar
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
-      const dateStr = new Date().toISOString().split("T")[0];
-      const memRecord = getOrCreateMemoryUsage(user.uid, dateStr);
-      let usage = { ...memRecord };
-
-      if (!firestoreUnavailable && adminDb) {
-        try {
-          const quotaDocRef = adminDb.collection("usage").doc(user.uid).collection("daily").doc(dateStr);
-          const doc = await quotaDocRef.get();
-          if (doc.exists) {
-            const data = doc.data() || {};
-            usage = {
-              aiTutor: Math.max(data.aiTutor || 0, memRecord.aiTutor || 0),
-              notes: Math.max(data.notes || 0, memRecord.notes || 0),
-              quiz: Math.max(data.quiz || 0, memRecord.quiz || 0),
-              mockExam: Math.max(data.mockExam || 0, memRecord.mockExam || 0),
-              questionPaper: Math.max(data.questionPaper || 0, memRecord.questionPaper || 0),
-              ocr: Math.max(data.ocr || 0, memRecord.ocr || 0),
-              mindmap: Math.max(data.mindmap || 0, memRecord.mindmap || 0),
-              explainTopic: Math.max(data.explainTopic || 0, memRecord.explainTopic || 0),
-              aiEditor: Math.max(data.aiEditor || 0, memRecord.aiEditor || 0),
-              other: Math.max(data.other || 0, memRecord.other || 0),
-            };
-          }
-        } catch (e) {
-          // Graceful fallback to memory store
-        }
+      if (!adminDb) {
+        res.status(503).json({ error: "Quota service unavailable" });
+        return;
       }
-      
+      const dateStr = new Date().toISOString().split("T")[0];
+      const quotaDocRef = adminDb.collection("usage").doc(user.uid).collection("daily").doc(dateStr);
+      const doc = await quotaDocRef.get();
+      const data = doc.exists ? (doc.data() || {}) : {};
+
       const featureKeys = ['aiTutor', 'notes', 'quiz', 'mockExam', 'questionPaper', 'ocr', 'mindmap', 'explainTopic', 'aiEditor', 'other'] as const;
       const safeUsage = {
-        aiTutor: usage.aiTutor || 0,
-        notes: usage.notes || 0,
-        quiz: usage.quiz || 0,
-        mockExam: usage.mockExam || 0,
-        questionPaper: usage.questionPaper || 0,
-        ocr: usage.ocr || 0,
-        mindmap: usage.mindmap || 0,
-        explainTopic: usage.explainTopic || 0,
-        aiEditor: usage.aiEditor || 0,
-        other: usage.other || 0,
+        aiTutor: data.aiTutor || 0,
+        notes: data.notes || 0,
+        quiz: data.quiz || 0,
+        mockExam: data.mockExam || 0,
+        questionPaper: data.questionPaper || 0,
+        ocr: data.ocr || 0,
+        mindmap: data.mindmap || 0,
+        explainTopic: data.explainTopic || 0,
+        aiEditor: data.aiEditor || 0,
+        other: data.other || 0,
       };
 
       const details: Record<string, { used: number; limit: number; remaining: number; percentage: number }> = {};
@@ -2074,7 +1982,7 @@ Keep your tone encouraging and educational. Use clear formatting, lists, and mar
       });
     } catch (error: any) {
       console.error("Get AI usage error:", error);
-      res.status(500).json({ error: "Failed to fetch AI usage stats." });
+      res.status(503).json({ error: "Failed to fetch AI usage stats." });
     }
   });
 
@@ -2087,15 +1995,8 @@ Keep your tone encouraging and educational. Use clear formatting, lists, and mar
         return;
       }
 
-      // 1. Clear in-memory / cache data
-      for (const key of serverUsageStore.keys()) {
-        if (key.startsWith(`${uid}:`)) {
-          serverUsageStore.delete(key);
-        }
-      }
-
-      // 2. Clean Firestore usage records if present
-      if (!firestoreUnavailable && adminDb) {
+      // 1. Clean Firestore usage records if present
+      if (adminDb) {
         try {
           const usageCollections = await adminDb.collection("usage").doc(uid).collection("daily").listDocuments();
           for (const docRef of usageCollections) {
@@ -2107,7 +2008,7 @@ Keep your tone encouraging and educational. Use clear formatting, lists, and mar
         }
       }
 
-      // 3. Delete from Firebase Auth if real user
+      // 2. Delete from Firebase Auth if real user
       if (adminAuth && !uid.startsWith('guest_')) {
         try {
           await adminAuth.deleteUser(uid);

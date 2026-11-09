@@ -1,28 +1,30 @@
-# Implementation Plan - Ascend Study Authentication System Hardening
+# Implementation Plan - Fix AI Usage Quota & Rate-Limit Bypass (QUOTA-01)
 
 ## Overview
-Fix and harden the Ascend Study authentication system to ensure robust, real, and trustworthy Firebase Authentication and Firestore data synchronization across Chrome desktop, mobile browsers, and the Android APK/AAB. Remove all fallback mocks and plaintext password storage in localStorage.
+Eliminate the process-local in-memory quota fallback (`serverUsageStore` / `firestoreUnavailable`) in `server.ts`. When Firestore is unavailable, do not silently grant unlimited AI usage or rely on per-instance memory counters. Instead, return a retryable HTTP 503 Service Unavailable response to enforce robust, multi-instance production quota limits.
 
 ## Proposed Changes
 
-### 1. Security & Cleanup (`localStorage` & Mock Fallbacks)
-- Clear any existing `account_` keys from `localStorage` on app startup.
-- Remove all mock user fabrication in `AuthContext`, `AuthModal`, and service files. Never fake success on failure.
+### 1. Update Quota Enforcement Engine (`server.ts`)
+- Remove `firestoreUnavailable` flag and process-local memory quota store (`serverUsageStore`).
+- In `checkAndIncrementQuota`:
+  - Require Firestore (`adminDb`). If `adminDb` is unavailable or throws a transient network/service error, catch and throw an explicit retryable error (or return `{ allowed: false, error: 'QUOTA_STORAGE_UNAVAILABLE' }`).
+  - Do not fall back to `memRecord` / process-local memory.
+  - Enforce consistent UTC date boundaries (`new Date().toISOString().split('T')[0]`).
+- In `checkDailyLimit`:
+  - If quota check encounters a storage/Firestore error, return HTTP 503 (`{ error: 'Authentication service unavailable' }` or `{ error: 'Quota service temporarily unavailable, please try again.', code: 'QUOTA_STORAGE_UNAVAILABLE' }`).
+  - Ensure authenticated `user.uid` from `req.user` is strictly used (preventing client UID manipulation).
 
-### 2. Authentication Flow (`src/contexts/AuthContext.tsx` & `src/services/firebase.ts`)
-- **Email Sign-Up**: If current user is anonymous, upgrade with `linkWithCredential(EmailAuthProvider.credential(email, password))` and update profile displayName. Otherwise, `createUserWithEmailAndPassword`. Handle errors cleanly with bilingual mapping.
-- **Email Sign-In**: Strict `signInWithEmailAndPassword`. Any failure surfaces the error and does not log in.
-- **Google Sign-In**:
-  - Web: `signInWithPopup`, with fallback to `signInWithRedirect` if blocked or unsupported.
-  - Native Android (`Capacitor.isNativePlatform()`): Use `@capacitor-firebase/authentication` plugin (`FirebaseAuthentication.signInWithGoogle()`), extract `idToken`, build `GoogleAuthProvider.credential(idToken)`, and sign in with the Firebase Web SDK.
-  - Link with credential if user is anonymous.
-- **Password Reset & Account Deletion**: Ensure `sendPasswordResetEmail` and account deletion (re-authenticating when required, deleting Auth user + Firestore document) function reliably.
+### 2. Update Quota Reset & Fetch Endpoints (`server.ts`)
+- In `/api/user/ai-usage` and related endpoints, handle Firestore connection failures gracefully without returning fake zeroed counters or bypassing limits.
 
-### 3. Firestore Profile Synchronization
-- Ensure user profile documents strictly sync to `users/{auth.currentUser.uid}`.
-- Payload adheres to `firestore.rules` (`isValidUserCreate`: `uid == request.auth.uid`, numeric `xp` and `streak`, NO `role` field).
-- Graceful error handling and retry mechanism for profile sync.
+### 3. Add Automated Unit Tests (`src/services/quota.test.ts`)
+- Test normal quota consumption.
+- Test daily quota exhaustion (429 response).
+- Test Firestore unavailable behavior (503 response).
+- Test Firestore recovery.
+- Test attempt to manipulate another user's quota or unauthenticated requests (401 response).
+- Test daily reset date boundary logic.
 
-### 4. Build & Verification
-- Run `compile_applet` and `lint_applet` to ensure zero TypeScript errors or build issues.
-- Verify sign-up, sign-in, Google auth, and profile persistence flow.
+### 4. Verification
+- Run `npm test`, `npm run lint`, and `npm run build`.

@@ -42,16 +42,25 @@ import {
 
 import defaultFirebaseConfig from "../../firebase-applet-config.json";
 
+const getEnv = (key: string) => {
+  try {
+    if (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env[key]) {
+      return (import.meta as any).env[key];
+    }
+  } catch {}
+  return process.env[key];
+};
+
 // Read configuration from environment variables (for Vercel/Production) with fallback to default JSON
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || defaultFirebaseConfig.apiKey,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || defaultFirebaseConfig.authDomain,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || defaultFirebaseConfig.projectId,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || defaultFirebaseConfig.storageBucket,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || defaultFirebaseConfig.messagingSenderId,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || defaultFirebaseConfig.appId,
-  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || (defaultFirebaseConfig as any).databaseURL,
-  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || (defaultFirebaseConfig as any).firestoreDatabaseId
+  apiKey: getEnv('VITE_FIREBASE_API_KEY') || defaultFirebaseConfig.apiKey,
+  authDomain: getEnv('VITE_FIREBASE_AUTH_DOMAIN') || defaultFirebaseConfig.authDomain,
+  projectId: getEnv('VITE_FIREBASE_PROJECT_ID') || defaultFirebaseConfig.projectId,
+  storageBucket: getEnv('VITE_FIREBASE_STORAGE_BUCKET') || defaultFirebaseConfig.storageBucket,
+  messagingSenderId: getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID') || defaultFirebaseConfig.messagingSenderId,
+  appId: getEnv('VITE_FIREBASE_APP_ID') || defaultFirebaseConfig.appId,
+  databaseURL: getEnv('VITE_FIREBASE_DATABASE_URL') || (defaultFirebaseConfig as any).databaseURL,
+  firestoreDatabaseId: getEnv('VITE_FIREBASE_DATABASE_ID') || (defaultFirebaseConfig as any).firestoreDatabaseId
 };
 
 // Initialize Firebase
@@ -137,8 +146,8 @@ export function getFriendlyAuthErrorMessage(errorCodeOrMessage: string, lang: st
   
   if (code.includes('operation-not-allowed') || code.includes('password_login_disabled')) {
     return isHindiMode
-      ? 'प्रमाणीकरण सफल रहा। कृपया प्रतीक्षा करें...'
-      : 'Authenticating your session, please wait...';
+      ? 'यह साइन-इन विधि सक्षम नहीं है। कृपया दूसरी विधि का उपयोग करें।'
+      : 'This sign-in method is not enabled. Please contact support or use another method.';
   }
   if (code.includes('user-not-found') || code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('invalid-login-credentials')) {
     return isHindiMode 
@@ -162,30 +171,40 @@ export function getFriendlyAuthErrorMessage(errorCodeOrMessage: string, lang: st
   }
   if (code.includes('unauthorized-domain')) {
     return isHindiMode 
-      ? 'गूगल प्रमाणीकरण संसाधित हो रहा है...' 
-      : 'Google authentication processing...';
+      ? 'यह डोमेन प्रमाणीकरण के लिए अधिकृत नहीं है।' 
+      : 'This domain is not authorized for authentication in Firebase console.';
   }
   if (code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) {
-    return lang === 'hi' 
+    return isHindiMode 
       ? 'गूगल साइन-इन विंडो बंद कर दी गई थी।' 
       : 'Google Sign-In popup was closed before completing.';
   }
   if (code.includes('popup-blocked')) {
-    return lang === 'hi' 
+    return isHindiMode 
       ? 'ब्राउज़र ने पॉपअप ब्लॉक कर दिया। कृपया पॉपअप की अनुमति दें।' 
       : 'Popup was blocked by your browser. Please allow popups for this site.';
   }
   if (code.includes('network-request-failed')) {
-    return lang === 'hi' 
+    return isHindiMode 
       ? 'इंटरनेट कनेक्शन में समस्या है। कृपया नेटवर्क जांचें।' 
       : 'Network error. Please check your internet connection.';
   }
   if (code.includes('too-many-requests')) {
-    return lang === 'hi' 
+    return isHindiMode 
       ? 'बहुत सारे असफल प्रयास। कृपया थोड़ी देर बाद पुनः प्रयास करें।' 
       : 'Access temporarily blocked due to many failed attempts. Please try again in a few moments.';
   }
-  return errorCodeOrMessage || (lang === 'hi' ? 'प्रमाणीकरण विफल रहा।' : 'Authentication failed.');
+  if (code.includes('account-exists-with-different-credential')) {
+    return isHindiMode
+      ? 'इसी ईमेल पते से एक खाता पहले से मौजूद है।'
+      : 'An account already exists with the same email address but different sign-in credentials.';
+  }
+  if (code.includes('requires-recent-login')) {
+    return isHindiMode
+      ? 'यह संवेदनशील कार्रवाई है जिसके लिए हालिया लॉगिन की आवश्यकता है।'
+      : 'This operation requires recent authentication. Please sign in again and retry.';
+  }
+  return errorCodeOrMessage || (isHindiMode ? 'प्रमाणीकरण विफल रहा।' : 'Authentication failed.');
 }
 
 export function withTimeout<T>(promise: Promise<T>, _ms: number = 60000, _fallbackMessage: string = 'Operation timed out'): Promise<T> {
