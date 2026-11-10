@@ -32,6 +32,7 @@ import {
 import { generateQuiz, shuffleQuizQuestions } from '../services/geminiService';
 import { PersonalLearningService } from '../services/personalLearningService';
 import { showToast } from './Toast';
+import { MultiplayerBattleModal } from './MultiplayerBattleModal';
 import { parseError, logError } from '../utils/errorHandler';
 import { playSuccessChime, triggerHaptic } from '../services/soundEffects';
 import type { Subject, MockExam, UserProfile } from '../types';
@@ -362,6 +363,7 @@ export default function QuizSection({
 }: QuizSectionProps) {
   // Navigation & Step State
   const [viewState, setViewState] = useState<'setup' | 'loading' | 'active' | 'results' | 'history'>('setup');
+  const [isMultiplayerOpen, setIsMultiplayerOpen] = useState(false);
 
   // Loading Progressive steps states
   const [loadingStep, setLoadingStep] = useState(0);
@@ -891,6 +893,26 @@ export default function QuizSection({
                   {QUIZ_LANGUAGES.find(q => q.id === quizLanguage)?.label} - {QUIZ_LANGUAGES.find(q => q.id === quizLanguage)?.description}
                 </span>
               </div>
+            </div>
+
+            {/* MULTIPLAYER BATTLE BANNER */}
+            <div className="mb-6 p-5 bg-gradient-to-r from-indigo-900/40 via-purple-900/30 to-slate-900 border border-indigo-500/30 rounded-2xl flex items-center justify-between shadow-lg">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 rounded-xl bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-300">
+                  <Trophy className="w-6 h-6 animate-bounce" />
+                </div>
+                <div>
+                  <h4 className="text-white font-extrabold text-base">Real-Time Multiplayer Quiz Battle</h4>
+                  <p className="text-slate-300 text-xs mt-0.5">Challenge friends live, answer synchronized questions, and climb global leaderboards!</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsMultiplayerOpen(true)}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition flex items-center space-x-2 shrink-0 border border-indigo-400/30"
+              >
+                <Users className="w-4 h-4" />
+                <span>Play Live Battle</span>
+              </button>
             </div>
 
             {/* SUBJECT PICKER CARDS */}
@@ -2069,6 +2091,7 @@ Ascend Study Buddy • AI-Powered Education`;
         )}
 
       </AnimatePresence>
+      <MultiplayerBattleModal isOpen={isMultiplayerOpen} onClose={() => setIsMultiplayerOpen(false)} onAddXp={onAddXp} />
     </div>
   );
 }

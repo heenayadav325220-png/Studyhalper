@@ -1,30 +1,27 @@
-# Implementation Plan - Fix AI Usage Quota & Rate-Limit Bypass (QUOTA-01)
+# Implementation Plan - Real-Time Multiplayer Study & Quiz Battle System
 
-## Overview
-Eliminate the process-local in-memory quota fallback (`serverUsageStore` / `firestoreUnavailable`) in `server.ts`. When Firestore is unavailable, do not silently grant unlimited AI usage or rely on per-instance memory counters. Instead, return a retryable HTTP 503 Service Unavailable response to enforce robust, multi-instance production quota limits.
+## 1. Overview
+Implement a fully real-time multiplayer Quiz Battle and Shared Study Room system inside Ascend Study co-powered by Firebase Firestore and Gemini AI, with zero alterations to unrelated app UI.
 
-## Proposed Changes
+## 2. Architecture & Data Flow
 
-### 1. Update Quota Enforcement Engine (`server.ts`)
-- Remove `firestoreUnavailable` flag and process-local memory quota store (`serverUsageStore`).
-- In `checkAndIncrementQuota`:
-  - Require Firestore (`adminDb`). If `adminDb` is unavailable or throws a transient network/service error, catch and throw an explicit retryable error (or return `{ allowed: false, error: 'QUOTA_STORAGE_UNAVAILABLE' }`).
-  - Do not fall back to `memRecord` / process-local memory.
-  - Enforce consistent UTC date boundaries (`new Date().toISOString().split('T')[0]`).
-- In `checkDailyLimit`:
-  - If quota check encounters a storage/Firestore error, return HTTP 503 (`{ error: 'Authentication service unavailable' }` or `{ error: 'Quota service temporarily unavailable, please try again.', code: 'QUOTA_STORAGE_UNAVAILABLE' }`).
-  - Ensure authenticated `user.uid` from `req.user` is strictly used (preventing client UID manipulation).
+### Firebase Firestore Collections
+- `quizRooms`: Rooms created by hosts with settings (subject, difficulty, questions, status).
+- `quizRooms/{roomId}/participants`: Real-time participant roster, ready status, and scores.
+- `quizRooms/{roomId}/answers`: Server-validated answer submissions and speed bonus tracking.
+- `studyRooms`: Shared Pomodoro study rooms with synchronized timer state.
 
-### 2. Update Quota Reset & Fetch Endpoints (`server.ts`)
-- In `/api/user/ai-usage` and related endpoints, handle Firestore connection failures gracefully without returning fake zeroed counters or bypassing limits.
+### Backend API Endpoints (`server.ts`)
+- `POST /api/quiz-battle/create`: AI question generation via Gemini + room initialization.
+- `POST /api/quiz-battle/join`: Room code validation and participant entry.
+- `POST /api/quiz-battle/start`: Match start trigger by host.
+- `POST /api/quiz-battle/submit-answer`: Server-side scoring (base points + speed bonus).
+- `POST /api/study-rooms/timer`: Shared Pomodoro timer synchronization.
 
-### 3. Add Automated Unit Tests (`src/services/quota.test.ts`)
-- Test normal quota consumption.
-- Test daily quota exhaustion (429 response).
-- Test Firestore unavailable behavior (503 response).
-- Test Firestore recovery.
-- Test attempt to manipulate another user's quota or unauthenticated requests (401 response).
-- Test daily reset date boundary logic.
+## 3. Frontend Implementation
+- Create `src/components/MultiplayerBattleModal.tsx` maintaining the exact dark ambient theme (slate-950/indigo).
+- Integration into existing dashboard/navigation via a prominent "Multiplayer Quiz Battle & Study Rooms" card/button.
 
-### 4. Verification
-- Run `npm test`, `npm run lint`, and `npm run build`.
+## 4. Verification
+- TypeScript type checking (`tsc --noEmit`).
+- Production build compilation (`npm run build`).

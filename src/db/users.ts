@@ -2,35 +2,9 @@ import { db } from './index.js';
 import { users } from './schema.js';
 import { eq } from 'drizzle-orm';
 
-const memoryUsers = new Map<string, any>();
-
-function getMemoryUser(uid: string, email: string, displayName?: string, photoUrl?: string) {
-  if (!memoryUsers.has(uid)) {
-    memoryUsers.set(uid, {
-      id: Math.floor(Math.random() * 10000) + 1,
-      uid,
-      email,
-      displayName: displayName || email.split('@')[0],
-      photoUrl: photoUrl || '',
-      xp: 0,
-      streak: 0,
-      petLevel: 1,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-  } else {
-    const existing = memoryUsers.get(uid);
-    existing.email = email || existing.email;
-    if (displayName) existing.displayName = displayName;
-    if (photoUrl) existing.photoUrl = photoUrl;
-    existing.updatedAt = new Date();
-  }
-  return memoryUsers.get(uid);
-}
-
 export async function getOrCreateUser(uid: string, email: string, displayName?: string, photoUrl?: string) {
   if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
-    return getMemoryUser(uid, email, displayName, photoUrl);
+    throw new Error("Database is not configured. Data persistence is unavailable.");
   }
   try {
     const result = await db.insert(users)
@@ -51,41 +25,38 @@ export async function getOrCreateUser(uid: string, email: string, displayName?: 
       })
       .returning();
 
+    if (!result || result.length === 0) {
+      throw new Error("User sync returned no result.");
+    }
     return result[0];
-  } catch (error) {
-    console.warn("Database unavailable, falling back to memory store:", error);
-    return getMemoryUser(uid, email, displayName, photoUrl);
+  } catch (error: any) {
+    console.error("Database error in getOrCreateUser:", error);
+    throw new Error(`Database operation failed: ${error?.message || error}`);
   }
 }
 
 export async function getUserProfile(uid: string) {
   if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
-    return memoryUsers.get(uid) || null;
+    throw new Error("Database is not configured. Data persistence is unavailable.");
   }
   try {
     const result = await db.select().from(users).where(eq(users.uid, uid)).limit(1);
     return result[0] || null;
-  } catch (error) {
-    console.warn("Database unavailable, falling back to memory store:", error);
-    return memoryUsers.get(uid) || null;
+  } catch (error: any) {
+    console.error("Database error in getUserProfile:", error);
+    throw new Error(`Database operation failed: ${error?.message || error}`);
   }
 }
 
 export async function updateUserStats(uid: string, xpEarned: number, streak?: number) {
-  // NOTE: Daily streak validation is verified on the frontend using timezone-safe
-  // lastStreakDate comparison to prevent manual farming/forgery before synchronization.
   if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
-    const user = memoryUsers.get(uid);
-    if (!user) return null;
-    user.xp = (user.xp || 0) + xpEarned;
-    if (streak !== undefined) user.streak = streak;
-    user.petLevel = Math.max(1, Math.floor(user.xp / 150) + 1);
-    user.updatedAt = new Date();
-    return user;
+    throw new Error("Database is not configured. Data persistence is unavailable.");
   }
   try {
     const existing = await getUserProfile(uid);
-    if (!existing) return null;
+    if (!existing) {
+      throw new Error("User profile not found for stats update.");
+    }
 
     const newXp = (existing.xp || 0) + xpEarned;
     const newStreak = streak !== undefined ? streak : existing.streak;
@@ -101,17 +72,12 @@ export async function updateUserStats(uid: string, xpEarned: number, streak?: nu
       .where(eq(users.uid, uid))
       .returning();
 
-    return result[0];
-  } catch (error) {
-    console.warn("Database unavailable, falling back to memory store:", error);
-    const user = memoryUsers.get(uid);
-    if (user) {
-      user.xp = (user.xp || 0) + xpEarned;
-      if (streak !== undefined) user.streak = streak;
-      user.petLevel = Math.max(1, Math.floor(user.xp / 150) + 1);
-      user.updatedAt = new Date();
-      return user;
+    if (!result || result.length === 0) {
+      throw new Error("User stats update failed.");
     }
-    return null;
+    return result[0];
+  } catch (error: any) {
+    console.error("Database error in updateUserStats:", error);
+    throw new Error(`Database write failed: ${error?.message || error}`);
   }
 }

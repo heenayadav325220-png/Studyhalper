@@ -2,12 +2,10 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema.js';
 
-// Add global connection pool caching to persist across hot-reloads
 declare global {
   var _postgresPool: Pool | undefined;
 }
 
-// Function to create or retrieve the connection pool.
 export const createPool = () => {
   if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
     return null;
@@ -23,7 +21,6 @@ export const createPool = () => {
       connectionTimeoutMillis: 15000,
     });
 
-    // Prevent unhandled pool-level errors from crashing the application
     global._postgresPool.on('error', (err) => {
       console.error('Unexpected error on idle SQL pool client:', err);
     });
@@ -31,7 +28,6 @@ export const createPool = () => {
   return global._postgresPool;
 };
 
-// Create or retrieve the pool instance and initialize Drizzle with resilient mock fallback
 const pool = createPool();
 
 let dbInstance: any;
@@ -39,32 +35,19 @@ if (pool) {
   try {
     dbInstance = drizzle(pool, { schema });
   } catch (err) {
-    console.warn('[AI Studio] Database connection error — using mock proxy:', err);
-    const noOp = {
-      findMany: async () => [],
-      findFirst: async () => null,
-      findUnique: async () => null,
-      create: async (d: any) => d?.data ?? {},
-      update: async (d: any) => d?.data ?? {},
-      delete: async () => ({}),
-    };
+    console.warn('[AI Studio] Database connection error:', err);
     dbInstance = new Proxy({}, {
-      get: (_, prop) => prop === 'query' ? new Proxy({}, { get: () => noOp }) : async () => [],
+      get: () => {
+        throw new Error("Database connection is unavailable. Persistence failed.");
+      }
     });
   }
 } else {
-  const noOp = {
-    findMany: async () => [],
-    findFirst: async () => null,
-    findUnique: async () => null,
-    create: async (d: any) => d?.data ?? {},
-    update: async (d: any) => d?.data ?? {},
-    delete: async () => ({}),
-  };
   dbInstance = new Proxy({}, {
-    get: (_, prop) => prop === 'query' ? new Proxy({}, { get: () => noOp }) : async () => [],
+    get: () => {
+      throw new Error("Database connection is not configured. Persistence failed.");
+    }
   });
 }
 
 export const db = dbInstance;
-

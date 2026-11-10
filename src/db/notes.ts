@@ -2,36 +2,21 @@ import { db } from './index.js';
 import { notes, studySessions, mockExams } from './schema.js';
 import { eq, desc, and } from 'drizzle-orm';
 
-const memoryNotes: any[] = [];
-const memoryStudySessions: any[] = [];
-const memoryMockExams: any[] = [];
-
 export async function getUserNotes(uid: string) {
   if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
-    return memoryNotes.filter(n => n.uid === uid).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+    throw new Error("Database is not configured. Data persistence is unavailable.");
   }
   try {
     return await db.select().from(notes).where(eq(notes.uid, uid)).orderBy(desc(notes.updatedAt));
-  } catch (error) {
-    console.warn("Database unavailable, falling back to memory notes:", error);
-    return memoryNotes.filter(n => n.uid === uid).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  } catch (error: any) {
+    console.error("Database error in getUserNotes:", error);
+    throw new Error(`Database operation failed: ${error?.message || error}`);
   }
 }
 
 export async function createNote(uid: string, title: string, content: string, subject: string, tags?: string) {
   if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
-    const newNote = {
-      id: Math.floor(Math.random() * 10000) + 1,
-      uid,
-      title,
-      content,
-      subject,
-      tags: tags || '',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    memoryNotes.push(newNote);
-    return newNote;
+    throw new Error("Database is not configured. Data persistence is unavailable.");
   }
   try {
     const result = await db.insert(notes)
@@ -43,62 +28,37 @@ export async function createNote(uid: string, title: string, content: string, su
         tags: tags || '',
       })
       .returning();
+    if (!result || result.length === 0) {
+      throw new Error("Note insert returned no result.");
+    }
     return result[0];
-  } catch (error) {
-    console.warn("Database unavailable, falling back to memory notes:", error);
-    const newNote = {
-      id: Math.floor(Math.random() * 10000) + 1,
-      uid,
-      title,
-      content,
-      subject,
-      tags: tags || '',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    memoryNotes.push(newNote);
-    return newNote;
+  } catch (error: any) {
+    console.error("Database error in createNote:", error);
+    throw new Error(`Database write failed: ${error?.message || error}`);
   }
 }
 
 export async function deleteNote(id: number, uid: string) {
   if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
-    const idx = memoryNotes.findIndex(n => n.id === id && n.uid === uid);
-    if (idx !== -1) {
-      const deleted = memoryNotes.splice(idx, 1);
-      return deleted[0];
-    }
-    return { id };
+    throw new Error("Database is not configured. Data persistence is unavailable.");
   }
   try {
     const result = await db.delete(notes)
       .where(and(eq(notes.id, id), eq(notes.uid, uid)))
       .returning();
-    return result[0];
-  } catch (error) {
-    console.warn("Database unavailable, falling back to memory notes:", error);
-    const idx = memoryNotes.findIndex(n => n.id === id && n.uid === uid);
-    if (idx !== -1) {
-      const deleted = memoryNotes.splice(idx, 1);
-      return deleted[0];
+    if (!result || result.length === 0) {
+      throw new Error("Note not found or could not be deleted.");
     }
-    return { id };
+    return result[0];
+  } catch (error: any) {
+    console.error("Database error in deleteNote:", error);
+    throw new Error(`Database delete failed: ${error?.message || error}`);
   }
 }
 
 export async function logStudySession(uid: string, subject: string, durationMinutes: number, topic?: string, xpEarned: number = 25) {
   if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
-    const session = {
-      id: Math.floor(Math.random() * 10000) + 1,
-      uid,
-      subject,
-      durationMinutes,
-      topic: topic || '',
-      xpEarned,
-      createdAt: new Date(),
-    };
-    memoryStudySessions.push(session);
-    return session;
+    throw new Error("Database is not configured. Data persistence is unavailable.");
   }
   try {
     const result = await db.insert(studySessions)
@@ -110,36 +70,19 @@ export async function logStudySession(uid: string, subject: string, durationMinu
         xpEarned,
       })
       .returning();
+    if (!result || result.length === 0) {
+      throw new Error("Study session log failed.");
+    }
     return result[0];
-  } catch (error) {
-    console.warn("Database unavailable, falling back to memory study sessions:", error);
-    const session = {
-      id: Math.floor(Math.random() * 10000) + 1,
-      uid,
-      subject,
-      durationMinutes,
-      topic: topic || '',
-      xpEarned,
-      createdAt: new Date(),
-    };
-    memoryStudySessions.push(session);
-    return session;
+  } catch (error: any) {
+    console.error("Database error in logStudySession:", error);
+    throw new Error(`Database write failed: ${error?.message || error}`);
   }
 }
 
 export async function logMockExam(uid: string, subject: string, score: number, totalQuestions: number, details?: string) {
   if (!process.env.SQL_HOST && !process.env.DATABASE_URL) {
-    const exam = {
-      id: Math.floor(Math.random() * 10000) + 1,
-      uid,
-      subject,
-      score,
-      totalQuestions,
-      details: details || '',
-      createdAt: new Date(),
-    };
-    memoryMockExams.push(exam);
-    return exam;
+    throw new Error("Database is not configured. Data persistence is unavailable.");
   }
   try {
     const result = await db.insert(mockExams)
@@ -151,19 +94,12 @@ export async function logMockExam(uid: string, subject: string, score: number, t
         details: details || '',
       })
       .returning();
+    if (!result || result.length === 0) {
+      throw new Error("Mock exam log failed.");
+    }
     return result[0];
-  } catch (error) {
-    console.warn("Database unavailable, falling back to memory mock exams:", error);
-    const exam = {
-      id: Math.floor(Math.random() * 10000) + 1,
-      uid,
-      subject,
-      score,
-      totalQuestions,
-      details: details || '',
-      createdAt: new Date(),
-    };
-    memoryMockExams.push(exam);
-    return exam;
+  } catch (error: any) {
+    console.error("Database error in logMockExam:", error);
+    throw new Error(`Database write failed: ${error?.message || error}`);
   }
 }
