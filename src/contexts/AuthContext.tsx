@@ -160,14 +160,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }, { merge: true });
       }
     } catch (err) {
-      console.warn('Firestore profile fetch/init warning (using local fallback):', err);
+      console.debug('Firestore profile fetch/init warning (using local fallback):', err);
     }
 
     try {
       localStorage.setItem('ascend_user_profile', JSON.stringify(profile));
       localStorage.setItem(`user_profile_${user.uid}`, JSON.stringify(profile));
     } catch (e) {
-      console.warn('LocalStorage save error:', e);
+      console.debug('LocalStorage save error:', e);
     }
 
     setUserProfile(profile);

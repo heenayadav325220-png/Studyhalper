@@ -6,7 +6,7 @@ if (typeof window !== "undefined") {
   try {
     analytics = getAnalytics(app);
   } catch (e) {
-    console.warn("Firebase Analytics initialization skipped or failed:", e);
+    console.debug("Firebase Analytics initialization skipped or failed:", e);
   }
 }
 

@@ -1,19 +1,12 @@
 import { 
   db, 
-  auth, 
   collection, 
   doc, 
-  setDoc, 
-  getDoc, 
-  getDocs, 
-  updateDoc, 
   onSnapshot, 
   query, 
-  where, 
-  orderBy, 
-  limit 
+  orderBy 
 } from './firebase';
-import { API_BASE } from '../config/apiConfig';
+import { safeFetch } from './geminiService';
 
 export interface QuizRoom {
   id: string;
@@ -55,16 +48,7 @@ export interface StudyRoom {
   createdAt: string;
 }
 
-async function getAuthToken(): Promise<string | null> {
-  if (!auth.currentUser) return null;
-  try {
-    return await auth.currentUser.getIdToken();
-  } catch (err) {
-    return null;
-  }
-}
-
-// 1. Create Quiz Room via Backend (triggers Gemini AI question generation)
+// 1. Create Quiz Room via Backend using safeFetch
 export async function createQuizRoomApi(params: {
   subject: string;
   topic: string;
@@ -72,12 +56,10 @@ export async function createQuizRoomApi(params: {
   questionCount: number;
   language: string;
 }): Promise<QuizRoom> {
-  const token = await getAuthToken();
-  const res = await fetch(`${API_BASE}/api/quiz-battle/create`, {
+  const res = await safeFetch("/api/quiz-battle/create", {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     },
     body: JSON.stringify(params)
   });
@@ -91,12 +73,10 @@ export async function createQuizRoomApi(params: {
 
 // 2. Join Quiz Room
 export async function joinQuizRoomApi(roomCode: string): Promise<{ room: QuizRoom; participant: QuizParticipant }> {
-  const token = await getAuthToken();
-  const res = await fetch(`${API_BASE}/api/quiz-battle/join`, {
+  const res = await safeFetch("/api/quiz-battle/join", {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     },
     body: JSON.stringify({ roomCode })
   });
@@ -110,12 +90,10 @@ export async function joinQuizRoomApi(roomCode: string): Promise<{ room: QuizRoo
 
 // 3. Start Match (Host only)
 export async function startQuizMatchApi(roomId: string): Promise<void> {
-  const token = await getAuthToken();
-  const res = await fetch(`${API_BASE}/api/quiz-battle/start`, {
+  const res = await safeFetch("/api/quiz-battle/start", {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     },
     body: JSON.stringify({ roomId })
   });
@@ -132,12 +110,10 @@ export async function submitQuizAnswerApi(params: {
   selectedOption: number;
   responseTimeMs: number;
 }): Promise<{ isCorrect: boolean; correctOption: number; pointsEarned: number; newScore: number }> {
-  const token = await getAuthToken();
-  const res = await fetch(`${API_BASE}/api/quiz-battle/submit-answer`, {
+  const res = await safeFetch("/api/quiz-battle/submit-answer", {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     },
     body: JSON.stringify(params)
   });

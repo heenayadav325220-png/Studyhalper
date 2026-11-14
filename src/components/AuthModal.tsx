@@ -88,6 +88,7 @@ export default function AuthModal({
   
   // UI States
   const [loading, setLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -99,6 +100,7 @@ export default function AuthModal({
       setCurrentTab(hasFirebaseUser ? 'profile' : 'signin');
       setError(null);
       setSuccessMessage(null);
+      setIsSuccess(false);
       setShowDeleteConfirm(false);
     }
   }, [isOpen]);
@@ -111,11 +113,13 @@ export default function AuthModal({
     setFullName('');
     setError(null);
     setSuccessMessage(null);
+    setIsSuccess(false);
   };
 
   const handleTabChange = (tab: AuthTab) => {
     setError(null);
     setSuccessMessage(null);
+    setIsSuccess(false);
     setCurrentTab(tab);
   };
 
@@ -132,6 +136,7 @@ export default function AuthModal({
     setSuccessMessage(null);
     try {
       await signInWithEmail(cleanEmail, password);
+      setIsSuccess(true);
       setSuccessMessage(isHi ? 'सफलतापूर्वक लॉग इन किया गया! 🎉' : 'Logged in successfully! Welcome back 🎉');
       if (onAuthSuccess && userProfile) onAuthSuccess(userProfile);
       setTimeout(() => {
@@ -166,6 +171,7 @@ export default function AuthModal({
         className: selectedClass,
         targetGoal: selectedGoal
       });
+      setIsSuccess(true);
       setSuccessMessage(isHi ? 'खाता सफलतापूर्वक बनाया गया! +250 XP बोनस मिला 🚀' : 'Account created successfully! +250 XP bonus earned 🚀');
       if (onAuthSuccess && userProfile) onAuthSuccess(userProfile);
       setTimeout(() => {
@@ -186,6 +192,7 @@ export default function AuthModal({
     setSuccessMessage(null);
     try {
       await signInWithGoogle();
+      setIsSuccess(true);
       setSuccessMessage(isHi ? 'गूगल के साथ सफलतापूर्वक प्रमाणित हुआ! 🎉' : 'Signed in with Google successfully! 🎉');
       if (onAuthSuccess && userProfile) onAuthSuccess(userProfile);
       setTimeout(() => {
@@ -585,11 +592,21 @@ export default function AuthModal({
 
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-600 text-white font-extrabold text-xs rounded-xl shadow-lg transition flex items-center justify-center space-x-2 cursor-pointer active:scale-98 disabled:opacity-50"
+                  disabled={loading || isSuccess}
+                  className={`w-full py-3 text-white font-extrabold text-xs rounded-xl shadow-lg transition flex items-center justify-center space-x-2 cursor-pointer active:scale-98 disabled:opacity-50 ${
+                    isSuccess ? 'bg-emerald-600' : 'bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-600'
+                  }`}
                 >
-                  {loading ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  {isSuccess ? (
+                    <>
+                      <CheckCircle className="w-4 h-4 text-white" />
+                      <span>{isHi ? 'सफल! स्वागत है 🎉' : 'Success! Welcome 🎉'}</span>
+                    </>
+                  ) : loading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>{isHi ? 'प्रक्रिया जारी है...' : 'Processing...'}</span>
+                    </>
                   ) : (
                     <>
                       <span>{isHi ? 'लॉग इन करें' : 'Sign In'}</span>
@@ -746,11 +763,21 @@ export default function AuthModal({
 
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-full mt-2 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-lg transition flex items-center justify-center space-x-2 cursor-pointer active:scale-98 disabled:opacity-50"
+                  disabled={loading || isSuccess}
+                  className={`w-full mt-2 py-3 text-white font-extrabold text-xs rounded-xl shadow-lg transition flex items-center justify-center space-x-2 cursor-pointer active:scale-98 disabled:opacity-50 ${
+                    isSuccess ? 'bg-emerald-600' : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500'
+                  }`}
                 >
-                  {loading ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  {isSuccess ? (
+                    <>
+                      <CheckCircle className="w-4 h-4 text-white" />
+                      <span>{isHi ? 'खाता बन गया! स्वागत है 🚀' : 'Account Created! Welcome 🚀'}</span>
+                    </>
+                  ) : loading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>{isHi ? 'खाता बन रहा है...' : 'Creating Account...'}</span>
+                    </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4" />

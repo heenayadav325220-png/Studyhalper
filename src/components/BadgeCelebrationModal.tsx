@@ -56,7 +56,7 @@ export function BadgeCelebrationModal({
         playChime(0.2, 783.99, 'triangle'); // G5
         playChime(0.3, 1046.50, 'sine');  // C6
       } catch (err) {
-        console.warn("Audio context not supported", err);
+        console.debug("Audio context not supported", err);
       }
     }
   }, [badge]);

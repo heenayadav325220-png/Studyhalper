@@ -11,7 +11,7 @@ import {
   QuizParticipant
 } from '../services/multiplayerService';
 import { useAuth } from '../context/AuthContext';
-import { Trophy, Users, Play, Copy, Check, ArrowLeft, Clock, Award, Sparkles, ShieldCheck, Share2 } from 'lucide-react';
+import { Trophy, Users, Play, Copy, Check, ArrowLeft, Clock, Award, Sparkles } from 'lucide-react';
 
 interface MultiplayerBattleModalProps {
   isOpen: boolean;
@@ -20,7 +20,7 @@ interface MultiplayerBattleModalProps {
 }
 
 export const MultiplayerBattleModal: React.FC<MultiplayerBattleModalProps> = ({ isOpen, onClose, onAddXp }) => {
-  const { user } = useAuth();
+  const { currentUser } = useAuth();
   const [view, setView] = useState<'menu' | 'create' | 'join' | 'lobby' | 'battle' | 'results'>('menu');
   const [subject, setSubject] = useState('Physics');
   const [topic, setTopic] = useState('Mechanics & Kinematics');
@@ -164,7 +164,7 @@ export const MultiplayerBattleModal: React.FC<MultiplayerBattleModalProps> = ({ 
   if (!isOpen) return null;
 
   const currentQuestion = activeRoom?.questions?.[currentQuestionIndex];
-  const isHost = activeRoom?.hostId === user?.uid;
+  const isHost = activeRoom?.hostId === currentUser?.uid;
 
   return (
     <AnimatePresence>

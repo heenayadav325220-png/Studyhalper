@@ -1,33 +1,14 @@
-import { auth } from './firebase';
-import { API_BASE } from '../config/apiConfig';
+import { safeFetch } from './geminiService';
 
-// Get current user auth token
-async function getAuthToken(): Promise<string | null> {
-  if (!auth.currentUser) return null;
-  try {
-    return await auth.currentUser.getIdToken();
-  } catch (err) {
-    console.warn("Failed to get ID token:", err);
-    return null;
-  }
-}
-
-// Sync user account with Cloud SQL
+// Sync user account with Cloud SQL using safeFetch
 export async function syncUserWithSql(displayName?: string, photoUrl?: string) {
-  const token = await getAuthToken();
-  if (!token) return null;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
-    const res = await fetch(`${API_BASE}/api/user/sync`, {
+    const res = await safeFetch("/api/user/sync", {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ displayName, photoUrl }),
-      signal: controller.signal,
     });
     if (res.ok) {
       const data = await res.json();
@@ -35,23 +16,15 @@ export async function syncUserWithSql(displayName?: string, photoUrl?: string) {
     }
   } catch (err) {
     console.warn('SQL User sync notice:', err);
-  } finally {
-    clearTimeout(timeoutId);
   }
   return null;
 }
 
 // Fetch user profile & stats from Cloud SQL
 export async function fetchSqlUserProfile() {
-  const token = await getAuthToken();
-  if (!token) return null;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
-    const res = await fetch(`${API_BASE}/api/user/profile`, {
-      headers: { 'Authorization': `Bearer ${token}` },
-      signal: controller.signal,
+    const res = await safeFetch("/api/user/profile", {
+      headers: { 'Content-Type': 'application/json' },
     });
     if (res.ok) {
       const data = await res.json();
@@ -59,64 +32,44 @@ export async function fetchSqlUserProfile() {
     }
   } catch (err) {
     console.warn('SQL fetch profile notice:', err);
-  } finally {
-    clearTimeout(timeoutId);
   }
   return null;
 }
 
 // Save study session in Cloud SQL
 export async function logSqlStudySession(subject: string, durationMinutes: number, topic?: string, xpEarned: number = 25) {
-  const token = await getAuthToken();
-  if (!token) return null;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
-    const res = await fetch(`${API_BASE}/api/study-sessions`, {
+    const res = await safeFetch("/api/study-sessions", {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ subject, durationMinutes, topic, xpEarned }),
-      signal: controller.signal,
     });
     if (res.ok) {
       return await res.json();
     }
   } catch (err) {
     console.warn('SQL study session log notice:', err);
-  } finally {
-    clearTimeout(timeoutId);
   }
   return null;
 }
 
 // Save mock exam result in Cloud SQL
 export async function logSqlMockExam(subject: string, score: number, totalQuestions: number, details?: string) {
-  const token = await getAuthToken();
-  if (!token) return null;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
-    const res = await fetch(`${API_BASE}/api/mock-exams`, {
+    const res = await safeFetch("/api/mock-exams", {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ subject, score, totalQuestions, details }),
-      signal: controller.signal,
     });
     if (res.ok) {
       return await res.json();
     }
   } catch (err) {
     console.warn('SQL mock exam log notice:', err);
-  } finally {
-    clearTimeout(timeoutId);
   }
   return null;
 }

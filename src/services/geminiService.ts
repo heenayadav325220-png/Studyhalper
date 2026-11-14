@@ -390,7 +390,7 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
       return cachedAuthToken.token;
     }
 
-    const { auth } = await import("./firebase");
+    const { auth, signInAnonymously } = await import("./firebase");
     
     let user = auth.currentUser;
     if (user) {
@@ -415,7 +415,7 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
           unsubscribe();
           resolve(null);
         }
-      }, 800);
+      }, 4000);
     });
 
     user = await waitForAuthUser();
@@ -427,6 +427,17 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
       } catch (e) {}
     }
 
+    if (!auth.currentUser) {
+      try {
+        const anonCred = await signInAnonymously(auth);
+        const token = await anonCred.user.getIdToken();
+        cachedAuthToken = { token, expiresAt: Date.now() + 50 * 60 * 1000 };
+        return token;
+      } catch (e) {
+        console.warn("Anonymous sign-in fallback failed:", e);
+      }
+    }
+
     if (auth.currentUser) {
       try {
         const token = await auth.currentUser.getIdToken();
@@ -434,7 +445,9 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
         return token;
       } catch (e) {}
     }
-    return "";
+    const fallbackToken = `ascend_fallback_${getPersistentUserId()}`;
+    cachedAuthToken = { token: fallbackToken, expiresAt: Date.now() + 50 * 60 * 1000 };
+    return fallbackToken;
   };
 
   // Define the core fetch promise
