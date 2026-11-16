@@ -84,7 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // Sync profile with Firestore & LocalStorage
+  // Sync profile with Firestore & LocalStorage with timeout protection
   const fetchOrInitUserProfile = async (user: FirebaseUser): Promise<UserProfile> => {
     const userDocRef = doc(db, 'users', user.uid);
     let profile: UserProfile = {
@@ -99,8 +99,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       lastActive: new Date().toISOString()
     };
 
+    const withTimeout = async <T,>(promise: Promise<T>, ms = 3500): Promise<T> => {
+      let timeoutId: any;
+      const timeoutPromise = new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Firestore timeout')), ms);
+      });
+      try {
+        const result = await Promise.race([promise, timeoutPromise]);
+        clearTimeout(timeoutId);
+        return result;
+      } catch (err) {
+        clearTimeout(timeoutId);
+        throw err;
+      }
+    };
+
     try {
-      const snap = await getDoc(userDocRef);
+      const snap = await withTimeout(getDoc(userDocRef));
       if (snap.exists()) {
         const data = snap.data() as Partial<UserProfile>;
         let unlocked = Array.isArray(data.unlockedBadges) ? data.unlockedBadges : [];
@@ -114,9 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 updateDoc(userDocRef, { unlockedBadges: unlocked }).catch(() => {});
               }
             }
-          } catch (e) {
-            console.warn('Local storage badge migration warning:', e);
-          }
+          } catch (e) {}
         }
 
         profile = {
@@ -132,15 +145,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           lastStreakDate: data.lastStreakDate || '',
           unlockedBadges: unlocked
         };
-
-        const lastActiveTime = data.lastActive ? new Date(data.lastActive).getTime() : 0;
-        if (Date.now() - lastActiveTime > 15 * 60 * 1000) {
-          updateDoc(userDocRef, {
-            lastActive: new Date().toISOString()
-          }).catch(() => {});
-        }
       } else {
-        await setDoc(userDocRef, {
+        await withTimeout(setDoc(userDocRef, {
           uid: profile.uid,
           name: profile.name,
           email: profile.email || '',
@@ -157,18 +163,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isOnboarded: profile.isOnboarded || false,
           authProvider: profile.authProvider,
           createdAt: serverTimestamp()
-        }, { merge: true });
+        }, { merge: true }));
       }
     } catch (err) {
-      console.debug('Firestore profile fetch/init warning (using local fallback):', err);
+      console.debug('Firestore profile fetch/init fallback used:', err);
     }
 
     try {
       localStorage.setItem('ascend_user_profile', JSON.stringify(profile));
       localStorage.setItem(`user_profile_${user.uid}`, JSON.stringify(profile));
-    } catch (e) {
-      console.debug('LocalStorage save error:', e);
-    }
+    } catch (e) {}
 
     setUserProfile(profile);
     return profile;
