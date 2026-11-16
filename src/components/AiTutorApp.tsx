@@ -1142,6 +1142,7 @@ export const AiTutorApp = memo(function AiTutorApp({
 
 
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [showTopRightMenu, setShowTopRightMenu] = useState(false);
   const topRightMenuRef = useRef<HTMLDivElement>(null);
 
@@ -3957,6 +3958,28 @@ export const AiTutorApp = memo(function AiTutorApp({
 
                 <div className="space-y-2">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                    Global Ranking & Community
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setShowLeaderboardModal(true);
+                    }}
+                    className="p-3 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-2xl transition text-left flex items-center space-x-2.5 w-full cursor-pointer"
+                  >
+                    <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+                      <Trophy className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-amber-300 block">Live XP Leaderboard</span>
+                      <span className="text-[9px] text-amber-200/70">Top registered students live</span>
+                    </div>
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
                     Math & Formula Tools
                   </span>
                   <div className="grid grid-cols-2 gap-2">
@@ -4640,6 +4663,12 @@ export const AiTutorApp = memo(function AiTutorApp({
       </div>
 
 
+      <RealtimeLeaderboardModal 
+        isOpen={showLeaderboardModal} 
+        onClose={() => setShowLeaderboardModal(false)} 
+        currentUser={user} 
+        appLanguage={globalAppLanguage} 
+      />
     </div>
   );
 });

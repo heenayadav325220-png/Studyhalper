@@ -2,12 +2,11 @@ import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Trophy, Flame, X, Zap } from 'lucide-react';
 import { db, collection, query, orderBy, limit, onSnapshot } from '../services/firebase';
-import type { UserProfile } from '../types';
 
 interface RealtimeLeaderboardModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentUser: UserProfile;
+  currentUser: any;
   appLanguage?: string;
 }
 
@@ -32,7 +31,8 @@ export const RealtimeLeaderboardModal: React.FC<RealtimeLeaderboardModalProps> =
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isOpen) return;
+    let unsubscribe = () => {};
+    if (!isOpen) return unsubscribe;
     setLoading(true);
 
     if (!db) {
@@ -48,14 +48,14 @@ export const RealtimeLeaderboardModal: React.FC<RealtimeLeaderboardModalProps> =
         }
       ]);
       setLoading(false);
-      return;
+      return unsubscribe;
     }
 
     try {
       const usersRef = collection(db, 'users');
       const q = query(usersRef, orderBy('xp', 'desc'), limit(25));
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
+      unsubscribe = onSnapshot(q, (snapshot) => {
         const list: LeaderboardUser[] = [];
         snapshot.forEach((docSnap) => {
           const data = docSnap.data();
@@ -100,8 +100,6 @@ export const RealtimeLeaderboardModal: React.FC<RealtimeLeaderboardModalProps> =
         ]);
         setLoading(false);
       });
-
-      return () => unsubscribe();
     } catch (e) {
       console.warn("Failed to subscribe to leaderboard:", e);
       setLeaderboardUsers([
@@ -117,6 +115,8 @@ export const RealtimeLeaderboardModal: React.FC<RealtimeLeaderboardModalProps> =
       ]);
       setLoading(false);
     }
+
+    return () => unsubscribe();
   }, [isOpen, currentUser]);
 
   if (!isOpen) return null;
