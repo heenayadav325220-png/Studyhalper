@@ -363,7 +363,6 @@ function parseMarkdownBlocks(text: string): string[] {
 
 const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
   text,
-  isLatest,
   fontStyle = 'classic',
 }: {
   text: string;
@@ -371,28 +370,12 @@ const StaggeredRevealMarkdown = memo(function StaggeredRevealMarkdown({
   fontStyle?: 'classic' | 'modern';
 }) {
   const blocks = useMemo(() => parseMarkdownBlocks(text), [text]);
-  const [visibleCount, setVisibleCount] = useState(() => (isLatest ? 1 : blocks.length));
-  const isAllRevealed = visibleCount >= blocks.length;
+  const [visibleCount, setVisibleCount] = useState(() => blocks.length);
+  const isAllRevealed = true;
 
   useEffect(() => {
-    if (!isLatest) {
-      setVisibleCount(blocks.length);
-      return;
-    }
-
-    setVisibleCount(1);
-    const interval = setInterval(() => {
-      setVisibleCount((prev) => {
-        if (prev >= blocks.length) {
-          clearInterval(interval);
-          return prev;
-        }
-        return prev + 1;
-      });
-    }, 280);
-
-    return () => clearInterval(interval);
-  }, [text, isLatest, blocks.length]);
+    setVisibleCount(blocks.length);
+  }, [text, blocks.length]);
 
   const isClassic = fontStyle === 'classic';
 

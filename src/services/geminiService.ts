@@ -384,7 +384,8 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
     } catch (e) {}
   }
 
-  // Helper to retrieve/refresh Firebase ID token
+  // Helper to retrieve/refresh Firebase ID token with zero artificial delay
+  let authInitializedPromise: Promise<any> | null = null;
   const getValidIdToken = async (): Promise<string> => {
     if (cachedAuthToken && Date.now() < cachedAuthToken.expiresAt) {
       return cachedAuthToken.token;
@@ -392,33 +393,35 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
 
     const { auth, signInAnonymously } = await import("./firebase");
     
-    let user = auth.currentUser;
-    if (user) {
+    if (auth.currentUser) {
       try {
-        const token = await user.getIdToken();
+        const token = await auth.currentUser.getIdToken();
         cachedAuthToken = { token, expiresAt: Date.now() + 50 * 60 * 1000 };
         return token;
-      } catch (e) {
-        console.warn("Failed to read idToken from currentUser:", e);
-      }
+      } catch (e) {}
     }
 
-    const waitForAuthUser = () => new Promise<any>((resolve) => {
-      let resolved = false;
-      const unsubscribe = auth.onAuthStateChanged((u) => {
-        unsubscribe();
-        resolved = true;
-        resolve(u);
+    if (!authInitializedPromise) {
+      authInitializedPromise = new Promise((resolve) => {
+        let resolved = false;
+        const unsubscribe = auth.onAuthStateChanged((u) => {
+          if (!resolved) {
+            resolved = true;
+            unsubscribe();
+            resolve(u);
+          }
+        });
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            unsubscribe();
+            resolve(auth.currentUser);
+          }
+        }, 500);
       });
-      setTimeout(() => {
-        if (!resolved) {
-          unsubscribe();
-          resolve(null);
-        }
-      }, 4000);
-    });
+    }
 
-    user = await waitForAuthUser();
+    const user = await authInitializedPromise;
     if (user) {
       try {
         const token = await user.getIdToken();
@@ -433,19 +436,10 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
         const token = await anonCred.user.getIdToken();
         cachedAuthToken = { token, expiresAt: Date.now() + 50 * 60 * 1000 };
         return token;
-      } catch (e) {
-        console.warn("Anonymous sign-in fallback failed:", e);
-      }
-    }
-
-    if (auth.currentUser) {
-      try {
-        const token = await auth.currentUser.getIdToken();
-        cachedAuthToken = { token, expiresAt: Date.now() + 50 * 60 * 1000 };
-        return token;
       } catch (e) {}
     }
-    const fallbackToken = `ascend_fallback_${getPersistentUserId()}`;
+
+    const fallbackToken = `ascend_user_${getPersistentUserId()}`;
     cachedAuthToken = { token: fallbackToken, expiresAt: Date.now() + 50 * 60 * 1000 };
     return fallbackToken;
   };
