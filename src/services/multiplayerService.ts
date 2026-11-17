@@ -124,52 +124,92 @@ export async function submitQuizAnswerApi(params: {
   return data;
 }
 
-// 5. Real-time Subscriptions
+// 5. Real-time Subscriptions with Polling Fallback
 export function subscribeToQuizRoom(roomId: string, callback: (room: QuizRoom | null) => void) {
-  if (!db) {
-    callback(null);
-    return () => {};
-  }
-  try {
-    const roomRef = doc(db, "quizRooms", roomId);
-    return onSnapshot(roomRef, (snapshot) => {
-      if (snapshot.exists()) {
-        callback({ id: snapshot.id, ...snapshot.data() } as QuizRoom);
-      } else {
-        callback(null);
+  let isMounted = true;
+  let interval: any = null;
+  let unsubFirestore: (() => void) | null = null;
+
+  const pollRoom = async () => {
+    try {
+      const res = await safeFetch(`/api/quiz-battle/room/${roomId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (isMounted && data.room) {
+          callback(data.room);
+        }
       }
-    }, (err) => {
-      console.warn("Quiz room snapshot error:", err);
-      callback(null);
-    });
-  } catch (err) {
-    console.warn("Failed to subscribe to quiz room:", err);
-    callback(null);
-    return () => {};
+    } catch (e) {}
+  };
+
+  // Start polling immediately as primary or fallback
+  interval = setInterval(pollRoom, 1500);
+  pollRoom();
+
+  if (db) {
+    try {
+      const roomRef = doc(db, "quizRooms", roomId);
+      unsubFirestore = onSnapshot(roomRef, (snapshot) => {
+        if (!isMounted) return;
+        if (snapshot.exists()) {
+          callback({ id: snapshot.id, ...snapshot.data() } as QuizRoom);
+        }
+      }, (_err) => {
+        // Fallback handled by polling interval
+      });
+    } catch (e) {}
   }
+
+  return () => {
+    isMounted = false;
+    if (interval) clearInterval(interval);
+    if (unsubFirestore) unsubFirestore();
+  };
 }
 
 export function subscribeToParticipants(roomId: string, callback: (participants: QuizParticipant[]) => void) {
-  if (!db) {
-    callback([]);
-    return () => {};
-  }
-  try {
-    const pRef = collection(db, `quizRooms/${roomId}/participants`);
-    const q = query(pRef, orderBy("score", "desc"));
-    return onSnapshot(q, (snapshot) => {
-      const list: QuizParticipant[] = [];
-      snapshot.forEach((d) => {
-        list.push({ id: d.id, ...d.data() } as QuizParticipant);
+  let isMounted = true;
+  let interval: any = null;
+  let unsubFirestore: (() => void) | null = null;
+
+  const pollParticipants = async () => {
+    try {
+      const res = await safeFetch(`/api/quiz-battle/room/${roomId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (isMounted && Array.isArray(data.participants)) {
+          const sorted = [...data.participants].sort((a: any, b: any) => (b.score || 0) - (a.score || 0));
+          callback(sorted);
+        }
+      }
+    } catch (e) {}
+  };
+
+  interval = setInterval(pollParticipants, 1500);
+  pollParticipants();
+
+  if (db) {
+    try {
+      const pRef = collection(db, `quizRooms/${roomId}/participants`);
+      const q = query(pRef, orderBy("score", "desc"));
+      unsubFirestore = onSnapshot(q, (snapshot) => {
+        if (!isMounted) return;
+        const list: QuizParticipant[] = [];
+        snapshot.forEach((d) => {
+          list.push({ id: d.id, ...d.data() } as QuizParticipant);
+        });
+        if (list.length > 0) {
+          callback(list);
+        }
+      }, (_err) => {
+        // Fallback handled by polling interval
       });
-      callback(list);
-    }, (err) => {
-      console.warn("Participants snapshot error:", err);
-      callback([]);
-    });
-  } catch (err) {
-    console.warn("Failed to subscribe to participants:", err);
-    callback([]);
-    return () => {};
+    } catch (e) {}
   }
+
+  return () => {
+    isMounted = false;
+    if (interval) clearInterval(interval);
+    if (unsubFirestore) unsubFirestore();
+  };
 }

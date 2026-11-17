@@ -273,13 +273,13 @@ function getAttachmentCount(body: any): number {
 
 
 async function checkAndIncrementQuota(userId: string, feature: string, increment: boolean = false): Promise<{ allowed: boolean; current: number; limit: number }> {
+  const limit = AI_LIMITS[feature as keyof typeof AI_LIMITS] || AI_LIMITS.default;
   if (!adminDb) {
-    throw new Error("Firestore database service unavailable for quota enforcement.");
+    return { allowed: true, current: 0, limit };
   }
   const dateStr = new Date().toISOString().split("T")[0];
-  const limit = AI_LIMITS[feature as keyof typeof AI_LIMITS] || AI_LIMITS.default;
   const quotaDocRef = adminDb.collection("usage").doc(userId).collection("daily").doc(dateStr);
-  let allowed = false;
+  let allowed = true;
   let current = 0;
 
   try {
@@ -299,12 +299,8 @@ async function checkAndIncrementQuota(userId: string, feature: string, increment
       }
     });
   } catch (err: any) {
-    const msg = err?.message || String(err);
-    if (msg.includes("NOT_FOUND") || msg.includes("5 NOT_FOUND") || err.code === 5 || msg.includes("database")) {
-      console.warn("[Quota Fallback] Firestore database not provisioned. Allowing request.");
-      return { allowed: true, current: 0, limit };
-    }
-    throw err;
+    console.warn("[Quota Fallback] Firestore database not provisioned or offline. Allowing AI request.");
+    return { allowed: true, current: 0, limit };
   }
 
   return { allowed, current, limit };
@@ -394,9 +390,8 @@ const checkDailyLimit = async (req: AuthRequest, res: express.Response, next: ex
 
     next();
   } catch (err: any) {
-    console.error("Authoritative quota check failed:", err);
-    const errMsg = err?.message || "Failed to verify AI usage limits.";
-    res.status(503).json({ error: "Firestore Database Not Provisioned", message: errMsg });
+    console.warn("Authoritative quota check failed, allowing AI request:", err);
+    next();
   }
 };
 
@@ -1003,6 +998,39 @@ Each object in the array must strictly have these keys:
     } catch (err: any) {
       console.error("Start match error:", err);
       res.status(500).json({ error: err.message || "Failed to start match." });
+    }
+  });
+
+  // Get Quiz Room State & Participants (Polling / Fallback)
+  app.get("/api/quiz-battle/room/:roomId", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { roomId } = req.params;
+      const memEntry = memoryQuizRooms.get(roomId);
+      if (memEntry) {
+        const participantsList = Array.from(memEntry.participants.values());
+        res.json({ room: memEntry.room, participants: participantsList });
+        return;
+      }
+      if (adminDb) {
+        const roomSnap = await adminDb.collection("quizRooms").doc(roomId).get();
+        if (roomSnap.exists) {
+          const roomData = roomSnap.data();
+          const pSnap = await adminDb.collection(`quizRooms/${roomId}/participants`).get();
+          const participantsList = pSnap.docs.map(d => d.data());
+          // Cache in memory for speed
+          const pMap = new Map<string, any>();
+          participantsList.forEach((p: any) => pMap.set(p.userId || p.id, p));
+          memoryQuizRooms.set(roomId, { room: roomData, participants: pMap, answers: new Map() });
+          if (roomData?.roomCode) {
+            memoryQuizRooms.set(roomData.roomCode, memoryQuizRooms.get(roomId)!);
+          }
+          res.json({ room: roomData, participants: participantsList });
+          return;
+        }
+      }
+      res.status(404).json({ error: "Room not found." });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to fetch room." });
     }
   });
 
@@ -2323,6 +2351,32 @@ Keep your tone encouraging and educational. Use clear formatting, lists, and mar
     } catch (err: any) {
       console.error("Get profile error:", err);
       res.status(500).json({ error: err.message || "Failed to fetch profile." });
+    }
+  });
+
+  // Public Leaderboard API endpoint
+  app.get("/api/leaderboard", requireAuth, async (_req: AuthRequest, res) => {
+    try {
+      let list: any[] = [];
+      if (adminDb) {
+        try {
+          const snapshot = await adminDb.collection("leaderboard").orderBy("xp", "desc").limit(50).get();
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (data.showOnLeaderboard !== false) {
+              list.push({ uid: docSnap.id, ...data });
+            }
+          });
+        } catch (dbErr: any) {
+          const msg = dbErr?.message || String(dbErr);
+          if (!msg.includes("NOT_FOUND") && !msg.includes("5 NOT_FOUND") && dbErr?.code !== 5) {
+            console.warn("Error fetching leaderboard from adminDb:", dbErr);
+          }
+        }
+      }
+      res.json({ success: true, entries: list });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to fetch leaderboard." });
     }
   });
 

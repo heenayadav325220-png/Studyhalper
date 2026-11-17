@@ -93,10 +93,13 @@ export async function executeAIRequest(
       }
     }
 
-    const modelName = context.modelPreference || "gemini-2.5-flash";
+    const primaryModel = context.modelPreference || "gemini-2.5-flash";
+    const fallbackModel = primaryModel === "gemini-2.5-flash" ? "gemini-1.5-flash" : "gemini-2.5-flash";
+
+    let response: any = null;
+    let usedModel = primaryModel;
 
     const requestConfig: any = {
-      model: modelName,
       config: {
         temperature
       }
@@ -121,14 +124,27 @@ export async function executeAIRequest(
     }
     requestConfig.contents = contents;
 
-    const response = await ai.models.generateContent(requestConfig);
-    const text = response.text || "";
+    try {
+      requestConfig.model = primaryModel;
+      response = await ai.models.generateContent(requestConfig);
+    } catch (primaryErr: any) {
+      console.warn(`[Gemini Gateway] Primary model ${primaryModel} failed, trying fallback ${fallbackModel}:`, primaryErr?.message);
+      try {
+        requestConfig.model = fallbackModel;
+        usedModel = fallbackModel;
+        response = await ai.models.generateContent(requestConfig);
+      } catch (fallbackErr: any) {
+        throw fallbackErr;
+      }
+    }
+
+    const text = response?.text || "";
 
     return {
       success: true,
       text,
       provider: "gemini",
-      model: modelName,
+      model: usedModel,
       usage: {
         inputTokens: response.usageMetadata?.promptTokenCount,
         outputTokens: response.usageMetadata?.candidatesTokenCount,
