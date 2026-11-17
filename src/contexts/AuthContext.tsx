@@ -17,6 +17,7 @@ import {
   serverTimestamp
 } from '../services/firebase';
 import type { FirebaseUser } from '../services/firebase';
+import { syncLeaderboardEntry } from '../services/firebaseDb';
 import type { UserProfile } from '../types';
 
 export interface AuthContextType {
@@ -54,7 +55,8 @@ const DEFAULT_PROFILE: UserProfile = {
   isOnboarded: false,
   authProvider: 'password',
   lastStreakDate: '',
-  unlockedBadges: []
+  unlockedBadges: [],
+  showOnLeaderboard: true
 };
 
 // Clean up legacy plaintext password records from localStorage
@@ -175,6 +177,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {}
 
     setUserProfile(profile);
+    if (!user.isAnonymous) {
+      syncLeaderboardEntry(profile, { ensureExists: true }).catch(() => {});
+    }
     return profile;
   };
 
@@ -262,6 +267,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (e) {
         console.warn('Profile update sync error:', e);
       }
+
+      syncLeaderboardEntry(updatedProfile).catch(() => {});
 
       return user;
     } catch (err: any) {

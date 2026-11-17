@@ -300,6 +300,13 @@ export default function AuthModal({
           console.warn('Error deleting user doc from Firestore:', e);
         }
 
+        // B2. Delete public leaderboard entry
+        try {
+          await deleteDoc(doc(db, 'leaderboard', uid));
+        } catch (e) {
+          console.warn('Error deleting leaderboard doc from Firestore:', e);
+        }
+
         // C. Delete mock exams owned by user
         try {
           const examsRef = collection(db, 'exams');

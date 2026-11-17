@@ -2407,6 +2407,7 @@ Keep your tone encouraging and educational. Use clear formatting, lists, and mar
             await docRef.delete();
           }
           await adminDb.collection("usage").doc(uid).delete();
+          await adminDb.collection("leaderboard").doc(uid).delete();
         } catch (e) {
           // Continue with deletion
         }

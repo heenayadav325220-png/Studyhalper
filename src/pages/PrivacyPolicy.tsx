@@ -158,6 +158,17 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
                     : 'Your language preference (English/Hindi), theme setting, layout preferences, text input drafts, local copies of user profile states, study progress metrics (completed and weak topics), custom learning style preferences, and an offline database of logged mistakes and spaced repetition items in the browser\'s localStorage to maintain high speeds and offline availability. We do not store sensitive account credentials or passwords locally.'}
                 </div>
               </li>
+              <li className="flex items-start gap-2.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="text-white font-semibold">
+                    {isHi ? 'सार्वजनिक लीडरबोर्ड प्रदर्शन: ' : 'Public Leaderboard Display: '}
+                  </strong>
+                  {isHi
+                    ? 'जब तक आप अपनी प्रोफ़ाइल सेटिंग्स में "लीडरबोर्ड पर मुझे दिखाएं" बंद नहीं करते, आपका प्रदर्शन नाम, अवतार, स्तर, दैनिक स्ट्रीक और XP अन्य लॉग-इन छात्रों को लाइव लीडरबोर्ड पर दिखाई देते हैं (आपका ईमेल या निजी नोट्स कभी सार्वजनिक नहीं किए जाते)।'
+                    : 'Your display name, avatar, level, streak, and XP are publicly displayed to other signed-in students on the live leaderboard unless you opt out using the "Show me on leaderboard" toggle in Profile Settings (your email address and private records are never shared).'}
+                </div>
+              </li>
             </ul>
           </section>
 

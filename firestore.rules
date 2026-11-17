@@ -11,6 +11,11 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isRegisteredUser() {
+      return isSignedIn()
+        && (!('firebase' in request.auth.token) || request.auth.token.firebase.sign_in_provider != 'anonymous');
+    }
+
     function incoming() {
       return request.resource.data;
     }
@@ -38,6 +43,7 @@ service cloud.firestore {
         && (!('lastActive' in data) || (data.lastActive is string && data.lastActive.size() <= 60))
         && (!('lastStreakDate' in data) || (data.lastStreakDate is string && data.lastStreakDate.size() <= 40))
         && (!('unlockedBadges' in data) || (data.unlockedBadges is list && data.unlockedBadges.size() <= 100))
+        && (!('showOnLeaderboard' in data) || data.showOnLeaderboard is bool)
         && (!('role' in data));
     }
 
@@ -53,6 +59,7 @@ service cloud.firestore {
         && (!('streak' in data) || ((data.streak is int || data.streak is float) && data.streak >= 0))
         && (!('lastStreakDate' in data) || (data.lastStreakDate is string && data.lastStreakDate.size() <= 40))
         && (!('unlockedBadges' in data) || (data.unlockedBadges is list && data.unlockedBadges.size() <= 100))
+        && (!('showOnLeaderboard' in data) || data.showOnLeaderboard is bool)
         && (!('createdAt' in prev) || !('createdAt' in data) || data.createdAt == prev.createdAt)
         && (!('role' in data) || ('role' in prev && data.role == prev.role));
     }
@@ -194,6 +201,48 @@ service cloud.firestore {
     match /usage/{userId}/daily/{date} {
       allow read: if isSignedIn() && request.auth.uid == userId;
       allow write: if false;
+    }
+
+    // Validation helpers for public non-PII Leaderboard entries
+    function isValidLeaderboardAvatar(avatar) {
+      return avatar is string
+        && ((avatar.matches('^https://.*') && avatar.size() <= 500)
+            || (avatar.size() >= 1 && avatar.size() <= 24 && !avatar.matches('.*[:/\\\\<>].*')));
+    }
+
+    function isValidLeaderboardEntry(data, uid) {
+      return data.keys().hasAll(['uid', 'name', 'xp', 'streak', 'level', 'avatar', 'lastStreakDate', 'showOnLeaderboard', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'name', 'xp', 'streak', 'level', 'avatar', 'lastStreakDate', 'showOnLeaderboard', 'updatedAt'])
+        && uid is string && uid.size() > 0 && uid.size() <= 128
+        && data.uid is string && data.uid == uid && data.uid == request.auth.uid
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
+        && (data.xp is int || data.xp is float) && data.xp >= 0 && data.xp <= 50000000
+        && (data.streak is int || data.streak is float) && data.streak >= 0 && data.streak <= 10000
+        && (data.level is int || data.level is float) && data.level >= 1 && data.level <= 10000
+        && isValidLeaderboardAvatar(data.avatar)
+        && data.lastStreakDate is string && data.lastStreakDate.size() <= 40
+        && data.showOnLeaderboard is bool
+        && data.updatedAt is timestamp
+        && data.updatedAt == request.time;
+    }
+
+    function isValidLeaderboardUpdate(data, prev, uid) {
+      return isValidLeaderboardEntry(data, uid)
+        && data.uid == prev.uid
+        && (data.xp <= prev.xp || (
+          prev.updatedAt is timestamp
+          && request.time.toMillis() >= prev.updatedAt.toMillis()
+          && data.xp <= prev.xp + 500 + (100.0 * (request.time.toMillis() - prev.updatedAt.toMillis()) / 60000.0)
+        ))
+        && data.streak <= prev.streak + 1;
+    }
+
+    // 7. Public Leaderboard: Non-PII rankings for opted-in registered users with anti-cheat limits
+    match /leaderboard/{uid} {
+      allow get, list: if isSignedIn();
+      allow create: if isRegisteredUser() && isOwner(uid) && isValidLeaderboardEntry(incoming(), uid);
+      allow update: if isRegisteredUser() && isOwner(uid) && isValidLeaderboardUpdate(incoming(), existing(), uid);
+      allow delete: if isOwner(uid);
     }
   }
 }

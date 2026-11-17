@@ -55,9 +55,62 @@
           "items": {
             "type": "string"
           }
+        },
+        "showOnLeaderboard": {
+          "type": "boolean",
+          "description": "Whether the user opts in to public leaderboard display (default true)"
         }
       },
       "required": ["uid", "name", "xp", "level", "streak", "petLevel", "petXp", "petName", "language", "lastActive"]
+    },
+    "leaderboardEntry": {
+      "title": "LeaderboardEntry",
+      "description": "Public non-PII leaderboard projection for opted-in registered students",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth user ID matching document ID"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Public student display name"
+        },
+        "xp": {
+          "type": "number",
+          "description": "Total experience points (0 to 50,000,000)"
+        },
+        "streak": {
+          "type": "number",
+          "description": "Current daily streak count (0 to 10,000)"
+        },
+        "level": {
+          "type": "number",
+          "description": "Current student level"
+        },
+        "avatar": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Emoji or https URL avatar only"
+        },
+        "lastStreakDate": {
+          "type": "string",
+          "maxLength": 40,
+          "description": "YYYY-MM-DD local date of last completed streak day"
+        },
+        "showOnLeaderboard": {
+          "type": "boolean",
+          "description": "Visibility preference (default true)"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last update"
+        }
+      },
+      "required": ["uid", "name", "xp", "streak", "level", "avatar", "lastStreakDate", "showOnLeaderboard", "updatedAt"]
     },
     "chatMessage": {
       "title": "ChatMessage",
@@ -341,6 +394,10 @@
     "documents/{docId}": {
       "schema": "studyDocument",
       "description": "Core educational study documents and notes"
+    },
+    "leaderboard/{uid}": {
+      "schema": "leaderboardEntry",
+      "description": "Public non-PII leaderboard entries for opted-in registered students"
     }
   }
 }

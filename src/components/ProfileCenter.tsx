@@ -31,10 +31,11 @@ import {
   MessageSquare,
   BarChart3,
   Edit3,
-  GraduationCap
+  GraduationCap,
+  Trophy
 } from 'lucide-react';
 import { auth, signOut, updateProfile } from '../services/firebase';
-import { updateUserProfile } from '../services/firebaseDb';
+import { updateUserProfile, syncLeaderboardEntry } from '../services/firebaseDb';
 import { safeFetch, AI_LIMITS, currentQuotaUsage, refreshQuotaUsageFromServer } from '../services/geminiService';
 import { playUiSound } from '../services/soundEffects';
 import { triggerHaptic } from '../services/soundEffects';
@@ -961,6 +962,59 @@ export default function ProfileCenter({
                       </button>
                     )}
                   </div>
+                </div>
+
+                {/* Show me on leaderboard toggle */}
+                <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0 mt-0.5">
+                      <Trophy className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-white">
+                        {appLanguage === 'hi' ? 'लीडरबोर्ड पर मुझे दिखाएं' : 'Show me on leaderboard'}
+                      </h4>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        {appLanguage === 'hi'
+                          ? 'अन्य पंजीकृत छात्रों को आपका नाम, अवतार, स्ट्रीक और XP दिखाएं (ईमेल कभी साझा नहीं किया जाता)।'
+                          : 'Display your name, avatar, level, streak, and XP on the public leaderboard (email is never shared).'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={userProfile.showOnLeaderboard !== false}
+                    aria-label={appLanguage === 'hi' ? 'लीडरबोर्ड पर मुझे दिखाएं' : 'Show me on leaderboard'}
+                    onClick={() => {
+                      const nextVal = !(userProfile.showOnLeaderboard !== false);
+                      playUiSound(soundMode);
+                      onUpdateProfile({ showOnLeaderboard: nextVal });
+                      updateUserProfile(userProfile.uid, { showOnLeaderboard: nextVal });
+                      syncLeaderboardEntry({ ...userProfile, showOnLeaderboard: nextVal }).catch(() => {});
+                      if (onShowToast) {
+                        onShowToast(
+                          nextVal
+                            ? appLanguage === 'hi'
+                              ? 'आप अब लीडरबोर्ड पर दिखाई देंगे'
+                              : 'You are now visible on the leaderboard'
+                            : appLanguage === 'hi'
+                            ? 'लीडरबोर्ड से आपकी प्रोफ़ाइल हटा दी गई है'
+                            : 'Removed from public leaderboard',
+                          'info'
+                        );
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                      userProfile.showOnLeaderboard !== false ? 'bg-indigo-600' : 'bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        userProfile.showOnLeaderboard !== false ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
 
                 {/* Privacy & Cloud Architecture Note */}

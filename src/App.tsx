@@ -86,6 +86,7 @@ import {
 import { 
   subscribeUserProfile, 
   updateUserProfile, 
+  syncLeaderboardEntry,
   subscribeToChats, 
   sendGroupMessage, 
   subscribeToWhiteboard, 
@@ -216,7 +217,8 @@ const DEFAULT_USER: UserProfile = {
   className: '',
   targetGoal: '',
   isOnboarded: false,
-  lastStreakDate: ''
+  lastStreakDate: '',
+  showOnLeaderboard: true
 };
 
 // High-performance static neon border component with custom masking to preserve card gradients and details
@@ -905,8 +907,16 @@ export default function App() {
           const className = localSaved.className !== undefined ? localSaved.className : (profile.className || prev.className || '');
           const targetGoal = localSaved.targetGoal !== undefined ? localSaved.targetGoal : (profile.targetGoal || prev.targetGoal || '');
           const onboardedState = isDoneLocal || localSaved.isOnboarded || profile.isOnboarded || prev.isOnboarded || false;
+          const showOnLeaderboard =
+            localSaved.showOnLeaderboard !== undefined
+              ? localSaved.showOnLeaderboard
+              : profile.showOnLeaderboard !== undefined
+              ? profile.showOnLeaderboard
+              : prev.showOnLeaderboard !== undefined
+              ? prev.showOnLeaderboard
+              : true;
 
-          return {
+          const merged: UserProfile = {
             ...DEFAULT_USER,
             ...profile,
             ...prev,
@@ -919,8 +929,15 @@ export default function App() {
             schoolName,
             className,
             targetGoal,
-            isOnboarded: onboardedState
+            isOnboarded: onboardedState,
+            showOnLeaderboard
           };
+
+          if (auth.currentUser && !auth.currentUser.isAnonymous) {
+            syncLeaderboardEntry(merged, { ensureExists: true }).catch(() => {});
+          }
+
+          return merged;
         });
         if (profile.language && !localStorage.getItem('ascend_app_language')) {
           setAppLanguage(profile.language);
