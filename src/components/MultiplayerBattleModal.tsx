@@ -117,6 +117,10 @@ export const MultiplayerBattleModal: React.FC<MultiplayerBattleModalProps> = ({ 
     if (!activeRoom) return;
     try {
       await startQuizMatchApi(activeRoom.id);
+      setView('battle');
+      setSelectedOption(null);
+      setAnswerResult(null);
+      setTimeLeft(15);
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to start match.");
     }
