@@ -789,6 +789,7 @@ interface AiChatMessageItemProps {
   onSpeak: (id: string, text: string) => void;
   onSaveToNotebook: (msg: ChatMessage) => void;
   onOpenReportModal: (msg: ChatMessage) => void;
+  onOpenAuth?: () => void;
 }
 
 const AiChatMessageItem: React.FC<AiChatMessageItemProps> = memo(({
@@ -805,7 +806,8 @@ const AiChatMessageItem: React.FC<AiChatMessageItemProps> = memo(({
   onCopy,
   onSpeak,
   onSaveToNotebook,
-  onOpenReportModal
+  onOpenReportModal,
+  onOpenAuth
 }) => {
   return (
     <motion.div
@@ -833,6 +835,18 @@ const AiChatMessageItem: React.FC<AiChatMessageItemProps> = memo(({
         <div className={`pt-1 pb-2 px-0 ${tutorFontStyle === 'classic' ? 'tutor-editorial font-serif' : 'tutor-modern font-sans'}`}>
           <StaggeredRevealMarkdown text={msg.text} isLatest={isLatest} fontStyle={tutorFontStyle} />
         </div>
+
+        {(msg.text.toLowerCase().includes('sign in') || msg.text.toLowerCase().includes('साइन इन')) && onOpenAuth && (
+          <div className="mt-3 mb-2">
+            <button
+              type="button"
+              onClick={onOpenAuth}
+              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition cursor-pointer shadow-lg shadow-indigo-600/30 flex items-center gap-2"
+            >
+              <span>{appLanguage === 'hi' ? 'फिर से साइन इन करें' : 'Sign In Again'}</span>
+            </button>
+          </div>
+        )}
 
         {isPdf && (
           <div className="mt-3 mb-2 p-3.5 bg-gradient-to-r from-amber-50/80 via-amber-50/50 to-indigo-50/40 border border-amber-200/80 rounded-2xl flex items-center justify-between shadow-xs">
@@ -3037,6 +3051,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                   onSpeak={handleSpeakText}
                   onSaveToNotebook={handleSaveToNotebook}
                   onOpenReportModal={handleOpenReportModal}
+                  onOpenAuth={onOpenAuth}
                 />
               );
             })}

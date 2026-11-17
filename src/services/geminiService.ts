@@ -322,11 +322,18 @@ export function setLocalCache(category: string, country: string, topic: string, 
 
 const inFlightRequests = new Map<string, Promise<Response>>();
 
-// High-performance Auth Token Cache (Firebase ID tokens are valid for 1 hour)
+// High-performance Auth Token Cache
 let cachedAuthToken: { token: string; expiresAt: number } | null = null;
 export function invalidateAuthTokenCache() {
   cachedAuthToken = null;
 }
+
+// Clear token cache whenever auth state changes
+import("./firebase").then(({ auth }) => {
+  auth.onAuthStateChanged(() => {
+    invalidateAuthTokenCache();
+  });
+}).catch(() => {});
 
 // Safe custom fetch wrapper with built-in localized caching for notes & AI tools
 export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
@@ -384,64 +391,63 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
     } catch (e) {}
   }
 
-  // Helper to retrieve/refresh Firebase ID token with zero artificial delay
+  // Helper to retrieve/refresh Firebase ID token using getIdTokenResult and real expiration time
   let authInitializedPromise: Promise<any> | null = null;
-  const getValidIdToken = async (): Promise<string> => {
+  const getValidIdToken = async (): Promise<string | null> => {
     if (cachedAuthToken && Date.now() < cachedAuthToken.expiresAt) {
       return cachedAuthToken.token;
     }
 
     const { auth, signInAnonymously } = await import("./firebase");
     
-    if (auth.currentUser) {
-      try {
-        const token = await auth.currentUser.getIdToken();
-        cachedAuthToken = { token, expiresAt: Date.now() + 50 * 60 * 1000 };
-        return token;
-      } catch (e) {}
-    }
-
-    if (!authInitializedPromise) {
-      authInitializedPromise = new Promise((resolve) => {
-        let resolved = false;
-        const unsubscribe = auth.onAuthStateChanged((u) => {
-          if (!resolved) {
-            resolved = true;
-            unsubscribe();
-            resolve(u);
-          }
+    let currentUser = auth.currentUser;
+    if (!currentUser) {
+      if (!authInitializedPromise) {
+        authInitializedPromise = new Promise((resolve) => {
+          let resolved = false;
+          const unsubscribe = auth.onAuthStateChanged((u) => {
+            if (!resolved) {
+              resolved = true;
+              unsubscribe();
+              resolve(u);
+            }
+          });
+          setTimeout(() => {
+            if (!resolved) {
+              resolved = true;
+              unsubscribe();
+              resolve(auth.currentUser);
+            }
+          }, 500);
         });
-        setTimeout(() => {
-          if (!resolved) {
-            resolved = true;
-            unsubscribe();
-            resolve(auth.currentUser);
-          }
-        }, 500);
-      });
+      }
+      currentUser = await authInitializedPromise;
     }
 
-    const user = await authInitializedPromise;
-    if (user) {
-      try {
-        const token = await user.getIdToken();
-        cachedAuthToken = { token, expiresAt: Date.now() + 50 * 60 * 1000 };
-        return token;
-      } catch (e) {}
-    }
-
-    if (!auth.currentUser) {
+    if (!currentUser) {
       try {
         const anonCred = await signInAnonymously(auth);
-        const token = await anonCred.user.getIdToken();
-        cachedAuthToken = { token, expiresAt: Date.now() + 50 * 60 * 1000 };
-        return token;
-      } catch (e) {}
+        currentUser = anonCred.user;
+      } catch (e) {
+        console.warn("Anonymous sign-in failed during token acquisition:", e);
+      }
     }
 
-    const fallbackToken = `ascend_user_${getPersistentUserId()}`;
-    cachedAuthToken = { token: fallbackToken, expiresAt: Date.now() + 50 * 60 * 1000 };
-    return fallbackToken;
+    if (currentUser) {
+      try {
+        const tokenResult = await currentUser.getIdTokenResult();
+        const token = tokenResult.token;
+        const expirationTimeMs = new Date(tokenResult.expirationTime).getTime();
+        const expiresAt = expirationTimeMs - 2 * 60 * 1000; // 2 minutes before real expiration
+        cachedAuthToken = { token, expiresAt };
+        return token;
+      } catch (e) {
+        console.warn("Failed to get ID token result:", e);
+      }
+    }
+
+    // Do not send fake fallback token for AI endpoints
+    return null;
   };
 
   // Define the core fetch promise
@@ -479,15 +485,17 @@ export async function safeFetch(input: RequestInfo | URL, init?: RequestInit): P
     try {
       response = await fetch(resolvedInput, modifiedInit);
 
-      // On 401, invalidate cached token, force refresh and retry ONCE
+      // On 401, invalidate cached token, force refresh and retry ONCE (works for anonymous users too)
       if (response.status === 401) {
         invalidateAuthTokenCache();
         console.warn("Received 401, forcing token refresh and retrying...");
         try {
           const { auth } = await import("./firebase");
           if (auth.currentUser) {
-            const newToken = await auth.currentUser.getIdToken(true);
-            cachedAuthToken = { token: newToken, expiresAt: Date.now() + 50 * 60 * 1000 };
+            const newTokenResult = await auth.currentUser.getIdTokenResult(true);
+            const newToken = newTokenResult.token;
+            const newExpiresAt = new Date(newTokenResult.expirationTime).getTime() - 2 * 60 * 1000;
+            cachedAuthToken = { token: newToken, expiresAt: newExpiresAt };
             const retryHeaders = new Headers(modifiedInit.headers || {});
             retryHeaders.set("Authorization", `Bearer ${newToken}`);
             if (persistentUserId) {
@@ -659,8 +667,15 @@ export async function getStudyAnswer(
     }
     throw new Error("No output generated by the AI model. Please try asking again.");
   } else {
+    if (response.status === 401) {
+      throw new Error("Please sign in again to use this feature (कृपया इस सुविधा का उपयोग करने के लिए फिर से साइन इन करें)");
+    }
     const errData = await response.json().catch(() => ({}));
-    throw new Error(errData?.error || errData?.message || `[HTTP ${response.status}] Failed to connect to AI serverless function on Vercel`);
+    const rawErr = errData?.error || errData?.message || '';
+    if (rawErr.toLowerCase().includes('token') || rawErr.toLowerCase().includes('unauthorized') || rawErr.toLowerCase().includes('401')) {
+      throw new Error("Please sign in again to use this feature (कृपया इस सुविधा का उपयोग करने के लिए फिर से साइन इन करें)");
+    }
+    throw new Error(rawErr || `[HTTP ${response.status}] Failed to connect to AI serverless function on Vercel`);
   }
 }
 

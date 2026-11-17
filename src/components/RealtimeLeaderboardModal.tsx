@@ -76,34 +76,37 @@ export const RealtimeLeaderboardModal: React.FC<RealtimeLeaderboardModalProps> =
     setEntries([]);
     setSelfEntry(null);
 
+    const timeoutId = setTimeout(() => {
+      if (isMounted && loading) {
+        setLoading(false);
+        setError(isHi ? 'लीडरबोर्ड लोड नहीं हो सका' : "Couldn't load leaderboard");
+      }
+    }, 8000);
+
     // Ensure current user is synced to leaderboard when opening modal
     if (currentUser && !auth.currentUser?.isAnonymous) {
       syncLeaderboardEntry(currentUser).catch(() => {});
     }
 
-    // Fetch authoritative leaderboard from backend API immediately
-    safeFetch('/api/leaderboard')
-      .then(res => res.json())
-      .then(data => {
-        if (!isMounted || !data.success || !Array.isArray(data.entries)) return;
-        const rawList: PublicLeaderboardEntry[] = data.entries.map((d: any) => docToLeaderboardEntry(d.uid, d));
-        let rankedList: PublicLeaderboardEntry[];
-        if (activeTab === 'xp') {
-          rankedList = rawList.sort((a, b) => b.xp - a.xp).slice(0, 10);
-        } else {
-          const { today, yesterday } = getLocalDateStrings();
-          rankedList = filterAndRankStreakEntries(rawList, today, yesterday, 10);
-        }
-        if (rankedList.length > 0) {
+    // Fetch authoritative leaderboard from backend API immediately ONLY when activeTab === 'xp'
+    if (activeTab === 'xp') {
+      safeFetch('/api/leaderboard')
+        .then(res => res.json())
+        .then(data => {
+          if (!isMounted || !data.success || !Array.isArray(data.entries)) return;
+          if (error) return;
+          const rawList: PublicLeaderboardEntry[] = data.entries.map((d: any) => docToLeaderboardEntry(d.uid, d));
+          const rankedList = rawList.sort((a, b) => b.xp - a.xp).slice(0, 10);
           setEntries(rankedList);
           setLoading(false);
-          setError(null);
-        }
-      })
-      .catch(() => {});
+        })
+        .catch(() => {});
+    }
 
     if (!db) {
       setLoading(false);
+      setError(isHi ? 'लीडरबोर्ड लोड नहीं हो सका' : "Couldn't load leaderboard");
+      clearTimeout(timeoutId);
       return;
     }
 
@@ -113,6 +116,9 @@ export const RealtimeLeaderboardModal: React.FC<RealtimeLeaderboardModalProps> =
       if (!isMounted) return;
 
       if (!auth.currentUser) {
+        setLoading(false);
+        setError(isHi ? 'लीडरबोर्ड लोड नहीं हो सका' : "Couldn't load leaderboard");
+        clearTimeout(timeoutId);
         return;
       }
 
@@ -136,24 +142,22 @@ export const RealtimeLeaderboardModal: React.FC<RealtimeLeaderboardModalProps> =
               }
             });
 
-            if (rawList.length > 0) {
-              let rankedList: PublicLeaderboardEntry[];
-              if (activeTab === 'xp') {
-                rankedList = rawList.slice(0, 10);
-              } else {
-                const { today, yesterday } = getLocalDateStrings();
-                rankedList = filterAndRankStreakEntries(rawList, today, yesterday, 10);
-              }
-
-              setEntries(rankedList);
-              setError(null);
-              setLoading(false);
+            let rankedList: PublicLeaderboardEntry[];
+            if (activeTab === 'xp') {
+              rankedList = rawList.slice(0, 10);
+            } else {
+              const { today, yesterday } = getLocalDateStrings();
+              rankedList = filterAndRankStreakEntries(rawList, today, yesterday, 10);
             }
+
+            setEntries(rankedList);
+            setError(null);
+            setLoading(false);
 
             const myUid = auth.currentUser?.uid;
             const isRegistered = Boolean(auth.currentUser && !auth.currentUser.isAnonymous);
             const optedIn = currentUser?.showOnLeaderboard !== false;
-            const inTopTen = Boolean(myUid && entries.some((item) => item.uid === myUid));
+            const inTopTen = Boolean(myUid && rankedList.some((item) => item.uid === myUid));
 
             if (myUid && isRegistered && optedIn && !inTopTen) {
               try {
@@ -175,11 +179,15 @@ export const RealtimeLeaderboardModal: React.FC<RealtimeLeaderboardModalProps> =
           (err) => {
             if (!isMounted) return;
             console.warn('Leaderboard snapshot error:', err);
+            setError(isHi ? 'लीडरबोर्ड लोड नहीं हो सका' : "Couldn't load leaderboard");
+            setLoading(false);
           }
         );
       } catch (err) {
         if (!isMounted) return;
         console.warn('Failed to subscribe to leaderboard:', err);
+        setError(isHi ? 'लीडरबोर्ड लोड नहीं हो सका' : "Couldn't load leaderboard");
+        setLoading(false);
       }
     };
 
@@ -202,6 +210,7 @@ export const RealtimeLeaderboardModal: React.FC<RealtimeLeaderboardModalProps> =
 
     return () => {
       isMounted = false;
+      clearTimeout(timeoutId);
       if (authTimeout) clearTimeout(authTimeout);
       if (unsubscribeAuth) unsubscribeAuth();
       if (unsubscribeSnapshot) unsubscribeSnapshot();
