@@ -33,8 +33,6 @@ import {
 import { generateQuiz, shuffleQuizQuestions } from '../services/geminiService';
 import { PersonalLearningService } from '../services/personalLearningService';
 import { showToast } from './Toast';
-import { MultiplayerBattleModal } from './MultiplayerBattleModal';
-import { RealtimeLeaderboardModal } from './RealtimeLeaderboardModal';
 import { parseError, logError } from '../utils/errorHandler';
 import { playSuccessChime, triggerHaptic } from '../services/soundEffects';
 import type { Subject, MockExam, UserProfile } from '../types';
@@ -365,8 +363,6 @@ export default function QuizSection({
 }: QuizSectionProps) {
   // Navigation & Step State
   const [viewState, setViewState] = useState<'setup' | 'loading' | 'active' | 'results' | 'history'>('setup');
-  const [isMultiplayerOpen, setIsMultiplayerOpen] = useState(false);
-  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
 
   // Loading Progressive steps states
   const [loadingStep, setLoadingStep] = useState(0);
@@ -895,35 +891,6 @@ export default function QuizSection({
                   <strong>{getQuizText('selectedLangBadge', quizLanguage)}:</strong>{' '}
                   {QUIZ_LANGUAGES.find(q => q.id === quizLanguage)?.label} - {QUIZ_LANGUAGES.find(q => q.id === quizLanguage)?.description}
                 </span>
-              </div>
-            </div>
-
-            {/* MULTIPLAYER BATTLE BANNER */}
-            <div className="mb-6 p-5 bg-gradient-to-r from-indigo-900/40 via-purple-900/30 to-slate-900 border border-indigo-500/30 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 rounded-xl bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-300">
-                  <Trophy className="w-6 h-6 animate-bounce" />
-                </div>
-                <div>
-                  <h4 className="text-white font-extrabold text-base">Real-Time Multiplayer Quiz Battle & Leaderboard</h4>
-                  <p className="text-slate-300 text-xs mt-0.5">Challenge friends live, answer synchronized questions, and climb global live rankings!</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2 shrink-0">
-                <button
-                  onClick={() => setIsLeaderboardOpen(true)}
-                  className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow-lg transition flex items-center space-x-2 border border-amber-400/30 cursor-pointer"
-                >
-                  <Trophy className="w-4 h-4" />
-                  <span>Live Leaderboard</span>
-                </button>
-                <button
-                  onClick={() => setIsMultiplayerOpen(true)}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition flex items-center space-x-2 border border-indigo-400/30 cursor-pointer"
-                >
-                  <Users className="w-4 h-4" />
-                  <span>Play Live Battle</span>
-                </button>
               </div>
             </div>
 
@@ -2103,8 +2070,6 @@ Ascend Study Buddy • AI-Powered Education`;
         )}
 
       </AnimatePresence>
-      <MultiplayerBattleModal isOpen={isMultiplayerOpen} onClose={() => setIsMultiplayerOpen(false)} onAddXp={onAddXp} />
-      <RealtimeLeaderboardModal isOpen={isLeaderboardOpen} onClose={() => setIsLeaderboardOpen(false)} currentUser={user} appLanguage={language} />
     </div>
   );
 }

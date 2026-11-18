@@ -3,7 +3,6 @@ import {
   db, 
   collection, 
   doc, 
-  getDoc,
   setDoc, 
   deleteDoc, 
   getDocs, 
@@ -12,10 +11,8 @@ import {
   where, 
   orderBy,
   limit,
-  writeBatch,
-  serverTimestamp
+  writeBatch
 } from './firebase';
-import { buildLeaderboardPayloadFields } from '../utils/leaderboardUtils';
 import type { UserProfile, RoomChatMessage, WhiteboardElement, MockExam, StudyDocument } from '../types';
 
 // Fallback Helper: Is user offline or Firestore uninitialized?
@@ -47,109 +44,6 @@ export function subscribeUserProfile(userId: string, callback: (profile: UserPro
   }
 }
 
-// Track last synced leaderboard fields per uid to avoid redundant writes
-const lastSyncedLeaderboard: Record<string, string> = {};
-const checkedExistingLeaderboardUids = new Set<string>();
-
-function hasLeaderboardRelevantFields(updates: Partial<UserProfile>): boolean {
-  return (
-    updates.xp !== undefined ||
-    updates.streak !== undefined ||
-    updates.name !== undefined ||
-    updates.avatar !== undefined ||
-    updates.level !== undefined ||
-    updates.lastStreakDate !== undefined ||
-    updates.showOnLeaderboard !== undefined
-  );
-}
-
-export async function syncLeaderboardEntry(
-  profile: Partial<UserProfile> & { uid?: string },
-  options?: { ensureExists?: boolean }
-): Promise<void> {
-  try {
-    if (!db || isOffline() || !auth.currentUser || auth.currentUser.isAnonymous) {
-      return;
-    }
-
-    const verifiedUid = auth.currentUser.uid;
-    if (profile.uid && profile.uid !== verifiedUid) {
-      return;
-    }
-
-    const leaderboardRef = doc(db, 'leaderboard', verifiedUid);
-
-    if (profile.showOnLeaderboard === false) {
-      lastSyncedLeaderboard[verifiedUid] = 'hidden';
-      checkedExistingLeaderboardUids.add(verifiedUid);
-      const delPromise = deleteDoc(leaderboardRef);
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Leaderboard delete timeout')), 2000)
-      );
-      await Promise.race([delPromise, timeoutPromise]);
-      return;
-    }
-
-    const mergedProfile: Partial<UserProfile> & { uid: string } = {
-      ...profile,
-      uid: verifiedUid,
-      name: profile.name || auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || 'Student',
-      avatar: profile.avatar || auth.currentUser.photoURL || '🧑‍🎓',
-      photoURL: profile.photoURL || auth.currentUser.photoURL || undefined
-    };
-
-    const fields = buildLeaderboardPayloadFields(mergedProfile);
-    const snapshotKey = JSON.stringify(fields);
-
-    if (options?.ensureExists && !checkedExistingLeaderboardUids.has(verifiedUid)) {
-      checkedExistingLeaderboardUids.add(verifiedUid);
-      try {
-        const existingSnap = await Promise.race([
-          getDoc(leaderboardRef),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('Leaderboard check timeout')), 2000)
-          )
-        ]);
-        if (existingSnap.exists()) {
-          const d = existingSnap.data();
-          const existingFields = buildLeaderboardPayloadFields({
-            uid: verifiedUid,
-            name: d.name,
-            xp: d.xp,
-            streak: d.streak,
-            level: d.level,
-            avatar: d.avatar,
-            lastStreakDate: d.lastStreakDate,
-            showOnLeaderboard: d.showOnLeaderboard
-          });
-          const existingKey = JSON.stringify(existingFields);
-          if (existingKey === snapshotKey) {
-            lastSyncedLeaderboard[verifiedUid] = snapshotKey;
-            return;
-          }
-        }
-      } catch {
-        // Proceed silently if offline/check fails
-        return;
-      }
-    } else if (lastSyncedLeaderboard[verifiedUid] === snapshotKey) {
-      return;
-    }
-
-    const writePromise = setDoc(leaderboardRef, {
-      ...fields,
-      updatedAt: serverTimestamp()
-    });
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Leaderboard write timeout')), 2000)
-    );
-    await Promise.race([writePromise, timeoutPromise]);
-    lastSyncedLeaderboard[verifiedUid] = snapshotKey;
-  } catch {
-    // Must never block the UI and must fail silently when offline or unauthenticated
-  }
-}
-
 // Write coalescing and debouncing for user profile updates
 // Prevents generating multiple Firestore document writes when XP/streaks/stats update rapidly
 let profileSyncTimer: any = null;
@@ -158,12 +52,10 @@ let pendingProfileBatch: Record<string, Partial<UserProfile>> = {};
 export async function updateUserProfile(userId: string, profile: Partial<UserProfile>): Promise<void> {
   const verifiedUid = auth.currentUser?.uid || userId;
   // Always persist immediately to localStorage for zero-latency local UX
-  let latestMerged: Partial<UserProfile> = { ...profile, uid: verifiedUid };
   try {
     const local = localStorage.getItem(`user_profile_${verifiedUid}`);
     const parsed = local ? JSON.parse(local) : {};
     const updated = { ...parsed, ...profile, uid: verifiedUid };
-    latestMerged = updated;
     localStorage.setItem(`user_profile_${verifiedUid}`, JSON.stringify(updated));
     localStorage.setItem('ascend_user_profile', JSON.stringify(updated));
   } catch (e) {
@@ -199,17 +91,6 @@ export async function updateUserProfile(userId: string, profile: Partial<UserPro
       await Promise.race([writePromise, timeoutPromise]);
     } catch (err) {
       console.warn("Firestore updateUserProfile non-blocking note:", err);
-    }
-
-    if (hasLeaderboardRelevantFields(batchUpdates)) {
-      let fullProfile: Partial<UserProfile> = { ...latestMerged, ...batchUpdates, uid: verifiedUid };
-      try {
-        const local = localStorage.getItem(`user_profile_${verifiedUid}`);
-        if (local) {
-          fullProfile = { ...JSON.parse(local), ...batchUpdates, uid: verifiedUid };
-        }
-      } catch {}
-      syncLeaderboardEntry(fullProfile).catch(() => {});
     }
   }, 1500);
 }
@@ -310,7 +191,6 @@ export function subscribeToWhiteboard(roomId: string, callback: (elements: White
     }
   };
 
-  // Provide initial local elements immediately for instant zero-latency rendering
   const initialLocal = getLocalElements();
   callback(initialLocal);
 
@@ -319,8 +199,6 @@ export function subscribeToWhiteboard(roomId: string, callback: (elements: White
   }
   try {
     const wbRef = collection(db, `rooms/${roomId}/whiteboard`);
-    // Cost Optimization: Limit to latest 60 drawing strokes descending, reversed in memory
-    // Reduces initial listener read cost by 70%
     const q = query(wbRef, orderBy("timestamp", "desc"), limit(60));
     return onSnapshot(q, (snapshot) => {
       const elements: WhiteboardElement[] = [];
@@ -328,10 +206,7 @@ export function subscribeToWhiteboard(roomId: string, callback: (elements: White
         elements.push({ id: d.id, ...d.data() } as WhiteboardElement);
       });
       const remoteElements = elements.reverse();
-      
-      // Update local cache so offline transition is seamless
       localStorage.setItem(localKey, JSON.stringify(remoteElements));
-      
       callback(remoteElements);
     }, (error) => {
       console.warn("Whiteboard snapshot error, falling back to local:", error);
@@ -398,7 +273,6 @@ export async function clearWhiteboardRoom(roomId: string): Promise<void> {
     const snapshot = await getDocs(wbRef);
     if (snapshot.empty) return;
 
-    // Batch delete in a single atomic commit instead of multiple sequential network calls
     const batch = writeBatch(db);
     let deleteCount = 0;
     snapshot.forEach((d) => {
@@ -425,8 +299,6 @@ export function subscribeToMockExams(userId: string, callback: (exams: MockExam[
   try {
     const verifiedUid = auth.currentUser?.uid || userId;
     const examsRef = collection(db, "exams");
-    // Cost Optimization: Limit to recent 20 mock exams (down from 50)
-    // Slices document read costs and prevents reading large question sets unnecessarily
     const q = query(examsRef, where("userId", "==", verifiedUid), orderBy("timestamp", "desc"), limit(20));
     return onSnapshot(q, (snapshot) => {
       const exams: MockExam[] = [];
@@ -489,8 +361,6 @@ export function subscribeToStudyDocuments(ownerId: string, callback: (docs: Stud
   try {
     const verifiedOwnerId = auth.currentUser?.uid || ownerId;
     const docsRef = collection(db, "documents");
-    // Cost Optimization: Limit to recent 25 study documents (down from 100)
-    // Slices read consumption by 75% for note archives
     const q = query(docsRef, where("ownerId", "==", verifiedOwnerId), orderBy("timestamp", "desc"), limit(25));
     return onSnapshot(q, (snapshot) => {
       const documents: StudyDocument[] = [];
