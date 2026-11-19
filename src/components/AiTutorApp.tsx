@@ -41,8 +41,7 @@ import {
   Bot,
   Clock,
   Bug,
-  MessageSquare,
-  Trophy
+  MessageSquare
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';

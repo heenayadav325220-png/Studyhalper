@@ -27,8 +27,7 @@ import {
   Target,
   Copy,
   CheckCheck,
-  Globe,
-  Users
+  Globe
 } from 'lucide-react';
 import { generateQuiz, shuffleQuizQuestions } from '../services/geminiService';
 import { PersonalLearningService } from '../services/personalLearningService';

@@ -61,7 +61,7 @@ test('2. Missing token -> 401', async () => {
 
   assert.strictEqual(result.nextCalled, false);
   assert.strictEqual(result.statusCode, 401);
-  assert.deepStrictEqual(result.jsonBody, { error: 'Missing authorization header' });
+  assert.deepStrictEqual(result.jsonBody, { error: 'Missing authorization header', code: 'token_missing' });
 });
 
 test('3. Empty Bearer token -> 401', async () => {
@@ -71,7 +71,7 @@ test('3. Empty Bearer token -> 401', async () => {
 
   assert.strictEqual(result.nextCalled, false);
   assert.strictEqual(result.statusCode, 401);
-  assert.deepStrictEqual(result.jsonBody, { error: 'Empty authorization token' });
+  assert.deepStrictEqual(result.jsonBody, { error: 'Empty authorization token', code: 'token_empty' });
 });
 
 test('4. Malformed token (missing Bearer) -> 401', async () => {
@@ -81,7 +81,7 @@ test('4. Malformed token (missing Bearer) -> 401', async () => {
 
   assert.strictEqual(result.nextCalled, false);
   assert.strictEqual(result.statusCode, 401);
-  assert.deepStrictEqual(result.jsonBody, { error: 'Malformed authorization header' });
+  assert.deepStrictEqual(result.jsonBody, { error: 'Malformed authorization header', code: 'token_malformed' });
 });
 
 test('5. Expired token -> 401', async () => {
@@ -97,7 +97,7 @@ test('5. Expired token -> 401', async () => {
 
   assert.strictEqual(result.nextCalled, false);
   assert.strictEqual(result.statusCode, 401);
-  assert.deepStrictEqual(result.jsonBody, { error: 'Invalid or expired token' });
+  assert.deepStrictEqual(result.jsonBody, { error: 'Invalid or expired token', code: 'token_expired' });
   restoreVerify();
 });
 
@@ -112,7 +112,7 @@ test('6. Invalid token -> 401', async () => {
 
   assert.strictEqual(result.nextCalled, false);
   assert.strictEqual(result.statusCode, 401);
-  assert.deepStrictEqual(result.jsonBody, { error: 'Invalid or expired token' });
+  assert.deepStrictEqual(result.jsonBody, { error: 'Invalid or expired token', code: 'token_invalid' });
   restoreVerify();
 });
 
@@ -129,7 +129,7 @@ test('7. Firebase Admin infrastructure failure -> 503', async () => {
 
   assert.strictEqual(result.nextCalled, false);
   assert.strictEqual(result.statusCode, 503);
-  assert.deepStrictEqual(result.jsonBody, { error: 'Authentication service unavailable' });
+  assert.deepStrictEqual(result.jsonBody, { error: 'Authentication service unavailable', code: 'service_unavailable' });
   restoreVerify();
 });
 
@@ -140,7 +140,7 @@ test('8. x-user-id without a valid token -> 401', async () => {
 
   assert.strictEqual(result.nextCalled, false);
   assert.strictEqual(result.statusCode, 401);
-  assert.deepStrictEqual(result.jsonBody, { error: 'Missing authorization header' });
+  assert.deepStrictEqual(result.jsonBody, { error: 'Missing authorization header', code: 'token_missing' });
 });
 
 test('9. Valid Firebase Anonymous Auth token -> request proceeds', async () => {

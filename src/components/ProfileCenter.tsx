@@ -31,8 +31,7 @@ import {
   MessageSquare,
   BarChart3,
   Edit3,
-  GraduationCap,
-  Trophy
+  GraduationCap
 } from 'lucide-react';
 import { auth, signOut, updateProfile } from '../services/firebase';
 import { updateUserProfile } from '../services/firebaseDb';

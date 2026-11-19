@@ -43,11 +43,6 @@ export interface User {
   }[];
 }
 
-export interface LeaderboardEntry {
-  name: string;
-  points: number;
-  level: number;
-}
 
 export interface Group {
   id: number;
@@ -101,19 +96,6 @@ export interface UserProfile {
   photoURL?: string;
   lastStreakDate?: string;
   unlockedBadges?: string[];
-  showOnLeaderboard?: boolean;
-}
-
-export interface PublicLeaderboardEntry {
-  uid: string;
-  name: string;
-  xp: number;
-  streak: number;
-  level: number;
-  avatar: string;
-  lastStreakDate: string;
-  showOnLeaderboard: boolean;
-  updatedAt?: any;
 }
 
 export interface RoomChatMessage {

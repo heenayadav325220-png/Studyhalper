@@ -7,6 +7,7 @@ export interface AIRequestContext {
   preferredProvider?: "gemini";
   modelPreference?: string;
   systemInstruction?: string;
+  thinkingBudget?: number;
 }
 
 export interface NormalizedAIResponse {
@@ -94,12 +95,12 @@ export async function executeAIRequest(
     }
 
     const primaryModel = context.modelPreference || "gemini-2.5-flash";
-    const fallbackModel = primaryModel === "gemini-2.5-flash" ? "gemini-1.5-flash" : "gemini-2.5-flash";
+    const usedModel = primaryModel;
 
     let response: any = null;
-    let usedModel = primaryModel;
 
     const requestConfig: any = {
+      model: primaryModel,
       config: {
         temperature
       }
@@ -107,6 +108,10 @@ export async function executeAIRequest(
 
     if (systemInstruction) {
       requestConfig.config.systemInstruction = systemInstruction;
+    }
+
+    if (primaryModel.startsWith("gemini-2.5-flash")) {
+      requestConfig.config.thinkingConfig = { thinkingBudget: context.thinkingBudget ?? 0 };
     }
 
     // Build contents array supporting multimodal images if present
@@ -125,16 +130,17 @@ export async function executeAIRequest(
     requestConfig.contents = contents;
 
     try {
-      requestConfig.model = primaryModel;
       response = await ai.models.generateContent(requestConfig);
-    } catch (primaryErr: any) {
-      console.warn(`[Gemini Gateway] Primary model ${primaryModel} failed, trying fallback ${fallbackModel}:`, primaryErr?.message);
-      try {
-        requestConfig.model = fallbackModel;
-        usedModel = fallbackModel;
+    } catch (err: any) {
+      const status = err?.status || err?.code || '';
+      const msg = (err?.message || '').toUpperCase();
+      const is503OrOverloaded = status === 503 || status === '503' || status === 503000 || msg.includes('UNAVAILABLE') || msg.includes('OVERLOADED');
+      if (is503OrOverloaded) {
+        console.warn(`[Gemini Gateway] Model ${primaryModel} returned 503/overloaded, waiting 700ms to retry once...`, err?.message);
+        await new Promise(resolve => setTimeout(resolve, 700));
         response = await ai.models.generateContent(requestConfig);
-      } catch (fallbackErr: any) {
-        throw fallbackErr;
+      } else {
+        throw err;
       }
     }
 
