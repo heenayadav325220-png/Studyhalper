@@ -353,7 +353,9 @@ const checkDailyLimit = async (req: AuthRequest, res: express.Response, next: ex
   }
 
   try {
-    const { allowed, limit } = await checkAndIncrementQuota(user.uid, quotaKey, true);
+    const quotaPromise = checkAndIncrementQuota(user.uid, quotaKey, true);
+    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve({ allowed: true, limit: 30 }), 1000));
+    const { allowed, limit } = await Promise.race([quotaPromise, timeoutPromise]) as any;
     if (!allowed) {
       const isHindi = req.headers["accept-language"]?.includes("hi") || req.query.lang === "hi";
       const displayName = quotaKey === "aiTutor" ? "AI Tutor" : quotaKey;

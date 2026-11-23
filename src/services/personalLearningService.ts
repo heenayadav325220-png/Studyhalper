@@ -487,21 +487,45 @@ export class PersonalLearningService {
 
   // --- AI TUTOR COMPACT STUDENT MEMORY ---
   static async compileStudentMemory(userId: string): Promise<any> {
-    const { completed, weak } = await this.getTopicStats(userId);
-    const mistakes = await this.getMistakes(userId);
-    const revisions = await this.getRevisionTopics(userId);
-    
-    const recentMistakes = mistakes.slice(-5).map(m => `[${m.subject}] ${m.topic}: "${m.question}"`);
-    const spacedRevisions = revisions.filter(r => r.status === 'pending').map(r => `${r.subject} - ${r.topic} (${r.priority} Priority)`);
-    const preferredStyle = this.getPreferredStyle(userId);
-    
-    return {
-      completedTopics: completed.slice(0, 10), // keep compact for AI tokens
-      weakTopics: weak.slice(0, 10),
-      recentMistakes,
-      spacedRevisions,
-      preferredStyle
-    };
+    try {
+      const memoryPromise = (async () => {
+        const { completed, weak } = await this.getTopicStats(userId);
+        const mistakes = await this.getMistakes(userId);
+        const revisions = await this.getRevisionTopics(userId);
+        
+        const recentMistakes = mistakes.slice(-5).map(m => `[${m.subject}] ${m.topic}: "${m.question}"`);
+        const spacedRevisions = revisions.filter(r => r.status === 'pending').map(r => `${r.subject} - ${r.topic} (${r.priority} Priority)`);
+        const preferredStyle = this.getPreferredStyle(userId);
+        
+        return {
+          completedTopics: completed.slice(0, 10),
+          weakTopics: weak.slice(0, 10),
+          recentMistakes,
+          spacedRevisions,
+          preferredStyle
+        };
+      })();
+
+      const timeoutPromise = new Promise((resolve) => 
+        setTimeout(() => resolve({
+          completedTopics: [],
+          weakTopics: [],
+          recentMistakes: [],
+          spacedRevisions: [],
+          preferredStyle: this.getPreferredStyle(userId)
+        }), 1000)
+      );
+
+      return await Promise.race([memoryPromise, timeoutPromise]);
+    } catch (e) {
+      return {
+        completedTopics: [],
+        weakTopics: [],
+        recentMistakes: [],
+        spacedRevisions: [],
+        preferredStyle: 'Adaptive'
+      };
+    }
   }
 
   static setPreferredStyle(userId: string, style: string): void {
