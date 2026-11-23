@@ -71,6 +71,7 @@ interface ProfileCenterProps {
   customization: UiCustomization;
   onUpdateCustomization: (updated: UiCustomization) => void;
   onShowToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  onOpenAdMarketingModal?: () => void;
 }
 
 const FEATURE_META: Record<string, { label: string; description: string; icon: any; color: string; bg: string }> = {
@@ -158,7 +159,8 @@ export default function ProfileCenter({
   onLanguageChange,
   customization,
   onUpdateCustomization,
-  onShowToast
+  onShowToast,
+  onOpenAdMarketingModal
 }: ProfileCenterProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'usage' | 'preferences' | 'account' | 'help'>('overview');
@@ -868,6 +870,31 @@ export default function ProfileCenter({
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
+
+                {/* Ad Campaign Hub Card */}
+                {onOpenAdMarketingModal && (
+                  <div className="p-3.5 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 flex items-center justify-between gap-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/35">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white">Ad & Marketing Campaign Hub</h4>
+                        <p className="text-[11px] text-indigo-300/80">YouTube Shorts & Instagram Reels ad scripts for Class 9-12 students</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        onOpenAdMarketingModal();
+                        playUiSound(soundMode);
+                      }}
+                      className="px-3 py-1.5 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-indigo-600/30 shrink-0"
+                    >
+                      <span>View Ads</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
 
                 {/* App Language Selector Row */}
                 <div className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800/80 flex items-center justify-between gap-3">

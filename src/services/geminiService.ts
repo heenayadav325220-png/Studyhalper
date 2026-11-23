@@ -622,6 +622,106 @@ export function cleanAndParseJson<T>(text: string, fallback: T): T {
   }
 }
 
+export async function getStudyAnswerStream(
+  prompt: string, 
+  imageBase64?: string | string[], 
+  studentContext?: { name: string; school: string; className: string; country?: string; memory?: any }, 
+  language: string = "English",
+  persona: 'default' | 'socratic' | 'debugger' | 'translator' | 'math' = 'default',
+  history?: { role: 'user' | 'model', text: string }[],
+  signal?: AbortSignal,
+  onChunk?: (chunk: string) => void
+): Promise<string> {
+  const cleanPrompt = typeof prompt === 'string' ? prompt : String(prompt || '');
+
+  const cleanHistory = Array.isArray(history) 
+    ? history.map(h => ({ role: h.role === 'user' ? ('user' as const) : ('model' as const), text: typeof h.text === 'string' ? h.text : String(h.text || '') }))
+    : undefined;
+
+  const imagesArray = Array.isArray(imageBase64)
+    ? imageBase64
+    : imageBase64
+    ? [imageBase64]
+    : [];
+
+  const response = await safeFetch("/api/gemini/answer-stream", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    signal,
+    body: JSON.stringify({ 
+      prompt: cleanPrompt, 
+      imageBase64: imagesArray.length === 1 ? imagesArray[0] : undefined,
+      imagesBase64: imagesArray,
+      studentContext, 
+      language, 
+      persona, 
+      history: cleanHistory 
+    }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      try {
+        const { auth, signInAnonymously } = await import("./firebase");
+        await signInAnonymously(auth);
+      } catch (e) {
+        // ignore
+      }
+      throw new Error("Please sign in again to use this feature (कृपया इस सुविधा का उपयोग करने के लिए फिर से साइन इन करें)");
+    }
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData?.error || errData?.message || `[HTTP ${response.status}] Failed to connect to AI stream`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const text = await response.text();
+    if (onChunk) onChunk(text);
+    return text;
+  }
+
+  const decoder = new TextDecoder();
+  let accumulatedText = "";
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        const dataStr = trimmed.slice(5).trim();
+        if (dataStr === "[DONE]") continue;
+        try {
+          const parsed = JSON.parse(dataStr);
+          if (parsed.text) {
+            accumulatedText += parsed.text;
+            if (onChunk) onChunk(parsed.text);
+          } else if (parsed.error) {
+            throw new Error(parsed.error);
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+  } catch (err: any) {
+    if (err?.name !== 'AbortError') {
+      console.warn("Stream reading error:", err);
+    }
+  }
+
+  return accumulatedText;
+}
+
 export async function getStudyAnswer(
   prompt: string, 
   imageBase64?: string | string[], 

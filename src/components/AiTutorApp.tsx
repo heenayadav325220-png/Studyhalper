@@ -51,7 +51,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const CodeHighlighter = SyntaxHighlighter as any;
-import { getStudyAnswer, currentQuotaUsage, AI_LIMITS } from '../services/geminiService';
+import { getStudyAnswerStream, currentQuotaUsage, AI_LIMITS } from '../services/geminiService';
 import { PersonalLearningService } from '../services/personalLearningService';
 import { exportConversationToPdf } from '../utils/pdfExport';
 import { showToast } from './Toast';
@@ -2100,26 +2100,40 @@ export const AiTutorApp = memo(function AiTutorApp({
           images: m.images || (m.image ? [m.image] : [])
         }));
 
-      const answer = await getStudyAnswer(
+      const msgId = 'msg_ai_' + Date.now();
+      const initialAiMsg: ChatMessage = {
+        id: msgId,
+        sender: 'ai',
+        text: '',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        subject: selectedSubject,
+        mode: tutorMode
+      };
+
+      setMessages((prev) => [...prev, initialAiMsg]);
+
+      let accumulated = "";
+      await getStudyAnswerStream(
         promptContext, 
         imagesToSend.length > 0 ? imagesToSend : undefined, 
         studentCtx, 
         selectedLanguage,
         'default',
         historyPayload,
-        controller.signal
+        controller.signal,
+        (chunk) => {
+          accumulated += chunk;
+          setMessages((prev) => 
+            prev.map(m => m.id === msgId ? { ...m, text: accumulated } : m)
+          );
+        }
       );
 
-      const aiMsg: ChatMessage = {
-        id: 'msg_ai_' + Date.now(),
-        sender: 'ai',
-        text: answer || 'I could not generate an answer right now. Please try asking again!',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        subject: selectedSubject,
-        mode: tutorMode
-      };
-
-      setMessages((prev) => [...prev, aiMsg]);
+      if (!accumulated) {
+        setMessages((prev) => 
+          prev.map(m => m.id === msgId ? { ...m, text: 'I could not generate an answer right now. Please try asking again!' } : m)
+        );
+      }
       
       // Clear local attached files
       setLocalAttachedFiles([]);

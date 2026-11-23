@@ -110,9 +110,7 @@ export async function executeAIRequest(
       requestConfig.config.systemInstruction = systemInstruction;
     }
 
-    if (primaryModel.startsWith("gemini-2.5-flash")) {
-      requestConfig.config.thinkingConfig = { thinkingBudget: context.thinkingBudget ?? 0 };
-    }
+
 
     // Build contents array supporting multimodal images if present
     let contents: any = promptContent;
@@ -163,6 +161,97 @@ export async function executeAIRequest(
       success: false,
       error: {
         code: err?.status || err?.code || "GEMINI_ERROR",
+        message: err?.message || String(err)
+      }
+    };
+  }
+}
+
+export async function executeAIRequestStream(
+  context: AIRequestContext,
+  promptOrParams: any,
+  onChunk: (text: string) => void
+): Promise<NormalizedAIResponse> {
+  const ai = getAiClient();
+  if (!ai) {
+    return {
+      success: false,
+      error: {
+        code: "CONFIG_ERROR",
+        message: "Gemini API key is not configured on the server."
+      }
+    };
+  }
+
+  try {
+    let promptContent = "";
+    let systemInstruction = context.systemInstruction;
+    let temperature = 0.7;
+    let imagesBase64: string[] = [];
+
+    if (typeof promptOrParams === "string") {
+      promptContent = promptOrParams;
+    } else if (promptOrParams && typeof promptOrParams === "object") {
+      promptContent = promptOrParams.contents || promptOrParams.prompt || "";
+      if (promptOrParams.config?.temperature !== undefined) {
+        temperature = promptOrParams.config.temperature;
+      }
+      if (promptOrParams.systemInstruction) {
+        systemInstruction = promptOrParams.systemInstruction;
+      }
+      if (promptOrParams.imagesBase64 && Array.isArray(promptOrParams.imagesBase64)) {
+        imagesBase64 = promptOrParams.imagesBase64;
+      } else if (promptOrParams.imageBase64) {
+        imagesBase64 = [promptOrParams.imageBase64];
+      }
+    }
+
+    const primaryModel = context.modelPreference || "gemini-2.5-flash";
+    const requestConfig: any = {
+      model: primaryModel,
+      config: { temperature }
+    };
+    if (systemInstruction) {
+      requestConfig.config.systemInstruction = systemInstruction;
+    }
+
+
+    let contents: any = promptContent;
+    if (imagesBase64.length > 0) {
+      contents = [
+        promptContent,
+        ...imagesBase64.map(b64 => ({
+          inlineData: {
+            data: b64.replace(/^data:image\/[a-z]+;base64,/, ''),
+            mimeType: 'image/jpeg'
+          }
+        }))
+      ];
+    }
+    requestConfig.contents = contents;
+
+    const responseStream = await ai.models.generateContentStream(requestConfig);
+    let fullText = "";
+    for await (const chunk of responseStream) {
+      const chunkText = chunk.text || "";
+      if (chunkText) {
+        fullText += chunkText;
+        onChunk(chunkText);
+      }
+    }
+
+    return {
+      success: true,
+      text: fullText,
+      provider: "gemini",
+      model: primaryModel
+    };
+  } catch (err: any) {
+    console.error("[Direct Gemini Stream Error]:", err);
+    return {
+      success: false,
+      error: {
+        code: err?.status || err?.code || "STREAM_ERROR",
         message: err?.message || String(err)
       }
     };

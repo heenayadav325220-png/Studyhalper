@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import { initializeGateway, executeAIRequest, getProviderHealth } from "./src/services/aiGateway.js";
+import { initializeGateway, executeAIRequest, executeAIRequestStream, getProviderHealth } from "./src/services/aiGateway.js";
 initializeGateway();
 
 import express from "express";
@@ -570,6 +570,108 @@ Make sure you write keywords like "PDF", "Notes", "Summary", "Formula Sheet", "P
     } catch (err: any) {
       console.error("[AI Tutor] All providers failed:", err?.message || err);
       res.status(503).json({ error: err?.message || "AI सेवा इस समय उपलब्ध नहीं है। कृपया थोड़ी देर बाद पुनः प्रयास करें।" });
+    }
+  });
+
+  // API Route: Real-Time Streaming AI Tutor Answer
+  app.post("/api/gemini/answer-stream", requireAuth, checkDailyLimit, rateLimitAi, async (req: AuthRequest, res) => {
+    try {
+      const { prompt, imageBase64, imagesBase64, studentContext, language, persona, history } = req.body;
+      if (!prompt && !imageBase64 && (!imagesBase64 || imagesBase64.length === 0)) {
+        res.status(400).json({ error: "Prompt or image is required." });
+        return;
+      }
+
+      const hasImages = (imageBase64 || (imagesBase64 && imagesBase64.length > 0));
+      const studentInfo = studentContext && studentContext.name ? `Addressing student: ${studentContext.name} (${studentContext.className || ''} ${studentContext.school || ''}).` : '';
+      
+      let studentMemoryContext = '';
+      if (studentContext && studentContext.memory) {
+        const m = studentContext.memory;
+        studentMemoryContext = `
+STUDENT ADAPTIVE MEMORY PROFILE:
+- Completed/Mastered Topics: ${Array.isArray(m.completedTopics) ? m.completedTopics.join(', ') : 'None yet'}
+- Weak Topics (Needs Work): ${Array.isArray(m.weakTopics) ? m.weakTopics.join(', ') : 'None yet'}
+- Spaced Revisions Pending: ${Array.isArray(m.spacedRevisions) ? m.spacedRevisions.join(', ') : 'None yet'}
+- Mistakes Pattern (Mistake Book): ${Array.isArray(m.recentMistakes) ? m.recentMistakes.join(', ') : 'No recorded mistakes'}
+- Preferred Explanation/Teaching Style: ${m.preferredStyle || 'Adaptive (Intuitive analogies first, then formal definitions)'}
+`;
+      }
+
+      const personaStyle = persona === 'socratic' 
+        ? 'Mode: SOCRATIC TEACHER - Guide with helpful probing questions before revealing full answers.' 
+        : persona === 'math' 
+        ? 'Mode: MATH WIZARD - Show ultra-precise mathematical steps and boxed answers.' 
+        : 'Mode: GENERAL TUTOR - Provide clear, intuitive, and structured explanations.';
+
+      const sysInstruction = `You are ASCEND AI TUTOR — an intelligent, calm, highly capable study partner who helps students genuinely understand subjects and become better at solving problems independently.
+${studentInfo} ${personaStyle}
+${studentMemoryContext}
+- Language requested: ${language === 'hi' ? 'Hindi (Devanagari script)' : language === 'Hinglish' ? 'Hinglish (mix of simple Hindi & English in Latin script)' : 'English'}.
+- NO COMPLIMENT FILLER / NO CONVERSATIONAL FLUFF: Never start responses with things like "Excellent choice!", "That's a fantastic question!". Open directly with the core concept or answer.`;
+
+      const contents: any[] = [];
+      if (history && Array.isArray(history) && history.length > 0) {
+        for (const msg of history) {
+          const parts: any[] = [{ text: msg.text || '' }];
+          const msgImages = Array.isArray(msg.images) ? msg.images : (msg.image ? [msg.image] : []);
+          for (const img of msgImages) {
+            if (!img || typeof img !== 'string') continue;
+            const mimeMatch = img.match(/^data:(image\/\w+);base64,/);
+            const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+            const cleanBase64 = img.replace(/^data:image\/\w+;base64,/, '');
+            parts.push({ inlineData: { mimeType, data: cleanBase64 } });
+          }
+          contents.push({ role: msg.role === 'user' ? 'user' : 'model', parts });
+        }
+      }
+
+      const currentParts: any[] = [{ text: prompt || 'Please explain.' }];
+      const allImages: string[] = [];
+      if (Array.isArray(imagesBase64) && imagesBase64.length > 0) {
+        allImages.push(...imagesBase64);
+      } else if (imageBase64) {
+        allImages.push(imageBase64);
+      }
+      for (const img of allImages) {
+        if (!img || typeof img !== 'string') continue;
+        const mimeMatch = img.match(/^data:(image\/\w+);base64,/);
+        const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+        const cleanBase64 = img.replace(/^data:image\/\w+;base64,/, '');
+        currentParts.push({ inlineData: { mimeType, data: cleanBase64 } });
+      }
+      contents.push({ role: 'user', parts: currentParts });
+
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      const result = await executeAIRequestStream({
+        modality: hasImages ? "image" : "text",
+        requiresVision: !!hasImages,
+        preferredProvider: "gemini",
+        modelPreference: "gemini-2.5-flash",
+        systemInstruction: sysInstruction,
+        thinkingBudget: 512
+      }, {
+        contents
+      }, (chunkText) => {
+        res.write(`data: ${JSON.stringify({ text: chunkText })}\n\n`);
+      });
+
+      if (!result.success) {
+        res.write(`data: ${JSON.stringify({ error: result.error?.message || "Stream error" })}\n\n`);
+      }
+      res.write('data: [DONE]\n\n');
+      res.end();
+    } catch (err: any) {
+      console.error("[AI Tutor Stream] Error:", err?.message || err);
+      if (!res.headersSent) {
+        res.status(503).json({ error: err?.message || "AI stream service unavailable." });
+      } else {
+        res.write(`data: ${JSON.stringify({ error: err?.message || "Stream terminated" })}\n\n`);
+        res.end();
+      }
     }
   });
 

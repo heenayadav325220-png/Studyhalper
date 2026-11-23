@@ -39,6 +39,7 @@ import {
   Music
 } from 'lucide-react';
 import { MusicPlayerModal } from './components/MusicPlayerModal';
+import { AdMarketingHub } from './components/AdMarketingHub';
 
 // Real Lazy Loading / Dynamic Code Splitting for heavy secondary modules
 const InteractiveToolkit = React.lazy(() => import('./components/InteractiveToolkit'));
@@ -423,6 +424,7 @@ export default function App() {
   });
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [showProfileCenter, setShowProfileCenter] = useState(false);
+  const [showAdMarketingModal, setShowAdMarketingModal] = useState(false);
   const [quotaUsage, setQuotaUsage] = useState(currentQuotaUsage);
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
 
@@ -4155,6 +4157,19 @@ export default function App() {
           customization={uiCustomization}
           onUpdateCustomization={handleUpdateCustomization}
           onShowToast={(msg, type) => showToast(msg, type || 'info')}
+          onOpenAdMarketingModal={() => {
+            setShowProfileCenter(false);
+            setShowAdMarketingModal(true);
+          }}
+        />
+      )}
+
+      {/* AD & MARKETING CAMPAIGN HUB MODAL */}
+      {showAdMarketingModal && (
+        <AdMarketingHub
+          isOpen={showAdMarketingModal}
+          onClose={() => setShowAdMarketingModal(false)}
+          appLanguage={appLanguage}
         />
       )}
 
