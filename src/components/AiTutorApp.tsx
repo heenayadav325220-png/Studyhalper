@@ -775,6 +775,7 @@ const UserChatMessageItem: React.FC<UserChatMessageItemProps> = memo(({
 interface AiChatMessageItemProps {
   msg: ChatMessage;
   isLatest: boolean;
+  isLoading: boolean;
   tutorFontStyle: 'classic' | 'modern';
   appLanguage: Language;
   isPdf: boolean;
@@ -793,6 +794,7 @@ interface AiChatMessageItemProps {
 const AiChatMessageItem: React.FC<AiChatMessageItemProps> = memo(({
   msg,
   isLatest,
+  isLoading,
   tutorFontStyle,
   appLanguage,
   isPdf,
@@ -874,11 +876,12 @@ const AiChatMessageItem: React.FC<AiChatMessageItemProps> = memo(({
         )}
 
         {/* Professional Action Suite */}
-        <div className="bg-transparent px-0 pt-1 pb-1 flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center space-x-1">
-            <button
-              type="button"
-              onClick={() => onCopy(msg.id, msg.text)}
+        {(!isLatest || !isLoading) && !!msg.text && msg.text.trim() !== '' && (
+          <div className="bg-transparent px-0 pt-1 pb-1 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center space-x-1">
+              <button
+                type="button"
+                onClick={() => onCopy(msg.id, msg.text)}
               title="Copy answer"
               className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 rounded-md transition cursor-pointer active:scale-90"
               aria-label="Copy answer"
@@ -944,6 +947,7 @@ const AiChatMessageItem: React.FC<AiChatMessageItemProps> = memo(({
             </button>
           </div>
         </div>
+        )}
 
       </div>
     </motion.div>
@@ -3050,6 +3054,7 @@ export const AiTutorApp = memo(function AiTutorApp({
                   key={msg.id}
                   msg={msg}
                   isLatest={isLatest}
+                  isLoading={isLoading}
                   tutorFontStyle={tutorFontStyle}
                   appLanguage={appLanguage}
                   isPdf={isPdfMaterial(msg.text)}
